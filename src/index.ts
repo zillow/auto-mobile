@@ -1178,7 +1178,10 @@ async function main() {
 
     if (daemonCommand) {
       await runDaemonCommand(daemonCommand, daemonArgs);
-      return;
+      // Exit explicitly after daemon command completes to prevent process from hanging
+      // Same issue as CLI mode - event loop may have pending operations
+      logger.close();
+      process.exit(0);
     }
 
     if (cliMode) {

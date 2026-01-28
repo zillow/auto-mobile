@@ -138,7 +138,13 @@ fun StorageDashboard(
                 databases = databases,
                 modifier = Modifier.fillMaxSize()
             )
-            StorageTab.KeyValue -> KeyValueInspector(modifier = Modifier.fillMaxSize())
+            StorageTab.KeyValue -> KeyValueInspector(
+                keyValueFiles = when (dataSourceMode) {
+                    DataSourceMode.Fake -> StorageMockData.keyValueFiles
+                    DataSourceMode.Real -> emptyList()
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }

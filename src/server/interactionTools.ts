@@ -27,7 +27,7 @@ import {
 } from "../models";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
-import { createJSONToolResponse } from "../utils/toolUtils";
+import { createJSONToolResponse, createStructuredToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 import { resolveSwipeDirection } from "../utils/swipeOnUtils";
 import { RecompositionTracker } from "../features/performance/RecompositionTracker";
@@ -1512,7 +1512,7 @@ export function registerInteractionTools() {
       ? `${searchStats.changeCount} view hierarchy changes over ${searchStats.requestCount} requests within ${searchStats.durationMs}ms`
       : undefined;
 
-    return createJSONToolResponse({
+    return createStructuredToolResponse({
       message: searchSummary ? `Tapped on element (${searchSummary})` : "Tapped on element",
       observation: result.observation,
       ...result
@@ -1795,7 +1795,7 @@ export function registerInteractionTools() {
     });
 
     if (resolved.error) {
-      return createJSONToolResponse({
+      return createStructuredToolResponse({
         message: resolved.error,
         success: false,
         error: resolved.error
@@ -1854,7 +1854,7 @@ export function registerInteractionTools() {
       message = `${message} Warning: ${result.warning}`;
     }
 
-    return createJSONToolResponse({
+    return createStructuredToolResponse({
       message,
       ...result
     });

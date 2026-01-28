@@ -1,6 +1,7 @@
 ---
 name: automobile-playground-discover-screens
 description: Comprehensive test of AutoMobile Playground discover screens with playful robot-themed interactions
+appId: "dev.jasonpearson.automobile.playground"
 steps:
   - tool: rotate
     orientation: portrait
@@ -11,7 +12,7 @@ steps:
     label: Stop the AutoMobile playground app
 
   - tool: openLink
-    url: "automobile:playground/discover"
+    url: "automobile://playground/discover"
 
   - tool: tapOn
     text: "Tap"
@@ -33,12 +34,6 @@ steps:
     action: "tap"
     label: Navigate to Swipe screen
 
-  - tool: swipeOnScreen
-    direction: left
-    duration: 500
-    includeSystemInsets: false
-    label: Perform left swipe gesture
-
   - tool: tapOn
     text: "Media"
     action: "tap"
@@ -49,9 +44,19 @@ steps:
     action: "tap"
     label: Play AutoMobile Promo video
 
+  - tool: observe
+    waitFor:
+      text: "AutoMobile"
+      timeout: 1000
+
   - tool: pressButton
     button: back
     label: Return from video player
+
+  - tool: observe
+    waitFor:
+      text: "Text"
+      timeout: 1000
 
   - tool: tapOn
     text: "Text"
@@ -80,6 +85,11 @@ steps:
     action: "tap"
     label: Navigate to Chat screen
 
+  - tool: observe
+    waitFor:
+      text: "What do you want to say?"
+      timeout: 500
+
   - tool: tapOn
     text: "What do you want to say?"
     action: "tap"
@@ -106,10 +116,3 @@ steps:
   - tool: terminateApp
     appId: dev.jasonpearson.automobile.playground
     label: Stop the AutoMobile playground app
-
-  - tool: openLink
-    url: "automobile:playground/slides/${slide}"
-
-  - tool: rotate
-    orientation: landscape
-    label: Rotate screen to landscape mode

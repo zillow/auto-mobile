@@ -1,0 +1,68 @@
+---
+name: automobile-camera-app-demo
+description: Camera App demo
+
+steps:
+  - tool: launchApp
+    appId: "com.android.camera2"
+    coldBoot: true
+
+  - tool: observe
+    waitFor:
+      elementId: "com.android.camera2:id/shutter_button"
+      timeout: 1500
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/shutter_button"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/mode_options_toggle"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/camera_toggle_button"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/shutter_button"
+
+  - tool: observe
+    waitFor:
+      elementId: "com.android.camera2:id/rounded_thumbnail_view"
+      timeout: 500
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/rounded_thumbnail_view"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/filmstrip_bottom_control_edit"
+
+  - tool: tapOn
+    action: "tap"
+    text: "Markup"
+
+  - tool: tapOn
+    action: "tap"
+    id: "android:id/button_once"
+
+  - tool: tapOn
+    action: "tap"
+    text: "Markup"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.google.android.markup:id/save"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.camera2:id/filmstrip_bottom_control_share"
+
+  - tool: pressButton
+    button: "back"
+
+  - tool: terminateApp
+    appId: "com.android.camera2"

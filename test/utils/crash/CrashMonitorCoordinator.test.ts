@@ -136,7 +136,7 @@ describe("CrashMonitorCoordinator", () => {
   describe("event listeners", () => {
     test("should notify crash listeners when crash detected", async () => {
       const receivedCrashes: CrashEvent[] = [];
-      coordinator.addCrashListener((crash) => {
+      coordinator.addCrashListener(crash => {
         receivedCrashes.push(crash);
       });
 
@@ -151,7 +151,7 @@ describe("CrashMonitorCoordinator", () => {
 
     test("should notify ANR listeners when ANR detected", async () => {
       const receivedAnrs: AnrEvent[] = [];
-      coordinator.addAnrListener((anr) => {
+      coordinator.addAnrListener(anr => {
         receivedAnrs.push(anr);
       });
 

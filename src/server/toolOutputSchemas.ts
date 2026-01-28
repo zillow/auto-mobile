@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// Android accessibility returns boolean attributes as strings ("true"/"false")
+// This schema accepts both for compatibility
+const booleanOrString = z.union([z.boolean(), z.literal("true"), z.literal("false")]).optional();
+
 export const elementBoundsSchema = z.object({
   left: z.number().int(),
   top: z.number().int(),
@@ -16,15 +20,15 @@ export const elementSchema = z.object({
   "content-desc": z.string().optional(),
   "class": z.string().optional(),
   "package": z.string().optional(),
-  "checkable": z.boolean().optional(),
-  "checked": z.boolean().optional(),
-  "clickable": z.boolean().optional(),
-  "enabled": z.boolean().optional(),
-  "focusable": z.boolean().optional(),
-  "focused": z.boolean().optional(),
-  "accessibility-focused": z.boolean().optional(),
-  "scrollable": z.boolean().optional(),
-  "selected": z.boolean().optional()
+  "checkable": booleanOrString,
+  "checked": booleanOrString,
+  "clickable": booleanOrString,
+  "enabled": booleanOrString,
+  "focusable": booleanOrString,
+  "focused": booleanOrString,
+  "accessibility-focused": booleanOrString,
+  "scrollable": booleanOrString,
+  "selected": booleanOrString
 }).passthrough();
 
 export const selectedElementStateSchema = z.object({

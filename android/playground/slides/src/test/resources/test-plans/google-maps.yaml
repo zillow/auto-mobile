@@ -1,0 +1,27 @@
+---
+name: automobile-google-maps-demo
+description: Google Maps demo
+
+steps:
+  - tool: launchApp
+    appId: "com.google.android.apps.maps"
+    coldBoot: true
+
+  - tool: pinchOn
+    direction: "in"
+    scale: 0.3
+
+  - tool: tapOn
+    action: "tap"
+    text: "Search here"
+
+  - tool: inputText
+    text: "New York City"
+
+  - tool: imeAction
+    action: "search"
+
+  - tool: observe
+    waitFor:
+      text: "Newark"
+      timeout: 3000

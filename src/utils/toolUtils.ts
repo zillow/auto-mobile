@@ -91,6 +91,27 @@ export class DefaultToolResponseFormatter implements ToolResponseFormatter {
 export const createJSONToolResponse = DefaultToolResponseFormatter.createJSONToolResponse;
 export const createImageToolResponse = DefaultToolResponseFormatter.createImageToolResponse;
 
+/**
+ * Creates a structured tool response for tools with outputSchema.
+ * MCP tools with outputSchema must return structuredContent.
+ * @param content The structured data that matches the tool's outputSchema
+ * @returns A properly formatted tool response with both content and structuredContent
+ */
+export const createStructuredToolResponse = (content: any): {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: any;
+} => {
+  return {
+    content: [
+      {
+        type: "text",
+        text: stringifyToolResponse(content)
+      }
+    ],
+    structuredContent: content
+  };
+};
+
 export const throwIfAborted = (signal?: AbortSignal): void => {
   if (signal?.aborted) {
     throw new Error(OPERATION_CANCELLED_MESSAGE);

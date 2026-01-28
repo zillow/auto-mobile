@@ -46,12 +46,13 @@ import org.jetbrains.jewel.ui.component.Text
  */
 @Composable
 fun KeyValueInspector(
+    keyValueFiles: List<KeyValueFile>,
     modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
 
     // State
-    var selectedFile by remember { mutableStateOf(StorageMockData.keyValueFiles.firstOrNull()) }
+    var selectedFile by remember(keyValueFiles) { mutableStateOf(keyValueFiles.firstOrNull()) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedEntry by remember { mutableStateOf<KeyValueEntry?>(null) }
     var editingEntry by remember { mutableStateOf<KeyValueEntry?>(null) }
@@ -91,7 +92,7 @@ fun KeyValueInspector(
 
             // File list
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(StorageMockData.keyValueFiles) { file ->
+                items(keyValueFiles) { file ->
                     val isSelected = file == selectedFile
 
                     Row(

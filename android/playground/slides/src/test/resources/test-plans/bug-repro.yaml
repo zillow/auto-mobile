@@ -1,0 +1,57 @@
+---
+name: automobile-playground-bug-repro-demo
+description: Demonstrate reproducing a bug
+
+steps:
+  - tool: terminateApp
+    appId: dev.jasonpearson.automobile.playground
+    label: Stop the AutoMobile playground app
+
+  - tool: openLink
+    url: "automobile://playground/demos/bugs/repro"
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_toggle"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: highlight
+    action: "tap"
+    text: "Displayed"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_reset"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_toggle"
+
+  - tool: tapOn
+    action: "tap"
+    id: "bug_repro_add"
+
+  - tool: terminateApp
+    appId: "dev.jasonpearson.automobile.playground"

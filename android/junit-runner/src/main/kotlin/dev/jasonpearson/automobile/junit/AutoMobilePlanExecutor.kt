@@ -14,12 +14,135 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Test
 
 /**
  * Internal executor class that handles the actual execution of AutoMobile plans with parameter
  * substitution and daemon socket integration.
  */
 internal object AutoMobilePlanExecutor {
+
+  /** Detected test context from stack trace inspection. */
+  private data class TestContext(val className: String, val methodName: String)
+
+  /**
+   * Detect the calling test class and method from the current stack trace. Looks for methods
+   * annotated with @Test by inspecting the call stack.
+   */
+  private fun detectTestContext(): TestContext? {
+    val stackTrace = Thread.currentThread().stackTrace
+
+    for (element in stackTrace) {
+      // Skip internal classes
+      if (
+          element.className.startsWith("java.") ||
+              element.className.startsWith("kotlin.") ||
+              element.className.startsWith("jdk.") ||
+              element.className.startsWith("sun.") ||
+              element.className.contains("AutoMobilePlan")
+      ) {
+        continue
+      }
+
+      try {
+        val clazz = Class.forName(element.className)
+        val methods = clazz.declaredMethods
+
+        for (method in methods) {
+          if (method.name == element.methodName && method.isAnnotationPresent(Test::class.java)) {
+            // Found a @Test annotated method in the call stack
+            val simpleClassName = clazz.simpleName
+            return TestContext(simpleClassName, method.name)
+          }
+        }
+      } catch (_: ClassNotFoundException) {
+        // Class not found, skip
+      } catch (_: NoClassDefFoundError) {
+        // Class definition error, skip
+      }
+    }
+
+    return null
+  }
+
+  /** Build test metadata JSON object for the daemon request. */
+  private fun buildTestMetadata(testContext: TestContext): JsonObject {
+    val metadata =
+        mutableMapOf<String, JsonElement>(
+            "testClass" to JsonPrimitive(testContext.className),
+            "testMethod" to JsonPrimitive(testContext.methodName),
+            "isCi" to JsonPrimitive(resolveCiMode()),
+        )
+
+    // Add optional metadata if available
+    val appVersion = firstNonBlank(
+        System.getProperty("automobile.app.version", ""),
+        System.getenv("AUTOMOBILE_APP_VERSION"),
+        System.getenv("APP_VERSION"),
+    )
+    if (appVersion != null) {
+      metadata["appVersion"] = JsonPrimitive(appVersion)
+    }
+
+    val gitCommit = firstNonBlank(
+        System.getProperty("automobile.git.commit", ""),
+        System.getenv("AUTOMOBILE_GIT_COMMIT"),
+        System.getenv("GITHUB_SHA"),
+        System.getenv("GIT_COMMIT"),
+        System.getenv("CI_COMMIT_SHA"),
+    )
+    if (gitCommit != null) {
+      metadata["gitCommit"] = JsonPrimitive(gitCommit)
+    }
+
+    val targetSdk = firstNonBlank(
+        System.getProperty("automobile.android.targetSdk", ""),
+        System.getProperty("automobile.targetSdk", ""),
+        System.getenv("AUTOMOBILE_TARGET_SDK"),
+        System.getenv("ANDROID_TARGET_SDK"),
+    )?.toIntOrNull()
+    if (targetSdk != null) {
+      metadata["targetSdk"] = JsonPrimitive(targetSdk)
+    }
+
+    val jdkVersion = firstNonBlank(
+        System.getProperty("java.version"),
+        System.getProperty("java.runtime.version"),
+    )
+    if (jdkVersion != null) {
+      metadata["jdkVersion"] = JsonPrimitive(jdkVersion)
+    }
+
+    val jvmTarget = firstNonBlank(
+        System.getProperty("kotlin.jvm.target"),
+        System.getProperty("java.specification.version"),
+    )
+    if (jvmTarget != null) {
+      metadata["jvmTarget"] = JsonPrimitive(jvmTarget)
+    }
+
+    val gradleVersion = firstNonBlank(
+        System.getProperty("org.gradle.version"),
+        System.getProperty("gradle.version"),
+    )
+    if (gradleVersion != null) {
+      metadata["gradleVersion"] = JsonPrimitive(gradleVersion)
+    }
+
+    return JsonObject(metadata)
+  }
+
+  private fun resolveCiMode(): Boolean {
+    if (System.getProperty("automobile.ci.mode", "false").toBoolean()) {
+      return true
+    }
+    val envValue = System.getenv("CI") ?: return false
+    return envValue.equals("true", ignoreCase = true) || envValue == "1"
+  }
+
+  private fun firstNonBlank(vararg values: String?): String? {
+    return values.firstOrNull { !it.isNullOrBlank() }
+  }
 
   /** Execute an AutoMobile plan with parameter substitution. */
   fun execute(
@@ -159,6 +282,12 @@ internal object AutoMobilePlanExecutor {
 
     if (options.device != "auto") {
       args["deviceId"] = JsonPrimitive(options.device)
+    }
+
+    // Detect calling test context and include metadata for test run recording
+    val testContext = detectTestContext()
+    if (testContext != null) {
+      args["testMetadata"] = buildTestMetadata(testContext)
     }
 
     if (options.debugMode) {

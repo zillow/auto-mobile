@@ -1,0 +1,80 @@
+---
+name: automobile-youtube-search-demo
+description: YouTube Search demo
+
+steps:
+  - tool: launchApp
+    appId: "com.android.chrome"
+    coldBoot: true
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.chrome:id/tab_switcher_button"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.chrome:id/menu_button"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.chrome:id/close_all_tabs_menu_id"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.chrome:id/positive_button"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.chrome:id/toolbar_action_button"
+
+  - tool: tapOn
+    action: "tap"
+    id: "com.android.chrome:id/search_box_text"
+
+  - tool: inputText
+    text: "https://m.youtube.com"
+    imeAction: "go"
+
+  - tool: observe
+    waitFor:
+      text: "Try searching to get started"
+      timeout: 2000
+
+  - tool: tapOn
+    action: "tap"
+    text: "Search YouTube"
+
+  - tool: inputText
+    text: "Droidcon NYC 2025 AutoMobile"
+    imeAction: "go"
+
+  - tool: observe
+    waitFor:
+      text: "AutoMobile - Jason Pearson | droidcon New York 2025"
+      timeout: 2000
+
+  - tool: swipeOn
+    direction: up
+    lookFor:
+      text: "AutoMobile - Jason Pearson | droidcon New York 2025"
+
+  - tool: tapOn
+    action: "tap"
+    text: "AutoMobile - Jason Pearson | droidcon New York 2025"
+
+  - tool: observe
+    waitFor:
+      text: "Skip"
+      timeout: 6000
+
+  - tool: tapOn
+    action: "tap"
+    text: "Skip"
+
+  - tool: observe
+    waitFor:
+      text: "AutoMobile - Jason Pearson | droidcon New York 2025"
+      timeout: 20000
+
+  - tool: terminateApp
+    appId: "com.android.chrome"

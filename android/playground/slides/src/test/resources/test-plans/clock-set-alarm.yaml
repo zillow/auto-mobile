@@ -1,6 +1,8 @@
 ---
 name: clock-set-alarm
 description: Set demo mode to 8pm and create 7:30 AM alarm in Clock app
+appId: "com.google.android.deskclock"
+
 steps:
   - tool: launchApp
     appId: com.google.android.deskclock
@@ -25,6 +27,11 @@ steps:
   - tool: tapOn
     text: "30"
     label: Select 30 for minutes
+    action: "tap"
+
+  - tool: tapOn
+    text: "AM"
+    label: Select AM
     action: "tap"
 
   - tool: tapOn

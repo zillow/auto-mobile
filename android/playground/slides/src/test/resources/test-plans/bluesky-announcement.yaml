@@ -8,7 +8,7 @@ steps:
     orientation: portrait
     label: Orient device to portrait mode
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: dev.jasonpearson.automobile.playground
     label: Stop the AutoMobile playground app
 
@@ -91,7 +91,7 @@ steps:
   - tool: "tapOn"
     id: "composerPublishBtn"
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: dev.jasonpearson.automobile.playground
     label: Stop the AutoMobile playground app
 

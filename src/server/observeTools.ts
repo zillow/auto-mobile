@@ -4,7 +4,7 @@ import { ResourceRegistry } from "./resourceRegistry";
 import { RESOURCE_URIS } from "./observationResources";
 import { ActionableError } from "../models/ActionableError";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
-import { createJSONToolResponse, throwIfAborted } from "../utils/toolUtils";
+import { createJSONToolResponse, createStructuredToolResponse, throwIfAborted } from "../utils/toolUtils";
 import { BootedDevice, Element, ObserveResult, ViewHierarchyResult } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
@@ -260,7 +260,7 @@ export function registerObserveTools() {
       ]);
 
       if (waitOutcome) {
-        return createJSONToolResponse({
+        return createStructuredToolResponse({
           ...result,
           awaitedElement: waitOutcome.awaitedElement,
           awaitDuration: waitOutcome.awaitDuration,
@@ -268,7 +268,7 @@ export function registerObserveTools() {
         });
       }
 
-      return createJSONToolResponse(result);
+      return createStructuredToolResponse(result);
     } catch (error) {
       throw new ActionableError(`Failed to execute observe: ${error}`);
     }

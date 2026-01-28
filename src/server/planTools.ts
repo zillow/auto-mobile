@@ -3,7 +3,7 @@ import { ToolRegistry } from "./toolRegistry";
 import { ActionableError, BootedDevice, ExecutePlanResult } from "../models";
 import { importPlanFromYaml, executePlan } from "../utils/planUtils";
 import { logger } from "../utils/logger";
-import { createJSONToolResponse } from "../utils/toolUtils";
+import { createStructuredToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 import { TestExecutionRepository, TestExecutionStatus, TestStepRecord } from "../db/testExecutionRepository";
 import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
@@ -152,6 +152,7 @@ const executePlanTool = async (device: BootedDevice, params: {
     options?: {
       steps?: TestStepRecord[];
       errorMessage?: string;
+      videoPath?: string;
     }
   ) => {
     if (!params.testMetadata) {
@@ -178,6 +179,7 @@ const executePlanTool = async (device: BootedDevice, params: {
         sessionUuid: params.sessionUuid,
         errorMessage: options?.errorMessage,
         steps: options?.steps,
+        videoPath: options?.videoPath,
       });
     } catch (error) {
       logger.warn(`Failed to record test execution timing: ${error}`);
@@ -373,6 +375,7 @@ const executePlanTool = async (device: BootedDevice, params: {
 
     // Execute the plan with device context, ensuring video recording is stopped in finally block
     let result;
+    let videoFilePath: string | undefined;
     try {
       logger.info(`[PERF +${Date.now() - perfStart}ms] Starting plan execution on device ${device.deviceId} (${device.platform})`);
       result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal, params.abortStrategy);
@@ -383,8 +386,9 @@ const executePlanTool = async (device: BootedDevice, params: {
       if (videoRecordingId) {
         try {
           logger.info(`[PERF +${Date.now() - perfStart}ms] Stopping automatic video recording: ${videoRecordingId}`);
-          await stopVideoRecording(videoRecordingId);
-          logger.info(`[PERF +${Date.now() - perfStart}ms] Video recording stopped successfully`);
+          const stopResult = await stopVideoRecording(videoRecordingId);
+          videoFilePath = stopResult.metadata.filePath;
+          logger.info(`[PERF +${Date.now() - perfStart}ms] Video recording stopped successfully: ${videoFilePath}`);
         } catch (videoError) {
           logger.warn(`[PERF +${Date.now() - perfStart}ms] Failed to stop automatic video recording: ${videoError}`);
           // Don't throw - let the original result/error propagate
@@ -399,6 +403,7 @@ const executePlanTool = async (device: BootedDevice, params: {
     await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime, {
       steps,
       errorMessage,
+      videoPath: videoFilePath,
     });
 
     const response: ExecutePlanResult = {
@@ -413,7 +418,7 @@ const executePlanTool = async (device: BootedDevice, params: {
     };
 
     logger.info(`[PERF +${Date.now() - perfStart}ms] Returning from executePlanTool (deviceId=${device.deviceId})`);
-    return createJSONToolResponse(response);
+    return createStructuredToolResponse(response);
   } catch (error) {
     logger.error(`[PERF] Failed to execute plan: ${error}`);
 
@@ -431,7 +436,7 @@ const executePlanTool = async (device: BootedDevice, params: {
     };
 
     logger.info(`[PERF] Returning error from executePlanTool (deviceId=${device.deviceId})`);
-    return createJSONToolResponse(response);
+    return createStructuredToolResponse(response);
   }
 };
 

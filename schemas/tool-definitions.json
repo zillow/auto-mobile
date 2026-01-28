@@ -2068,31 +2068,139 @@
                     "type": "string"
                   },
                   "checkable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "checked": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "clickable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "enabled": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "focusable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "focused": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "accessibility-focused": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "scrollable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "selected": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -2164,31 +2272,139 @@
                     "type": "string"
                   },
                   "checkable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "checked": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "clickable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "enabled": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "focusable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "focused": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "accessibility-focused": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "scrollable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "selected": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -2260,31 +2476,139 @@
                     "type": "string"
                   },
                   "checkable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "checked": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "clickable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "enabled": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "focusable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "focused": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "accessibility-focused": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "scrollable": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   },
                   "selected": {
-                    "type": "boolean"
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string",
+                        "const": "true"
+                      },
+                      {
+                        "type": "string",
+                        "const": "false"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -2458,31 +2782,139 @@
               "type": "string"
             },
             "checkable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "checked": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "clickable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "enabled": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focusable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "accessibility-focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "scrollable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "selected": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             }
           },
           "required": [
@@ -2551,31 +2983,139 @@
               "type": "string"
             },
             "checkable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "checked": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "clickable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "enabled": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focusable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "accessibility-focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "scrollable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "selected": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             }
           },
           "required": [
@@ -2667,31 +3207,139 @@
               "type": "string"
             },
             "checkable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "checked": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "clickable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "enabled": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focusable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "accessibility-focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "scrollable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "selected": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             }
           },
           "required": [
@@ -3711,31 +4359,139 @@
               "type": "string"
             },
             "checkable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "checked": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "clickable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "enabled": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focusable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "accessibility-focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "scrollable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "selected": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             }
           },
           "required": [
@@ -3956,31 +4712,139 @@
                   "type": "string"
                 },
                 "checkable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "checked": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "clickable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "enabled": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focusable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "accessibility-focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "scrollable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "selected": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -4049,31 +4913,139 @@
                   "type": "string"
                 },
                 "checkable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "checked": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "clickable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "enabled": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focusable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "accessibility-focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "scrollable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "selected": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -4394,31 +5366,139 @@
               "type": "string"
             },
             "checkable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "checked": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "clickable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "enabled": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focusable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "accessibility-focused": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "scrollable": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             },
             "selected": {
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "const": "true"
+                },
+                {
+                  "type": "string",
+                  "const": "false"
+                }
+              ]
             }
           },
           "required": [
@@ -4586,31 +5666,139 @@
                   "type": "string"
                 },
                 "checkable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "checked": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "clickable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "enabled": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focusable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "accessibility-focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "scrollable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "selected": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -4679,31 +5867,139 @@
                   "type": "string"
                 },
                 "checkable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "checked": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "clickable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "enabled": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focusable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "accessibility-focused": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "scrollable": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 },
                 "selected": {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string",
+                      "const": "true"
+                    },
+                    {
+                      "type": "string",
+                      "const": "false"
+                    }
+                  ]
                 }
               },
               "required": [

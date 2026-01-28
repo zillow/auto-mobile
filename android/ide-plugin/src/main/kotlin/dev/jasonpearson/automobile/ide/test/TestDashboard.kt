@@ -1463,34 +1463,81 @@ private fun VideoPlayerWithTimeline(
     stepTimestamps: List<Pair<Long, Long>>,
 ) {
     val colors = JewelTheme.globalColors
+    val videoPath = testRun.videoPath
+
+    // Track the current frame and video dimensions
+    var videoAspectRatio by remember { mutableStateOf(9f / 16f) } // Default to portrait
+
+    // Keep track of the last successfully loaded frame
+    var lastLoadedFrame by remember { mutableStateOf<org.jetbrains.skia.Image?>(null) }
 
     Column {
-        // Video placeholder
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+        // Video display area
+        if (videoPath != null) {
+            // Extract frame at current time, or use last frame time if at end
+            val effectiveTimeMs = if (playbackTimeMs >= testRun.durationMs) {
+                // At end - show frame from slightly before end
+                (testRun.durationMs - 100L).coerceAtLeast(0L)
+            } else {
+                playbackTimeMs
+            }
+
+            val frameImage = remember(videoPath, effectiveTimeMs) {
+                extractVideoFrame(videoPath, effectiveTimeMs)
+            }
+
+            // Update last loaded frame and aspect ratio when we get a frame
+            frameImage?.let { img ->
+                lastLoadedFrame = img
+                videoAspectRatio = img.width.toFloat() / img.height.toFloat()
+            }
+
+            // Use current frame, or fall back to last loaded frame
+            val displayFrame = frameImage ?: lastLoadedFrame
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
             ) {
-                val currentStep = testRun.steps.getOrNull(currentStepIndex)
-                Text(
-                    currentStep?.screenName ?: "Video",
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.8f),
-                )
-                currentStep?.screenshotPath?.let {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Frame ${currentStepIndex + 1}/${testRun.steps.size}",
-                        fontSize = 10.sp,
-                        color = Color.White.copy(alpha = 0.5f),
+                if (displayFrame != null) {
+                    Image(
+                        bitmap = displayFrame.toComposeImageBitmap(),
+                        contentDescription = "Video frame",
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.FillWidth,
                     )
+                } else {
+                    // Loading state - show minimal placeholder (only shown initially)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "Loading...",
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.5f),
+                        )
+                    }
                 }
+            }
+        } else {
+            // No video available
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "No video recording",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.5f),
+                )
             }
         }
 
@@ -1533,12 +1580,34 @@ private fun VideoPlayerWithTimeline(
 
         Spacer(Modifier.height(4.dp))
 
-        // Time display
-        Text(
-            "${formatTime(playbackTimeMs)} / ${formatTime(testRun.durationMs.toLong())}",
-            fontSize = 10.sp,
-            color = colors.text.normal.copy(alpha = 0.5f),
-        )
+        // Time display and Open Video link
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${formatTime(playbackTimeMs)} / ${formatTime(testRun.durationMs.toLong())}",
+                fontSize = 10.sp,
+                color = colors.text.normal.copy(alpha = 0.5f),
+            )
+
+            if (videoPath != null) {
+                Link(
+                    text = "Open Video File",
+                    onClick = {
+                        try {
+                            val file = java.io.File(videoPath)
+                            if (file.exists()) {
+                                java.awt.Desktop.getDesktop().open(file)
+                            }
+                        } catch (e: Exception) {
+                            Logger.getInstance("VideoPlayer").warn("Failed to open video: ${e.message}")
+                        }
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -1919,5 +1988,73 @@ private fun ArtifactButton(label: String) {
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(label, fontSize = 12.sp)
+    }
+}
+
+// Cache for extracted video frames to avoid repeated ffmpeg calls
+private val frameCache = mutableMapOf<String, org.jetbrains.skia.Image?>()
+
+/**
+ * Extract a frame from the video at the specified time using ffmpeg.
+ * Returns null if extraction fails or ffmpeg is not available.
+ */
+private fun extractVideoFrame(videoPath: String, timeMs: Long): org.jetbrains.skia.Image? {
+    // Create cache key based on video path and time (rounded to nearest 500ms for efficiency)
+    val roundedTimeMs = (timeMs / 500) * 500
+    val cacheKey = "$videoPath:$roundedTimeMs"
+
+    // Return cached frame if available
+    frameCache[cacheKey]?.let { return it }
+
+    // Limit cache size
+    if (frameCache.size > 100) {
+        frameCache.clear()
+    }
+
+    return try {
+        val file = java.io.File(videoPath)
+        if (!file.exists()) {
+            frameCache[cacheKey] = null
+            return null
+        }
+
+        // Convert time to ffmpeg format (HH:MM:SS.mmm)
+        val seconds = timeMs / 1000.0
+        val timeStr = String.format("%.3f", seconds)
+
+        // Create temp file for the extracted frame
+        val tempFile = java.io.File.createTempFile("video_frame_", ".png")
+        tempFile.deleteOnExit()
+
+        // Use ffmpeg to extract a single frame
+        val process = ProcessBuilder(
+            "ffmpeg",
+            "-ss", timeStr,
+            "-i", videoPath,
+            "-vframes", "1",
+            "-y",
+            tempFile.absolutePath
+        )
+            .redirectErrorStream(true)
+            .start()
+
+        val exitCode = process.waitFor()
+        if (exitCode != 0 || !tempFile.exists() || tempFile.length() == 0L) {
+            tempFile.delete()
+            frameCache[cacheKey] = null
+            return null
+        }
+
+        // Load the image using Skia
+        val imageBytes = tempFile.readBytes()
+        tempFile.delete()
+
+        val image = org.jetbrains.skia.Image.makeFromEncoded(imageBytes)
+        frameCache[cacheKey] = image
+        image
+    } catch (e: Exception) {
+        Logger.getInstance("VideoPlayer").debug("Failed to extract video frame: ${e.message}")
+        frameCache[cacheKey] = null
+        null
     }
 }
