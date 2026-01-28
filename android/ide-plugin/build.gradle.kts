@@ -37,7 +37,7 @@ dependencies {
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
   }
   // Ktor client engine for MCP transport (CIO = Coroutine-based I/O)
-  implementation("io.ktor:ktor-client-cio:3.0.3") {
+  implementation("io.ktor:ktor-client-cio:3.4.0") {
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
   }
 
