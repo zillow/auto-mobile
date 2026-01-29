@@ -3,6 +3,7 @@ package dev.jasonpearson.automobile.sdk
 import android.content.Context
 import android.content.Intent
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
+import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -59,6 +60,7 @@ object AutoMobileSDK {
     RecompositionTracker.initialize(this.context!!)
     AutoMobileNotifications.initialize(this.context!!)
     DatabaseInspector.initialize(this.context!!)
+    SharedPreferencesInspector.initialize(this.context!!)
   }
 
   /**
