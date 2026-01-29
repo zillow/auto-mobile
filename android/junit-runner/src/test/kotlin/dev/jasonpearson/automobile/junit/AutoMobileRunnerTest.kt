@@ -1,6 +1,10 @@
 package dev.jasonpearson.automobile.junit
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
@@ -116,6 +120,109 @@ class AutoMobileRunnerTest {
     assertEquals("com.example.app", args["cleanupAppId"]?.jsonPrimitive?.content)
     assertEquals("true", args["cleanupClearAppData"]?.jsonPrimitive?.content)
   }
+
+  @Test
+  fun testParseDaemonToolResultIncludesFailedStepInfoInErrorMessage() {
+    val runner = AutoMobileRunner(TestTargetClass::class.java)
+
+    // Build a daemon response with failedStep info
+    val failedStepJson =
+        JsonObject(
+            mapOf(
+                "stepIndex" to JsonPrimitive(3),
+                "tool" to JsonPrimitive("tapOn"),
+                "error" to JsonPrimitive("Element \"Submit Button\" not found on screen"),
+                "device" to JsonPrimitive("emulator-5554"),
+            )
+        )
+    val resultPayload =
+        JsonObject(
+            mapOf(
+                "success" to JsonPrimitive(false),
+                "executedSteps" to JsonPrimitive(3),
+                "totalSteps" to JsonPrimitive(10),
+                "failedStep" to failedStepJson,
+                "error" to JsonPrimitive("Plan execution failed"),
+            )
+        )
+    val contentItem =
+        JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("text"),
+                "text" to JsonPrimitive(Json.encodeToString(JsonObject.serializer(), resultPayload)),
+            )
+        )
+    val daemonResult =
+        JsonObject(
+            mapOf(
+                "content" to JsonArray(listOf(contentItem)),
+            )
+        )
+
+    val parseResult =
+        runner.invokeParseDaemonToolResult(
+            id = "test-1",
+            type = "response",
+            success = true,
+            result = daemonResult,
+            error = null,
+            json = Json { ignoreUnknownKeys = true },
+        )
+
+    assertFalse("Parse result should indicate failure", parseResult.first)
+    val errorMessage = parseResult.second
+    assertTrue("Error should contain step index (1-based)", errorMessage.contains("step 4"))
+    assertTrue("Error should contain tool name", errorMessage.contains("tapOn"))
+    assertTrue(
+        "Error should contain error text",
+        errorMessage.contains("Element \"Submit Button\" not found on screen"),
+    )
+    assertTrue("Error should contain device", errorMessage.contains("emulator-5554"))
+    assertTrue("Error should contain step counts", errorMessage.contains("3/10"))
+  }
+
+  @Test
+  fun testParseDaemonToolResultFallsBackToErrorWhenNoFailedStep() {
+    val runner = AutoMobileRunner(TestTargetClass::class.java)
+
+    // Build a daemon response without failedStep info
+    val resultPayload =
+        JsonObject(
+            mapOf(
+                "success" to JsonPrimitive(false),
+                "executedSteps" to JsonPrimitive(5),
+                "totalSteps" to JsonPrimitive(10),
+                "error" to JsonPrimitive("Connection timeout"),
+            )
+        )
+    val contentItem =
+        JsonObject(
+            mapOf(
+                "type" to JsonPrimitive("text"),
+                "text" to JsonPrimitive(Json.encodeToString(JsonObject.serializer(), resultPayload)),
+            )
+        )
+    val daemonResult =
+        JsonObject(
+            mapOf(
+                "content" to JsonArray(listOf(contentItem)),
+            )
+        )
+
+    val parseResult =
+        runner.invokeParseDaemonToolResult(
+            id = "test-2",
+            type = "response",
+            success = true,
+            result = daemonResult,
+            error = null,
+            json = Json { ignoreUnknownKeys = true },
+        )
+
+    assertFalse("Parse result should indicate failure", parseResult.first)
+    val errorMessage = parseResult.second
+    assertTrue("Error should contain fallback message", errorMessage.contains("Connection timeout"))
+  }
 }
 
 /** Test target class with various AutoMobile test annotations. */
@@ -172,4 +279,46 @@ fun AutoMobileRunner.invokeBuildDaemonExecutePlanArgs(
   method.isAccessible = true
   return method.invoke(this, base64PlanContent, annotation, sessionUuid, testName, className)
       as JsonObject
+}
+
+fun AutoMobileRunner.invokeParseDaemonToolResult(
+    id: String,
+    type: String,
+    success: Boolean,
+    result: JsonElement?,
+    error: String?,
+    json: Json,
+): Pair<Boolean, String> {
+  // Find the DaemonResponse class and construct it via reflection (it's internal)
+  val daemonResponseClass =
+      Class.forName("dev.jasonpearson.automobile.junit.DaemonResponse")
+  val daemonResponseConstructor =
+      daemonResponseClass.getDeclaredConstructor(
+          String::class.java,
+          String::class.java,
+          Boolean::class.java,
+          JsonElement::class.java,
+          String::class.java,
+      )
+  daemonResponseConstructor.isAccessible = true
+  val response = daemonResponseConstructor.newInstance(id, type, success, result, error)
+
+  val method =
+      this::class
+          .java
+          .getDeclaredMethod(
+              "parseDaemonToolResult",
+              daemonResponseClass,
+              Json::class.java,
+          )
+  method.isAccessible = true
+  val parseResult = method.invoke(this, response, json)
+  // ParsedToolResult is a private data class, so use reflection to extract values
+  val successField = parseResult::class.java.getDeclaredField("success")
+  successField.isAccessible = true
+  val parseSuccess = successField.get(parseResult) as Boolean
+  val errorMessageField = parseResult::class.java.getDeclaredField("errorMessage")
+  errorMessageField.isAccessible = true
+  val errorMessage = errorMessageField.get(parseResult) as String
+  return Pair(parseSuccess, errorMessage)
 }

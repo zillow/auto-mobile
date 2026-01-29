@@ -895,7 +895,7 @@ public final class AutoMobilePlanExecutor {
             if result.success {
                 return result
             }
-            throw ExecutorError.executionFailed(result.error ?? "AutoMobile plan failed")
+            throw ExecutorError.executionFailed(buildFailureMessage(from: result))
         } catch let error as MCPClientError {
             PerfTimer.log("executeOnce ERROR: MCPClientError - \(error.description)")
             throw ExecutorError.mcpFailure(error.description)
@@ -987,6 +987,21 @@ public final class AutoMobilePlanExecutor {
             return mcpError.isRetryable
         }
         return true
+    }
+
+    private func buildFailureMessage(from result: ExecutePlanResult) -> String {
+        var message = ""
+        if let failedStep = result.failedStep {
+            message += "Test plan execution failed at step \(failedStep.stepIndex + 1) (\(failedStep.tool)):"
+            message += "\n  Error: \(failedStep.error)"
+            message += "\n  Executed: \(result.executedSteps)/\(result.totalSteps) steps"
+            if let device = failedStep.device {
+                message += "\n  Device: \(device)"
+            }
+        } else {
+            message = result.error ?? "AutoMobile plan failed"
+        }
+        return message
     }
 }
 

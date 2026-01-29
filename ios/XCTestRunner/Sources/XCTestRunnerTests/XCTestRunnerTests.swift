@@ -247,6 +247,101 @@ final class XCTestRunnerTests: XCTestCase {
         let observer = AutoMobileTestObserver.register()
         XCTAssertNotNil(observer)
     }
+
+    func testExecutePlanFailureIncludesFailedStepInfo() {
+        let planContent = "name: Fail Plan\nsteps:\n  - tool: tapOn\n    element: Submit Button"
+        let planLoader = FakePlanLoader(content: planContent)
+        let mcpClient = FakeMCPClient()
+        let timer = FakeTimer()
+
+        mcpClient.queueResponse(
+            success: false,
+            executedSteps: 3,
+            totalSteps: 10,
+            failedStep: (
+                stepIndex: 3,
+                tool: "tapOn",
+                error: "Element \"Submit Button\" not found on screen",
+                device: "iPhone-15-Pro"
+            ),
+            error: "Plan execution failed"
+        )
+
+        let config = AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+            planPath: "fail-plan.yaml",
+            retryCount: 0,
+            timeoutSeconds: 5,
+            retryDelaySeconds: 0,
+            startStep: 0,
+            parameters: [:],
+            cleanup: nil,
+            planBundle: nil
+        )
+
+        let executor = AutoMobilePlanExecutor(
+            configuration: config,
+            planLoader: planLoader,
+            mcpClient: mcpClient,
+            timer: timer,
+            logger: NullLogger()
+        )
+
+        XCTAssertThrowsError(try executor.execute(testMetadata: nil)) { error in
+            let errorDescription = String(describing: error)
+            XCTAssertTrue(errorDescription.contains("step 4"), "Error should contain step index (1-based)")
+            XCTAssertTrue(errorDescription.contains("tapOn"), "Error should contain tool name")
+            XCTAssertTrue(
+                errorDescription.contains("Element \"Submit Button\" not found on screen"),
+                "Error should contain error text"
+            )
+            XCTAssertTrue(errorDescription.contains("iPhone-15-Pro"), "Error should contain device")
+            XCTAssertTrue(errorDescription.contains("3/10"), "Error should contain step counts")
+        }
+    }
+
+    func testExecutePlanFailureFallsBackToErrorWhenNoFailedStep() {
+        let planContent = "name: Fail Plan\nsteps:\n  - tool: observe"
+        let planLoader = FakePlanLoader(content: planContent)
+        let mcpClient = FakeMCPClient()
+        let timer = FakeTimer()
+
+        mcpClient.queueResponse(
+            success: false,
+            executedSteps: 5,
+            totalSteps: 10,
+            failedStep: nil,
+            error: "Connection timeout"
+        )
+
+        let config = AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+            planPath: "fail-plan.yaml",
+            retryCount: 0,
+            timeoutSeconds: 5,
+            retryDelaySeconds: 0,
+            startStep: 0,
+            parameters: [:],
+            cleanup: nil,
+            planBundle: nil
+        )
+
+        let executor = AutoMobilePlanExecutor(
+            configuration: config,
+            planLoader: planLoader,
+            mcpClient: mcpClient,
+            timer: timer,
+            logger: NullLogger()
+        )
+
+        XCTAssertThrowsError(try executor.execute(testMetadata: nil)) { error in
+            let errorDescription = String(describing: error)
+            XCTAssertTrue(
+                errorDescription.contains("Connection timeout"),
+                "Error should contain fallback error message"
+            )
+        }
+    }
 }
 
 private struct FakePlanLoader: AutoMobilePlanLoading {
@@ -273,6 +368,37 @@ private final class FakeMCPClient: AutoMobileMCPClient {
             "executedSteps": executedSteps,
             "totalSteps": totalSteps,
         ]
+        let data = try? JSONSerialization.data(withJSONObject: payload, options: [])
+        let text = String(data: data ?? Data(), encoding: .utf8) ?? "{}"
+        queuedResults.append(.success(MCPToolResponse(text: text)))
+    }
+
+    func queueResponse(
+        success: Bool,
+        executedSteps: Int,
+        totalSteps: Int,
+        failedStep: (stepIndex: Int, tool: String, error: String, device: String?)?,
+        error: String?
+    ) {
+        var payload: [String: Any] = [
+            "success": success,
+            "executedSteps": executedSteps,
+            "totalSteps": totalSteps,
+        ]
+        if let failedStep = failedStep {
+            var failedStepDict: [String: Any] = [
+                "stepIndex": failedStep.stepIndex,
+                "tool": failedStep.tool,
+                "error": failedStep.error,
+            ]
+            if let device = failedStep.device {
+                failedStepDict["device"] = device
+            }
+            payload["failedStep"] = failedStepDict
+        }
+        if let error = error {
+            payload["error"] = error
+        }
         let data = try? JSONSerialization.data(withJSONObject: payload, options: [])
         let text = String(data: data ?? Data(), encoding: .utf8) ?? "{}"
         queuedResults.append(.success(MCPToolResponse(text: text)))
