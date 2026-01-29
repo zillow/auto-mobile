@@ -24,6 +24,7 @@ import {
   NavigationGraphNodeDetail,
   NavigationGraphNodeResource,
   NavigationGraphNodeResourceProvider,
+  NavigationSuggestionInfo,
   UIState,
   ScrollPosition,
   SelectedElement,
@@ -51,6 +52,7 @@ export type {
   NavigationGraphNodeDetail,
   NavigationGraphNodeResource,
   NavigationGraphNodeResourceProvider,
+  NavigationSuggestionInfo,
   UIState,
 };
 
@@ -85,6 +87,16 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   private readonly TOOL_CALL_CORRELATION_WINDOW_MS = 2000;
   // Keep tool calls for 10 seconds
   private readonly TOOL_CALL_HISTORY_TTL_MS = 10000;
+
+  // Active navigation window: fingerprints seen within this window of an SDK event are correlated
+  private readonly ACTIVE_NAVIGATION_WINDOW_MS = 1000;
+
+  // Track active navigation from SDK events for fingerprint correlation
+  private activeNavigation: {
+    nodeId: number;
+    screenName: string;
+    startTime: number;
+  } | null = null;
 
   private constructor() {
     this.repository = new NavigationRepository();
@@ -197,6 +209,7 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   /**
    * Record a navigation event from WebSocket.
    * If the event contains an applicationId, automatically sets/switches the current app.
+   * This creates a "named node" in the navigation graph.
    */
   public async recordNavigationEvent(event: NavigationEvent): Promise<void> {
     // Auto-set current app from navigation event if provided
@@ -227,6 +240,14 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
         timestamp
       );
     }
+
+    // Set active navigation state for fingerprint correlation
+    // Fingerprints seen within ACTIVE_NAVIGATION_WINDOW_MS will be correlated to this node
+    this.activeNavigation = {
+      nodeId: node.id,
+      screenName: screenName,
+      startTime: timestamp,
+    };
 
     // Get modal stack from the most recent tool call (if any)
     const recentToolCall = this.findCorrelatedToolCall(timestamp);
@@ -309,8 +330,11 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
 
   /**
    * Record a navigation event detected from view hierarchy changes.
-   * This is an alternative to SDK navigation events for apps without SDK integration.
-   * Uses the fingerprint hash as the screen name.
+   * This does NOT create new nodes - it only:
+   * 1. Updates existing nodes if fingerprint is already correlated
+   * 2. Correlates fingerprint if within active navigation window
+   * 3. Creates a suggestion if app has named nodes but fingerprint is uncorrelated
+   * 4. Does nothing if app has no named nodes (SDK not integrated)
    */
   public async recordHierarchyNavigation(event: HierarchyNavigationEvent): Promise<void> {
     // Auto-set current app from package name if provided
@@ -323,104 +347,84 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
       return;
     }
 
-    // Use a shortened fingerprint hash as the screen name for readability
-    const screenName = `screen_${event.toFingerprint.substring(0, 12)}`;
+    const fingerprintHash = event.toFingerprint;
+    const fingerprintData = event.fingerprintData || JSON.stringify({ hash: fingerprintHash });
     const timestamp = event.timestamp;
 
-    // Get or create node and update visit count
-    const node = await this.repository.getOrCreateNode(
-      this.currentAppId,
-      screenName,
-      timestamp
-    );
+    // Case 1: Check if fingerprint is already correlated to a named node (scoped to this app)
+    const existingNode = await this.repository.getNodeByFingerprint(this.currentAppId, fingerprintHash);
+    if (existingNode) {
+      // Update the existing node's visit count and last_seen_at
+      await this.repository.updateNodeVisit(existingNode.id, timestamp);
 
-    // Record node visit for test coverage if session is active
-    if (this.activeTestSession) {
-      await this.testCoverageRepository.recordNodeVisit(
-        this.activeTestSession.id,
-        node.id,
-        timestamp
-      );
-    }
-
-    // Get modal stack from the most recent tool call (if any)
-    const recentToolCall = this.findCorrelatedToolCall(timestamp);
-    const currentModalStack = recentToolCall?.uiState?.modalStack;
-
-    // Create edge from previous screen to current screen
-    const fromScreenName = event.fromFingerprint
-      ? `screen_${event.fromFingerprint.substring(0, 12)}`
-      : null;
-
-    if (fromScreenName && fromScreenName !== screenName) {
-      const interaction = this.findCorrelatedToolCall(timestamp);
-
-      const toolName = interaction?.toolName || null;
-      const toolArgs = interaction?.args || null;
-
-      const edge = await this.repository.createEdge(
-        this.currentAppId,
-        fromScreenName,
-        screenName,
-        toolName,
-        toolArgs,
-        timestamp
-      );
-
-      // Record edge traversal for test coverage if session is active
+      // Record node visit for test coverage if session is active
       if (this.activeTestSession) {
-        await this.testCoverageRepository.recordEdgeTraversal(
+        await this.testCoverageRepository.recordNodeVisit(
           this.activeTestSession.id,
-          edge.id,
+          existingNode.id,
           timestamp
         );
       }
 
-      // Store UI elements if present in interaction
-      if (interaction?.uiState?.selectedElements) {
-        await this.storeUIElements(
-          edge.id,
-          interaction.uiState.selectedElements,
-          timestamp
-        );
-      }
+      // Update current screen to the named screen
+      this.currentScreen = existingNode.screen_name;
 
-      // Store modal stacks for from/to
-      const fromNode = await this.repository.getNode(this.currentAppId, fromScreenName);
-      if (fromNode) {
-        const fromModals = await this.repository.getNodeModals(fromNode.id);
-        if (fromModals.length > 0) {
-          await this.repository.setEdgeModals(edge.id, "from", fromModals);
-        }
-      }
-
-      if (currentModalStack && currentModalStack.length > 0) {
-        const toModalIds = currentModalStack.map(
-          m => m.identifier || `${m.type}-${m.layer}`
-        );
-        await this.repository.setEdgeModals(edge.id, "to", toModalIds);
-      }
-
-      // Store scroll position if present
-      if (interaction?.uiState?.scrollPosition) {
-        await this.storeScrollPosition(
-          edge.id,
-          interaction.uiState.scrollPosition,
-          timestamp
-        );
-      }
-
-      logger.info(
-        `[NAVIGATION_GRAPH] Hierarchy navigation: ${fromScreenName} -> ${screenName}` +
-        (toolName ? ` (via ${toolName})` : " (no correlated tool call)")
+      logger.debug(
+        `[NAVIGATION_GRAPH] Hierarchy fingerprint matched node: ${existingNode.screen_name}`
       );
-    } else if (!fromScreenName) {
-      logger.info(`[NAVIGATION_GRAPH] Initial hierarchy screen: ${screenName}`);
+
+      await this.repository.touchApp(this.currentAppId);
+      this.notifyGraphUpdated();
+      return;
     }
 
-    this.currentScreen = screenName;
-    await this.repository.touchApp(this.currentAppId);
-    this.notifyGraphUpdated();
+    // Case 2: Check if within active navigation window - correlate fingerprint to active node
+    if (this.activeNavigation) {
+      const timeSinceNavigation = timestamp - this.activeNavigation.startTime;
+
+      if (timeSinceNavigation >= 0 && timeSinceNavigation <= this.ACTIVE_NAVIGATION_WINDOW_MS) {
+        // Correlate this fingerprint to the active named node (scoped to this app)
+        await this.repository.getOrCreateFingerprint(
+          this.currentAppId,
+          this.activeNavigation.nodeId,
+          fingerprintHash,
+          fingerprintData,
+          timestamp
+        );
+
+        logger.info(
+          `[NAVIGATION_GRAPH] Correlated fingerprint to ${this.activeNavigation.screenName} ` +
+          `(${timeSinceNavigation}ms after navigation)`
+        );
+
+        // Clear active navigation after correlation
+        this.activeNavigation = null;
+        return;
+      }
+    }
+
+    // Case 3: Check if app has named nodes - create suggestion
+    const hasNamedNodes = await this.repository.hasNamedNodes(this.currentAppId);
+    if (hasNamedNodes) {
+      // Add as a suggestion for future promotion
+      await this.repository.addOrUpdateSuggestion(
+        this.currentAppId,
+        fingerprintHash,
+        fingerprintData,
+        timestamp
+      );
+
+      logger.debug(
+        `[NAVIGATION_GRAPH] Added fingerprint suggestion: ${fingerprintHash.substring(0, 12)}...`
+      );
+      return;
+    }
+
+    // Case 4: App has no named nodes - do nothing
+    // This app doesn't have SDK integration yet, so we don't track hierarchy-only navigation
+    logger.debug(
+      `[NAVIGATION_GRAPH] Ignoring hierarchy navigation - app has no named nodes`
+    );
   }
 
   /**
@@ -1182,6 +1186,54 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   ): Promise<void> {
     await this.repository.updateNodeScreenshot(appId, screenName, screenshotPath);
     logger.debug(`[NAVIGATION_GRAPH] Updated screenshot for ${screenName}: ${screenshotPath}`);
+    this.notifyGraphUpdated();
+  }
+
+  /**
+   * Get unpromoted navigation suggestions for the current app.
+   * These are fingerprints that have been seen but not yet correlated to a named node.
+   */
+  public async getSuggestions(): Promise<NavigationSuggestionInfo[]> {
+    if (!this.currentAppId) {
+      return [];
+    }
+
+    const suggestions = await this.repository.getSuggestions(this.currentAppId);
+    return suggestions.map(s => ({
+      id: s.id,
+      fingerprintHash: s.fingerprint_hash,
+      fingerprintData: s.fingerprint_data,
+      firstSeenAt: s.first_seen_at,
+      lastSeenAt: s.last_seen_at,
+      occurrenceCount: s.occurrence_count,
+    }));
+  }
+
+  /**
+   * Promote a suggestion to a named node.
+   * Creates the node if it doesn't exist and correlates the fingerprint.
+   */
+  public async promoteSuggestion(suggestionId: number, screenName: string): Promise<void> {
+    if (!this.currentAppId) {
+      throw new Error("No current app set");
+    }
+
+    const timestamp = Date.now();
+
+    // Get or create the named node
+    const node = await this.repository.getOrCreateNode(
+      this.currentAppId,
+      screenName,
+      timestamp
+    );
+
+    // Promote the suggestion (creates fingerprint and links suggestion)
+    await this.repository.promoteSuggestion(suggestionId, node.id, timestamp);
+
+    logger.info(
+      `[NAVIGATION_GRAPH] Promoted suggestion ${suggestionId} to screen: ${screenName}`
+    );
+
     this.notifyGraphUpdated();
   }
 

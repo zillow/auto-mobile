@@ -12,6 +12,10 @@ import type {
   NewNodeModal,
   NewEdgeModal,
   NewScrollPosition,
+  NavigationNodeFingerprint,
+  NewNavigationNodeFingerprint,
+  NavigationSuggestion,
+  NewNavigationSuggestion,
 } from "./types";
 import { logger } from "../utils/logger";
 
@@ -758,7 +762,7 @@ export class NavigationRepository {
       .where("app_id", "=", appId)
       .execute();
 
-    // Delete nodes (cascade will delete node_modals)
+    // Delete nodes (cascade will delete node_modals and navigation_node_fingerprints)
     await db
       .deleteFrom("navigation_nodes")
       .where("app_id", "=", appId)
@@ -770,6 +774,265 @@ export class NavigationRepository {
       .where("app_id", "=", appId)
       .execute();
 
+    // Delete navigation suggestions for this app
+    await db
+      .deleteFrom("navigation_suggestions")
+      .where("app_id", "=", appId)
+      .execute();
+
     logger.info(`[NAV_REPO] Cleared graph data for app: ${appId}`);
+  }
+
+  // ==========================================
+  // Fingerprint and Suggestion Methods
+  // ==========================================
+
+  /**
+   * Get or create a fingerprint record for a node.
+   * Fingerprints are scoped per app to prevent cross-app collisions.
+   */
+  async getOrCreateFingerprint(
+    appId: string,
+    nodeId: number,
+    hash: string,
+    data: string,
+    timestamp: number
+  ): Promise<NavigationNodeFingerprint> {
+    const db = getDatabase();
+
+    // Check if fingerprint already exists for this app
+    const existing = await db
+      .selectFrom("navigation_node_fingerprints")
+      .selectAll()
+      .where("app_id", "=", appId)
+      .where("fingerprint_hash", "=", hash)
+      .executeTakeFirst();
+
+    if (existing) {
+      // Update last_seen_at and increment occurrence_count
+      await db
+        .updateTable("navigation_node_fingerprints")
+        .set({
+          last_seen_at: timestamp,
+          occurrence_count: existing.occurrence_count + 1,
+        })
+        .where("id", "=", existing.id)
+        .execute();
+
+      return {
+        ...existing,
+        last_seen_at: timestamp,
+        occurrence_count: existing.occurrence_count + 1,
+      };
+    }
+
+    // Create new fingerprint record
+    const newFingerprint: NewNavigationNodeFingerprint = {
+      app_id: appId,
+      node_id: nodeId,
+      fingerprint_hash: hash,
+      fingerprint_data: data,
+      first_seen_at: timestamp,
+      last_seen_at: timestamp,
+      occurrence_count: 1,
+    };
+
+    const result = await db
+      .insertInto("navigation_node_fingerprints")
+      .values(newFingerprint)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    logger.debug(
+      `[NAV_REPO] New fingerprint for node ${nodeId}: ${hash.substring(0, 12)}...`
+    );
+
+    return result;
+  }
+
+  /**
+   * Find a navigation node by fingerprint hash within a specific app.
+   * Fingerprints are scoped per app to prevent cross-app collisions.
+   */
+  async getNodeByFingerprint(appId: string, hash: string): Promise<NavigationNode | undefined> {
+    const db = getDatabase();
+
+    const fingerprint = await db
+      .selectFrom("navigation_node_fingerprints")
+      .select("node_id")
+      .where("app_id", "=", appId)
+      .where("fingerprint_hash", "=", hash)
+      .executeTakeFirst();
+
+    if (!fingerprint) {
+      return undefined;
+    }
+
+    return db
+      .selectFrom("navigation_nodes")
+      .selectAll()
+      .where("id", "=", fingerprint.node_id)
+      .executeTakeFirst();
+  }
+
+  /**
+   * Get all fingerprints associated with a node.
+   */
+  async getFingerprintsForNode(nodeId: number): Promise<NavigationNodeFingerprint[]> {
+    const db = getDatabase();
+    return db
+      .selectFrom("navigation_node_fingerprints")
+      .selectAll()
+      .where("node_id", "=", nodeId)
+      .execute();
+  }
+
+  /**
+   * Add or update a navigation suggestion (uncorrelated fingerprint).
+   */
+  async addOrUpdateSuggestion(
+    appId: string,
+    hash: string,
+    data: string,
+    timestamp: number
+  ): Promise<NavigationSuggestion> {
+    const db = getDatabase();
+
+    // Check if suggestion already exists for this app and hash
+    const existing = await db
+      .selectFrom("navigation_suggestions")
+      .selectAll()
+      .where("app_id", "=", appId)
+      .where("fingerprint_hash", "=", hash)
+      .executeTakeFirst();
+
+    if (existing) {
+      // Update last_seen_at and increment occurrence_count
+      await db
+        .updateTable("navigation_suggestions")
+        .set({
+          last_seen_at: timestamp,
+          occurrence_count: existing.occurrence_count + 1,
+        })
+        .where("id", "=", existing.id)
+        .execute();
+
+      return {
+        ...existing,
+        last_seen_at: timestamp,
+        occurrence_count: existing.occurrence_count + 1,
+      };
+    }
+
+    // Create new suggestion
+    const newSuggestion: NewNavigationSuggestion = {
+      app_id: appId,
+      fingerprint_hash: hash,
+      fingerprint_data: data,
+      first_seen_at: timestamp,
+      last_seen_at: timestamp,
+      occurrence_count: 1,
+      promoted_to_fingerprint_id: null,
+    };
+
+    const result = await db
+      .insertInto("navigation_suggestions")
+      .values(newSuggestion)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    logger.debug(
+      `[NAV_REPO] New suggestion for app ${appId}: ${hash.substring(0, 12)}...`
+    );
+
+    return result;
+  }
+
+  /**
+   * Promote a suggestion to a named node.
+   * Creates a fingerprint record for the node and links the suggestion.
+   */
+  async promoteSuggestion(
+    suggestionId: number,
+    nodeId: number,
+    timestamp: number
+  ): Promise<NavigationNodeFingerprint> {
+    const db = getDatabase();
+
+    // Get the suggestion
+    const suggestion = await db
+      .selectFrom("navigation_suggestions")
+      .selectAll()
+      .where("id", "=", suggestionId)
+      .executeTakeFirst();
+
+    if (!suggestion) {
+      throw new Error(`Suggestion not found: ${suggestionId}`);
+    }
+
+    // Create fingerprint record (using app_id from suggestion)
+    const fingerprint = await this.getOrCreateFingerprint(
+      suggestion.app_id,
+      nodeId,
+      suggestion.fingerprint_hash,
+      suggestion.fingerprint_data,
+      timestamp
+    );
+
+    // Link suggestion to fingerprint
+    await db
+      .updateTable("navigation_suggestions")
+      .set({ promoted_to_fingerprint_id: fingerprint.id })
+      .where("id", "=", suggestionId)
+      .execute();
+
+    logger.info(
+      `[NAV_REPO] Promoted suggestion ${suggestionId} to node ${nodeId}`
+    );
+
+    return fingerprint;
+  }
+
+  /**
+   * Check if an app has any named navigation nodes.
+   */
+  async hasNamedNodes(appId: string): Promise<boolean> {
+    const db = getDatabase();
+    const result = await db
+      .selectFrom("navigation_nodes")
+      .select(db.fn.countAll<number>().as("count"))
+      .where("app_id", "=", appId)
+      .executeTakeFirst();
+
+    return Number(result?.count || 0) > 0;
+  }
+
+  /**
+   * Get unpromoted suggestions for an app.
+   */
+  async getSuggestions(appId: string): Promise<NavigationSuggestion[]> {
+    const db = getDatabase();
+    return db
+      .selectFrom("navigation_suggestions")
+      .selectAll()
+      .where("app_id", "=", appId)
+      .where("promoted_to_fingerprint_id", "is", null)
+      .orderBy("occurrence_count", "desc")
+      .execute();
+  }
+
+  /**
+   * Update a node's visit count and last_seen_at without creating a new node.
+   */
+  async updateNodeVisit(nodeId: number, timestamp: number): Promise<void> {
+    const db = getDatabase();
+    await db
+      .updateTable("navigation_nodes")
+      .set(eb => ({
+        last_seen_at: timestamp,
+        visit_count: eb("visit_count", "+", 1),
+      }))
+      .where("id", "=", nodeId)
+      .execute();
   }
 }

@@ -61,6 +61,9 @@ export function getDatabase(): Kysely<DatabaseSchema> {
     // Enable WAL mode for better concurrent read performance
     sqliteDb.exec("PRAGMA journal_mode = WAL;");
 
+    // Enable foreign key enforcement for cascade deletes
+    sqliteDb.exec("PRAGMA foreign_keys = ON;");
+
     dbInstance = new Kysely<DatabaseSchema>({
       dialect: new BunSqliteDialect({
         database: sqliteDb,

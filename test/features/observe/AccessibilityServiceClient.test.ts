@@ -322,8 +322,13 @@ describe("AccessibilityServiceClient", function() {
         await resultPromise;
         await new Promise(resolve => setImmediate(resolve));
 
+        // With named-nodes-only feature, hierarchy updates alone don't create screens
+        // They only update screens when there's an active SDK navigation event
+        // or when the fingerprint is already correlated to a named node.
+        // The app ID is still set from the package name.
         expect(navManager.getCurrentAppId()).toBe("com.google.android.deskclock");
-        expect(navManager.getCurrentScreen()).not.toBeNull();
+        // Without SDK events (named nodes), currentScreen remains null
+        expect(navManager.getCurrentScreen()).toBeNull();
       } finally {
         await testClient.close();
         NavigationGraphManager.resetInstance();

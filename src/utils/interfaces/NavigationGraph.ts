@@ -286,10 +286,25 @@ export interface HierarchyNavigationEvent {
   fromFingerprint: string | null;
   /** Screen fingerprint of the destination screen */
   toFingerprint: string;
+  /** Full fingerprint data as JSON string */
+  fingerprintData?: string;
   /** Timestamp when the navigation was detected */
   timestamp: number;
   /** Package name of the app */
   packageName?: string;
+}
+
+/**
+ * Represents a navigation suggestion - an uncorrelated fingerprint that
+ * could potentially be mapped to a named screen.
+ */
+export interface NavigationSuggestionInfo {
+  id: number;
+  fingerprintHash: string;
+  fingerprintData: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  occurrenceCount: number;
 }
 
 /**
@@ -344,4 +359,10 @@ export interface NavigationGraph {
 
   /** Export the current graph for debugging */
   exportGraph(): Promise<ExportedGraph>;
+
+  /** Get unpromoted navigation suggestions for the current app */
+  getSuggestions(): Promise<NavigationSuggestionInfo[]>;
+
+  /** Promote a suggestion to a named node */
+  promoteSuggestion(suggestionId: number, screenName: string): Promise<void>;
 }

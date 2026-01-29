@@ -149,6 +149,32 @@ export interface ScrollPositionsTable {
   created_at: Generated<string>;
 }
 
+// Navigation node fingerprints table - tracks fingerprints associated with named nodes
+export interface NavigationNodeFingerprintsTable {
+  id: Generated<number>;
+  app_id: string; // Scoped per app to prevent cross-app collisions
+  node_id: number;
+  fingerprint_hash: string; // Unique per app (not globally)
+  fingerprint_data: string; // Full fingerprint JSON
+  first_seen_at: number;
+  last_seen_at: number;
+  occurrence_count: number;
+  created_at: Generated<string>;
+}
+
+// Navigation suggestions table - uncorrelated fingerprints waiting for promotion
+export interface NavigationSuggestionsTable {
+  id: Generated<number>;
+  app_id: string;
+  fingerprint_hash: string;
+  fingerprint_data: string;
+  first_seen_at: number;
+  last_seen_at: number;
+  occurrence_count: number;
+  promoted_to_fingerprint_id: number | null;
+  created_at: Generated<string>;
+}
+
 // Prediction accuracy tables
 export interface PredictionOutcomesTable {
   id: Generated<number>;
@@ -524,6 +550,8 @@ export interface Database {
   failure_notifications: FailureNotificationsTable;
   crashes: CrashesTable;
   anrs: AnrsTable;
+  navigation_node_fingerprints: NavigationNodeFingerprintsTable;
+  navigation_suggestions: NavigationSuggestionsTable;
 }
 
 // Convenience types for each table
@@ -734,3 +762,11 @@ export type CrashUpdate = Updateable<CrashesTable>;
 export type Anr = Selectable<AnrsTable>;
 export type NewAnr = Insertable<AnrsTable>;
 export type AnrUpdate = Updateable<AnrsTable>;
+
+export type NavigationNodeFingerprint = Selectable<NavigationNodeFingerprintsTable>;
+export type NewNavigationNodeFingerprint = Insertable<NavigationNodeFingerprintsTable>;
+export type NavigationNodeFingerprintUpdate = Updateable<NavigationNodeFingerprintsTable>;
+
+export type NavigationSuggestion = Selectable<NavigationSuggestionsTable>;
+export type NewNavigationSuggestion = Insertable<NavigationSuggestionsTable>;
+export type NavigationSuggestionUpdate = Updateable<NavigationSuggestionsTable>;

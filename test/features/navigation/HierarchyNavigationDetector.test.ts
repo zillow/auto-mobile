@@ -130,7 +130,12 @@ describe("HierarchyNavigationDetector", () => {
       expect(detector.getPreviousFingerprint()?.hash).toBe(firstFingerprint?.hash);
     });
 
-    test("should record navigation to graph manager", async () => {
+    test("should call recordHierarchyNavigation on graph manager", async () => {
+      // Note: With the named-nodes-only feature, hierarchy events only create nodes
+      // if there's an active navigation from an SDK event within the correlation window.
+      // Without SDK events, hierarchy navigation is tracked as suggestions (if app has named nodes)
+      // or ignored entirely (if app has no named nodes).
+
       const hierarchy1 = createHierarchy("Screen A");
       const hierarchy2 = createHierarchy("Screen B");
 
@@ -143,9 +148,14 @@ describe("HierarchyNavigationDetector", () => {
       // Wait for async navigation recording
       await new Promise(resolve => setImmediate(resolve));
 
-      // Should have recorded navigation
+      // For apps without SDK events (no named nodes), hierarchy events don't create screens
+      // They are silently ignored until the app has named nodes from SDK integration
       const screens = await manager.getKnownScreens();
-      expect(screens.length).toBeGreaterThanOrEqual(2);
+      expect(screens.length).toBe(0); // No named nodes yet
+
+      // The detector should still track fingerprints internally
+      expect(detector.getCurrentFingerprint()).not.toBeNull();
+      expect(detector.getPreviousFingerprint()).not.toBeNull();
     });
 
     test("should not detect navigation for same fingerprint", () => {
@@ -230,9 +240,12 @@ describe("HierarchyNavigationDetector", () => {
   });
 
   describe("tool call correlation", () => {
-    test("should correlate with recent tool call", async () => {
+    test("should record tool calls even without SDK integration", async () => {
+      // Note: With the named-nodes-only feature, hierarchy events don't create edges
+      // without SDK integration. Tool calls are still recorded for future correlation
+      // when SDK events arrive.
+
       // First screen - stabilize
-      // Use real timestamps for correlation to work
       const hierarchy1: AccessibilityHierarchy = {
         updatedAt: Date.now(),
         packageName: "com.test.app",
@@ -251,7 +264,6 @@ describe("HierarchyNavigationDetector", () => {
       manager.recordToolCall("tapOn", { text: "Next" });
 
       // Second screen appears (navigation triggered by tool call)
-      // Use real timestamp slightly after tool call for correlation to work
       const hierarchy2: AccessibilityHierarchy = {
         updatedAt: Date.now(),
         packageName: "com.test.app",
@@ -266,20 +278,19 @@ describe("HierarchyNavigationDetector", () => {
       // Wait for async navigation recording
       await new Promise(resolve => setImmediate(resolve));
 
-      // Check that edge was recorded
-      const firstFingerprint = detector.getPreviousFingerprint();
-      expect(firstFingerprint).not.toBeNull();
+      // Without SDK events (named nodes), no screens or edges are created
+      // The detector tracks fingerprints internally, but they aren't recorded
+      // as named nodes in the graph
+      const screens = await manager.getKnownScreens();
+      expect(screens.length).toBe(0);
 
-      const fromScreen = `screen_${firstFingerprint!.hash.substring(0, 12)}`;
-      const edges = await manager.getEdgesFrom(fromScreen);
+      // Tool call should still be recorded in history
+      const stats = await manager.getStats();
+      expect(stats.toolCallHistorySize).toBe(1);
 
-      // Should have an edge
-      expect(edges.length).toBe(1);
-
-      // Edge should have the correlated tool call
-      expect(edges[0].edgeType).toBe("tool");
-      expect(edges[0].interaction).toBeDefined();
-      expect(edges[0].interaction?.toolName).toBe("tapOn");
+      // The detector should still track fingerprints
+      expect(detector.getCurrentFingerprint()).not.toBeNull();
+      expect(detector.getPreviousFingerprint()).not.toBeNull();
     });
   });
 });

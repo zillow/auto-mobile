@@ -531,3 +531,201 @@ describe("NavigationGraphManager - Scroll Position", () => {
     expect(edges[0].uiState!.scrollPosition!.targetElement.text).toBe("Second");
   });
 });
+
+describe("NavigationGraphManager - Named Nodes Only", () => {
+  let manager: NavigationGraphManager;
+
+  beforeAll(async () => {
+    await runMigrations();
+  });
+
+  beforeEach(async () => {
+    NavigationGraphManager.resetInstance();
+    manager = NavigationGraphManager.getInstance();
+    await manager.setCurrentApp("com.test.namedapp");
+    await manager.clearCurrentGraph();
+    await manager.setCurrentApp("com.test.namedapp");
+  });
+
+  afterEach(async () => {
+    NavigationGraphManager.resetInstance();
+  });
+
+  describe("recordHierarchyNavigation", () => {
+    it("should NOT create nodes from hierarchy events alone", async () => {
+      // Record hierarchy navigation without any SDK events
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "abc123def456",
+        timestamp: Date.now(),
+        packageName: "com.test.namedapp"
+      });
+
+      // Should have no nodes since app has no named nodes yet
+      const screens = await manager.getKnownScreens();
+      expect(screens).toHaveLength(0);
+    });
+
+    it("should correlate fingerprint during active navigation window", async () => {
+      const now = Date.now();
+
+      // First, create a named node via SDK event
+      await manager.recordNavigationEvent(createEvent("HomeScreen", now));
+
+      // Then, hierarchy event within 1000ms window should correlate
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_home_123",
+        fingerprintData: JSON.stringify({ layout: "home" }),
+        timestamp: now + 500, // Within 1000ms window
+        packageName: "com.test.namedapp"
+      });
+
+      // Should still have only one node (HomeScreen)
+      const screens = await manager.getKnownScreens();
+      expect(screens).toHaveLength(1);
+      expect(screens[0]).toBe("HomeScreen");
+
+      // The fingerprint should be correlated to this node
+      // Future hierarchy events with same fingerprint should update this node
+    });
+
+    it("should create suggestion when fingerprint is outside navigation window", async () => {
+      const now = Date.now();
+
+      // First, create a named node via SDK event
+      await manager.recordNavigationEvent(createEvent("HomeScreen", now));
+
+      // Hierarchy event outside the 1000ms window should create suggestion
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_settings_456",
+        fingerprintData: JSON.stringify({ layout: "settings" }),
+        timestamp: now + 1500, // Outside 1000ms window
+        packageName: "com.test.namedapp"
+      });
+
+      // Should have suggestions
+      const suggestions = await manager.getSuggestions();
+      expect(suggestions.length).toBeGreaterThanOrEqual(1);
+      expect(suggestions[0].fingerprintHash).toBe("fingerprint_settings_456");
+    });
+
+    it("should update existing node when fingerprint is already correlated", async () => {
+      const now = Date.now();
+
+      // Create named node and correlate fingerprint
+      await manager.recordNavigationEvent(createEvent("HomeScreen", now));
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_home_123",
+        timestamp: now + 500,
+        packageName: "com.test.namedapp"
+      });
+
+      // Navigate away
+      await manager.recordNavigationEvent(createEvent("Settings", now + 2000));
+
+      // Now hierarchy event with same fingerprint should update HomeScreen
+      // Using timestamp well outside the active navigation window (>1000ms)
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_home_123",
+        timestamp: now + 5000, // 3000ms after Settings navigation, well outside window
+        packageName: "com.test.namedapp"
+      });
+
+      // Should update current screen to HomeScreen
+      expect(manager.getCurrentScreen()).toBe("HomeScreen");
+
+      // Check visit count increased
+      const node = await manager.getNode("HomeScreen");
+      expect(node).toBeDefined();
+      expect(node!.visitCount).toBe(2);
+    });
+  });
+
+  describe("getSuggestions and promoteSuggestion", () => {
+    it("should return empty suggestions for app without named nodes", async () => {
+      // No SDK events, no named nodes
+      const suggestions = await manager.getSuggestions();
+      expect(suggestions).toHaveLength(0);
+    });
+
+    it("should promote suggestion to named node", async () => {
+      const now = Date.now();
+
+      // Create a named node so app has named nodes
+      await manager.recordNavigationEvent(createEvent("HomeScreen", now));
+
+      // Create a suggestion by sending hierarchy event outside window
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_settings_456",
+        fingerprintData: JSON.stringify({ layout: "settings" }),
+        timestamp: now + 1500, // Outside window
+        packageName: "com.test.namedapp"
+      });
+
+      // Get suggestions
+      const suggestions = await manager.getSuggestions();
+      expect(suggestions.length).toBeGreaterThanOrEqual(1);
+
+      const settingsSuggestion = suggestions.find(
+        s => s.fingerprintHash === "fingerprint_settings_456"
+      );
+      expect(settingsSuggestion).toBeDefined();
+
+      // Promote the suggestion
+      await manager.promoteSuggestion(settingsSuggestion!.id, "SettingsScreen");
+
+      // Should now have two named nodes
+      const screens = await manager.getKnownScreens();
+      expect(screens).toContain("HomeScreen");
+      expect(screens).toContain("SettingsScreen");
+
+      // Suggestion should no longer appear in unpromoted list
+      const remainingSuggestions = await manager.getSuggestions();
+      const stillPresent = remainingSuggestions.find(
+        s => s.fingerprintHash === "fingerprint_settings_456"
+      );
+      expect(stillPresent).toBeUndefined();
+    });
+
+    it("should recognize promoted fingerprint on future hierarchy events", async () => {
+      const now = Date.now();
+
+      // Create named node and suggestion
+      await manager.recordNavigationEvent(createEvent("HomeScreen", now));
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_settings_456",
+        fingerprintData: JSON.stringify({ layout: "settings" }),
+        timestamp: now + 1500, // Outside HomeScreen's window
+        packageName: "com.test.namedapp"
+      });
+
+      // Promote suggestion
+      const suggestions = await manager.getSuggestions();
+      const settingsSuggestion = suggestions.find(
+        s => s.fingerprintHash === "fingerprint_settings_456"
+      );
+      await manager.promoteSuggestion(settingsSuggestion!.id, "SettingsScreen");
+
+      // Navigate somewhere else
+      await manager.recordNavigationEvent(createEvent("Profile", now + 3000));
+
+      // Now hierarchy event with same fingerprint should update SettingsScreen
+      // Using timestamp well outside the active navigation window
+      await manager.recordHierarchyNavigation({
+        fromFingerprint: null,
+        toFingerprint: "fingerprint_settings_456",
+        timestamp: now + 6000, // 3000ms after Profile navigation, well outside window
+        packageName: "com.test.namedapp"
+      });
+
+      // Current screen should be SettingsScreen
+      expect(manager.getCurrentScreen()).toBe("SettingsScreen");
+    });
+  });
+});
