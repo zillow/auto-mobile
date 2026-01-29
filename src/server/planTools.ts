@@ -14,6 +14,7 @@ import { normalizePlanDevices } from "../utils/plan/PlanDevices";
 import { ExecutePlanStepDebugInfo } from "../models/ExecutePlanResult";
 import { serverConfig } from "../utils/ServerConfig";
 import { startVideoRecording, stopVideoRecording } from "./videoRecordingManager";
+import { stopTestRecording, getTestRecordingStatus } from "./testRecordingManager";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -440,6 +441,65 @@ const executePlanTool = async (device: BootedDevice, params: {
   }
 };
 
+// Export plan tool schema
+const exportPlanSchema = z.object({
+  recordingId: z.string().optional().describe("Recording ID to export (uses active recording if not specified)"),
+  planName: z.string().optional().describe("Name for the exported plan (auto-generated if not specified)"),
+});
+
+const exportPlanResultSchema = z.object({
+  success: z.boolean(),
+  recordingId: z.string().optional(),
+  planName: z.string().optional(),
+  planContent: z.string().optional(),
+  stepCount: z.number().int().optional(),
+  durationMs: z.number().int().optional(),
+  error: z.string().optional(),
+});
+
+// Export plan tool handler
+const exportPlanTool = async (params: {
+  recordingId?: string;
+  planName?: string;
+}): Promise<any> => {
+  try {
+    // Check if there's an active recording
+    const status = getTestRecordingStatus();
+    if (!status) {
+      return createStructuredToolResponse({
+        success: false,
+        error: "No active recording. Start a recording before exporting.",
+      });
+    }
+
+    // Validate recording ID if provided
+    if (params.recordingId && params.recordingId !== status.recordingId) {
+      return createStructuredToolResponse({
+        success: false,
+        error: `Recording ID ${params.recordingId} does not match active recording ${status.recordingId}.`,
+      });
+    }
+
+    // Stop the recording and get the plan
+    const result = await stopTestRecording(params.recordingId, params.planName);
+
+    return createStructuredToolResponse({
+      success: true,
+      recordingId: result.recordingId,
+      planName: result.planName,
+      planContent: result.planContent,
+      stepCount: result.stepCount,
+      durationMs: result.durationMs,
+    });
+  } catch (error) {
+    logger.error(`[exportPlan] Failed to export plan: ${error}`);
+    return createStructuredToolResponse({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 // Register plan tools for daemon-backed MCP servers and CLI usage.
 export const registerPlanTools = () => {
   ToolRegistry.registerDeviceAware(
@@ -450,5 +510,15 @@ export const registerPlanTools = () => {
     false,
     false,
     { outputSchema: executePlanResultSchema }
+  );
+
+  ToolRegistry.register(
+    "exportPlan",
+    "Stop the active test recording and export recorded interactions as a YAML plan. Returns the plan content.",
+    exportPlanSchema,
+    exportPlanTool,
+    false,
+    false,
+    exportPlanResultSchema
   );
 };

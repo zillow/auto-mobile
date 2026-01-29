@@ -808,6 +808,60 @@
     }
   },
   {
+    "name": "exportPlan",
+    "description": "Stop the active test recording and export recorded interactions as a YAML plan. Returns the plan content.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordingId": {
+          "description": "Recording ID to export (uses active recording if not specified)",
+          "type": "string"
+        },
+        "planName": {
+          "description": "Name for the exported plan (auto-generated if not specified)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "recordingId": {
+          "type": "string"
+        },
+        "planName": {
+          "type": "string"
+        },
+        "planContent": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "getDeepLinks",
     "description": "Query deep links for app",
     "inputSchema": {
