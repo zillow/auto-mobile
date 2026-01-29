@@ -146,13 +146,49 @@ export class FieldTypeDetector {
 
   /**
    * Get the current text value of an element
+   * For iOS, the `text` property often contains the accessibility label, not the input value.
+   * iOS text fields may have a `value` property with the actual input value.
    * @param element - The element to get text from
    * @returns The text value or empty string
    */
   getTextValue(element: Element): string {
+    // For iOS elements, prefer the `value` attribute which contains the actual input value
+    // The `text` attribute on iOS often contains the accessibility label
+    if (typeof element.value === "string") {
+      return element.value;
+    }
     if (typeof element.text === "string") {
       return element.text;
     }
     return "";
+  }
+
+  /**
+   * Check if element is an iOS element based on class patterns
+   * @param element - The element to check
+   * @returns true if the element appears to be iOS
+   */
+  isIOSElement(element: Element): boolean {
+    const className = this.getClassName(element);
+    return IOS_PATTERNS.text.some(pattern => className.includes(pattern.toLowerCase())) ||
+           IOS_PATTERNS.toggle.some(pattern => className.includes(pattern.toLowerCase())) ||
+           IOS_PATTERNS.dropdown.some(pattern => className.includes(pattern.toLowerCase()));
+  }
+
+  /**
+   * Check if verification should be skipped for this element/field type combination.
+   * On iOS, text and dropdown verification is unreliable because `text` contains the
+   * accessibility label rather than the actual input value.
+   * @param element - The element to check
+   * @param fieldType - The detected field type
+   * @returns true if verification should be skipped
+   */
+  shouldSkipVerification(element: Element, fieldType: FieldType): boolean {
+    // On iOS, text verification is unreliable unless `value` attribute is available
+    if (this.isIOSElement(element) && (fieldType === "text" || fieldType === "dropdown")) {
+      // Only skip if there's no `value` attribute to verify against
+      return typeof element.value !== "string";
+    }
+    return false;
   }
 }

@@ -139,7 +139,7 @@ Example usage:
         })),
         totalAttempts: result.totalAttempts,
         error: result.error
-      }, result.observation);
+      });
     },
     true, // supportsProgress
     false, // debugOnly

@@ -316,6 +316,7 @@ export class FakeFieldTypeDetector {
   private typeOverrides: Map<string, FieldType> = new Map();
   private checkedOverrides: Map<string, boolean> = new Map();
   private textOverrides: Map<string, string> = new Map();
+  private skipVerificationOverrides: Map<string, boolean> = new Map();
   private realDetector: FieldTypeDetector = new FieldTypeDetector();
 
   detect(element: Element): FieldType {
@@ -337,6 +338,19 @@ export class FakeFieldTypeDetector {
     return this.textOverrides.get(key) ?? this.realDetector.getTextValue(element);
   }
 
+  isIOSElement(element: Element): boolean {
+    return this.realDetector.isIOSElement(element);
+  }
+
+  shouldSkipVerification(element: Element, fieldType: FieldType): boolean {
+    const key = element["resource-id"] ?? element.text ?? "";
+    const override = this.skipVerificationOverrides.get(key);
+    if (override !== undefined) {
+      return override;
+    }
+    return this.realDetector.shouldSkipVerification(element, fieldType);
+  }
+
   setFieldType(selector: string, type: FieldType): void {
     this.typeOverrides.set(selector, type);
   }
@@ -349,9 +363,14 @@ export class FakeFieldTypeDetector {
     this.textOverrides.set(selector, text);
   }
 
+  setSkipVerification(selector: string, skip: boolean): void {
+    this.skipVerificationOverrides.set(selector, skip);
+  }
+
   reset(): void {
     this.typeOverrides.clear();
     this.checkedOverrides.clear();
     this.textOverrides.clear();
+    this.skipVerificationOverrides.clear();
   }
 }

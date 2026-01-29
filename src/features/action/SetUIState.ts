@@ -190,15 +190,27 @@ export class SetUIState extends BaseVisualChange {
     let attempts = 0;
     let lastError: string | undefined;
     let fieldType: FieldType | undefined;
+    let currentViewHierarchy = context.viewHierarchy;
 
     while (attempts < context.maxRetries) {
       attempts++;
 
       try {
-        // Find the element
-        let element = this.findElement(fieldSpec.selector, context.viewHierarchy);
+        // Find the element in current hierarchy
+        let element = this.findElement(fieldSpec.selector, currentViewHierarchy);
 
-        // If not found and scroll enabled, try scrolling
+        // If not found, refresh the view hierarchy before trying scroll
+        // This handles elements that appear after async load
+        if (!element && attempts > 1) {
+          logger.info(`[SetUIState] Element not found on attempt ${attempts}, refreshing view hierarchy`);
+          const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+          if (freshObs?.viewHierarchy) {
+            currentViewHierarchy = freshObs.viewHierarchy;
+            element = this.findElement(fieldSpec.selector, currentViewHierarchy);
+          }
+        }
+
+        // If still not found and scroll enabled, try scrolling
         if (!element && context.scrollToFind) {
           const scrollResult = await this.scrollToFindElement(
             fieldSpec.selector,
@@ -259,8 +271,11 @@ export class SetUIState extends BaseVisualChange {
         }
 
         // Verify if requested (and not sensitive)
+        // Also skip verification for iOS text/dropdown fields when value attribute is unavailable
         let verified: boolean | undefined;
-        if (context.verifyAfter && !fieldSpec.sensitive) {
+        const shouldSkipVerify = fieldSpec.sensitive ||
+          this.fieldTypeDetector.shouldSkipVerification(element, fieldType);
+        if (context.verifyAfter && !shouldSkipVerify) {
           verified = await this.verifyFieldValue(fieldSpec, fieldType, signal);
           if (!verified) {
             lastError = `Verification failed for ${this.describeSelector(fieldSpec.selector)}`;

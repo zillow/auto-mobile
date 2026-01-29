@@ -320,6 +320,41 @@ describe("SetUIState", () => {
       expect(result.fields[0].attempts).toBe(3);
       expect(result.fields[0].error).toContain("Failed to tap");
     });
+
+    test("refreshes view hierarchy between retries when element not found", async () => {
+      // Element appears after first attempt (simulating async load)
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          // First call: element not present
+          return createObserveResult({ hierarchy: { node: [] } });
+        }
+        // Subsequent calls: element appears
+        return createObserveResult(createHierarchyWithElement({
+          "resource-id": "async_field",
+          "text": "",
+          "class": "android.widget.EditText"
+        }));
+      });
+
+      fakeFieldTypeDetector.setFieldType("async_field", "text");
+
+      const setUIState = createSetUIState();
+      const result = await setUIState.execute({
+        fields: [{ selector: { elementId: "async_field" }, value: "loaded!" }],
+        maxRetries: 3,
+        scrollToFind: false,  // Disable scroll to test hierarchy refresh
+        verifyAfter: false
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.fields[0].success).toBe(true);
+      // Should have taken multiple attempts
+      expect(result.fields[0].attempts).toBeGreaterThan(1);
+      // Observe should have been called multiple times to refresh hierarchy
+      expect(observeCallCount).toBeGreaterThan(1);
+    });
   });
 
   describe("fail fast", () => {

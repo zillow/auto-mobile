@@ -227,5 +227,92 @@ describe("FieldTypeDetector", () => {
       const element = createElement({ text: 123 as any });
       expect(detector.getTextValue(element)).toBe("");
     });
+
+    test("prefers value attribute over text for iOS elements", () => {
+      const element = createElement({
+        "class": "UITextField",
+        "text": "Email Address",  // This is the label
+        "value": "user@example.com"  // This is the actual input value
+      });
+      expect(detector.getTextValue(element)).toBe("user@example.com");
+    });
+
+    test("falls back to text when value is not present", () => {
+      const element = createElement({
+        "class": "UITextField",
+        "text": "Email Address"
+      });
+      expect(detector.getTextValue(element)).toBe("Email Address");
+    });
+  });
+
+  describe("isIOSElement", () => {
+    test("returns true for UITextField", () => {
+      const element = createElement({ "class": "UITextField" });
+      expect(detector.isIOSElement(element)).toBe(true);
+    });
+
+    test("returns true for UITextView", () => {
+      const element = createElement({ "class": "UITextView" });
+      expect(detector.isIOSElement(element)).toBe(true);
+    });
+
+    test("returns true for UISwitch", () => {
+      const element = createElement({ "class": "UISwitch" });
+      expect(detector.isIOSElement(element)).toBe(true);
+    });
+
+    test("returns true for UIPickerView", () => {
+      const element = createElement({ "class": "UIPickerView" });
+      expect(detector.isIOSElement(element)).toBe(true);
+    });
+
+    test("returns false for Android EditText", () => {
+      const element = createElement({ "class": "android.widget.EditText" });
+      expect(detector.isIOSElement(element)).toBe(false);
+    });
+  });
+
+  describe("shouldSkipVerification", () => {
+    test("returns true for iOS text field without value attribute", () => {
+      const element = createElement({
+        "class": "UITextField",
+        "text": "Label only"
+      });
+      expect(detector.shouldSkipVerification(element, "text")).toBe(true);
+    });
+
+    test("returns false for iOS text field with value attribute", () => {
+      const element = createElement({
+        "class": "UITextField",
+        "text": "Label",
+        "value": "actual value"
+      });
+      expect(detector.shouldSkipVerification(element, "text")).toBe(false);
+    });
+
+    test("returns true for iOS dropdown without value attribute", () => {
+      const element = createElement({
+        "class": "UIPickerView",
+        "text": "Select option"
+      });
+      expect(detector.shouldSkipVerification(element, "dropdown")).toBe(true);
+    });
+
+    test("returns false for iOS checkbox/toggle (verification works)", () => {
+      const element = createElement({
+        "class": "UISwitch",
+        "checkable": true
+      });
+      expect(detector.shouldSkipVerification(element, "toggle")).toBe(false);
+    });
+
+    test("returns false for Android text field", () => {
+      const element = createElement({
+        "class": "android.widget.EditText",
+        "text": "some value"
+      });
+      expect(detector.shouldSkipVerification(element, "text")).toBe(false);
+    });
   });
 });
