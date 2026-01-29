@@ -724,6 +724,28 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     return values.firstOrNull { !it.isNullOrBlank() }
   }
 
+  private fun buildFailureMessage(
+      failedStep: FailedStepInfo?,
+      executedSteps: Int?,
+      totalSteps: Int?,
+      fallbackError: String?,
+  ): String {
+    return buildString {
+      if (failedStep != null) {
+        append("Test plan execution failed at step ${failedStep.stepIndex} (${failedStep.tool}):")
+        append("\n  Error: ${failedStep.error}")
+        if (executedSteps != null && totalSteps != null) {
+          append("\n  Executed: $executedSteps/$totalSteps steps")
+        }
+        if (failedStep.device != null) {
+          append("\n  Device: ${failedStep.device}")
+        }
+      } else {
+        append(fallbackError ?: "AutoMobile plan failed")
+      }
+    }
+  }
+
   private fun parseDaemonToolResult(response: DaemonResponse, json: Json): ParsedToolResult {
     if (!response.success) {
       return ParsedToolResult(false, response.error ?: "Daemon returned failure")
@@ -743,7 +765,26 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
           val parsed = json.parseToJsonElement(text).jsonObject
           val success = parsed["success"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
           if (success == false) {
-            val errorMessage = parsed["error"]?.jsonPrimitive?.content ?: "AutoMobile plan failed"
+            val failedStepObj = parsed["failedStep"]?.jsonObject
+            val failedStep =
+                if (failedStepObj != null) {
+                  FailedStepInfo(
+                      stepIndex =
+                          failedStepObj["stepIndex"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
+                      tool = failedStepObj["tool"]?.jsonPrimitive?.content ?: "unknown",
+                      error =
+                          failedStepObj["error"]?.jsonPrimitive?.content ?: "Unknown step error",
+                      device = failedStepObj["device"]?.jsonPrimitive?.content,
+                  )
+                } else {
+                  null
+                }
+            val executedSteps = parsed["executedSteps"]?.jsonPrimitive?.content?.toIntOrNull()
+            val totalSteps = parsed["totalSteps"]?.jsonPrimitive?.content?.toIntOrNull()
+            val fallbackError = parsed["error"]?.jsonPrimitive?.content
+
+            val errorMessage =
+                buildFailureMessage(failedStep, executedSteps, totalSteps, fallbackError)
             return ParsedToolResult(false, errorMessage)
           }
           return ParsedToolResult(true, "")
@@ -855,6 +896,13 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val aiRecoveryAttempted: Boolean = false,
       val aiRecoverySuccessful: Boolean = false,
       val logFile: File? = null,
+  )
+
+  private data class FailedStepInfo(
+      val stepIndex: Int,
+      val tool: String,
+      val error: String,
+      val device: String?,
   )
 
   private data class ParsedToolResult(val success: Boolean, val errorMessage: String)
