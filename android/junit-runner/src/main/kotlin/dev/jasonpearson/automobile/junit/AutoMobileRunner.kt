@@ -732,7 +732,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   ): String {
     return buildString {
       if (failedStep != null) {
-        append("Test plan execution failed at step ${failedStep.stepIndex} (${failedStep.tool}):")
+        append("Test plan execution failed at step ${failedStep.stepIndex + 1} (${failedStep.tool}):")
         append("\n  Error: ${failedStep.error}")
         if (executedSteps != null && totalSteps != null) {
           append("\n  Executed: $executedSteps/$totalSteps steps")

@@ -289,7 +289,7 @@ final class XCTestRunnerTests: XCTestCase {
 
         XCTAssertThrowsError(try executor.execute(testMetadata: nil)) { error in
             let errorDescription = String(describing: error)
-            XCTAssertTrue(errorDescription.contains("step 3"), "Error should contain step index")
+            XCTAssertTrue(errorDescription.contains("step 4"), "Error should contain step index (1-based)")
             XCTAssertTrue(errorDescription.contains("tapOn"), "Error should contain tool name")
             XCTAssertTrue(
                 errorDescription.contains("Element \"Submit Button\" not found on screen"),

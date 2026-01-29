@@ -992,7 +992,7 @@ public final class AutoMobilePlanExecutor {
     private func buildFailureMessage(from result: ExecutePlanResult) -> String {
         var message = ""
         if let failedStep = result.failedStep {
-            message += "Test plan execution failed at step \(failedStep.stepIndex) (\(failedStep.tool)):"
+            message += "Test plan execution failed at step \(failedStep.stepIndex + 1) (\(failedStep.tool)):"
             message += "\n  Error: \(failedStep.error)"
             message += "\n  Executed: \(result.executedSteps)/\(result.totalSteps) steps"
             if let device = failedStep.device {

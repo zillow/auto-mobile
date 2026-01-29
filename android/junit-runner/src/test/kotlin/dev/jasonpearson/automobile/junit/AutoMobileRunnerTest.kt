@@ -171,7 +171,7 @@ class AutoMobileRunnerTest {
 
     assertFalse("Parse result should indicate failure", parseResult.first)
     val errorMessage = parseResult.second
-    assertTrue("Error should contain step index", errorMessage.contains("step 3"))
+    assertTrue("Error should contain step index (1-based)", errorMessage.contains("step 4"))
     assertTrue("Error should contain tool name", errorMessage.contains("tapOn"))
     assertTrue(
         "Error should contain error text",
