@@ -45,7 +45,7 @@ export class PressButton extends BaseVisualChange {
         }
       },
       {
-        changeExpected: false,
+        changeExpected: true,
         timeoutMs: 2000, // Reduce timeout for faster execution
         progress,
         perf
