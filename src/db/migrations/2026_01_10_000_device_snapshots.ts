@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("device_snapshots")
+    .ifNotExists()
     .addColumn("snapshot_name", "text", col => col.primaryKey())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("device_name", "text", col => col.notNull())
@@ -18,24 +19,28 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createIndex("idx_device_snapshots_device_id")
+    .ifNotExists()
     .on("device_snapshots")
     .column("device_id")
     .execute();
 
   await db.schema
     .createIndex("idx_device_snapshots_last_accessed_at")
+    .ifNotExists()
     .on("device_snapshots")
     .column("last_accessed_at")
     .execute();
 
   await db.schema
     .createIndex("idx_device_snapshots_created_at")
+    .ifNotExists()
     .on("device_snapshots")
     .column("created_at")
     .execute();
 
   await db.schema
     .createTable("device_snapshot_configs")
+    .ifNotExists()
     .addColumn("key", "text", col => col.primaryKey())
     .addColumn("config_json", "text", col => col.notNull())
     .addColumn("updated_at", "text", col => col.notNull())

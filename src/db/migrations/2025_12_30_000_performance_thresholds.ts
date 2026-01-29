@@ -4,6 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create performance_thresholds table
   await db.schema
     .createTable("performance_thresholds")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("session_id", "text", col => col.notNull())
@@ -26,6 +27,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on device_id for fast lookups
   await db.schema
     .createIndex("idx_performance_thresholds_device_id")
+    .ifNotExists()
     .on("performance_thresholds")
     .column("device_id")
     .execute();
@@ -33,6 +35,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on session_id for session-specific queries
   await db.schema
     .createIndex("idx_performance_thresholds_session_id")
+    .ifNotExists()
     .on("performance_thresholds")
     .column("session_id")
     .execute();
@@ -40,6 +43,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create composite index for device + created_at for TTL queries
   await db.schema
     .createIndex("idx_performance_thresholds_device_created")
+    .ifNotExists()
     .on("performance_thresholds")
     .columns(["device_id", "created_at"])
     .execute();
@@ -47,6 +51,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create performance_audit_results table to store audit outcomes
   await db.schema
     .createTable("performance_audit_results")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("session_id", "text", col => col.notNull())
@@ -72,6 +77,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on device_id + timestamp for historical queries
   await db.schema
     .createIndex("idx_performance_audit_results_device_timestamp")
+    .ifNotExists()
     .on("performance_audit_results")
     .columns(["device_id", "timestamp"])
     .execute();

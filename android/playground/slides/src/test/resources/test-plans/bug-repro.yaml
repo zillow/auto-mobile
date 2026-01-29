@@ -1,6 +1,7 @@
 ---
 name: automobile-playground-bug-repro-demo
 description: Demonstrate reproducing a bug
+platform: "android"
 
 steps:
   - tool: terminateApp

@@ -4,6 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create navigation_apps table
   await db.schema
     .createTable("navigation_apps")
+    .ifNotExists()
     .addColumn("app_id", "text", col => col.primaryKey())
     .addColumn("created_at", "text", col =>
       col.notNull().defaultTo("datetime('now')")
@@ -14,6 +15,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create navigation_nodes table
   await db.schema
     .createTable("navigation_nodes")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -32,6 +34,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create unique constraint on (app_id, screen_name)
   await db.schema
     .createIndex("idx_navigation_nodes_app_screen")
+    .ifNotExists()
     .on("navigation_nodes")
     .columns(["app_id", "screen_name"])
     .unique()
@@ -40,6 +43,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create navigation_edges table
   await db.schema
     .createTable("navigation_edges")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -57,18 +61,21 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create indices for navigation_edges
   await db.schema
     .createIndex("idx_navigation_edges_app")
+    .ifNotExists()
     .on("navigation_edges")
     .column("app_id")
     .execute();
 
   await db.schema
     .createIndex("idx_navigation_edges_from")
+    .ifNotExists()
     .on("navigation_edges")
     .column("from_screen")
     .execute();
 
   await db.schema
     .createIndex("idx_navigation_edges_to")
+    .ifNotExists()
     .on("navigation_edges")
     .column("to_screen")
     .execute();
@@ -76,6 +83,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create ui_elements table
   await db.schema
     .createTable("ui_elements")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -100,6 +108,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on app_id for ui_elements
   await db.schema
     .createIndex("idx_ui_elements_app")
+    .ifNotExists()
     .on("ui_elements")
     .column("app_id")
     .execute();
@@ -107,6 +116,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create edge_ui_elements junction table
   await db.schema
     .createTable("edge_ui_elements")
+    .ifNotExists()
     .addColumn("edge_id", "integer", col =>
       col.notNull().references("navigation_edges.id").onDelete("cascade")
     )
@@ -119,6 +129,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create primary key for edge_ui_elements
   await db.schema
     .createIndex("idx_edge_ui_elements_pk")
+    .ifNotExists()
     .on("edge_ui_elements")
     .columns(["edge_id", "ui_element_id"])
     .unique()
@@ -127,6 +138,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create node_modals table
   await db.schema
     .createTable("node_modals")
+    .ifNotExists()
     .addColumn("node_id", "integer", col =>
       col.notNull().references("navigation_nodes.id").onDelete("cascade")
     )
@@ -140,6 +152,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create primary key for node_modals
   await db.schema
     .createIndex("idx_node_modals_pk")
+    .ifNotExists()
     .on("node_modals")
     .columns(["node_id", "stack_level"])
     .unique()
@@ -148,6 +161,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create edge_modals table
   await db.schema
     .createTable("edge_modals")
+    .ifNotExists()
     .addColumn("edge_id", "integer", col =>
       col.notNull().references("navigation_edges.id").onDelete("cascade")
     )
@@ -162,6 +176,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create primary key for edge_modals
   await db.schema
     .createIndex("idx_edge_modals_pk")
+    .ifNotExists()
     .on("edge_modals")
     .columns(["edge_id", "position", "stack_level"])
     .unique()
@@ -170,6 +185,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create scroll_positions table
   await db.schema
     .createTable("scroll_positions")
+    .ifNotExists()
     .addColumn("edge_id", "integer", col =>
       col.primaryKey().references("navigation_edges.id").onDelete("cascade")
     )

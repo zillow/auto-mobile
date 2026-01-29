@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("video_recordings")
+    .ifNotExists()
     .addColumn("recording_id", "text", col => col.primaryKey())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("platform", "text", col => col.notNull())
@@ -23,30 +24,35 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createIndex("idx_video_recordings_status")
+    .ifNotExists()
     .on("video_recordings")
     .column("status")
     .execute();
 
   await db.schema
     .createIndex("idx_video_recordings_device_status")
+    .ifNotExists()
     .on("video_recordings")
     .columns(["device_id", "status"])
     .execute();
 
   await db.schema
     .createIndex("idx_video_recordings_last_accessed_at")
+    .ifNotExists()
     .on("video_recordings")
     .column("last_accessed_at")
     .execute();
 
   await db.schema
     .createIndex("idx_video_recordings_created_at")
+    .ifNotExists()
     .on("video_recordings")
     .column("created_at")
     .execute();
 
   await db.schema
     .createTable("video_recording_configs")
+    .ifNotExists()
     .addColumn("key", "text", col => col.primaryKey())
     .addColumn("config_json", "text", col => col.notNull())
     .addColumn("updated_at", "text", col => col.notNull())

@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("test_executions")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("test_class", "text", col => col.notNull())
     .addColumn("test_method", "text", col => col.notNull())
@@ -28,12 +29,14 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createIndex("idx_test_executions_lookup")
+    .ifNotExists()
     .on("test_executions")
     .columns(["test_class", "test_method"])
     .execute();
 
   await db.schema
     .createIndex("idx_test_executions_timestamp")
+    .ifNotExists()
     .on("test_executions")
     .column("timestamp")
     .execute();

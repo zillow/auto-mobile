@@ -15,6 +15,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index for efficient session-based cleanup queries
   await db.schema
     .createIndex("idx_installed_apps_session")
+    .ifNotExists()
     .on("installed_apps")
     .columns(["daemon_session_id", "device_session_start"])
     .execute();

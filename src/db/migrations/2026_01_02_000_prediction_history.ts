@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("prediction_outcomes")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -28,30 +29,35 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createIndex("idx_prediction_outcomes_app")
+    .ifNotExists()
     .on("prediction_outcomes")
     .column("app_id")
     .execute();
 
   await db.schema
     .createIndex("idx_prediction_outcomes_from")
+    .ifNotExists()
     .on("prediction_outcomes")
     .column("from_screen")
     .execute();
 
   await db.schema
     .createIndex("idx_prediction_outcomes_predicted")
+    .ifNotExists()
     .on("prediction_outcomes")
     .column("predicted_screen")
     .execute();
 
   await db.schema
     .createIndex("idx_prediction_outcomes_tool")
+    .ifNotExists()
     .on("prediction_outcomes")
     .column("tool_name")
     .execute();
 
   await db.schema
     .createTable("prediction_transition_stats")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -72,6 +78,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createIndex("idx_prediction_transition_key")
+    .ifNotExists()
     .on("prediction_transition_stats")
     .columns(["app_id", "from_screen", "to_screen", "tool_name", "tool_args"])
     .unique()

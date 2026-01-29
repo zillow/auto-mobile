@@ -4,6 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create accessibility_baselines table
   await db.schema
     .createTable("accessibility_baselines")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("screen_id", "text", col => col.notNull().unique())
     .addColumn("violations_json", "text", col => col.notNull()) // JSON blob of WcagViolation[]
@@ -16,6 +17,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on screen_id for fast lookups
   await db.schema
     .createIndex("idx_accessibility_baselines_screen_id")
+    .ifNotExists()
     .on("accessibility_baselines")
     .column("screen_id")
     .execute();
@@ -23,6 +25,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on updated_at for cleanup queries
   await db.schema
     .createIndex("idx_accessibility_baselines_updated_at")
+    .ifNotExists()
     .on("accessibility_baselines")
     .column("updated_at")
     .execute();

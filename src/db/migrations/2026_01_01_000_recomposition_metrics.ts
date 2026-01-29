@@ -3,6 +3,7 @@ import { Kysely } from "kysely";
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable("recomposition_metrics")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("session_id", "text", col => col.notNull())
@@ -25,12 +26,14 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   await db.schema
     .createIndex("idx_recomposition_metrics_timestamp")
+    .ifNotExists()
     .on("recomposition_metrics")
     .column("timestamp")
     .execute();
 
   await db.schema
     .createIndex("idx_recomposition_metrics_composable")
+    .ifNotExists()
     .on("recomposition_metrics")
     .columns(["package_name", "composable_id", "timestamp"])
     .execute();

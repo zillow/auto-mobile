@@ -4,6 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create memory_thresholds table for per-app threshold configuration
   await db.schema
     .createTable("memory_thresholds")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("package_name", "text", col => col.notNull())
@@ -22,6 +23,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on device_id + package_name for fast lookups
   await db.schema
     .createIndex("idx_memory_thresholds_device_package")
+    .ifNotExists()
     .on("memory_thresholds")
     .columns(["device_id", "package_name"])
     .execute();
@@ -29,6 +31,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create memory_baselines table for adaptive baseline tracking
   await db.schema
     .createTable("memory_baselines")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("package_name", "text", col => col.notNull())
@@ -48,6 +51,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create unique index on device_id + package_name + tool_name
   await db.schema
     .createIndex("idx_memory_baselines_device_package_tool")
+    .ifNotExists()
     .on("memory_baselines")
     .columns(["device_id", "package_name", "tool_name"])
     .unique()
@@ -56,6 +60,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create memory_audit_results table to store audit outcomes
   await db.schema
     .createTable("memory_audit_results")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull())
     .addColumn("session_id", "text", col => col.notNull())
@@ -92,6 +97,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on device_id + timestamp for historical queries
   await db.schema
     .createIndex("idx_memory_audit_results_device_timestamp")
+    .ifNotExists()
     .on("memory_audit_results")
     .columns(["device_id", "timestamp"])
     .execute();
@@ -99,6 +105,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on package_name + timestamp for app-specific queries
   await db.schema
     .createIndex("idx_memory_audit_results_package_timestamp")
+    .ifNotExists()
     .on("memory_audit_results")
     .columns(["package_name", "timestamp"])
     .execute();
@@ -106,6 +113,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on passed for filtering failures
   await db.schema
     .createIndex("idx_memory_audit_results_passed")
+    .ifNotExists()
     .on("memory_audit_results")
     .column("passed")
     .execute();

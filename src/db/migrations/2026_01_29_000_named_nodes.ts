@@ -11,6 +11,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Fingerprints are scoped per app to prevent cross-app collisions
   await db.schema
     .createTable("navigation_node_fingerprints")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -31,6 +32,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create unique index on (app_id, fingerprint_hash) - fingerprints are unique per app
   await db.schema
     .createIndex("idx_navigation_node_fingerprints_app_hash")
+    .ifNotExists()
     .on("navigation_node_fingerprints")
     .columns(["app_id", "fingerprint_hash"])
     .unique()
@@ -39,6 +41,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on node_id for efficient lookups
   await db.schema
     .createIndex("idx_navigation_node_fingerprints_node")
+    .ifNotExists()
     .on("navigation_node_fingerprints")
     .column("node_id")
     .execute();
@@ -47,6 +50,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Stores uncorrelated fingerprints for apps that have named nodes
   await db.schema
     .createTable("navigation_suggestions")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("app_id", "text", col =>
       col.notNull().references("navigation_apps.app_id").onDelete("cascade")
@@ -67,6 +71,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create unique index on (app_id, fingerprint_hash) for deduplication
   await db.schema
     .createIndex("idx_navigation_suggestions_app_hash")
+    .ifNotExists()
     .on("navigation_suggestions")
     .columns(["app_id", "fingerprint_hash"])
     .unique()
@@ -75,6 +80,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on app_id for efficient queries
   await db.schema
     .createIndex("idx_navigation_suggestions_app")
+    .ifNotExists()
     .on("navigation_suggestions")
     .column("app_id")
     .execute();

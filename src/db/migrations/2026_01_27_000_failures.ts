@@ -18,6 +18,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "failure_groups"))) {
     await db.schema
       .createTable("failure_groups")
+    .ifNotExists()
       .addColumn("id", "text", col => col.primaryKey())
       .addColumn("type", "text", col => col.notNull()) // crash, anr, tool_failure
       .addColumn("signature", "text", col => col.notNull()) // Stack trace hash or tool+error
@@ -36,18 +37,21 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_failure_groups_type")
+    .ifNotExists()
       .on("failure_groups")
       .column("type")
       .execute();
 
     await db.schema
       .createIndex("idx_failure_groups_signature")
+    .ifNotExists()
       .on("failure_groups")
       .column("signature")
       .execute();
 
     await db.schema
       .createIndex("idx_failure_groups_last_occurrence")
+    .ifNotExists()
       .on("failure_groups")
       .column("last_occurrence")
       .execute();
@@ -57,6 +61,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "failure_occurrences"))) {
     await db.schema
       .createTable("failure_occurrences")
+    .ifNotExists()
       .addColumn("id", "text", col => col.primaryKey())
       .addColumn("group_id", "text", col =>
         col.notNull().references("failure_groups.id").onDelete("cascade")
@@ -78,24 +83,28 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_failure_occurrences_group")
+    .ifNotExists()
       .on("failure_occurrences")
       .column("group_id")
       .execute();
 
     await db.schema
       .createIndex("idx_failure_occurrences_timestamp")
+    .ifNotExists()
       .on("failure_occurrences")
       .column("timestamp")
       .execute();
 
     await db.schema
       .createIndex("idx_failure_occurrences_session")
+    .ifNotExists()
       .on("failure_occurrences")
       .column("session_id")
       .execute();
 
     await db.schema
       .createIndex("idx_failure_occurrences_device")
+    .ifNotExists()
       .on("failure_occurrences")
       .column("device_id")
       .execute();
@@ -105,6 +114,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "failure_occurrence_screens"))) {
     await db.schema
       .createTable("failure_occurrence_screens")
+    .ifNotExists()
       .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
       .addColumn("occurrence_id", "text", col =>
         col.notNull().references("failure_occurrences.id").onDelete("cascade")
@@ -116,6 +126,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_failure_occurrence_screens_occurrence")
+    .ifNotExists()
       .on("failure_occurrence_screens")
       .column("occurrence_id")
       .execute();
@@ -125,6 +136,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "failure_captures"))) {
     await db.schema
       .createTable("failure_captures")
+    .ifNotExists()
       .addColumn("id", "text", col => col.primaryKey())
       .addColumn("occurrence_id", "text", col =>
         col.notNull().references("failure_occurrences.id").onDelete("cascade")
@@ -138,6 +150,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_failure_captures_occurrence")
+    .ifNotExists()
       .on("failure_captures")
       .column("occurrence_id")
       .execute();
@@ -147,6 +160,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "failure_notifications"))) {
     await db.schema
       .createTable("failure_notifications")
+    .ifNotExists()
       .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
       .addColumn("occurrence_id", "text", col =>
         col.notNull().references("failure_occurrences.id").onDelete("cascade")
@@ -162,12 +176,14 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_failure_notifications_timestamp")
+    .ifNotExists()
       .on("failure_notifications")
       .column("timestamp")
       .execute();
 
     await db.schema
       .createIndex("idx_failure_notifications_acknowledged")
+    .ifNotExists()
       .on("failure_notifications")
       .column("acknowledged")
       .execute();

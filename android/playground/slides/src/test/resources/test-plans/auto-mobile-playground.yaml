@@ -2,6 +2,8 @@
 name: automobile-playground-discover-screens
 description: Comprehensive test of AutoMobile Playground discover screens with playful robot-themed interactions
 appId: "dev.jasonpearson.automobile.playground"
+platform: "android"
+
 steps:
   - tool: rotate
     orientation: portrait

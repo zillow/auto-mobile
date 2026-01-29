@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("feature_flags")
+    .ifNotExists()
     .addColumn("key", "text", col => col.primaryKey())
     .addColumn("enabled", "integer", col => col.notNull().defaultTo(0))
     .addColumn("config_json", "text")

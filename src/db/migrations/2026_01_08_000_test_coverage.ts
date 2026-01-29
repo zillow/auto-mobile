@@ -4,6 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create test_coverage_sessions table to track test run sessions
   await db.schema
     .createTable("test_coverage_sessions")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("session_uuid", "text", col => col.notNull().unique())
     .addColumn("app_id", "text", col =>
@@ -21,6 +22,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on session_uuid for fast lookups
   await db.schema
     .createIndex("idx_test_coverage_sessions_uuid")
+    .ifNotExists()
     .on("test_coverage_sessions")
     .column("session_uuid")
     .execute();
@@ -28,6 +30,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on app_id for filtering by app
   await db.schema
     .createIndex("idx_test_coverage_sessions_app")
+    .ifNotExists()
     .on("test_coverage_sessions")
     .column("app_id")
     .execute();
@@ -35,6 +38,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create test_node_coverage table to track which nodes were visited during tests
   await db.schema
     .createTable("test_node_coverage")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("session_id", "integer", col =>
       col.notNull().references("test_coverage_sessions.id").onDelete("cascade")
@@ -53,6 +57,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create unique constraint on (session_id, node_id)
   await db.schema
     .createIndex("idx_test_node_coverage_session_node")
+    .ifNotExists()
     .on("test_node_coverage")
     .columns(["session_id", "node_id"])
     .unique()
@@ -61,6 +66,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on session_id for efficient queries
   await db.schema
     .createIndex("idx_test_node_coverage_session")
+    .ifNotExists()
     .on("test_node_coverage")
     .column("session_id")
     .execute();
@@ -68,6 +74,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create test_edge_coverage table to track which edges were traversed during tests
   await db.schema
     .createTable("test_edge_coverage")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("session_id", "integer", col =>
       col.notNull().references("test_coverage_sessions.id").onDelete("cascade")
@@ -86,6 +93,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create unique constraint on (session_id, edge_id)
   await db.schema
     .createIndex("idx_test_edge_coverage_session_edge")
+    .ifNotExists()
     .on("test_edge_coverage")
     .columns(["session_id", "edge_id"])
     .unique()
@@ -94,6 +102,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on session_id for efficient queries
   await db.schema
     .createIndex("idx_test_edge_coverage_session")
+    .ifNotExists()
     .on("test_edge_coverage")
     .column("session_id")
     .execute();

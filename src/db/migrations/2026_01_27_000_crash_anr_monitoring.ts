@@ -76,6 +76,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index for failed tool calls
   await db.schema
     .createIndex("idx_tool_calls_status")
+    .ifNotExists()
     .on("tool_calls")
     .column("status")
     .ifNotExists()
@@ -85,6 +86,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "crashes"))) {
     await db.schema
       .createTable("crashes")
+    .ifNotExists()
       .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
       .addColumn("device_id", "text", col => col.notNull())
       .addColumn("package_name", "text", col => col.notNull())
@@ -115,30 +117,35 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_crashes_device_id")
+    .ifNotExists()
       .on("crashes")
       .column("device_id")
       .execute();
 
     await db.schema
       .createIndex("idx_crashes_package_name")
+    .ifNotExists()
       .on("crashes")
       .column("package_name")
       .execute();
 
     await db.schema
       .createIndex("idx_crashes_timestamp")
+    .ifNotExists()
       .on("crashes")
       .column("timestamp")
       .execute();
 
     await db.schema
       .createIndex("idx_crashes_navigation_node")
+    .ifNotExists()
       .on("crashes")
       .column("navigation_node_id")
       .execute();
 
     await db.schema
       .createIndex("idx_crashes_test_execution")
+    .ifNotExists()
       .on("crashes")
       .column("test_execution_id")
       .execute();
@@ -148,6 +155,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "anrs"))) {
     await db.schema
       .createTable("anrs")
+    .ifNotExists()
       .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
       .addColumn("device_id", "text", col => col.notNull())
       .addColumn("package_name", "text", col => col.notNull())
@@ -177,30 +185,35 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_anrs_device_id")
+    .ifNotExists()
       .on("anrs")
       .column("device_id")
       .execute();
 
     await db.schema
       .createIndex("idx_anrs_package_name")
+    .ifNotExists()
       .on("anrs")
       .column("package_name")
       .execute();
 
     await db.schema
       .createIndex("idx_anrs_timestamp")
+    .ifNotExists()
       .on("anrs")
       .column("timestamp")
       .execute();
 
     await db.schema
       .createIndex("idx_anrs_navigation_node")
+    .ifNotExists()
       .on("anrs")
       .column("navigation_node_id")
       .execute();
 
     await db.schema
       .createIndex("idx_anrs_test_execution")
+    .ifNotExists()
       .on("anrs")
       .column("test_execution_id")
       .execute();

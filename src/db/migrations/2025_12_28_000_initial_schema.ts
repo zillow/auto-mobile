@@ -4,6 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create device_configs table
   await db.schema
     .createTable("device_configs")
+    .ifNotExists()
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("device_id", "text", col => col.notNull().unique())
     .addColumn("platform", "text", col => col.notNull())
@@ -18,6 +19,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create index on device_id for fast lookups
   await db.schema
     .createIndex("idx_device_configs_device_id")
+    .ifNotExists()
     .on("device_configs")
     .column("device_id")
     .execute();

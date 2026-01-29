@@ -1,6 +1,7 @@
 ---
 name: automobile-google-maps-demo
 description: Google Maps demo
+platform: "android"
 
 steps:
   - tool: launchApp

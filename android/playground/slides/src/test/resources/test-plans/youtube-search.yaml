@@ -1,6 +1,7 @@
 ---
 name: automobile-youtube-search-demo
 description: YouTube Search demo
+platform: "android"
 
 steps:
   - tool: launchApp

@@ -1,6 +1,7 @@
 ---
 name: automobile-camera-app-demo
 description: Camera App demo
+platform: "android"
 
 steps:
   - tool: launchApp
