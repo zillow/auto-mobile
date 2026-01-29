@@ -10,6 +10,8 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 interface SettingsProvider {
   var enableYamlLinting: Boolean
   var testPlanOutputDirectory: String
+  var fogModeEnabled: Boolean
+  var autoFocusEnabled: Boolean
 }
 
 @State(
@@ -19,6 +21,8 @@ interface SettingsProvider {
 class AutoMobileSettings : PersistentStateComponent<AutoMobileSettings>, SettingsProvider {
   override var enableYamlLinting: Boolean = true
   override var testPlanOutputDirectory: String = "test/resources/test-plans"
+  override var fogModeEnabled: Boolean = true
+  override var autoFocusEnabled: Boolean = true
 
   override fun getState(): AutoMobileSettings = this
 

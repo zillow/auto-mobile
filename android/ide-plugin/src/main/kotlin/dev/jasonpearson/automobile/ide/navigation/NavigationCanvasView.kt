@@ -50,10 +50,19 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Brush
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 // Layout constants
 private val NODE_WIDTH = 80.dp
@@ -77,6 +86,11 @@ fun NavigationCanvasView(
     onFocusModeChanged: (Boolean) -> Unit = {},  // Called when zoom causes content to extend beyond canvas
     headerHeightPx: Float = 0f,  // Height of header area to check overlap against
     screenshotLoader: NavigationScreenshotLoader? = null,  // Loader for screenshot thumbnails
+    fogModeEnabled: Boolean = true,  // Whether fog mode overlay is enabled
+    autoFocusEnabled: Boolean = true,  // Whether to auto-center on current device screen
+    currentObservedScreen: String? = null,  // Current screen from device observation stream
+    onFogModeToggled: (Boolean) -> Unit = {},  // Called when user toggles fog mode
+    onAutoFocusToggled: (Boolean) -> Unit = {},  // Called when user toggles auto-focus
 ) {
     val density = LocalDensity.current
     val colors = JewelTheme.globalColors
@@ -96,6 +110,13 @@ fun NavigationCanvasView(
 
     // Track if canvas is hovered - focus mode only activates when canvas is hovered
     var isCanvasHovered by remember { mutableStateOf(false) }
+
+    // Fog mode state - tracks which screen the fog is centered on
+    var focusedScreenName by remember { mutableStateOf<String?>(null) }
+
+    // Animated offsets for smooth panning when focus changes
+    val animatedOffsetX = remember { Animatable(0f) }
+    val animatedOffsetY = remember { Animatable(0f) }
 
     // Compute highlighted elements based on hover state OR external highlights
     // Track hovered, source (came from), and target (could go to) screens separately
@@ -278,6 +299,32 @@ fun NavigationCanvasView(
     var hasInitialFit by remember { mutableStateOf(false) }
     var lastAutoPannedScreens by remember { mutableStateOf<List<String>>(emptyList()) }
 
+    // Update focusedScreenName from currentObservedScreen when auto-focus is enabled
+    LaunchedEffect(autoFocusEnabled, currentObservedScreen) {
+        if (autoFocusEnabled && currentObservedScreen != null) {
+            focusedScreenName = currentObservedScreen
+        }
+    }
+
+    // Helper to compute 2-step neighborhood of a screen (for auto-zoom)
+    fun computeNeighborhood(screenName: String, maxSteps: Int): Set<String> {
+        val result = mutableSetOf(screenName)
+        var frontier = setOf(screenName)
+        repeat(maxSteps) {
+            val next = mutableSetOf<String>()
+            for (screen in frontier) {
+                transitions.filter { it.trigger != "back" }.forEach { t ->
+                    if (t.fromScreen == screen) next.add(t.toScreen)
+                    if (t.toScreen == screen) next.add(t.fromScreen)
+                }
+            }
+            // Compute new frontier BEFORE adding to result, otherwise frontier is always empty
+            frontier = next - result
+            result.addAll(next)
+        }
+        return result
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -356,6 +403,55 @@ fun NavigationCanvasView(
                 }
             } else if (externalHighlightedScreens.isEmpty() && lastAutoPannedScreens.isNotEmpty()) {
                 lastAutoPannedScreens = emptyList()
+            }
+        }
+
+        // Animated pan and zoom for fog mode focus
+        LaunchedEffect(focusedScreenName, autoFocusEnabled, fogModeEnabled, viewportWidth, viewportHeight, nodePositions) {
+            if (fogModeEnabled && focusedScreenName != null && viewportWidth > 0 && viewportHeight > 0) {
+                val targetPos = positionByName[focusedScreenName]
+                if (targetPos != null) {
+                    // Compute 2-step neighborhood for auto-zoom
+                    val neighborhood = computeNeighborhood(focusedScreenName!!, 2)
+                    val neighborPositions = neighborhood.mapNotNull { positionByName[it] }
+
+                    if (neighborPositions.isNotEmpty()) {
+                        // Compute bounding box of neighborhood
+                        val minX = neighborPositions.minOf { it.x }
+                        val maxX = neighborPositions.maxOf { it.x } + nodeWidthPx
+                        val minY = neighborPositions.minOf { it.y }
+                        val maxY = neighborPositions.maxOf { it.y } + nodeHeightPx
+
+                        // Add padding
+                        val padding = 80f
+                        val boundsWidth = maxX - minX + padding * 2
+                        val boundsHeight = maxY - minY + padding * 2
+
+                        // Calculate scale to fit neighborhood in viewport
+                        val scaleX = viewportWidth / boundsWidth
+                        val scaleY = viewportHeight / boundsHeight
+                        val newScale = minOf(scaleX, scaleY, 1.5f).coerceIn(0.3f, 1.5f)
+
+                        // Calculate target offset to center the focused node
+                        val targetOffsetX = viewportWidth / 2 - (targetPos.x + nodeWidthPx / 2) * newScale
+                        val targetOffsetY = viewportHeight / 2 - (targetPos.y + nodeHeightPx / 2) * newScale
+
+                        // Update scale (not animated for simplicity)
+                        scale = newScale
+
+                        // Animate offset with 100ms ease-in-out
+                        launch { animatedOffsetX.animateTo(targetOffsetX, tween(100, easing = EaseInOut)) }
+                        launch { animatedOffsetY.animateTo(targetOffsetY, tween(100, easing = EaseInOut)) }
+                    }
+                }
+            }
+        }
+
+        // Sync animated offsets to actual offsets when animation completes or fog mode is off
+        LaunchedEffect(animatedOffsetX.value, animatedOffsetY.value, fogModeEnabled) {
+            if (fogModeEnabled && focusedScreenName != null) {
+                offsetX = animatedOffsetX.value
+                offsetY = animatedOffsetY.value
             }
         }
 
@@ -608,13 +704,77 @@ fun NavigationCanvasView(
                         isTarget = screen.name in highlightState.targetScreens,
                         isInTestFlow = screen.name in highlightState.testFlowScreens,
                         isCurrentReplayStep = screen.name == currentReplayScreen,
+                        isFogFocused = fogModeEnabled && screen.name == focusedScreenName,
                         isDimmed = hasAnyHighlight && screen.name !in highlightedScreens,
-                        onClick = { onScreenSelected(screen.id) },
+                        onClick = {
+                            // When clicking a node, focus on it and disable auto-focus
+                            if (fogModeEnabled) {
+                                focusedScreenName = screen.name
+                                onAutoFocusToggled(false)
+                            }
+                            onScreenSelected(screen.id)
+                        },
                         onHoverChange = { isHovered ->
                             hoveredScreenName = if (isHovered) screen.name else null
                         },
                         screenshotLoader = screenshotLoader,
                     )
+                }
+            }
+
+            // Fog overlay - radial gradient centered on focused node
+            if (fogModeEnabled && focusedScreenName != null) {
+                val focusPos = positionByName[focusedScreenName]
+                if (focusPos != null) {
+                    val centerX = (focusPos.x + nodeWidthPx / 2) * scale + offsetX
+                    val centerY = (focusPos.y + nodeHeightPx / 2) * scale + offsetY
+                    val surfaceColor = colors.text.normal.copy(alpha = 0f)
+                    val fogColor = JewelTheme.globalColors.text.normal.copy(alpha = 0.5f)
+
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val maxRadius = maxOf(size.width, size.height)
+
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.3f to fogColor.copy(alpha = 0.05f),
+                                    0.6f to fogColor.copy(alpha = 0.20f),
+                                    1.0f to fogColor,
+                                ),
+                                center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                                radius = maxRadius,
+                            ),
+                            size = size,
+                        )
+                    }
+                }
+            }
+
+            // Toggle controls at top of canvas
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .background(colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Fog Mode toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Fog", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.7f))
+                    Spacer(Modifier.width(4.dp))
+                    ToggleSwitch(checked = fogModeEnabled, onCheckedChange = onFogModeToggled)
+                }
+
+                // Auto-Focus toggle (only visible when fog mode is on)
+                if (fogModeEnabled) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Auto", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.7f))
+                        Spacer(Modifier.width(4.dp))
+                        ToggleSwitch(checked = autoFocusEnabled, onCheckedChange = onAutoFocusToggled)
+                    }
                 }
             }
 
@@ -645,6 +805,7 @@ private fun ScreenNodeCard(
     isTarget: Boolean,  // Green - nodes we could go to
     isInTestFlow: Boolean = false,  // Blue - part of test flow path
     isCurrentReplayStep: Boolean = false,  // Currently active step in replay
+    isFogFocused: Boolean = false,  // Focused node in fog mode
     isDimmed: Boolean,
     onClick: () -> Unit,
     onHoverChange: (Boolean) -> Unit,
@@ -675,18 +836,24 @@ private fun ScreenNodeCard(
     val green = Color(0xFF4CAF50)        // Green for target (could go to)
     val testFlowBlue = Color(0xFF2196F3) // Blue for test flow path
     val currentStepGreen = Color(0xFF00E676)  // Bright green for current step
+    val fogFocusYellow = Color(0xFFFFEB3B)  // Yellow for fog focus center
 
     // Visual states based on highlighting type
-    val isHighlighted = isHovered || isSource || isTarget || isInTestFlow || isCurrentReplayStep
+    val isHighlighted = isHovered || isSource || isTarget || isInTestFlow || isCurrentReplayStep || isFogFocused
     val borderColor = when {
         isCurrentReplayStep -> currentStepGreen  // Current step is bright green
+        isFogFocused -> fogFocusYellow  // Fog focus is yellow
         isHovered -> lightBlue
         isInTestFlow -> testFlowBlue
         isSource -> orange
         isTarget -> green
         else -> Color.Transparent
     }
-    val borderWidth = if (isCurrentReplayStep) 3.dp else 2.dp
+    val borderWidth = when {
+        isCurrentReplayStep -> 3.dp
+        isFogFocused -> 3.dp
+        else -> 2.dp
+    }
     val textAlpha = if (isDimmed) 0.4f else 0.8f
 
     Tooltip(
@@ -794,6 +961,36 @@ private fun ZoomButton(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun ToggleSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = JewelTheme.globalColors
+    val trackColor = if (checked) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.3f)
+    val thumbColor = Color.White
+
+    Box(
+        modifier = modifier
+            .width(32.dp)
+            .height(18.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(trackColor)
+            .clickable { onCheckedChange(!checked) }
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(2.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .offset(x = if (checked) 14.dp else 0.dp)
+                .clip(CircleShape)
+                .background(thumbColor),
+        )
     }
 }
 

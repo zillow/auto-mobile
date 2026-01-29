@@ -4,4 +4,6 @@ package dev.jasonpearson.automobile.ide.settings
 class FakeSettingsProvider(
     override var enableYamlLinting: Boolean = true,
     override var testPlanOutputDirectory: String = "test/resources/test-plans",
+    override var fogModeEnabled: Boolean = true,
+    override var autoFocusEnabled: Boolean = true,
 ) : SettingsProvider

@@ -16,6 +16,7 @@ import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
 import dev.jasonpearson.automobile.ide.datasource.NavigationGraph
 import dev.jasonpearson.automobile.ide.datasource.Result
+import dev.jasonpearson.automobile.ide.settings.AutoMobileSettings
 import com.intellij.openapi.diagnostic.Logger
 
 private val LOG = Logger.getInstance("NavigationDashboard")
@@ -37,6 +38,14 @@ fun NavigationDashboard(
     var currentSection by remember { mutableStateOf(NavigationSection.FlowMap) }
     var selectedScreenId by remember { mutableStateOf<String?>(null) }
     var selectedTransitionId by remember { mutableStateOf<String?>(null) }
+
+    // Fog mode settings - read from persisted settings
+    val settings = remember { AutoMobileSettings.getInstance() }
+    var fogModeEnabled by remember { mutableStateOf(settings.fogModeEnabled) }
+    var autoFocusEnabled by remember { mutableStateOf(settings.autoFocusEnabled) }
+
+    // Track current screen from navigation stream
+    var currentObservedScreen by remember { mutableStateOf<String?>(null) }
 
     // Screenshot loader for navigation graph thumbnails (only for real data mode)
     val screenshotLoader = remember(clientProvider, dataSourceMode) {
@@ -101,10 +110,11 @@ fun NavigationDashboard(
         observationStreamClient.navigationUpdates.collect { update ->
             // Only update if it's for the selected app (or if no app filter is set)
             if (selectedAppId == null || update.appId == selectedAppId) {
-                LOG.info("Received navigation update - appId=${update.appId}, nodes=${update.nodes.size}, edges=${update.edges.size}")
+                LOG.info("Received navigation update - appId=${update.appId}, nodes=${update.nodes.size}, edges=${update.edges.size}, currentScreen=${update.currentScreen}")
                 // Ensure state updates happen on the main thread for proper recomposition
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     navigationGraph = convertStreamUpdateToGraph(update)
+                    currentObservedScreen = update.currentScreen
                     isLoading = false
                     error = null
                 }
@@ -143,6 +153,17 @@ fun NavigationDashboard(
                     onFocusModeChanged = onFocusModeChanged,
                     headerHeightPx = headerHeightPx,
                     screenshotLoader = screenshotLoader,
+                    fogModeEnabled = fogModeEnabled,
+                    autoFocusEnabled = autoFocusEnabled,
+                    currentObservedScreen = currentObservedScreen,
+                    onFogModeToggled = { enabled ->
+                        fogModeEnabled = enabled
+                        settings.fogModeEnabled = enabled
+                    },
+                    onAutoFocusToggled = { enabled ->
+                        autoFocusEnabled = enabled
+                        settings.autoFocusEnabled = enabled
+                    },
                 )
             }
 
