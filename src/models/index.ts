@@ -91,3 +91,5 @@ export * from "./VisualHighlight";
 export * from "./VideoRecording";
 export * from "./DeviceSnapshot";
 export * from "./Appearance";
+export * from "./SetUIStateOptions";
+export * from "./SetUIStateResult";

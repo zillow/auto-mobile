@@ -1,0 +1,596 @@
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
+import {
+  BootedDevice,
+  Element,
+  ObserveResult,
+  ViewHierarchyResult
+} from "../../models";
+import { SetUIStateOptions, FieldSpec, ElementSelector } from "../../models/SetUIStateOptions";
+import { SetUIStateResult, FieldResult, FieldType } from "../../models/SetUIStateResult";
+import { FieldTypeDetector } from "./FieldTypeDetector";
+import { ElementUtils } from "../utility/ElementUtils";
+import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
+
+/**
+ * Interface for TapOnElement dependency
+ */
+export interface TapOnElementLike {
+  execute(
+    options: { text?: string; elementId?: string; action: string; container?: { text?: string; elementId?: string } },
+    progress?: ProgressCallback,
+    signal?: AbortSignal
+  ): Promise<{ success: boolean; element?: Element; observation?: ObserveResult; error?: string }>;
+}
+
+/**
+ * Interface for InputText dependency
+ */
+export interface InputTextLike {
+  execute(text: string, imeAction?: string): Promise<{ success: boolean; text: string; observation?: ObserveResult; error?: string }>;
+}
+
+/**
+ * Interface for ClearText dependency
+ */
+export interface ClearTextLike {
+  execute(progress?: ProgressCallback): Promise<{ success: boolean; observation?: ObserveResult; error?: string }>;
+}
+
+/**
+ * Interface for SwipeOn dependency
+ */
+export interface SwipeOnLike {
+  execute(
+    options: { direction: string; lookFor?: { text?: string; elementId?: string }; scrollToFind?: boolean },
+    progress?: ProgressCallback
+  ): Promise<{ success: boolean; found?: boolean; element?: Element; observation?: ObserveResult; error?: string }>;
+}
+
+/**
+ * Interface for ObserveScreen dependency
+ */
+export interface ObserveScreenLike {
+  execute(
+    queryOptions?: any,
+    perf?: any,
+    skipWaitForFresh?: boolean,
+    minTimestamp?: number,
+    signal?: AbortSignal
+  ): Promise<ObserveResult>;
+}
+
+/**
+ * Dependencies that can be injected for testing
+ */
+export interface SetUIStateDependencies {
+  tapOnElement?: TapOnElementLike;
+  inputText?: InputTextLike;
+  clearText?: ClearTextLike;
+  swipeOn?: SwipeOnLike;
+  observeScreen?: ObserveScreenLike;
+  fieldTypeDetector?: FieldTypeDetector;
+  timer?: Timer;
+}
+
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_VERIFY_AFTER = true;
+const DEFAULT_SCROLL_TO_FIND = true;
+const DEFAULT_SCROLL_DIRECTION = "down";
+
+/**
+ * SetUIState - Declarative form field population tool
+ *
+ * Populates form fields by specifying desired end-state rather than procedural steps.
+ * Orchestrates existing tools (TapOnElement, InputText, ClearText, SwipeOn, ObserveScreen)
+ * with automatic retry and verification.
+ */
+export class SetUIState extends BaseVisualChange {
+  private fieldTypeDetector: FieldTypeDetector;
+  private elementUtils: ElementUtils;
+  private dependencies: SetUIStateDependencies;
+
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    dependencies: SetUIStateDependencies = {}
+  ) {
+    super(device, adb, dependencies.timer ?? defaultTimer);
+    this.fieldTypeDetector = dependencies.fieldTypeDetector ?? new FieldTypeDetector();
+    this.elementUtils = new ElementUtils();
+    this.dependencies = dependencies;
+  }
+
+  /**
+   * Execute the setUIState operation
+   * @param options - Configuration options
+   * @param progress - Optional progress callback
+   * @param signal - Optional abort signal
+   * @returns Result of the operation
+   */
+  async execute(
+    options: SetUIStateOptions,
+    progress?: ProgressCallback,
+    signal?: AbortSignal
+  ): Promise<SetUIStateResult> {
+    const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    const verifyAfter = options.verifyAfter ?? DEFAULT_VERIFY_AFTER;
+    const scrollToFind = options.scrollToFind ?? DEFAULT_SCROLL_TO_FIND;
+    const scrollDirection = options.scrollDirection ?? DEFAULT_SCROLL_DIRECTION;
+
+    const fieldResults: FieldResult[] = [];
+    let totalAttempts = 0;
+    let lastObservation: ObserveResult | undefined;
+
+    // Get initial observation
+    lastObservation = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+
+    for (const fieldSpec of options.fields) {
+      const result = await this.processField(
+        fieldSpec,
+        {
+          maxRetries,
+          verifyAfter,
+          scrollToFind,
+          scrollDirection,
+          viewHierarchy: lastObservation?.viewHierarchy
+        },
+        progress,
+        signal
+      );
+
+      fieldResults.push(result);
+      totalAttempts += result.attempts;
+
+      // Update last observation if we got one
+      if (result.success) {
+        const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+        if (freshObs) {
+          lastObservation = freshObs;
+        }
+      }
+
+      // Fail fast: stop on first field failure after retries
+      if (!result.success) {
+        logger.warn(`[SetUIState] Field failed, stopping: ${this.describeSelector(fieldSpec.selector)}`);
+        return {
+          success: false,
+          fields: fieldResults,
+          totalAttempts,
+          observation: lastObservation,
+          error: result.error ?? `Failed to set field: ${this.describeSelector(fieldSpec.selector)}`
+        };
+      }
+    }
+
+    return {
+      success: true,
+      fields: fieldResults,
+      totalAttempts,
+      observation: lastObservation
+    };
+  }
+
+  /**
+   * Process a single field
+   */
+  private async processField(
+    fieldSpec: FieldSpec,
+    context: {
+      maxRetries: number;
+      verifyAfter: boolean;
+      scrollToFind: boolean;
+      scrollDirection: "up" | "down";
+      viewHierarchy?: ViewHierarchyResult;
+    },
+    progress?: ProgressCallback,
+    signal?: AbortSignal
+  ): Promise<FieldResult> {
+    let attempts = 0;
+    let lastError: string | undefined;
+    let fieldType: FieldType | undefined;
+
+    while (attempts < context.maxRetries) {
+      attempts++;
+
+      try {
+        // Find the element
+        let element = this.findElement(fieldSpec.selector, context.viewHierarchy);
+
+        // If not found and scroll enabled, try scrolling
+        if (!element && context.scrollToFind) {
+          const scrollResult = await this.scrollToFindElement(
+            fieldSpec.selector,
+            context.scrollDirection,
+            progress
+          );
+          if (scrollResult.found && scrollResult.element) {
+            element = scrollResult.element;
+          } else if (!scrollResult.found) {
+            // Try reverse direction
+            const reverseDirection = context.scrollDirection === "down" ? "up" : "down";
+            const reverseResult = await this.scrollToFindElement(
+              fieldSpec.selector,
+              reverseDirection,
+              progress
+            );
+            if (reverseResult.found && reverseResult.element) {
+              element = reverseResult.element;
+            }
+          }
+        }
+
+        if (!element) {
+          lastError = `Element not found: ${this.describeSelector(fieldSpec.selector)}`;
+          continue;
+        }
+
+        // Detect field type
+        fieldType = this.fieldTypeDetector.detect(element);
+        logger.info(`[SetUIState] Field type detected: ${fieldType} for ${this.describeSelector(fieldSpec.selector)}`);
+
+        // Check if field already has correct value
+        const alreadyCorrect = this.isFieldAlreadyCorrect(element, fieldSpec, fieldType);
+        if (alreadyCorrect) {
+          logger.info(`[SetUIState] Field already has correct value, skipping`);
+          return {
+            selector: fieldSpec.selector,
+            success: true,
+            attempts,
+            verified: true,
+            fieldType,
+            skipped: true
+          };
+        }
+
+        // Apply the value based on field type
+        const applyResult = await this.applyFieldValue(
+          element,
+          fieldSpec,
+          fieldType,
+          progress,
+          signal
+        );
+
+        if (!applyResult.success) {
+          lastError = applyResult.error;
+          continue;
+        }
+
+        // Verify if requested (and not sensitive)
+        let verified: boolean | undefined;
+        if (context.verifyAfter && !fieldSpec.sensitive) {
+          verified = await this.verifyFieldValue(fieldSpec, fieldType, signal);
+          if (!verified) {
+            lastError = `Verification failed for ${this.describeSelector(fieldSpec.selector)}`;
+            continue;
+          }
+        }
+
+        return {
+          selector: fieldSpec.selector,
+          success: true,
+          attempts,
+          verified,
+          fieldType
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+        logger.warn(`[SetUIState] Attempt ${attempts} failed: ${lastError}`);
+      }
+    }
+
+    return {
+      selector: fieldSpec.selector,
+      success: false,
+      attempts,
+      error: lastError,
+      fieldType
+    };
+  }
+
+  /**
+   * Find element in view hierarchy
+   */
+  private findElement(selector: ElementSelector, viewHierarchy?: ViewHierarchyResult): Element | null {
+    if (!viewHierarchy) {
+      return null;
+    }
+
+    if (selector.text) {
+      return this.elementUtils.findElementByText(viewHierarchy, selector.text, undefined, true, false);
+    }
+
+    if (selector.elementId) {
+      return this.elementUtils.findElementByResourceId(viewHierarchy, selector.elementId);
+    }
+
+    return null;
+  }
+
+  /**
+   * Scroll to find an element
+   */
+  private async scrollToFindElement(
+    selector: ElementSelector,
+    direction: "up" | "down",
+    progress?: ProgressCallback
+  ): Promise<{ found: boolean; element?: Element }> {
+    const swipeOn = this.getSwipeOn();
+    const lookFor = selector.text
+      ? { text: selector.text }
+      : { elementId: selector.elementId };
+
+    const result = await swipeOn.execute(
+      { direction, lookFor },
+      progress
+    );
+
+    return {
+      found: result.found ?? false,
+      element: result.element
+    };
+  }
+
+  /**
+   * Check if field already has the correct value
+   */
+  private isFieldAlreadyCorrect(element: Element, fieldSpec: FieldSpec, fieldType: FieldType): boolean {
+    switch (fieldType) {
+      case "text":
+        if (fieldSpec.value !== undefined) {
+          const currentValue = this.fieldTypeDetector.getTextValue(element);
+          return currentValue === fieldSpec.value;
+        }
+        return false;
+
+      case "checkbox":
+      case "toggle":
+        if (fieldSpec.selected !== undefined) {
+          const isChecked = this.fieldTypeDetector.isChecked(element);
+          return isChecked === fieldSpec.selected;
+        }
+        return false;
+
+      case "dropdown":
+        if (fieldSpec.value !== undefined) {
+          const currentValue = this.fieldTypeDetector.getTextValue(element);
+          return currentValue === fieldSpec.value;
+        }
+        return false;
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Apply value to field based on type
+   */
+  private async applyFieldValue(
+    element: Element,
+    fieldSpec: FieldSpec,
+    fieldType: FieldType,
+    progress?: ProgressCallback,
+    signal?: AbortSignal
+  ): Promise<{ success: boolean; error?: string }> {
+    const tapOnElement = this.getTapOnElement();
+    const inputText = this.getInputText();
+    const clearText = this.getClearText();
+
+    try {
+      switch (fieldType) {
+        case "text": {
+          if (fieldSpec.value === undefined) {
+            return { success: false, error: "value is required for text fields" };
+          }
+
+          // Tap to focus
+          const tapResult = await tapOnElement.execute(
+            this.buildTapOptions(fieldSpec.selector, "tap"),
+            progress,
+            signal
+          );
+          if (!tapResult.success) {
+            return { success: false, error: `Failed to tap on field: ${tapResult.error}` };
+          }
+
+          // Clear existing text
+          const clearResult = await clearText.execute(progress);
+          if (!clearResult.success) {
+            return { success: false, error: `Failed to clear text: ${clearResult.error}` };
+          }
+
+          // Input new text
+          const inputResult = await inputText.execute(fieldSpec.value);
+          if (!inputResult.success) {
+            return { success: false, error: `Failed to input text: ${inputResult.error}` };
+          }
+
+          return { success: true };
+        }
+
+        case "checkbox":
+        case "toggle": {
+          if (fieldSpec.selected === undefined) {
+            return { success: false, error: "selected is required for checkbox/toggle fields" };
+          }
+
+          // Check current state
+          const isChecked = this.fieldTypeDetector.isChecked(element);
+
+          // Only tap if state needs to change
+          if (isChecked !== fieldSpec.selected) {
+            const tapResult = await tapOnElement.execute(
+              this.buildTapOptions(fieldSpec.selector, "tap"),
+              progress,
+              signal
+            );
+            if (!tapResult.success) {
+              return { success: false, error: `Failed to tap checkbox/toggle: ${tapResult.error}` };
+            }
+          }
+
+          return { success: true };
+        }
+
+        case "dropdown": {
+          if (fieldSpec.value === undefined) {
+            return { success: false, error: "value is required for dropdown fields" };
+          }
+
+          // Tap to open dropdown
+          const openResult = await tapOnElement.execute(
+            this.buildTapOptions(fieldSpec.selector, "tap"),
+            progress,
+            signal
+          );
+          if (!openResult.success) {
+            return { success: false, error: `Failed to open dropdown: ${openResult.error}` };
+          }
+
+          // Wait a bit for dropdown to open
+          await this.timer.sleep(200);
+
+          // Tap on the desired value
+          const selectResult = await tapOnElement.execute(
+            { text: fieldSpec.value, action: "tap" },
+            progress,
+            signal
+          );
+          if (!selectResult.success) {
+            return { success: false, error: `Failed to select dropdown value: ${selectResult.error}` };
+          }
+
+          return { success: true };
+        }
+
+        default:
+          return { success: false, error: `Unknown field type: ${fieldType}` };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * Verify field value after setting
+   */
+  private async verifyFieldValue(
+    fieldSpec: FieldSpec,
+    fieldType: FieldType,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    // Get fresh observation
+    const observation = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+    if (!observation?.viewHierarchy) {
+      return false;
+    }
+
+    // Find the element again
+    const element = this.findElement(fieldSpec.selector, observation.viewHierarchy);
+    if (!element) {
+      return false;
+    }
+
+    // Verify based on field type
+    switch (fieldType) {
+      case "text":
+        if (fieldSpec.value !== undefined) {
+          const currentValue = this.fieldTypeDetector.getTextValue(element);
+          return currentValue === fieldSpec.value;
+        }
+        return true;
+
+      case "checkbox":
+      case "toggle":
+        if (fieldSpec.selected !== undefined) {
+          const isChecked = this.fieldTypeDetector.isChecked(element);
+          return isChecked === fieldSpec.selected;
+        }
+        return true;
+
+      case "dropdown":
+        if (fieldSpec.value !== undefined) {
+          const currentValue = this.fieldTypeDetector.getTextValue(element);
+          return currentValue === fieldSpec.value;
+        }
+        return true;
+
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Build tap options from selector
+   */
+  private buildTapOptions(
+    selector: ElementSelector,
+    action: string
+  ): { text?: string; elementId?: string; action: string } {
+    if (selector.text) {
+      return { text: selector.text, action };
+    }
+    return { elementId: selector.elementId, action };
+  }
+
+  /**
+   * Describe a selector for error messages
+   */
+  private describeSelector(selector: ElementSelector): string {
+    if (selector.text) {
+      return `text="${selector.text}"`;
+    }
+    if (selector.elementId) {
+      return `elementId="${selector.elementId}"`;
+    }
+    return "unknown selector";
+  }
+
+  // Dependency getters with lazy initialization
+
+  private getTapOnElement(): TapOnElementLike {
+    if (this.dependencies.tapOnElement) {
+      return this.dependencies.tapOnElement;
+    }
+    // Lazy import to avoid circular dependencies
+    const { TapOnElement } = require("./TapOnElement");
+    return new TapOnElement(this.device, this.adb);
+  }
+
+  private getInputText(): InputTextLike {
+    if (this.dependencies.inputText) {
+      return this.dependencies.inputText;
+    }
+    const { InputText } = require("./InputText");
+    return new InputText(this.device, this.adb);
+  }
+
+  private getClearText(): ClearTextLike {
+    if (this.dependencies.clearText) {
+      return this.dependencies.clearText;
+    }
+    const { ClearText } = require("./ClearText");
+    return new ClearText(this.device, this.adb);
+  }
+
+  private getSwipeOn(): SwipeOnLike {
+    if (this.dependencies.swipeOn) {
+      return this.dependencies.swipeOn;
+    }
+    const { SwipeOn } = require("./SwipeOn");
+    return new SwipeOn(this.device, this.adb);
+  }
+
+  private getObserveScreen(): ObserveScreenLike {
+    if (this.dependencies.observeScreen) {
+      return this.dependencies.observeScreen;
+    }
+    return this.observeScreen;
+  }
+}

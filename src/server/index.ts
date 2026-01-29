@@ -35,6 +35,7 @@ import { registerSnapshotTools } from "./snapshotTools";
 import { registerBiometricTools } from "./biometricTools";
 import { registerHighlightTools } from "./highlightTools";
 import { registerDatabaseTools } from "./databaseTools";
+import { registerFormTools } from "./formTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
 // Import resource registration functions
@@ -143,6 +144,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerBiometricTools();
   registerHighlightTools();
   registerDatabaseTools();
+  registerFormTools();
   registerDebugTools();
   startupBenchmark.endPhase("toolRegistration");
 
