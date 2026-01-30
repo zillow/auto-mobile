@@ -4167,6 +4167,44 @@
     }
   },
   {
+    "name": "startTestRecording",
+    "description": "Start test recording mode on the active device. Records user interactions for later export as a test plan. Returns the session ID which can be used with exportPlan.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "recordingId": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "deviceId": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "swipeOn",
     "description": "Swipe/scroll on screen or elements",
     "inputSchema": {
