@@ -6,9 +6,8 @@ import {
   ViewHierarchyWindowInfo
 } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
-import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
-import { RequestManager } from "../../utils/RequestManager";
 import { PortManager } from "../../utils/PortManager";
 import { shouldUseHostControl, getHostControlHost } from "../../utils/hostControlClient";
 import { isRunningInDocker } from "../../utils/dockerEnv";
@@ -18,6 +17,11 @@ import {
   HierarchyNavigationUpdateMetrics
 } from "../navigation/HierarchyNavigationDetector";
 import { AccessibilityHierarchy } from "../navigation/ScreenFingerprint";
+import {
+  DeviceServiceClient,
+  WebSocketFactory,
+  defaultWebSocketFactory,
+} from "./DeviceServiceClient";
 
 /**
  * Interface for iOS accessibility node format (matching Android format)
@@ -351,32 +355,16 @@ export interface XCTestService {
 }
 
 /**
- * Factory type for creating WebSocket instances (for testing)
- */
-export type WebSocketFactory = (url: string) => WebSocket;
-
-/**
- * Default WebSocket factory
- */
-const defaultWebSocketFactory: WebSocketFactory = (url: string) => new WebSocket(url);
-
-/**
  * XCTestServiceClient - WebSocket client for iOS XCTestService
  * Provides iOS UI hierarchy and interaction capabilities matching Android AccessibilityServiceClient
+ *
+ * Extends DeviceServiceClient for shared connection lifecycle management.
  */
-export class XCTestServiceClient implements XCTestService {
+export class XCTestServiceClient extends DeviceServiceClient implements XCTestService {
   private static instances: Map<string, XCTestServiceClient> = new Map();
 
   // Default port matches XCTestService on iOS
   public static readonly DEFAULT_PORT = 8765;
-
-  // Connection state
-  private ws: WebSocket | null = null;
-  private isConnecting: boolean = false;
-  private connectionAttempts: number = 0;
-  private lastConnectionAttempt: number = 0;
-  private static readonly CONNECTION_ATTEMPT_RESET_MS = 10000;
-  private static readonly MAX_CONNECTION_ATTEMPTS = 3;
 
   // Hierarchy caching
   private cachedHierarchy: CachedHierarchy | null = null;
@@ -386,23 +374,12 @@ export class XCTestServiceClient implements XCTestService {
   // Push update callbacks
   private onPushUpdateCallbacks: Set<(hierarchy: XCTestHierarchy) => void> = new Set();
 
-  // Auto-reconnect
-  private autoReconnectEnabled: boolean = true;
-  private reconnectTimeoutId: ReturnType<Timer["setTimeout"]> | null = null;
-  private static readonly RECONNECT_DELAY_MS = 2000;
-
-  // Health check
-  private healthCheckIntervalId: ReturnType<Timer["setInterval"]> | null = null;
-  private static readonly HEALTH_CHECK_INTERVAL_MS = 30000;
-
-  // Request management
-  private requestManager: RequestManager;
-
-  // Dependencies
+  // Platform-specific dependencies
   private readonly device: BootedDevice;
   private readonly port: number;
-  private readonly timer: Timer;
-  private readonly wsFactory: WebSocketFactory;
+
+  // Logging tag for base class
+  protected readonly logTag = "XCTestServiceClient";
 
   private constructor(
     device: BootedDevice,
@@ -410,11 +387,9 @@ export class XCTestServiceClient implements XCTestService {
     wsFactory: WebSocketFactory = defaultWebSocketFactory,
     timer: Timer = defaultTimer
   ) {
+    super(timer, wsFactory);
     this.device = device;
     this.port = port;
-    this.wsFactory = wsFactory;
-    this.timer = timer;
-    this.requestManager = new RequestManager(timer);
   }
 
   /**
@@ -456,19 +431,61 @@ export class XCTestServiceClient implements XCTestService {
     XCTestServiceClient.instances.clear();
   }
 
-  // MARK: - Connection Management
+  // ===========================================================================
+  // DeviceServiceClient abstract method implementations
+  // ===========================================================================
 
-  public isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  /**
+   * Get the WebSocket URL for connecting to the iOS XCTestService.
+   */
+  protected getWebSocketUrl(): string {
+    const wsHost = this.resolveWebSocketHost();
+    return `ws://${wsHost}:${this.port}/ws`;
   }
 
-  public async ensureConnected(perf?: PerformanceTracker): Promise<boolean> {
-    if (this.isConnected()) {
-      return true;
+  /**
+   * Handle an incoming WebSocket message.
+   */
+  protected handleMessage(data: WebSocket.Data): void {
+    try {
+      const message = JSON.parse(data.toString()) as WebSocketMessage;
+      this.processMessage(message);
+    } catch (error) {
+      logger.warn(`[XCTestServiceClient] Failed to parse message: ${error}`);
     }
-
-    return this.connectWebSocket(perf ?? new NoOpPerformanceTracker());
   }
+
+  /**
+   * Called when WebSocket connection is established.
+   */
+  protected onConnectionEstablished(): void {
+    // No additional setup needed for iOS
+  }
+
+  /**
+   * Called when WebSocket connection is closed.
+   */
+  protected onConnectionClosed(): void {
+    this.cachedHierarchy = null;
+
+    if (this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector.dispose();
+      this.hierarchyNavigationDetector = null;
+    }
+  }
+
+  /**
+   * Platform-specific setup before WebSocket connection.
+   * iOS doesn't need port forwarding like Android.
+   */
+  protected async setupBeforeConnect(_perf: PerformanceTracker): Promise<void> {
+    // No port forwarding needed for iOS simulator
+    // For real devices, iproxy may be needed in the future
+  }
+
+  // ===========================================================================
+  // Platform-specific methods
+  // ===========================================================================
 
   private resolveWebSocketHost(): string {
     if (shouldUseHostControl() && isRunningInDocker()) {
@@ -477,94 +494,7 @@ export class XCTestServiceClient implements XCTestService {
     return "localhost";
   }
 
-  private async connectWebSocket(perf: PerformanceTracker): Promise<boolean> {
-    if (this.isConnecting) {
-      // Wait for current connection attempt
-      await this.timer.sleep(100);
-      return this.isConnected();
-    }
-
-    // Reset connection attempts if enough time has passed
-    const now = this.timer.now();
-    if (now - this.lastConnectionAttempt > XCTestServiceClient.CONNECTION_ATTEMPT_RESET_MS) {
-      this.connectionAttempts = 0;
-    }
-
-    if (this.connectionAttempts >= XCTestServiceClient.MAX_CONNECTION_ATTEMPTS) {
-      logger.warn(`[XCTestServiceClient] Max connection attempts (${XCTestServiceClient.MAX_CONNECTION_ATTEMPTS}) reached`);
-      return false;
-    }
-
-    this.isConnecting = true;
-    this.lastConnectionAttempt = now;
-    this.connectionAttempts++;
-
-    try {
-      // For iOS simulator, we connect directly to localhost
-      // TODO: For real devices, may need port forwarding via iproxy
-      const wsHost = this.resolveWebSocketHost();
-      const wsUrl = `ws://${wsHost}:${this.port}/ws`;
-      logger.info(`[XCTestServiceClient] Connecting to ${wsUrl}`);
-
-      return await new Promise<boolean>(resolve => {
-        const ws = this.wsFactory(wsUrl);
-        let resolved = false;
-
-        const connectionTimeout = this.timer.setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            ws.close();
-            logger.warn(`[XCTestServiceClient] Connection timeout`);
-            resolve(false);
-          }
-        }, 5000);
-
-        ws.on("open", () => {
-          if (resolved) {return;}
-          resolved = true;
-          this.timer.clearTimeout(connectionTimeout);
-          this.ws = ws;
-          this.setupMessageHandler(ws);
-          this.startHealthCheck();
-          logger.info(`[XCTestServiceClient] Connected to ${wsUrl}`);
-          resolve(true);
-        });
-
-        ws.on("error", error => {
-          if (!resolved) {
-            resolved = true;
-            this.timer.clearTimeout(connectionTimeout);
-            logger.warn(`[XCTestServiceClient] Connection error: ${error.message}`);
-            resolve(false);
-          }
-        });
-
-        ws.on("close", () => {
-          if (!resolved) {
-            resolved = true;
-            this.timer.clearTimeout(connectionTimeout);
-            resolve(false);
-          }
-          this.handleDisconnect();
-        });
-      });
-    } finally {
-      this.isConnecting = false;
-    }
-  }
-
-  private setupMessageHandler(ws: WebSocket): void {
-    ws.on("message", data => {
-      try {
-        const message = JSON.parse(data.toString()) as WebSocketMessage;
-        this.handleMessage(message);
-      } catch (error) {
-        logger.warn(`[XCTestServiceClient] Failed to parse message: ${error}`);
-      }
-    });
-  }
-
-  private handleMessage(message: WebSocketMessage): void {
+  private processMessage(message: WebSocketMessage): void {
     const { type, requestId } = message;
 
     // Handle push messages (no requestId)
@@ -651,76 +581,13 @@ export class XCTestServiceClient implements XCTestService {
         hierarchy: message.data,
         receivedAt: now,
         fresh: true,
-        perfTiming: message.perfTiming
+        perfTiming: message.perfTiming as XCTestPerfTiming | undefined
       };
       logger.info(`[XCTestServiceClient] Received hierarchy push update - UI changed`);
 
       // Notify listeners (e.g., ObserveScreen to clear its cache)
       this.notifyPushUpdateListeners(message.data);
       return;
-    }
-  }
-
-  private handleDisconnect(): void {
-    this.ws = null;
-    this.stopHealthCheck();
-
-    if (this.autoReconnectEnabled) {
-      this.scheduleReconnect();
-    }
-  }
-
-  private scheduleReconnect(): void {
-    if (this.reconnectTimeoutId) {
-      return;
-    }
-
-    this.reconnectTimeoutId = this.timer.setTimeout(() => {
-      this.reconnectTimeoutId = null;
-      void this.connectWebSocket(new NoOpPerformanceTracker());
-    }, XCTestServiceClient.RECONNECT_DELAY_MS);
-  }
-
-  private startHealthCheck(): void {
-    if (this.healthCheckIntervalId) {
-      return;
-    }
-
-    this.healthCheckIntervalId = this.timer.setInterval(() => {
-      if (!this.isConnected()) {
-        void this.connectWebSocket(new NoOpPerformanceTracker());
-      }
-    }, XCTestServiceClient.HEALTH_CHECK_INTERVAL_MS);
-  }
-
-  private stopHealthCheck(): void {
-    if (this.healthCheckIntervalId) {
-      this.timer.clearInterval(this.healthCheckIntervalId);
-      this.healthCheckIntervalId = null;
-    }
-  }
-
-  public async close(): Promise<void> {
-    this.autoReconnectEnabled = false;
-    this.stopHealthCheck();
-
-    if (this.reconnectTimeoutId) {
-      this.timer.clearTimeout(this.reconnectTimeoutId);
-      this.reconnectTimeoutId = null;
-    }
-
-    this.requestManager.cancelAll(new Error("Client closed"));
-
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-
-    this.cachedHierarchy = null;
-
-    if (this.hierarchyNavigationDetector) {
-      this.hierarchyNavigationDetector.dispose();
-      this.hierarchyNavigationDetector = null;
     }
   }
 
@@ -738,16 +605,6 @@ export class XCTestServiceClient implements XCTestService {
     if (this.hierarchyNavigationDetector) {
       this.hierarchyNavigationDetector.reset();
     }
-  }
-
-  public async waitForConnection(maxAttempts: number = 3, delayMs: number = 1000): Promise<boolean> {
-    for (let i = 0; i < maxAttempts; i++) {
-      if (await this.ensureConnected()) {
-        return true;
-      }
-      await this.timer.sleep(delayMs);
-    }
-    return false;
   }
 
   public async verifyServiceReady(
@@ -871,12 +728,12 @@ export class XCTestServiceClient implements XCTestService {
 
   private convertNodeForNavigation(
     node: XCTestNode | XCTestNode[]
-  ): Record<string, any> | Record<string, any>[] {
+  ): Record<string, unknown> | Record<string, unknown>[] {
     if (Array.isArray(node)) {
       return node.map(child => this.convertNodeForNavigation(child));
     }
 
-    const converted: Record<string, any> = {};
+    const converted: Record<string, unknown> = {};
 
     const contentDesc = this.readNodeField<string>(node, "contentDesc", "content-desc");
     const resourceId = this.readNodeField<string>(node, "resourceId", "resource-id");

@@ -47,6 +47,11 @@ import type {
   SubscribeStorageResult,
   UnsubscribeStorageResult,
 } from "../storage/storageTypes";
+import {
+  DeviceServiceClient,
+  WebSocketFactory,
+  defaultWebSocketFactory,
+} from "./DeviceServiceClient";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -724,7 +729,7 @@ export interface AccessibilityService {
  * Client for interacting with the AutoMobile Accessibility Service via WebSocket
  * Uses singleton pattern per device to maintain persistent WebSocket connection
  */
-export class AccessibilityServiceClient implements AccessibilityService {
+export class AccessibilityServiceClient extends DeviceServiceClient implements AccessibilityService {
   private device: BootedDevice;
   private adb: AdbClient;
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
@@ -736,28 +741,15 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Singleton instances per device
   private static instances: Map<string, AccessibilityServiceClient> = new Map();
 
-  private ws: WebSocket | null = null;
+  // Hierarchy caching
   private cachedHierarchy: CachedHierarchy | null = null;
-  private isConnecting: boolean = false;
-  private connectionAttempts: number = 0;
-  private lastConnectionAttempt: number = 0;
-  private readonly maxConnectionAttempts: number = 3;
-  private static readonly CONNECTION_ATTEMPT_RESET_MS = 10000; // Reset attempts after 10 seconds
+
+  // Android-specific state
   private portForwardingSetup: boolean = false;
   private lastWebSocketTimeout: number = 0;
   private static readonly WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000; // Skip WebSocket wait for 5 seconds after timeout
   private recompositionTrackingConfigured: boolean = false;
   private recompositionTrackingEnabled: boolean = false;
-
-  // Auto-reconnection state
-  private autoReconnectEnabled: boolean = true;
-  private reconnectTimeoutId: ReturnType<Timer["setTimeout"]> | null = null;
-  private static readonly RECONNECT_DELAY_MS = 2000; // Wait 2 seconds before reconnecting
-
-  // Health check state
-  private healthCheckIntervalId: ReturnType<Timer["setInterval"]> | null = null;
-  private static readonly HEALTH_CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
-  private lastHealthCheckTime: number = 0;
 
   // All request/response operations use RequestManager for unified tracking with automatic timeouts.
   // Operations: screenshot, swipe, tap_coordinates, drag, pinch, setText, imeAction, selectAll,
@@ -770,15 +762,6 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private storageChangeListeners: Set<(event: StorageChangedEvent) => void> = new Set();
 
 
-  // WebSocket factory for testing
-  private webSocketFactory: (url: string) => WebSocket;
-
-  // Timer for testing
-  private timer: Timer;
-
-  // Request manager for unified request/response handling with timeouts
-  private requestManager: RequestManager;
-
   // Hierarchy navigation detector for view hierarchy-based navigation
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
   // Track apps that emit SDK navigation events so we can avoid overriding screen names
@@ -787,6 +770,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Screenshot backoff scheduler for streaming screenshots after hierarchy updates
   private screenshotBackoffScheduler: ScreenshotBackoffScheduler | null = null;
   private cachedScreenDimensions: { width: number; height: number } | null = null;
+
+  // Logging tag for base class
+  protected readonly logTag = "ACCESSIBILITY_SERVICE";
 
   /**
    * Private constructor - use getInstance() instead
@@ -798,15 +784,13 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private constructor(
     device: BootedDevice,
     adb: AdbClient,
-    webSocketFactory?: (url: string) => WebSocket,
+    webSocketFactory?: WebSocketFactory,
     timer?: Timer,
     installedAppsRepository?: InstalledAppsStore
   ) {
+    super(timer ?? defaultTimer, webSocketFactory ?? defaultWebSocketFactory);
     this.device = device;
     this.adb = adb;
-    this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
-    this.timer = timer || defaultTimer;
-    this.requestManager = new RequestManager(this.timer);
     this.installedAppsRepository = installedAppsRepository ?? null;
     // Allocate a unique local port for this device (supports multiple emulators)
     this.localPort = PortManager.allocate(device.deviceId);
@@ -863,6 +847,57 @@ export class AccessibilityServiceClient implements AccessibilityService {
     return new AccessibilityServiceClient(device, adb, webSocketFactory, timer, installedAppsRepository);
   }
 
+  // ===========================================================================
+  // DeviceServiceClient abstract method implementations
+  // ===========================================================================
+
+  /**
+   * Get the WebSocket URL for connecting to the Android accessibility service.
+   */
+  protected getWebSocketUrl(): string {
+    return `ws://localhost:${this.localPort}/ws`;
+  }
+
+  /**
+   * Handle an incoming WebSocket message.
+   */
+  protected async handleMessage(data: WebSocket.Data): Promise<void> {
+    return this.handleWebSocketMessage(data);
+  }
+
+  /**
+   * Called when WebSocket connection is established.
+   */
+  protected onConnectionEstablished(): void {
+    // No additional setup needed - health check is started by base class
+  }
+
+  /**
+   * Called when WebSocket connection is closed.
+   */
+  protected onConnectionClosed(): void {
+    // Mark installed apps cache as stale since we may have missed package events
+    void this.markInstalledAppsStale("websocket_closed");
+
+    // Dispose hierarchy navigation detector to avoid stale state
+    if (this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector.dispose();
+      this.hierarchyNavigationDetector = null;
+    }
+  }
+
+  /**
+   * Platform-specific setup before WebSocket connection.
+   * Sets up ADB port forwarding from local port to device port.
+   */
+  protected async setupBeforeConnect(perf: PerformanceTracker): Promise<void> {
+    await this.setupPortForwarding(perf);
+  }
+
+  // ===========================================================================
+  // Platform-specific methods
+  // ===========================================================================
+
   /**
    * Get the hierarchy navigation detector, creating it lazily if needed.
    * The detector monitors view hierarchy updates to detect screen changes.
@@ -905,42 +940,6 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
   }
 
-  /**
-   * Check if WebSocket is currently connected
-   */
-  public isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
-  }
-
-  public async waitForConnection(
-    maxAttempts: number = 10,
-    delayMs: number = 300
-  ): Promise<boolean> {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      // Reset connection attempts counter to allow fresh connection attempts
-      this.connectionAttempts = 0;
-
-      const connected = await this.ensureConnected();
-      if (connected) {
-        logger.info(`[ACCESSIBILITY_SERVICE] WebSocket connected after ${attempt} attempt(s) (${(attempt - 1) * delayMs}ms)`);
-        return true;
-      }
-
-      if (attempt < maxAttempts) {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms`);
-        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
-      }
-    }
-
-    logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket not ready after ${maxAttempts} attempts (${maxAttempts * delayMs}ms)`);
-    return false;
-  }
-
-  public async ensureConnected(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<boolean> {
-    return this.connectWebSocket(perf);
-  }
 
   /**
    * Verify the accessibility service is ready to respond to requests.
@@ -1194,188 +1193,6 @@ export class AccessibilityServiceClient implements AccessibilityService {
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
       throw error;
-    }
-  }
-
-  /**
-   * Connect to the WebSocket server
-   * @param perf - Performance tracker for timing
-   */
-  private async connectWebSocket(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<boolean> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      logger.debug("[ACCESSIBILITY_SERVICE] WebSocket already connected (reusing connection)");
-      return true;
-    }
-
-    // If WebSocket exists but is not OPEN (stale/closing), clean it up and reset attempts
-    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-      logger.info(`[ACCESSIBILITY_SERVICE] Cleaning up stale WebSocket (state: ${this.ws.readyState})`);
-      try {
-        this.ws.close();
-      } catch {
-        // Ignore close errors on stale socket
-      }
-      this.ws = null;
-      this.connectionAttempts = 0; // Reset to allow new connection attempts
-      // Reset port forwarding flag so next attempt will re-setup the forward
-      this.portForwardingSetup = false;
-    }
-
-    if (this.isConnecting) {
-      logger.debug("[ACCESSIBILITY_SERVICE] Connection already in progress, waiting...");
-      // Wait for ongoing connection attempt
-      return new Promise(resolve => {
-        const checkInterval = this.timer.setInterval(() => {
-          if (!this.isConnecting) {
-            this.timer.clearInterval(checkInterval);
-            resolve(this.ws?.readyState === WebSocket.OPEN);
-          }
-        }, 100);
-      });
-    }
-
-    // Reset connection attempts if enough time has passed since last attempt
-    if (this.connectionAttempts >= this.maxConnectionAttempts) {
-      const timeSinceLastAttempt = Date.now() - this.lastConnectionAttempt;
-      if (timeSinceLastAttempt >= AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Resetting connection attempts after ${timeSinceLastAttempt}ms cooldown`);
-        this.connectionAttempts = 0;
-      } else {
-        logger.warn(`[ACCESSIBILITY_SERVICE] Max connection attempts (${this.maxConnectionAttempts}) reached, cooldown remaining: ${AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS - timeSinceLastAttempt}ms`);
-        return false;
-      }
-    }
-
-    this.isConnecting = true;
-    this.connectionAttempts++;
-    this.lastConnectionAttempt = Date.now();
-
-    try {
-      // Ensure port forwarding is setup
-      await perf.track("portForwarding", () => this.setupPortForwarding(perf));
-
-      const wsUrl = `ws://localhost:${this.localPort}/ws`;
-      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${wsUrl} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}, device: ${this.device.deviceId})`);
-
-      return await perf.track("wsConnect", () => new Promise<boolean>((resolve, reject) => {
-        const ws = this.webSocketFactory(wsUrl);
-        const connectionTimeout = this.timer.setTimeout(() => {
-          ws.close();
-          // Reset port forwarding flag so next attempt will re-setup the forward
-          this.portForwardingSetup = false;
-          reject(new Error("WebSocket connection timeout"));
-        }, 5000);
-
-        ws.on("open", () => {
-          this.timer.clearTimeout(connectionTimeout);
-          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connected successfully");
-          this.ws = ws;
-          this.isConnecting = false;
-          this.connectionAttempts = 0; // Reset on successful connection
-
-          // Start health check monitoring
-          this.startHealthCheck();
-
-          resolve(true);
-        });
-
-        ws.on("message", (data: WebSocket.Data) => {
-          this.handleWebSocketMessage(data);
-        });
-
-        ws.on("error", error => {
-          this.timer.clearTimeout(connectionTimeout);
-          logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket error: ${error.message}`);
-          this.isConnecting = false;
-          // Reset port forwarding flag so next attempt will re-setup the forward
-          this.portForwardingSetup = false;
-          reject(error);
-        });
-
-        ws.on("close", () => {
-          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connection closed");
-          this.ws = null;
-          this.isConnecting = false;
-          // Reset connection attempts on close to allow future retries
-          this.connectionAttempts = 0;
-          void this.markInstalledAppsStale("websocket_closed");
-
-          // Stop health check
-          this.stopHealthCheck();
-
-          // Attempt automatic reconnection if enabled
-          if (this.autoReconnectEnabled) {
-            logger.info(`[ACCESSIBILITY_SERVICE] Scheduling reconnection in ${AccessibilityServiceClient.RECONNECT_DELAY_MS}ms`);
-            this.reconnectTimeoutId = this.timer.setTimeout(() => {
-              this.reconnectTimeoutId = null;
-              logger.info("[ACCESSIBILITY_SERVICE] Attempting automatic reconnection...");
-              void this.connectWebSocket(new NoOpPerformanceTracker()).then(connected => {
-                if (connected) {
-                  logger.info("[ACCESSIBILITY_SERVICE] Automatic reconnection successful");
-                } else {
-                  logger.warn("[ACCESSIBILITY_SERVICE] Automatic reconnection failed");
-                }
-              });
-            }, AccessibilityServiceClient.RECONNECT_DELAY_MS);
-          }
-        });
-      }));
-    } catch (error) {
-      this.isConnecting = false;
-      // Reset port forwarding flag so next attempt will re-setup the forward
-      this.portForwardingSetup = false;
-      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to connect to WebSocket: ${error}`);
-      return false;
-    }
-  }
-
-  /**
-   * Start periodic health check to ensure WebSocket stays connected
-   */
-  private startHealthCheck(): void {
-    // Clear any existing health check
-    this.stopHealthCheck();
-
-    logger.debug(`[ACCESSIBILITY_SERVICE] Starting health check (interval: ${AccessibilityServiceClient.HEALTH_CHECK_INTERVAL_MS}ms)`);
-    this.lastHealthCheckTime = Date.now();
-
-    this.healthCheckIntervalId = this.timer.setInterval(() => {
-      const now = Date.now();
-      const timeSinceLastCheck = now - this.lastHealthCheckTime;
-      this.lastHealthCheckTime = now;
-
-      // Check if WebSocket is still connected
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        logger.warn("[ACCESSIBILITY_SERVICE] Health check failed: WebSocket not connected");
-        this.stopHealthCheck();
-
-        // Attempt reconnection if auto-reconnect is enabled and not already connecting
-        if (this.autoReconnectEnabled && !this.isConnecting && !this.reconnectTimeoutId) {
-          logger.info("[ACCESSIBILITY_SERVICE] Health check triggering reconnection...");
-          void this.connectWebSocket(new NoOpPerformanceTracker()).then(connected => {
-            if (connected) {
-              logger.info("[ACCESSIBILITY_SERVICE] Health check reconnection successful");
-            } else {
-              logger.warn("[ACCESSIBILITY_SERVICE] Health check reconnection failed");
-            }
-          });
-        }
-      } else {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Health check passed (time since last: ${timeSinceLastCheck}ms)`);
-      }
-    }, AccessibilityServiceClient.HEALTH_CHECK_INTERVAL_MS);
-  }
-
-  /**
-   * Stop the health check interval
-   */
-  private stopHealthCheck(): void {
-    if (this.healthCheckIntervalId !== null) {
-      logger.debug("[ACCESSIBILITY_SERVICE] Stopping health check");
-      this.timer.clearInterval(this.healthCheckIntervalId);
-      this.healthCheckIntervalId = null;
     }
   }
 
@@ -2753,34 +2570,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
    */
   async close(): Promise<void> {
     try {
-      // Disable auto-reconnect before closing
-      this.autoReconnectEnabled = false;
+      // Call base class close which handles:
+      // - Disabling auto-reconnect
+      // - Clearing reconnection timeout
+      // - Stopping health check
+      // - Canceling pending requests
+      // - Closing WebSocket
+      // - Calling onConnectionClosed() for hierarchy detector cleanup
+      await super.close();
 
-      // Clear any pending reconnection timeout
-      if (this.reconnectTimeoutId !== null) {
-        this.timer.clearTimeout(this.reconnectTimeoutId);
-        this.reconnectTimeoutId = null;
-      }
-
-      // Stop health check
-      this.stopHealthCheck();
-
-      // Cancel all pending requests
-      this.requestManager.cancelAll(new Error("WebSocket connection closed"));
-
-      if (this.ws) {
-        logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
-        this.ws.close();
-        this.ws = null;
-      }
-
-      // Dispose hierarchy navigation detector
-      if (this.hierarchyNavigationDetector) {
-        this.hierarchyNavigationDetector.dispose();
-        this.hierarchyNavigationDetector = null;
-      }
-
-      // Remove port forwarding for this device
+      // Android-specific cleanup: remove port forwarding
       if (this.portForwardingSetup) {
         await this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {
           // Ignore errors
