@@ -60,7 +60,6 @@ private val LOG = Logger.getInstance("TestDashboard")
 
 enum class TestScreen {
     Dashboard,
-    ExploratoryTest,
     RecordingTest,
     ModuleSelection,
     TestRunDetail,
@@ -169,15 +168,11 @@ fun TestDashboard(
             testRuns = testRuns,
             isLoading = isLoading,
             error = error,
-            onExploratoryTest = { currentScreen = TestScreen.ExploratoryTest },
             onRecordTest = { currentScreen = TestScreen.RecordingTest },
             onTestRunClick = { run ->
                 selectedTestRun = run
                 currentScreen = TestScreen.TestRunDetail
             },
-        )
-        TestScreen.ExploratoryTest -> ExploratoryTestScreen(
-            onBack = { currentScreen = TestScreen.Dashboard },
         )
         TestScreen.RecordingTest -> RecordingTestScreen(
             recordedActions = recordedActions,
@@ -226,7 +221,6 @@ private fun TestDashboardHome(
     testRuns: List<TestRun>,
     isLoading: Boolean = false,
     error: String? = null,
-    onExploratoryTest: () -> Unit,
     onRecordTest: () -> Unit,
     onTestRunClick: (TestRun) -> Unit,
 ) {
@@ -264,16 +258,9 @@ private fun TestDashboardHome(
 
         Spacer(Modifier.height(20.dp))
 
-        // Action buttons
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            DefaultButton(onClick = onExploratoryTest) {
-                Text("Exploratory Test")
-            }
-            OutlinedButton(onClick = onRecordTest) {
-                Text("Record Test")
-            }
+        // Action button
+        DefaultButton(onClick = onRecordTest) {
+            Text("Record Test")
         }
 
         Spacer(Modifier.height(24.dp))
@@ -464,186 +451,6 @@ private fun TestRunRowEnhanced(
     }
 }
 
-
-@Composable
-private fun ExploratoryTestScreen(onBack: () -> Unit) {
-    val colors = JewelTheme.globalColors
-    var isLoadingAnalysis by remember { mutableStateOf(true) }
-
-    // Simulate loading analysis
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(1500)
-        isLoadingAnalysis = false
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-    ) {
-        Link("← Back", onClick = onBack)
-        Spacer(Modifier.height(12.dp))
-
-        Text("Exploratory Test", fontSize = 18.sp)
-        Text(
-            "Let AI explore untested areas of your app",
-            color = colors.text.normal.copy(alpha = 0.6f),
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        // Prompt input
-        Text("Prompt", fontSize = 13.sp, color = colors.text.normal.copy(alpha = 0.8f))
-        Spacer(Modifier.height(8.dp))
-
-        val placeholderText = "Describe what you want to explore..."
-        val defaultPrompt = "Explore the app and find untested functionality"
-        val promptState = remember { TextFieldState("") }
-        val isEmpty = promptState.text.isEmpty()
-
-        // Prompt input row with multiline text area, Clear, and Start buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(80.dp)
-                    .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                    .padding(8.dp),
-            ) {
-                // Placeholder text when empty
-                if (isEmpty) {
-                    Text(
-                        placeholderText,
-                        fontSize = 12.sp,
-                        color = colors.text.normal.copy(alpha = 0.4f),
-                    )
-                }
-                androidx.compose.foundation.text.BasicTextField(
-                    state = promptState,
-                    modifier = Modifier.fillMaxSize(),
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 12.sp,
-                        color = colors.text.normal,
-                    ),
-                    lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
-                        minHeightInLines = 2,
-                        maxHeightInLines = 4,
-                    ),
-                )
-            }
-
-            // Clear button - only enabled when there's text
-            if (!isEmpty) {
-                OutlinedButton(
-                    onClick = {
-                        promptState.edit { replace(0, length, "") }
-                    },
-                ) {
-                    Text("Clear")
-                }
-            }
-
-            DefaultButton(
-                onClick = {
-                    // Use default prompt if empty, otherwise use entered text
-                    val finalPrompt = if (isEmpty) defaultPrompt else promptState.text.toString()
-                    // TODO: Start exploration with finalPrompt
-                },
-            ) {
-                Text("Start")
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Suggested prompts - only show after analysis loads
-        if (!isLoadingAnalysis) {
-            Text("Suggested", fontSize = 12.sp, color = colors.text.normal.copy(alpha = 0.5f))
-            Spacer(Modifier.height(6.dp))
-
-            // Heuristically generated prompts based on coverage analysis
-            val suggestedPrompts = listOf(
-                "Test the VideoCall screen - try starting, ending, and muting calls",
-                "Explore Privacy settings and verify all toggles work correctly",
-                "Test the VoiceCall → MediaGallery transition with different media types",
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                suggestedPrompts.forEach { suggestion ->
-                    SuggestedPromptChip(
-                        text = suggestion,
-                        onClick = {
-                            promptState.edit {
-                                replace(0, length, suggestion)
-                            }
-                        },
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // Coverage analysis with loading state
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                .padding(16.dp),
-        ) {
-            if (isLoadingAnalysis) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Simple animated loading dots using LaunchedEffect
-                    var dotCount by remember { mutableStateOf(0) }
-                    androidx.compose.runtime.LaunchedEffect(Unit) {
-                        while (true) {
-                            kotlinx.coroutines.delay(300)
-                            dotCount = (dotCount + 1) % 4
-                        }
-                    }
-                    val dots = ".".repeat(dotCount)
-                    Text(
-                        "Analyzing coverage$dots",
-                        fontSize = 12.sp,
-                        color = colors.text.normal.copy(alpha = 0.6f),
-                    )
-                }
-            } else {
-                Column {
-                    Text("Coverage Analysis", fontSize = 13.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Based on your navigation graph, these areas have low test coverage:",
-                        fontSize = 12.sp,
-                        color = colors.text.normal.copy(alpha = 0.7f),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    listOf(
-                        "VideoCall screen (55% coverage)",
-                        "Privacy settings flow (58% coverage)",
-                        "VoiceCall → MediaGallery transition (untested)",
-                        "GroupChat error handling (no tests)",
-                    ).forEach { item ->
-                        Text(
-                            "• $item",
-                            fontSize = 11.sp,
-                            color = colors.text.normal.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun SuggestedPromptChip(
     text: String,
@@ -687,6 +494,18 @@ private fun RecordingTestScreen(
 ) {
     val colors = JewelTheme.globalColors
 
+    // Two-phase state: setup vs recording
+    var isRecording by remember { mutableStateOf(false) }
+    val promptState = remember { TextFieldState("") }
+    var isLoadingAnalysis by remember { mutableStateOf(true) }
+    var promptExpanded by remember { mutableStateOf(false) }
+
+    // Simulate loading analysis (for setup phase)
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1500)
+        isLoadingAnalysis = false
+    }
+
     // Decode screenshot if available
     val screenshotBytes = remember(screenshotUpdate?.screenshotBase64) {
         screenshotUpdate?.screenshotBase64?.let { base64 ->
@@ -702,247 +521,455 @@ private fun RecordingTestScreen(
     val currentPackageName = hierarchyUpdate?.packageName
     val currentScreenName = navigationUpdate?.currentScreen
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Header with recording indicator
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    if (!isRecording) {
+        // ============ SETUP PHASE ============
+        val scrollState = rememberScrollState()
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Link("← Cancel", onClick = onBack)
-            }
+            Link("← Back", onClick = onBack)
+            Spacer(Modifier.height(12.dp))
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Recording indicator (pulsing red dot)
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(Color(0xFFFF4444), CircleShape)
-                )
-                Text("Recording", fontSize = 12.sp, color = Color(0xFFFF4444))
-            }
-
-            DefaultButton(onClick = onFinishRecording) {
-                Text("Finish Recording")
-            }
-        }
-
-        // Instructions
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                .padding(12.dp),
-        ) {
+            Text("Record Test", fontSize = 18.sp)
             Text(
-                "Use your AI agent (Claude Code, Codex, etc.) to interact with the app. " +
-                    "Tool calls will be recorded below.",
+                "Create and record a UI test",
+                color = colors.text.normal.copy(alpha = 0.6f),
                 fontSize = 12.sp,
-                color = colors.text.normal.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 4.dp),
             )
-        }
 
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(24.dp))
 
-        // Main content - side by side device preview and action log
-        Row(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            // Left side: Device preview with live screenshot
-            Column(
-                modifier = Modifier.width(180.dp).fillMaxHeight(),
+            // Prompt input
+            Text("Prompt", fontSize = 13.sp, color = colors.text.normal.copy(alpha = 0.8f))
+            Spacer(Modifier.height(8.dp))
+
+            val placeholderText = "Describe what you want to test..."
+            val isEmpty = promptState.text.isEmpty()
+
+            // Prompt input row with multiline text area, Clear, and Start buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom,
             ) {
-                // Current screen info
-                if (currentPackageName != null || currentScreenName != null) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                            .padding(8.dp),
-                    ) {
-                        currentPackageName?.let { pkg ->
-                            Text(
-                                pkg.substringAfterLast('.'),
-                                fontSize = 11.sp,
-                                color = colors.text.normal.copy(alpha = 0.8f),
-                            )
-                        }
-                        currentScreenName?.let { screen ->
-                            Text(
-                                screen,
-                                fontSize = 10.sp,
-                                color = colors.text.normal.copy(alpha = 0.5f),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-
-                // Live device screenshot
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
-                        .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
-                        .border(1.dp, colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center,
+                        .height(80.dp)
+                        .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                        .padding(8.dp),
                 ) {
-                    if (screenshotBytes != null) {
-                        // Display the live screenshot
-                        val imageBitmap = remember(screenshotBytes) {
-                            try {
-                                val skiaImage = Image.makeFromEncoded(screenshotBytes)
-                                skiaImage.toComposeImageBitmap()
-                            } catch (e: Exception) {
-                                null
+                    // Placeholder text when empty
+                    if (isEmpty) {
+                        Text(
+                            placeholderText,
+                            fontSize = 12.sp,
+                            color = colors.text.normal.copy(alpha = 0.4f),
+                        )
+                    }
+                    androidx.compose.foundation.text.BasicTextField(
+                        state = promptState,
+                        modifier = Modifier.fillMaxSize(),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontSize = 12.sp,
+                            color = colors.text.normal,
+                        ),
+                        lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
+                            minHeightInLines = 2,
+                            maxHeightInLines = 4,
+                        ),
+                    )
+                }
+
+                // Clear button - only enabled when there's text
+                if (!isEmpty) {
+                    OutlinedButton(
+                        onClick = {
+                            promptState.edit { replace(0, length, "") }
+                        },
+                    ) {
+                        Text("Clear")
+                    }
+                }
+
+                DefaultButton(
+                    onClick = { isRecording = true },
+                ) {
+                    Text("Start")
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Suggested prompts - only show after analysis loads
+            if (!isLoadingAnalysis) {
+                Text("Suggested", fontSize = 12.sp, color = colors.text.normal.copy(alpha = 0.5f))
+                Spacer(Modifier.height(6.dp))
+
+                // Heuristically generated prompts based on coverage analysis
+                val suggestedPrompts = listOf(
+                    "Test the VideoCall screen - try starting, ending, and muting calls",
+                    "Explore Privacy settings and verify all toggles work correctly",
+                    "Test the VoiceCall → MediaGallery transition with different media types",
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    suggestedPrompts.forEach { suggestion ->
+                        SuggestedPromptChip(
+                            text = suggestion,
+                            onClick = {
+                                promptState.edit {
+                                    replace(0, length, suggestion)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Coverage analysis with loading state
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .padding(16.dp),
+            ) {
+                if (isLoadingAnalysis) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Simple animated loading dots using LaunchedEffect
+                        var dotCount by remember { mutableStateOf(0) }
+                        LaunchedEffect(Unit) {
+                            while (true) {
+                                kotlinx.coroutines.delay(300)
+                                dotCount = (dotCount + 1) % 4
                             }
                         }
-                        imageBitmap?.let { bitmap ->
-                            Image(
-                                bitmap = bitmap,
-                                contentDescription = "Live device screen",
-                                modifier = Modifier.fillMaxSize().padding(4.dp),
-                                contentScale = ContentScale.Fit,
+                        val dots = ".".repeat(dotCount)
+                        Text(
+                            "Analyzing coverage$dots",
+                            fontSize = 12.sp,
+                            color = colors.text.normal.copy(alpha = 0.6f),
+                        )
+                    }
+                } else {
+                    Column {
+                        Text("Coverage Analysis", fontSize = 13.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Based on your navigation graph, these areas have low test coverage:",
+                            fontSize = 12.sp,
+                            color = colors.text.normal.copy(alpha = 0.7f),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        listOf(
+                            "VideoCall screen (55% coverage)",
+                            "Privacy settings flow (58% coverage)",
+                            "VoiceCall → MediaGallery transition (untested)",
+                            "GroupChat error handling (no tests)",
+                        ).forEach { item ->
+                            Text(
+                                "• $item",
+                                fontSize = 11.sp,
+                                color = colors.text.normal.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(vertical = 2.dp),
                             )
-                        } ?: run {
-                            // Fallback if image decode fails
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // ============ RECORDING PHASE ============
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header with recording indicator
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Link("← Cancel", onClick = onBack)
+
+                // Collapsible prompt indicator
+                Row(
+                    modifier = Modifier
+                        .clickable { promptExpanded = !promptExpanded }
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (promptExpanded) "▼" else "▶",
+                        fontSize = 10.sp,
+                        color = colors.text.normal.copy(alpha = 0.5f),
+                    )
+                    val promptPreview = if (promptState.text.isEmpty()) {
+                        "No prompt"
+                    } else if (promptState.text.length > 20) {
+                        promptState.text.take(20).toString() + "..."
+                    } else {
+                        promptState.text.toString()
+                    }
+                    Text(
+                        promptPreview,
+                        fontSize = 11.sp,
+                        color = colors.text.normal.copy(alpha = 0.6f),
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Recording indicator (pulsing red dot)
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(Color(0xFFFF4444), CircleShape)
+                    )
+                    Text("Recording", fontSize = 12.sp, color = Color(0xFFFF4444))
+                }
+
+                DefaultButton(onClick = onFinishRecording) {
+                    Text("Finish Recording")
+                }
+            }
+
+            // Expanded prompt section (read-only)
+            if (promptExpanded && promptState.text.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(6.dp))
+                        .padding(12.dp),
+                ) {
+                    Text(
+                        promptState.text.toString(),
+                        fontSize = 12.sp,
+                        color = colors.text.normal.copy(alpha = 0.7f),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // Instructions
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+            ) {
+                Text(
+                    "Use your AI agent (Claude Code, Codex, etc.) to interact with the app. " +
+                        "Tool calls will be recorded below.",
+                    fontSize = 12.sp,
+                    color = colors.text.normal.copy(alpha = 0.7f),
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Main content - side by side device preview and action log
+            Row(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // Left side: Device preview with live screenshot
+                Column(
+                    modifier = Modifier.width(180.dp).fillMaxHeight(),
+                ) {
+                    // Current screen info
+                    if (currentPackageName != null || currentScreenName != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                .padding(8.dp),
+                        ) {
+                            currentPackageName?.let { pkg ->
+                                Text(
+                                    pkg.substringAfterLast('.'),
+                                    fontSize = 11.sp,
+                                    color = colors.text.normal.copy(alpha = 0.8f),
+                                )
+                            }
+                            currentScreenName?.let { screen ->
+                                Text(
+                                    screen,
+                                    fontSize = 10.sp,
+                                    color = colors.text.normal.copy(alpha = 0.5f),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    // Live device screenshot
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                            .border(1.dp, colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (screenshotBytes != null) {
+                            // Display the live screenshot
+                            val imageBitmap = remember(screenshotBytes) {
+                                try {
+                                    val skiaImage = Image.makeFromEncoded(screenshotBytes)
+                                    skiaImage.toComposeImageBitmap()
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                            imageBitmap?.let { bitmap ->
+                                Image(
+                                    bitmap = bitmap,
+                                    contentDescription = "Live device screen",
+                                    modifier = Modifier.fillMaxSize().padding(4.dp),
+                                    contentScale = ContentScale.Fit,
+                                )
+                            } ?: run {
+                                // Fallback if image decode fails
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Text("Device Preview", fontSize = 10.sp, color = colors.text.normal.copy(alpha = 0.4f))
+                                }
+                            }
+                        } else {
+                            // No screenshot available yet
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
                             ) {
-                                Text("Device Preview", fontSize = 10.sp, color = colors.text.normal.copy(alpha = 0.4f))
-                            }
-                        }
-                    } else {
-                        // No screenshot available yet
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text("📱", fontSize = 24.sp)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "Awaiting device...",
-                                fontSize = 10.sp,
-                                color = colors.text.normal.copy(alpha = 0.4f),
-                            )
-                            if (screenshotUpdate == null) {
+                                Text("📱", fontSize = 24.sp)
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    "Connect a device to see live updates",
-                                    fontSize = 9.sp,
-                                    color = colors.text.normal.copy(alpha = 0.3f),
+                                    "Awaiting device...",
+                                    fontSize = 10.sp,
+                                    color = colors.text.normal.copy(alpha = 0.4f),
                                 )
+                                if (screenshotUpdate == null) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Connect a device to see live updates",
+                                        fontSize = 9.sp,
+                                        color = colors.text.normal.copy(alpha = 0.3f),
+                                    )
+                                }
                             }
+                        }
+                    }
+
+                    // Navigation info if available
+                    navigationUpdate?.let { navUpdate ->
+                        if (navUpdate.nodes.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "${navUpdate.nodes.size} screens discovered",
+                                fontSize = 10.sp,
+                                color = Color(0xFF4CAF50),
+                            )
                         }
                     }
                 }
 
-                // Navigation info if available
-                navigationUpdate?.let { navUpdate ->
-                    if (navUpdate.nodes.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "${navUpdate.nodes.size} screens discovered",
-                            fontSize = 10.sp,
-                            color = Color(0xFF4CAF50),
-                        )
-                    }
-                }
-            }
-
-            // Right side: Terminal-style action log
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
-                    .padding(12.dp),
-            ) {
-                if (recordedActions.isEmpty()) {
-                    Column {
-                        Text(
-                            "$ awaiting tool calls...",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF888888),
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "# Example actions that will be recorded:",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF666666),
-                        )
-                        Text(
-                            "# - tapOn(element: \"Login button\")",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF666666),
-                        )
-                        Text(
-                            "# - inputText(text: \"user@example.com\")",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF666666),
-                        )
-                        Text(
-                            "# - swipeOn(direction: \"up\")",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF666666),
-                        )
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
-                    ) {
-                        recordedActions.forEachIndexed { index, action ->
+                // Right side: Terminal-style action log
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                ) {
+                    if (recordedActions.isEmpty()) {
+                        Column {
                             Text(
-                                "[$index] ${action.toolName}(${action.parameters.entries.joinToString { "${it.key}: ${it.value}" }})",
+                                "$ awaiting tool calls...",
                                 fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
-                                color = Color(0xFF4EC9B0),
+                                color = Color(0xFF888888),
                             )
-                            action.result?.let {
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                "# Example actions that will be recorded:",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF666666),
+                            )
+                            Text(
+                                "# - tapOn(element: \"Login button\")",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF666666),
+                            )
+                            Text(
+                                "# - inputText(text: \"user@example.com\")",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF666666),
+                            )
+                            Text(
+                                "# - swipeOn(direction: \"up\")",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF666666),
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.verticalScroll(rememberScrollState()),
+                        ) {
+                            recordedActions.forEachIndexed { index, action ->
                                 Text(
-                                    "    → $it",
-                                    fontSize = 11.sp,
+                                    "[$index] ${action.toolName}(${action.parameters.entries.joinToString { "${it.key}: ${it.value}" }})",
+                                    fontSize = 12.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    color = Color(0xFF888888),
+                                    color = Color(0xFF4EC9B0),
                                 )
+                                action.result?.let {
+                                    Text(
+                                        "    → $it",
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color(0xFF888888),
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
                             }
-                            Spacer(Modifier.height(4.dp))
                         }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(12.dp))
 
-        // Launch buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(colors.text.normal.copy(alpha = 0.03f))
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedButton(onClick = { /* TODO: Launch Claude Code */ }) {
-                Text("Launch Claude Code")
-            }
-            OutlinedButton(onClick = { /* TODO: Launch Codex */ }) {
-                Text("Launch Codex")
+            // Launch buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.text.normal.copy(alpha = 0.03f))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(onClick = { /* TODO: Launch Claude Code */ }) {
+                    Text("Launch Claude Code")
+                }
+                OutlinedButton(onClick = { /* TODO: Launch Codex */ }) {
+                    Text("Launch Codex")
+                }
             }
         }
     }
