@@ -89,4 +89,38 @@ describe("startTestRecording tool", () => {
     expect(payload.success).toBe(false);
     expect(payload.error).toContain("Unable to connect to accessibility service");
   });
+
+  test("returns error when recording active on different device", async () => {
+    const differentDevice = {
+      deviceId: "emulator-5556",
+      name: "Pixel 7 API 34",
+      platform: "android" as const,
+      status: "booted" as const,
+    };
+
+    mock.module("../../src/server/testRecordingManager", () => ({
+      startTestRecording: mock(() => Promise.reject(
+        new Error("Recording already active on device emulator-5554 (rec-123). Stop the existing recording before starting a new one on emulator-5556.")
+      )),
+      stopTestRecording: mock(() => Promise.resolve({})),
+      getTestRecordingStatus: mock(() => ({
+        recordingId: "rec-123",
+        deviceId: "emulator-5554",
+        platform: "android",
+        startedAt: "2024-01-01T00:00:00.000Z",
+        eventCount: 5,
+        durationMs: 30000,
+      })),
+    }));
+
+    const tool = ToolRegistry.getTool("startTestRecording");
+    expect(tool).toBeDefined();
+
+    const response = await tool!.deviceAwareHandler!(differentDevice, {});
+    const payload = JSON.parse(response.content?.[0]?.text ?? "{}");
+
+    expect(payload.success).toBe(false);
+    expect(payload.error).toContain("Recording already active on device emulator-5554");
+    expect(payload.error).toContain("emulator-5556");
+  });
 });

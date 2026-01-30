@@ -312,6 +312,12 @@ const formatPlanName = (planName?: string): string => {
 
 export async function startTestRecording(device: BootedDevice): Promise<TestRecordingStartResult> {
   if (activeRecording) {
+    if (activeRecording.deviceId !== device.deviceId) {
+      throw new Error(
+        `Recording already active on device ${activeRecording.deviceId} (${activeRecording.recordingId}). ` +
+        `Stop the existing recording before starting a new one on ${device.deviceId}.`
+      );
+    }
     logger.info(`[TestRecording] Recording already active (${activeRecording.recordingId}), returning existing session`);
     return {
       recordingId: activeRecording.recordingId,
