@@ -28,7 +28,7 @@ import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from 
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appearanceSocketServer";
 import { startPerformanceStreamSocketServer, stopPerformanceStreamSocketServer } from "./performanceStreamSocketServer";
 import { startPerformancePushSocketServer, stopPerformancePushSocketServer } from "./performancePushSocketServer";
-import { startObservationStreamSocketServer, stopObservationStreamSocketServer, getObservationStreamServer } from "./observationStreamSocketServer";
+import { startDeviceDataStreamSocketServer, stopDeviceDataStreamSocketServer, getDeviceDataStreamServer } from "./deviceDataStreamSocketServer";
 import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
@@ -134,11 +134,11 @@ export class Daemon {
     await startAppearanceSocketServer();
     await startPerformanceStreamSocketServer();
     await startPerformancePushSocketServer();
-    await startObservationStreamSocketServer();
+    await startDeviceDataStreamSocketServer();
     await startFailuresStreamSocketServer();
 
     // Wire up callback to establish WebSocket connections when IDE plugins subscribe
-    this.setupObservationStreamCallback();
+    this.setupDeviceDataStreamCallback();
 
     startAppearanceSyncScheduler();
     this.startDeviceDisconnectMonitor();
@@ -485,8 +485,8 @@ export class Daemon {
    * the WebSocket connections to Android devices are established so that
    * hierarchy updates can flow continuously.
    */
-  private setupObservationStreamCallback(): void {
-    const server = getObservationStreamServer();
+  private setupDeviceDataStreamCallback(): void {
+    const server = getDeviceDataStreamServer();
     if (!server) {
       logger.warn("[Daemon] Observation stream server not available for callback setup");
       return;
@@ -548,7 +548,7 @@ export class Daemon {
    * Set up listener for navigation graph changes.
    * When the navigation graph changes, push updates to all subscribed IDE plugins.
    */
-  private setupNavigationGraphStreamListener(server: ReturnType<typeof getObservationStreamServer>): void {
+  private setupNavigationGraphStreamListener(server: ReturnType<typeof getDeviceDataStreamServer>): void {
     if (!server) {
       return;
     }
@@ -923,7 +923,7 @@ export class Daemon {
     await stopAppearanceSocketServer();
     await stopPerformanceStreamSocketServer();
     await stopPerformancePushSocketServer();
-    await stopObservationStreamSocketServer();
+    await stopDeviceDataStreamSocketServer();
     await stopFailuresStreamSocketServer();
     stopAppearanceSyncScheduler();
 
