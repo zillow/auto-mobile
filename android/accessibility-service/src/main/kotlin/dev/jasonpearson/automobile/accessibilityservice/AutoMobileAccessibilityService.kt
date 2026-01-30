@@ -3890,7 +3890,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append(""","key":null""")
         }
         if (event.value != null) {
-          append(""","value":${event.value}""") // Already JSON-encoded
+          append(""","value":${jsonCompact.encodeToString(event.value)}""")
         } else {
           append(""","value":null""")
         }
