@@ -3890,7 +3890,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append(""","key":null""")
         }
         if (event.value != null) {
-          append(""","value":${jsonCompact.encodeToString(event.value)}""")
+          // STRING values need JSON encoding (quotes + escaping), other types are already valid JSON
+          val jsonValue =
+              if (event.type == "STRING") jsonCompact.encodeToString(event.value) else event.value
+          append(""","value":$jsonValue""")
         } else {
           append(""","value":null""")
         }
