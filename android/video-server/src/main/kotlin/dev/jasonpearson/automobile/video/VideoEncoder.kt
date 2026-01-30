@@ -54,13 +54,11 @@ class VideoEncoder(
           setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000)
 
           // H.264 Baseline profile for maximum compatibility
+          // Note: We don't set KEY_LEVEL - let the codec choose the appropriate level
+          // based on resolution/fps. Level 3.1 can't handle 720p@60fps or 1080p@60fps.
           setInteger(
               MediaFormat.KEY_PROFILE,
               MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline,
-          )
-          setInteger(
-              MediaFormat.KEY_LEVEL,
-              MediaCodecInfo.CodecProfileLevel.AVCLevel31,
           )
 
           // CBR for consistent bitrate
