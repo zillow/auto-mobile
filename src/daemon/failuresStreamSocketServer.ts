@@ -1,9 +1,7 @@
-import { createServer, Server as NetServer, Socket } from "node:net";
-import { existsSync } from "node:fs";
-import { mkdir, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { logger } from "../utils/logger";
+import { Timer, defaultTimer } from "../utils/SystemTimer";
+import { RequestResponseSocketServer, getSocketPath, SocketServerConfig } from "./socketServer/index";
 import { FailuresRepository } from "../db/failuresRepository";
 import type {
   FailuresStreamSocketRequest,
@@ -12,15 +10,13 @@ import type {
   TimeAggregation,
 } from "./failuresStreamSocketTypes";
 
+const SOCKET_CONFIG: SocketServerConfig = {
+  defaultPath: path.join(os.homedir(), ".auto-mobile", "failures-stream.sock"),
+  externalPath: "/tmp/auto-mobile-failures-stream.sock",
+};
+
 const DEFAULT_LIMIT = 100;
 const STREAM_LIMIT_MAX = 500;
-
-// Use /tmp for socket when running with external emulator (Docker container with mounted home)
-const isExternalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
-const DEFAULT_SOCKET_PATH = isExternalMode
-  ? "/tmp/auto-mobile-failures-stream.sock"
-  : path.join(os.homedir(), ".auto-mobile", "failures-stream.sock");
-
 const failuresRepository = new FailuresRepository();
 
 /**
@@ -135,124 +131,40 @@ function normalizeDateRange(value: unknown): DateRangePreset | undefined {
   return value as DateRangePreset;
 }
 
-export class FailuresStreamSocketServer {
-  private server: NetServer | null = null;
-  private socketPath: string;
-
-  constructor(socketPath: string = DEFAULT_SOCKET_PATH) {
-    this.socketPath = socketPath;
+/**
+ * Socket server for failures stream.
+ * Handles poll_notifications, poll_groups, poll_timeline, and acknowledge commands.
+ */
+export class FailuresStreamSocketServer extends RequestResponseSocketServer<
+  FailuresStreamSocketRequest,
+  FailuresStreamSocketResponse
+> {
+  constructor(socketPath: string = getSocketPath(SOCKET_CONFIG), timer: Timer = defaultTimer) {
+    super(socketPath, timer, "FailuresStream");
   }
 
-  async start(): Promise<void> {
-    const directory = path.dirname(this.socketPath);
-    if (!existsSync(directory)) {
-      await mkdir(directory, { recursive: true });
-    }
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-
-    this.server = createServer(socket => {
-      this.handleConnection(socket);
-    });
-
-    return new Promise((resolve, reject) => {
-      this.server!.listen(this.socketPath, () => {
-        logger.info(`Failures stream socket listening on ${this.socketPath}`);
-        resolve();
-      });
-
-      this.server!.on("error", error => {
-        logger.error(`Failures stream socket error: ${error}`);
-        reject(error);
-      });
-    });
-  }
-
-  async close(): Promise<void> {
-    if (!this.server) {
-      return;
-    }
-
-    await new Promise<void>(resolve => {
-      this.server!.close(() => resolve());
-    });
-    this.server = null;
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-  }
-
-  isListening(): boolean {
-    return this.server?.listening ?? false;
-  }
-
-  private handleConnection(socket: Socket): void {
-    let buffer = "";
-    let pending = Promise.resolve();
-
-    socket.on("data", data => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        pending = pending
-          .then(() => this.processLine(socket, line))
-          .catch(error => {
-            logger.error(`Failures stream socket request error: ${error}`);
-          });
-      }
-    });
-
-    socket.on("error", error => {
-      logger.error(`Failures stream socket connection error: ${error}`);
-    });
-  }
-
-  private async processLine(socket: Socket, line: string): Promise<void> {
-    if (!line.trim()) {
-      return;
-    }
-
-    try {
-      const request = JSON.parse(line) as FailuresStreamSocketRequest;
-      const response = await this.handleRequest(request);
-      socket.write(JSON.stringify(response) + "\n");
-    } catch (error) {
-      logger.error(`Failures stream socket request error: ${error}`);
-      const errorResponse: FailuresStreamSocketResponse = {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-      socket.write(JSON.stringify(errorResponse) + "\n");
-    }
-  }
-
-  private async handleRequest(
+  protected async handleRequest(
     request: FailuresStreamSocketRequest
   ): Promise<FailuresStreamSocketResponse> {
-    try {
-      switch (request.command) {
-        case "poll_notifications":
-          return await this.handlePollNotifications(request);
-        case "poll_groups":
-          return await this.handlePollGroups(request);
-        case "poll_timeline":
-          return await this.handlePollTimeline(request);
-        case "acknowledge":
-          return await this.handleAcknowledge(request);
-        default:
-          throw new Error(`Unsupported command: ${String(request.command)}`);
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
+    switch (request.command) {
+      case "poll_notifications":
+        return await this.handlePollNotifications(request);
+      case "poll_groups":
+        return await this.handlePollGroups(request);
+      case "poll_timeline":
+        return await this.handlePollTimeline(request);
+      case "acknowledge":
+        return await this.handleAcknowledge(request);
+      default:
+        throw new Error(`Unsupported command: ${String(request.command)}`);
     }
+  }
+
+  protected createErrorResponse(_id: string | undefined, error: string): FailuresStreamSocketResponse {
+    return {
+      success: false,
+      error,
+    };
   }
 
   private async handlePollNotifications(

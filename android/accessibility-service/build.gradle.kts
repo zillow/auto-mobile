@@ -124,6 +124,9 @@ dependencies {
   // AutoMobile SDK for navigation event tracking
   implementation(projects.autoMobileSdk)
 
+  // Protocol module for type-safe WebSocket messages
+  implementation(projects.protocol)
+
   // Compose BOM
   implementation(platform(libs.compose.bom))
   implementation(libs.bundles.compose.ui)

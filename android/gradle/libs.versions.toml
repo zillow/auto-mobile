@@ -69,6 +69,7 @@ mavenpublish = "0.36.0"
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
 android-library = { id = "com.android.library", version.ref = "build-android-agp" }
 android-application = { id = "com.android.application", version.ref = "build-android-agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "build-kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "build-kotlin" }
 mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenpublish" }
 

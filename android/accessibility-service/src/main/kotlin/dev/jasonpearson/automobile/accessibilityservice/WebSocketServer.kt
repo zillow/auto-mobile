@@ -3,6 +3,8 @@ package dev.jasonpearson.automobile.accessibilityservice
 import android.util.Log
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
+import dev.jasonpearson.automobile.protocol.WebSocketMessageHandler
+import dev.jasonpearson.automobile.protocol.WebSocketResponse
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -21,10 +23,16 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
+import dev.jasonpearson.automobile.protocol.WebSocketRequest as ProtocolRequest
+import dev.jasonpearson.automobile.protocol.*
 
-/** Incoming WebSocket message format */
+/** Legacy incoming WebSocket message format - deprecated in favor of sealed class hierarchy */
+@Deprecated("Use WebSocketRequest sealed class from protocol module", ReplaceWith("dev.jasonpearson.automobile.protocol.WebSocketRequest"))
 @Serializable
-data class WebSocketRequest(
+data class LegacyWebSocketRequest(
     val type: String,
     val requestId: String? = null,
     // Tap coordinates parameters
@@ -74,14 +82,27 @@ data class WebSocketRequest(
     val fileName: String? = null,
 )
 
+/** Type alias for backward compatibility */
+@Suppress("DEPRECATION")
+typealias WebSocketRequest = LegacyWebSocketRequest
+
 /**
  * WebSocket server that streams view hierarchy updates to connected clients. Designed to work with
  * adb port forwarding for MCP server communication.
+ *
+ * Supports two modes of operation:
+ * 1. Handler mode (preferred): Pass a [WebSocketMessageHandler] to receive typed requests
+ * 2. Callback mode (legacy): Pass individual callback lambdas for each message type
+ *
+ * When a [messageHandler] is provided, it takes precedence over individual callbacks.
  */
 class WebSocketServer(
     private val port: Int = 8765,
     private val scope: CoroutineScope,
     private val perfProvider: PerfProvider = PerfProvider.instance,
+    /** Type-safe message handler - when provided, takes precedence over callbacks */
+    private val messageHandler: WebSocketMessageHandler? = null,
+    // Legacy callbacks - used when messageHandler is null
     private val onRequestHierarchy: ((disableAllFiltering: Boolean) -> Unit)? = null,
     private val onRequestHierarchyIfStale: ((sinceTimestamp: Long) -> Unit)? = null,
     private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
@@ -178,6 +199,20 @@ class WebSocketServer(
   private val json = Json {
     prettyPrint = false
     ignoreUnknownKeys = true
+  }
+
+  /** JSON configuration for protocol sealed classes with polymorphic serialization */
+  private val protocolJson = Json {
+    prettyPrint = false
+    ignoreUnknownKeys = true
+    classDiscriminator = "type"
+  }
+
+  /** JSON for encoding responses */
+  private val responseJson = Json {
+    prettyPrint = false
+    encodeDefaults = true
+    classDiscriminator = "type"
   }
 
   /** Start the WebSocket server */
@@ -310,6 +345,54 @@ class WebSocketServer(
     broadcastToClients(message)
   }
 
+  // =============================================================================
+  // Type-Safe Broadcast API (Protocol Types)
+  // =============================================================================
+
+  /**
+   * Broadcast mode for controlling message delivery.
+   */
+  sealed interface BroadcastMode {
+    /** Async broadcast via SharedFlow - non-blocking, best for event-driven updates */
+    data object Async : BroadcastMode
+
+    /** Sync broadcast - waits for delivery, use when ordering is critical */
+    data object Sync : BroadcastMode
+  }
+
+  /**
+   * Broadcast a typed WebSocketResponse to all connected clients.
+   *
+   * This is the preferred API for sending responses as it provides:
+   * - Type safety via sealed class hierarchy
+   * - Automatic JSON serialization
+   * - Unified sync/async control
+   *
+   * @param response The typed response object to broadcast
+   * @param mode Broadcast mode - Async (default) or Sync for ordering guarantees
+   */
+  suspend fun broadcast(response: WebSocketResponse, mode: BroadcastMode = BroadcastMode.Async) {
+    val message = responseJson.encodeToString(WebSocketResponse.serializer(), response)
+    when (mode) {
+      BroadcastMode.Async -> _messageFlow.emit(message)
+      BroadcastMode.Sync -> broadcastToClients(message)
+    }
+  }
+
+  /**
+   * Broadcast a typed SdkEvent to all connected clients.
+   *
+   * @param event The SDK event to broadcast
+   * @param mode Broadcast mode - Async (default) or Sync for ordering guarantees
+   */
+  suspend fun broadcast(event: SdkEvent, mode: BroadcastMode = BroadcastMode.Async) {
+    val message = responseJson.encodeToString(SdkEvent.serializer(), event)
+    when (mode) {
+      BroadcastMode.Async -> _messageFlow.emit(message)
+      BroadcastMode.Sync -> broadcastToClients(message)
+    }
+  }
+
   /** Internal method to send message to all connected clients */
   private suspend fun broadcastToClients(message: String) {
     val deadConnections = mutableListOf<DefaultWebSocketSession>()
@@ -357,8 +440,33 @@ class WebSocketServer(
 
   /** Handle incoming client message */
   private fun handleClientMessage(message: String) {
+    // If handler is available, try protocol-based handling first
+    if (messageHandler != null) {
+      try {
+        val request = protocolJson.decodeFromString<ProtocolRequest>(message)
+        Log.d(TAG, "Received ${request::class.simpleName} (requestId: ${request.requestId})")
+        scope.launch {
+          try {
+            val response = messageHandler.handleMessage(request)
+            if (response != null) {
+              val responseMessage = responseJson.encodeToString(WebSocketResponse.serializer(), response)
+              broadcast(responseMessage)
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Error handling message via handler", e)
+          }
+        }
+        return
+      } catch (e: Exception) {
+        Log.d(TAG, "Failed to parse as protocol request, falling back to legacy: ${e.message}")
+        // Fall through to legacy handling
+      }
+    }
+
+    // Legacy callback-based handling
     try {
-      val request = json.decodeFromString<WebSocketRequest>(message)
+      @Suppress("DEPRECATION")
+      val request = json.decodeFromString<LegacyWebSocketRequest>(message)
       when (request.type) {
         "request_hierarchy" -> {
           val disableAllFiltering = request.disableAllFiltering ?: false

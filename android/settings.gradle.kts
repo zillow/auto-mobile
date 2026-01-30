@@ -34,6 +34,8 @@ include(":accessibility-service")
 
 include(":auto-mobile-sdk")
 
+include(":protocol")
+
 include(":junit-runner")
 
 include(":test-plan-validation")

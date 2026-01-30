@@ -5,6 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import dev.jasonpearson.automobile.protocol.SdkDeviceInfo
+import dev.jasonpearson.automobile.protocol.SdkEventSerializer
+import dev.jasonpearson.automobile.protocol.SdkHandledExceptionEvent
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.concurrent.CopyOnWriteArrayList
@@ -171,11 +174,35 @@ object AutoMobileFailures {
         event: HandledExceptionEvent,
     ) {
         try {
+            // Create protocol event for type-safe serialization
+            val sdkEvent = SdkHandledExceptionEvent(
+                timestamp = event.timestamp,
+                applicationId = event.packageName,
+                exceptionClass = event.exceptionClass,
+                exceptionMessage = event.exceptionMessage,
+                stackTrace = event.stackTrace,
+                customMessage = event.customMessage,
+                currentScreen = event.currentScreen,
+                appVersion = event.appVersion,
+                deviceInfo = SdkDeviceInfo(
+                    model = event.deviceInfo.model,
+                    manufacturer = event.deviceInfo.manufacturer,
+                    osVersion = event.deviceInfo.osVersion,
+                    sdkInt = event.deviceInfo.sdkInt,
+                ),
+            )
+
             val intent =
                 Intent(ACTION_HANDLED_EXCEPTION).apply {
                     // Scope broadcast to only the accessibility service to prevent data leakage
                     // and spoofing from other installed apps
                     setPackage(ACCESSIBILITY_SERVICE_PACKAGE)
+
+                    // Type-safe serialized event (new protocol)
+                    putExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON, SdkEventSerializer.toJson(sdkEvent))
+                    putExtra(SdkEventSerializer.EXTRA_SDK_EVENT_TYPE, SdkEventSerializer.EventTypes.HANDLED_EXCEPTION)
+
+                    // Legacy extras for backward compatibility with older AccessibilityService versions
                     putExtra(EXTRA_TIMESTAMP, event.timestamp)
                     putExtra(EXTRA_EXCEPTION_CLASS, event.exceptionClass)
                     putExtra(EXTRA_EXCEPTION_MESSAGE, event.exceptionMessage)

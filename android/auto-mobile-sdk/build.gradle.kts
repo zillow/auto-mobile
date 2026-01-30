@@ -36,6 +36,9 @@ android {
 version = "0.0.8-SNAPSHOT"
 
 dependencies {
+  // Protocol module for type-safe event serialization
+  implementation(project(":protocol"))
+
   // Android core libraries
   implementation(libs.androidx.core)
   implementation(libs.androidx.appcompat)
