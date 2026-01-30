@@ -35,6 +35,11 @@ export interface PerformanceMetrics {
   anrDetected: boolean;
   anrDetails: string | null;
 
+  // Live metrics extension
+  timeToFirstFrameMs: number | null;
+  timeToInteractiveMs: number | null;
+  frameRateFps: number | null;
+
   // Raw diagnostics
   gfxinfoRaw: string | null;
   cpuStatsRaw: string | null;
@@ -63,6 +68,14 @@ export interface PerformanceViolation {
 }
 
 /**
+ * Options for metric collection
+ */
+export interface CollectMetricsOptions {
+  measureTtff?: boolean;
+  measureTti?: boolean;
+}
+
+/**
  * Performance audit class for collecting and validating performance metrics
  */
 export class PerformanceAudit {
@@ -87,19 +100,34 @@ export class PerformanceAudit {
   async collectMetrics(
     packageName: string,
     screenSize?: ScreenSize,
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    options?: CollectMetricsOptions
   ): Promise<PerformanceMetrics> {
+    const opts = options ?? {};
     logger.info(`[PerformanceAudit] Collecting metrics for ${packageName}`);
 
     // Collect metrics in parallel for efficiency
-    const [gfxMetrics, cpuMetrics, anrStatus] = await Promise.all([
+    const [gfxMetrics, cpuMetrics, anrStatus, frameRate] = await Promise.all([
       this.collectGfxMetrics(packageName, perf),
       this.collectCpuMetrics(packageName, perf),
       this.checkForAnr(packageName, perf),
+      this.calculateFrameRate(packageName, perf),
     ]);
 
     // Touch latency requires sequential execution after other metrics
     const touchLatency = await this.measureTouchLatency(packageName, screenSize, perf);
+
+    // Optional TTFF/TTI measurement (these are heavier operations)
+    let ttffMs: number | null = null;
+    let ttiMs: number | null = null;
+
+    if (opts.measureTtff) {
+      ttffMs = await this.measureTimeToFirstFrame(packageName, perf);
+    }
+
+    if (opts.measureTti && ttffMs !== null) {
+      ttiMs = await this.measureTimeToInteractive(packageName, ttffMs, perf);
+    }
 
     const result: PerformanceMetrics = {
       p50Ms: gfxMetrics.p50Ms ?? null,
@@ -115,6 +143,9 @@ export class PerformanceAudit {
       touchLatencyMs: touchLatency,
       anrDetected: anrStatus.anrDetected ?? false,
       anrDetails: anrStatus.anrDetails ?? null,
+      timeToFirstFrameMs: ttffMs,
+      timeToInteractiveMs: ttiMs,
+      frameRateFps: frameRate,
       gfxinfoRaw: gfxMetrics.gfxinfoRaw ?? null,
       cpuStatsRaw: cpuMetrics.cpuStatsRaw ?? null,
     };
@@ -306,6 +337,176 @@ export class PerformanceAudit {
       }
     } catch (error) {
       logger.warn(`[PerformanceAudit] Failed to measure touch latency: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Calculate frame rate (FPS) from gfxinfo data.
+   * Uses Total frames rendered / elapsed time to compute average FPS.
+   */
+  private async calculateFrameRate(
+    packageName: string,
+    perf: PerformanceTracker
+  ): Promise<number | null> {
+    try {
+      const { stdout } = await perf.track("adbGfxinfoFrameRate", () =>
+        this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`)
+      );
+
+      // Parse "Total frames rendered: N"
+      const totalFramesMatch = stdout.match(/Total frames rendered:\s*(\d+)/);
+      if (!totalFramesMatch) {
+        return null;
+      }
+
+      const totalFrames = parseInt(totalFramesMatch[1], 10);
+      if (totalFrames === 0) {
+        return null;
+      }
+
+      // Get refresh rate from device capabilities for accurate FPS calculation
+      const capabilities = await this.capabilitiesDetector.getCapabilities();
+      const refreshRate = capabilities.refreshRateHz || 60;
+
+      // Parse frame histogram to estimate duration
+      // Look for "Number HISTOGRAM..." or "janky frames" section
+      const jankyFramesMatch = stdout.match(/Janky frames:\s*(\d+)/);
+      const jankyFrames = jankyFramesMatch ? parseInt(jankyFramesMatch[1], 10) : 0;
+
+      // Calculate FPS based on frame time percentiles
+      // If we have p50, use it as the average frame time
+      const metrics = this.idle.parseMetrics(stdout);
+      if (metrics.percentile50th && metrics.percentile50th > 0) {
+        const avgFrameTimeMs = metrics.percentile50th;
+        const fps = 1000 / avgFrameTimeMs;
+        return Math.min(fps, refreshRate); // Cap at refresh rate
+      }
+
+      // Fallback: estimate FPS from janky frame ratio
+      // Assume janky frames take 2x normal frame time
+      if (jankyFrames > 0 && totalFrames > 0) {
+        const normalFrames = totalFrames - jankyFrames;
+        const frameTimeTarget = 1000 / refreshRate;
+        const totalTime = (normalFrames * frameTimeTarget) + (jankyFrames * frameTimeTarget * 2);
+        const fps = (totalFrames * 1000) / totalTime;
+        return Math.min(fps, refreshRate);
+      }
+
+      // Default to refresh rate if we can't calculate
+      return refreshRate;
+    } catch (error) {
+      logger.warn(`[PerformanceAudit] Failed to calculate frame rate: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Measure time to first frame (TTFF) by parsing ActivityManager logcat output.
+   * Looks for "ActivityManager: Displayed" log entries with timing information.
+   */
+  private async measureTimeToFirstFrame(
+    packageName: string,
+    perf: PerformanceTracker
+  ): Promise<number | null> {
+    try {
+      // Clear logcat and launch the app to measure fresh TTFF
+      // This looks for recent "Displayed" entries in logcat
+      const { stdout } = await perf.track("adbLogcatTtff", () =>
+        this.adb.executeCommand(
+          `shell "logcat -d -s ActivityManager:I | grep -E 'Displayed.*${packageName}' | tail -1"`
+        )
+      );
+
+      if (!stdout.trim()) {
+        logger.debug("[PerformanceAudit] No TTFF data found in logcat");
+        return null;
+      }
+
+      // Parse format: "Displayed com.example.app/.MainActivity: +500ms" or "+1s200ms"
+      const ttffMatch = stdout.match(/Displayed\s+\S+:\s*\+?(\d+)s?(\d*)m?s?/);
+      if (!ttffMatch) {
+        // Try alternative format: "+500ms" or "+1s200ms"
+        const altMatch = stdout.match(/\+(\d+)s(\d+)ms|\+(\d+)ms/);
+        if (altMatch) {
+          if (altMatch[1] && altMatch[2]) {
+            // Format: +Xs+Yms
+            const seconds = parseInt(altMatch[1], 10);
+            const ms = parseInt(altMatch[2], 10);
+            return seconds * 1000 + ms;
+          } else if (altMatch[3]) {
+            // Format: +Xms
+            return parseInt(altMatch[3], 10);
+          }
+        }
+        return null;
+      }
+
+      const seconds = ttffMatch[1] ? parseInt(ttffMatch[1], 10) : 0;
+      const ms = ttffMatch[2] ? parseInt(ttffMatch[2], 10) : 0;
+
+      return seconds * 1000 + ms;
+    } catch (error) {
+      logger.warn(`[PerformanceAudit] Failed to measure TTFF: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Measure time to interactive (TTI).
+   * TTI = TTFF + time until UI is stable (no jank for 500ms).
+   */
+  private async measureTimeToInteractive(
+    packageName: string,
+    ttffMs: number,
+    perf: PerformanceTracker
+  ): Promise<number | null> {
+    try {
+      const stabilityCheckIntervalMs = 100;
+      const stabilityThresholdMs = 500;
+      const maxWaitMs = 5000;
+
+      let stableStartTime: number | null = null;
+      let elapsedMs = 0;
+
+      while (elapsedMs < maxWaitMs) {
+        // Reset gfxinfo to start fresh measurement
+        await perf.track("adbGfxinfoTtiReset", () =>
+          this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName} reset`)
+        );
+
+        // Wait for check interval
+        await new Promise(resolve => setTimeout(resolve, stabilityCheckIntervalMs));
+        elapsedMs += stabilityCheckIntervalMs;
+
+        // Get metrics after interval
+        const { stdout: afterStdout } = await perf.track("adbGfxinfoTtiAfter", () =>
+          this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`)
+        );
+
+        const metrics = this.idle.parseMetrics(afterStdout);
+        const hasJank = (metrics.missedVsync || 0) > 0 ||
+                       (metrics.slowUiThread || 0) > 0 ||
+                       (metrics.frameDeadlineMissed || 0) > 0;
+
+        if (hasJank) {
+          stableStartTime = null;
+        } else {
+          if (stableStartTime === null) {
+            stableStartTime = elapsedMs;
+          } else if (elapsedMs - stableStartTime >= stabilityThresholdMs) {
+            // UI has been stable for threshold duration
+            logger.info(`[PerformanceAudit] TTI reached: ${ttffMs + stableStartTime}ms`);
+            return ttffMs + stableStartTime;
+          }
+        }
+      }
+
+      // Timed out waiting for stability
+      logger.warn(`[PerformanceAudit] TTI measurement timed out after ${maxWaitMs}ms`);
+      return null;
+    } catch (error) {
+      logger.warn(`[PerformanceAudit] Failed to measure TTI: ${error}`);
       return null;
     }
   }

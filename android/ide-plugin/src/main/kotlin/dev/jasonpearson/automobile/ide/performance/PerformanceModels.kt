@@ -74,6 +74,44 @@ data class MetricChange(
     val percentChange: Float,
 )
 
+/**
+ * Performance threshold constants for health status calculation.
+ * These values match the server-side thresholds.
+ */
+object PerformanceThresholds {
+    // FPS thresholds (lower is worse)
+    const val FPS_WARNING = 55f
+    const val FPS_CRITICAL = 45f
+
+    // Frame time thresholds in ms (higher is worse)
+    const val FRAME_TIME_WARNING_MS = 18f  // 16.67ms is 60fps, 18ms allows some margin
+    const val FRAME_TIME_CRITICAL_MS = 33f  // 33ms is 30fps
+
+    // Jank frame count thresholds (higher is worse)
+    const val JANK_WARNING_FRAMES = 5f
+    const val JANK_CRITICAL_FRAMES = 10f
+
+    // Touch latency thresholds in ms (higher is worse)
+    const val TOUCH_LATENCY_WARNING_MS = 100f
+    const val TOUCH_LATENCY_CRITICAL_MS = 200f
+
+    // Time to First Frame thresholds in ms (higher is worse)
+    const val TTFF_WARNING_MS = 500f
+    const val TTFF_CRITICAL_MS = 1000f
+
+    // Time to Interactive thresholds in ms (higher is worse)
+    const val TTI_WARNING_MS = 700f
+    const val TTI_CRITICAL_MS = 1500f
+
+    // Memory usage thresholds in MB (higher is worse)
+    const val MEMORY_WARNING_MB = 256f
+    const val MEMORY_CRITICAL_MB = 512f
+
+    // CPU usage thresholds in percent (higher is worse)
+    const val CPU_WARNING_PERCENT = 50f
+    const val CPU_CRITICAL_PERCENT = 80f
+}
+
 // Mock data for development
 object PerformanceMockData {
     private const val BASE_TIME = 1705000000000L

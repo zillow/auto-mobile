@@ -78,6 +78,20 @@ fun PerformanceDashboard(
     var realtimeMetricsHistory by remember { mutableStateOf<List<MetricDataPoint>>(emptyList()) }
     var lastPerformanceUpdate by remember { mutableStateOf<PerformanceStreamUpdate?>(null) }
 
+    // Screen names from navigation graph for filtering
+    var availableScreens by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    // Collect navigation updates to populate screen filter
+    LaunchedEffect(observationStreamClient) {
+        if (observationStreamClient == null) return@LaunchedEffect
+
+        observationStreamClient.navigationUpdates.collect { update ->
+            // Extract screen names from navigation nodes
+            val screenNames = update.nodes.map { it.screenName }.distinct().sorted()
+            availableScreens = screenNames
+        }
+    }
+
     // Collect real-time performance updates from the stream
     LaunchedEffect(observationStreamClient, isLive) {
         if (observationStreamClient == null || !isLive) return@LaunchedEffect
@@ -168,8 +182,16 @@ fun PerformanceDashboard(
 
     when (currentScreen) {
         PerformanceScreen.Overview -> currentRun?.let { run ->
+            // Merge screens from run and navigation graph
+            val allScreens = (run.screensAnalyzed + availableScreens).distinct().sorted()
+            val updatedRun = if (allScreens != run.screensAnalyzed) {
+                run.copy(screensAnalyzed = allScreens)
+            } else {
+                run
+            }
+
             PerformanceOverviewScreen(
-                run = run,
+                run = updatedRun,
                 selectedScreenFilter = selectedScreenFilter,
                 onScreenFilterChanged = { selectedScreenFilter = it },
                 onMetricSelected = { metric ->

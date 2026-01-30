@@ -27,6 +27,7 @@ import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from ".
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./deviceSnapshotSocketServer";
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appearanceSocketServer";
 import { startPerformanceStreamSocketServer, stopPerformanceStreamSocketServer } from "./performanceStreamSocketServer";
+import { startPerformancePushSocketServer, stopPerformancePushSocketServer } from "./performancePushSocketServer";
 import { startObservationStreamSocketServer, stopObservationStreamSocketServer, getObservationStreamServer } from "./observationStreamSocketServer";
 import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
@@ -132,6 +133,7 @@ export class Daemon {
     await startDeviceSnapshotSocketServer();
     await startAppearanceSocketServer();
     await startPerformanceStreamSocketServer();
+    await startPerformancePushSocketServer();
     await startObservationStreamSocketServer();
     await startFailuresStreamSocketServer();
 
@@ -920,6 +922,7 @@ export class Daemon {
     await stopDeviceSnapshotSocketServer();
     await stopAppearanceSocketServer();
     await stopPerformanceStreamSocketServer();
+    await stopPerformancePushSocketServer();
     await stopObservationStreamSocketServer();
     await stopFailuresStreamSocketServer();
     stopAppearanceSyncScheduler();

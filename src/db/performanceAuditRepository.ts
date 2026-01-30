@@ -3,7 +3,10 @@ import type { NewPerformanceAuditResult } from "./types";
 import { logger } from "../utils/logger";
 
 const RETENTION_MAX_ROWS = 10_000;
+const RETENTION_MAX_AGE_HOURS = 24;
+const PRUNING_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 let cleanupInProgress = false;
+let pruningTimer: NodeJS.Timeout | null = null;
 
 export interface PerformanceAuditMetricsRecord {
   p50Ms: number | null;
@@ -16,6 +19,10 @@ export interface PerformanceAuditMetricsRecord {
   frameDeadlineMissedCount: number | null;
   cpuUsagePercent: number | null;
   touchLatencyMs: number | null;
+  // Live metrics extension
+  timeToFirstFrameMs?: number | null;
+  timeToInteractiveMs?: number | null;
+  frameRateFps?: number | null;
 }
 
 export interface PerformanceAuditRecord {
@@ -26,6 +33,7 @@ export interface PerformanceAuditRecord {
   passed: boolean;
   metrics: PerformanceAuditMetricsRecord;
   diagnostics: string | null;
+  nodeId?: number | null;
 }
 
 export interface PerformanceAuditQuery {
@@ -45,6 +53,7 @@ export interface PerformanceAuditHistoryEntry {
   passed: boolean;
   metrics: PerformanceAuditMetricsRecord;
   diagnostics: string | null;
+  nodeId: number | null;
 }
 
 export interface PerformanceAuditHistoryPage {
@@ -87,6 +96,11 @@ export class PerformanceAuditRepository {
         cpu_usage_percent: record.metrics.cpuUsagePercent,
         touch_latency_ms: record.metrics.touchLatencyMs,
         diagnostics_json: record.diagnostics,
+        // Live metrics extension
+        time_to_first_frame_ms: record.metrics.timeToFirstFrameMs ?? null,
+        time_to_interactive_ms: record.metrics.timeToInteractiveMs ?? null,
+        frame_rate_fps: record.metrics.frameRateFps ?? null,
+        node_id: record.nodeId ?? null,
       };
 
       await db.insertInto("performance_audit_results").values(entry).execute();
@@ -121,6 +135,10 @@ export class PerformanceAuditRepository {
         "cpu_usage_percent",
         "touch_latency_ms",
         "diagnostics_json",
+        "time_to_first_frame_ms",
+        "time_to_interactive_ms",
+        "frame_rate_fps",
+        "node_id",
       ]);
 
     if (query.deviceId) {
@@ -161,8 +179,12 @@ export class PerformanceAuditRepository {
         frameDeadlineMissedCount: row.frame_deadline_missed_count,
         cpuUsagePercent: row.cpu_usage_percent,
         touchLatencyMs: row.touch_latency_ms,
+        timeToFirstFrameMs: row.time_to_first_frame_ms,
+        timeToInteractiveMs: row.time_to_interactive_ms,
+        frameRateFps: row.frame_rate_fps,
       },
       diagnostics: row.diagnostics_json,
+      nodeId: row.node_id,
     }));
 
     return {
@@ -196,6 +218,10 @@ export class PerformanceAuditRepository {
         "cpu_usage_percent",
         "touch_latency_ms",
         "diagnostics_json",
+        "time_to_first_frame_ms",
+        "time_to_interactive_ms",
+        "frame_rate_fps",
+        "node_id",
       ]);
 
     if (query.deviceId) {
@@ -248,8 +274,12 @@ export class PerformanceAuditRepository {
         frameDeadlineMissedCount: row.frame_deadline_missed_count,
         cpuUsagePercent: row.cpu_usage_percent,
         touchLatencyMs: row.touch_latency_ms,
+        timeToFirstFrameMs: row.time_to_first_frame_ms,
+        timeToInteractiveMs: row.time_to_interactive_ms,
+        frameRateFps: row.frame_rate_fps,
       },
       diagnostics: row.diagnostics_json,
+      nodeId: row.node_id,
     }));
   }
 
@@ -289,6 +319,63 @@ export class PerformanceAuditRepository {
       logger.warn(`[PerformanceAuditRepository] Retention cleanup failed: ${error}`);
     } finally {
       cleanupInProgress = false;
+    }
+  }
+
+  /**
+   * Prune records older than the configured retention period (24 hours by default).
+   * Called periodically and lazily during listResultsSince.
+   */
+  async pruneOldRecords(): Promise<number> {
+    try {
+      const db = getDatabase();
+      const cutoffDate = new Date(Date.now() - RETENTION_MAX_AGE_HOURS * 60 * 60 * 1000);
+      const cutoffTimestamp = cutoffDate.toISOString();
+
+      const result = await db
+        .deleteFrom("performance_audit_results")
+        .where("timestamp", "<", cutoffTimestamp)
+        .executeTakeFirst();
+
+      const deletedCount = Number(result.numDeletedRows ?? 0);
+      if (deletedCount > 0) {
+        logger.info(`[PerformanceAuditRepository] Pruned ${deletedCount} old records`);
+      }
+      return deletedCount;
+    } catch (error) {
+      logger.warn(`[PerformanceAuditRepository] Pruning failed: ${error}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Start periodic pruning timer.
+   */
+  startPeriodicPruning(): void {
+    if (pruningTimer) {
+      return;
+    }
+
+    pruningTimer = setInterval(() => {
+      this.pruneOldRecords().catch(error => {
+        logger.warn(`[PerformanceAuditRepository] Periodic pruning error: ${error}`);
+      });
+    }, PRUNING_INTERVAL_MS);
+
+    // Don't prevent process exit
+    pruningTimer.unref();
+
+    logger.info(`[PerformanceAuditRepository] Started periodic pruning (every ${PRUNING_INTERVAL_MS / 1000}s)`);
+  }
+
+  /**
+   * Stop periodic pruning timer.
+   */
+  stopPeriodicPruning(): void {
+    if (pruningTimer) {
+      clearInterval(pruningTimer);
+      pruningTimer = null;
+      logger.info("[PerformanceAuditRepository] Stopped periodic pruning");
     }
   }
 }

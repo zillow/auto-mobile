@@ -66,6 +66,11 @@ export interface PerformanceAuditResultsTable {
   cpu_usage_percent: number | null;
   touch_latency_ms: number | null;
   diagnostics_json: string | null;
+  // Live metrics extension
+  time_to_first_frame_ms: number | null;
+  time_to_interactive_ms: number | null;
+  frame_rate_fps: number | null;
+  node_id: number | null; // FK to navigation_nodes.id
   created_at: Generated<string>;
 }
 
