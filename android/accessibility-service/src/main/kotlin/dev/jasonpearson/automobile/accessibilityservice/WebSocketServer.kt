@@ -69,6 +69,9 @@ data class WebSocketRequest(
     val requestPermission: Boolean? = null,
     // Filtering/optimization control
     val disableAllFiltering: Boolean? = null, // If true, disable all filtering and optimizations
+    // Storage inspection parameters
+    val packageName: String? = null,
+    val fileName: String? = null,
 )
 
 /**
@@ -148,6 +151,17 @@ class WebSocketServer(
     private val onGetTraversalOrder: ((requestId: String?) -> Unit)? = null,
     private val onAddHighlight:
         ((requestId: String?, highlightId: String?, shape: HighlightShape?) -> Unit)? =
+        null,
+    // Storage inspection callbacks
+    private val onListPreferenceFiles: ((requestId: String?, packageName: String) -> Unit)? = null,
+    private val onGetPreferences:
+        ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
+        null,
+    private val onSubscribeStorage:
+        ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
+        null,
+    private val onUnsubscribeStorage:
+        ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
         null,
 ) {
   companion object {
@@ -558,6 +572,45 @@ class WebSocketServer(
         "add_highlight" -> {
           Log.d(TAG, "Received add_highlight request (requestId: ${request.requestId})")
           onAddHighlight?.invoke(request.requestId, request.id, request.shape)
+        }
+        "list_preference_files" -> {
+          Log.d(TAG, "Received list_preference_files request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          if (!packageName.isNullOrBlank()) {
+            onListPreferenceFiles?.invoke(request.requestId, packageName)
+          } else {
+            Log.w(TAG, "list_preference_files request missing packageName")
+          }
+        }
+        "get_preferences" -> {
+          Log.d(TAG, "Received get_preferences request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank()) {
+            onGetPreferences?.invoke(request.requestId, packageName, fileName)
+          } else {
+            Log.w(TAG, "get_preferences request missing packageName or fileName")
+          }
+        }
+        "subscribe_storage" -> {
+          Log.d(TAG, "Received subscribe_storage request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank()) {
+            onSubscribeStorage?.invoke(request.requestId, packageName, fileName)
+          } else {
+            Log.w(TAG, "subscribe_storage request missing packageName or fileName")
+          }
+        }
+        "unsubscribe_storage" -> {
+          Log.d(TAG, "Received unsubscribe_storage request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank()) {
+            onUnsubscribeStorage?.invoke(request.requestId, packageName, fileName)
+          } else {
+            Log.w(TAG, "unsubscribe_storage request missing packageName or fileName")
+          }
         }
         else -> {
           Log.d(TAG, "Unknown message type: ${request.type}")

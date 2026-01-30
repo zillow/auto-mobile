@@ -42,11 +42,23 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
     }
 
     try {
+      // checkAvailability doesn't require the driver to be initialized
+      if (method == "checkAvailability") {
+        val response = handleCheckAvailability()
+        result.putBoolean("success", true)
+        result.putString("result", response.toString())
+        return result
+      }
+
       val driver = SharedPreferencesInspector.getDriver()
       val response =
         when (method) {
           "listFiles" -> handleListFiles(driver)
           "getPreferences" -> handleGetPreferences(driver, extras)
+          "subscribeToFile" -> handleSubscribeToFile(driver, extras)
+          "unsubscribeFromFile" -> handleUnsubscribeFromFile(driver, extras)
+          "getChanges" -> handleGetChanges(driver, extras)
+          "getListenedFiles" -> handleGetListenedFiles(driver)
           else -> throw IllegalArgumentException("Unknown method: $method")
         }
       result.putBoolean("success", true)
@@ -130,6 +142,125 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
       }
       else -> value ?: JSONObject.NULL
     }
+  }
+
+  /**
+   * Handles checkAvailability - returns SDK availability and version.
+   *
+   * This method works even when the driver isn't initialized, returning:
+   * - available: true (always true when inspection is enabled)
+   * - version: API version number for compatibility checking
+   */
+  private fun handleCheckAvailability(): JSONObject {
+    return JSONObject().apply {
+      put("available", true)
+      put("version", 1)
+    }
+  }
+
+  /**
+   * Handles subscribeToFile - starts listening for changes on a preference file.
+   *
+   * @param extras Must contain "fileName" string
+   * @return JSON with success status and subscription info
+   */
+  private fun handleSubscribeToFile(driver: SharedPreferencesDriver, extras: Bundle?): JSONObject {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+
+    val driverImpl =
+      driver as? SharedPreferencesDriverImpl
+        ?: throw IllegalStateException("Driver must be SharedPreferencesDriverImpl")
+
+    driverImpl.startListening(fileName)
+
+    return JSONObject().apply {
+      put("fileName", fileName)
+      put("subscribed", true)
+    }
+  }
+
+  /**
+   * Handles unsubscribeFromFile - stops listening for changes on a preference file.
+   *
+   * @param extras Must contain "fileName" string
+   * @return JSON with success status
+   */
+  private fun handleUnsubscribeFromFile(
+    driver: SharedPreferencesDriver,
+    extras: Bundle?,
+  ): JSONObject {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+
+    val driverImpl =
+      driver as? SharedPreferencesDriverImpl
+        ?: throw IllegalStateException("Driver must be SharedPreferencesDriverImpl")
+
+    driverImpl.stopListening(fileName)
+
+    return JSONObject().apply {
+      put("fileName", fileName)
+      put("subscribed", false)
+    }
+  }
+
+  /**
+   * Handles getChanges - returns queued changes for a file since a sequence number.
+   *
+   * @param extras Must contain "fileName" string, optionally "sinceSequence" long
+   * @return JSON with array of changes
+   */
+  private fun handleGetChanges(driver: SharedPreferencesDriver, extras: Bundle?): JSONObject {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+    val sinceSequence = extras?.getLong("sinceSequence", 0L) ?: 0L
+
+    val driverImpl =
+      driver as? SharedPreferencesDriverImpl
+        ?: throw IllegalStateException("Driver must be SharedPreferencesDriverImpl")
+
+    val changes = driverImpl.getQueuedChanges(fileName, sinceSequence)
+    val changesArray = JSONArray()
+
+    changes.forEach { change ->
+      changesArray.put(
+        JSONObject().apply {
+          put("fileName", change.fileName)
+          if (change.key != null) {
+            put("key", change.key)
+          } else {
+            put("key", JSONObject.NULL)
+          }
+          put("value", serializeValue(change.newValue, change.type))
+          put("type", change.type.name)
+          put("timestamp", change.timestamp)
+          put("sequenceNumber", change.sequenceNumber)
+        }
+      )
+    }
+
+    return JSONObject().apply {
+      put("fileName", fileName)
+      put("changes", changesArray)
+    }
+  }
+
+  /**
+   * Handles getListenedFiles - returns list of files currently being monitored.
+   *
+   * @return JSON with array of file names
+   */
+  private fun handleGetListenedFiles(driver: SharedPreferencesDriver): JSONObject {
+    val driverImpl =
+      driver as? SharedPreferencesDriverImpl
+        ?: throw IllegalStateException("Driver must be SharedPreferencesDriverImpl")
+
+    val files = driverImpl.getListenedFiles()
+    val filesArray = JSONArray()
+    files.forEach { filesArray.put(it) }
+
+    return JSONObject().apply { put("files", filesArray) }
   }
 
   // Required ContentProvider methods - not used for content call

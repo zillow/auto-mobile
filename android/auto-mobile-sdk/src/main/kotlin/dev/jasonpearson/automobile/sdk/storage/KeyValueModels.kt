@@ -41,3 +41,23 @@ fun interface OnPreferenceChangeListener {
    */
   fun onPreferenceChanged(fileName: String, key: String?)
 }
+
+/**
+ * Represents a change to a SharedPreferences value.
+ *
+ * Used for push-based change notifications to external observers.
+ */
+data class PreferenceChange(
+  /** The name of the preferences file that changed. */
+  val fileName: String,
+  /** The key that changed, or null if the file was cleared. */
+  val key: String?,
+  /** The new value, or null if the key was removed. */
+  val newValue: Any?,
+  /** The type of the value. */
+  val type: KeyValueType,
+  /** Timestamp when the change occurred (milliseconds since epoch). */
+  val timestamp: Long,
+  /** Monotonically increasing sequence number for ordering changes. */
+  val sequenceNumber: Long,
+)

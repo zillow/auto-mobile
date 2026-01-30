@@ -34,6 +34,7 @@ import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.TimeProvider
+import dev.jasonpearson.automobile.accessibilityservice.storage.StorageSubscriptionManager
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -101,6 +102,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
   // Job for collecting navigation event updates
   private var navigationEventJob: Job? = null
+
+  // Job for collecting storage change events
+  private var storageChangeJob: Job? = null
+
+  // Storage subscription manager for SharedPreferences inspection
+  private lateinit var storageSubscriptionManager: StorageSubscriptionManager
 
   private val commandReceiver =
       object : BroadcastReceiver() {
@@ -353,8 +360,21 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               }
               .launchIn(serviceScope)
 
+      // Initialize storage subscription manager for SharedPreferences inspection
+      storageSubscriptionManager = StorageSubscriptionManager(this)
+      Log.d(TAG, "Storage subscription manager initialized")
+
+      // Subscribe to storage change events and broadcast them
+      storageChangeJob =
+          storageSubscriptionManager.changeEvents
+              .onEach { event ->
+                Log.d(TAG, "Storage change: ${event.packageName}:${event.fileName} key=${event.key}")
+                broadcastStorageChange(event)
+              }
+              .launchIn(serviceScope)
+
       // Start WebSocket server with hierarchy, screenshot, swipe, text input, IME action,
-      // and clipboard callbacks
+      // clipboard, and storage callbacks
       webSocketServer =
           WebSocketServer(
               port = 8765,
@@ -443,6 +463,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onAddHighlight = { requestId, highlightId, shape ->
                 handleAddHighlight(requestId, highlightId, shape)
               },
+              onListPreferenceFiles = { requestId, packageName ->
+                handleListPreferenceFiles(requestId, packageName)
+              },
+              onGetPreferences = { requestId, packageName, fileName ->
+                handleGetPreferences(requestId, packageName, fileName)
+              },
+              onSubscribeStorage = { requestId, packageName, fileName ->
+                handleSubscribeStorage(requestId, packageName, fileName)
+              },
+              onUnsubscribeStorage = { requestId, packageName, fileName ->
+                handleUnsubscribeStorage(requestId, packageName, fileName)
+              },
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -494,6 +526,13 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
     // Cancel navigation event flow subscription
     navigationEventJob?.cancel()
+
+    // Cancel storage change flow subscription and clean up manager
+    storageChangeJob?.cancel()
+    if (::storageSubscriptionManager.isInitialized) {
+      storageSubscriptionManager.destroy()
+      Log.d(TAG, "Storage subscription manager destroyed")
+    }
 
     // Reset debouncer
     if (::hierarchyDebouncer.isInitialized) {
@@ -3643,6 +3682,227 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting traversal order error", e)
+    }
+  }
+
+  // ================= Storage Inspection Methods =================
+
+  private fun handleListPreferenceFiles(requestId: String?, packageName: String) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.listPreferenceFiles(packageName)
+      result.fold(
+          onSuccess = { files ->
+            broadcastPreferenceFilesResult(requestId, packageName, files, null)
+          },
+          onFailure = { error ->
+            broadcastPreferenceFilesResult(requestId, packageName, null, error.message)
+          },
+      )
+    }
+  }
+
+  private fun handleGetPreferences(requestId: String?, packageName: String, fileName: String) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.getPreferences(packageName, fileName)
+      result.fold(
+          onSuccess = { entries ->
+            broadcastPreferencesResult(requestId, packageName, fileName, entries, null)
+          },
+          onFailure = { error ->
+            broadcastPreferencesResult(requestId, packageName, fileName, null, error.message)
+          },
+      )
+    }
+  }
+
+  private fun handleSubscribeStorage(requestId: String?, packageName: String, fileName: String) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.subscribe(packageName, fileName)
+      result.fold(
+          onSuccess = { subscription ->
+            broadcastSubscribeStorageResult(
+                requestId,
+                packageName,
+                fileName,
+                subscription.subscriptionId,
+                null,
+            )
+          },
+          onFailure = { error ->
+            broadcastSubscribeStorageResult(requestId, packageName, fileName, null, error.message)
+          },
+      )
+    }
+  }
+
+  private fun handleUnsubscribeStorage(requestId: String?, packageName: String, fileName: String) {
+    serviceScope.launch {
+      val success = storageSubscriptionManager.unsubscribe(packageName, fileName)
+      broadcastUnsubscribeStorageResult(requestId, packageName, fileName, success)
+    }
+  }
+
+  private suspend fun broadcastPreferenceFilesResult(
+      requestId: String?,
+      packageName: String,
+      files: List<dev.jasonpearson.automobile.accessibilityservice.storage.PreferenceFileInfo>?,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping preference files broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"preference_files","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        if (files != null) {
+          append(""","success":true,"files":${jsonCompact.encodeToString(files)}""")
+        } else {
+          append(""","success":false,"error":${jsonCompact.encodeToString(error ?: "Unknown error")}""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted preference files to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting preference files", e)
+    }
+  }
+
+  private suspend fun broadcastPreferencesResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      entries: List<dev.jasonpearson.automobile.accessibilityservice.storage.PreferenceEntry>?,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping preferences broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"preferences","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        if (entries != null) {
+          append(""","success":true,"entries":${jsonCompact.encodeToString(entries)}""")
+        } else {
+          append(""","success":false,"error":${jsonCompact.encodeToString(error ?: "Unknown error")}""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted preferences to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting preferences", e)
+    }
+  }
+
+  private suspend fun broadcastSubscribeStorageResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      subscriptionId: String?,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping subscribe storage broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"subscribe_storage_result","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        if (subscriptionId != null) {
+          append(""","success":true,"subscriptionId":${jsonCompact.encodeToString(subscriptionId)}""")
+        } else {
+          append(""","success":false,"error":${jsonCompact.encodeToString(error ?: "Unknown error")}""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted subscribe storage result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting subscribe storage result", e)
+    }
+  }
+
+  private suspend fun broadcastUnsubscribeStorageResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      success: Boolean,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping unsubscribe storage broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"unsubscribe_storage_result","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        append(""","success":$success""")
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted unsubscribe storage result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting unsubscribe storage result", e)
+    }
+  }
+
+  private suspend fun broadcastStorageChange(
+      event: dev.jasonpearson.automobile.accessibilityservice.storage.PreferenceChangeEvent
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping storage change broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"storage_changed","timestamp":${System.currentTimeMillis()}""")
+        append(""","packageName":${jsonCompact.encodeToString(event.packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(event.fileName)}""")
+        if (event.key != null) {
+          append(""","key":${jsonCompact.encodeToString(event.key)}""")
+        } else {
+          append(""","key":null""")
+        }
+        if (event.value != null) {
+          append(""","value":${event.value}""") // Already JSON-encoded
+        } else {
+          append(""","value":null""")
+        }
+        append(""","valueType":${jsonCompact.encodeToString(event.type)}""")
+        append(""","eventTimestamp":${event.timestamp}""")
+        append(""","sequenceNumber":${event.sequenceNumber}""")
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted storage change to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting storage change", e)
     }
   }
 }

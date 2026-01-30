@@ -211,4 +211,178 @@ class FakeSharedPreferencesDriverTest {
 
     assertTrue(driver.getPreferenceFiles().isEmpty())
   }
+
+  // ================= Subscription/Listening Tests =================
+
+  @Test
+  fun `startListening marks file as listened`() {
+    driver.setPreferences("prefs", mapOf("key" to "value"))
+
+    assertFalse(driver.isListening("prefs"))
+
+    driver.startListening("prefs")
+
+    assertTrue(driver.isListening("prefs"))
+  }
+
+  @Test
+  fun `stopListening removes file from listened set`() {
+    driver.setPreferences("prefs", mapOf("key" to "value"))
+    driver.startListening("prefs")
+    assertTrue(driver.isListening("prefs"))
+
+    driver.stopListening("prefs")
+
+    assertFalse(driver.isListening("prefs"))
+  }
+
+  @Test
+  fun `stopAllListening clears all listened files`() {
+    driver.setPreferences("prefs1", mapOf("key" to "value"))
+    driver.setPreferences("prefs2", mapOf("key" to "value"))
+    driver.startListening("prefs1")
+    driver.startListening("prefs2")
+
+    driver.stopAllListening()
+
+    assertFalse(driver.isListening("prefs1"))
+    assertFalse(driver.isListening("prefs2"))
+    assertTrue(driver.getListenedFiles().isEmpty())
+  }
+
+  @Test
+  fun `getListenedFiles returns all listened files`() {
+    driver.setPreferences("prefs1", mapOf())
+    driver.setPreferences("prefs2", mapOf())
+    driver.startListening("prefs1")
+    driver.startListening("prefs2")
+
+    val listened = driver.getListenedFiles()
+
+    assertEquals(2, listened.size)
+    assertTrue(listened.contains("prefs1"))
+    assertTrue(listened.contains("prefs2"))
+  }
+
+  @Test
+  fun `changes are queued when listening`() {
+    driver.setPreferences("prefs", mapOf())
+    driver.startListening("prefs")
+
+    driver.putPreference("prefs", "key1", "value1")
+    driver.putPreference("prefs", "key2", 42)
+
+    val changes = driver.getQueuedChanges("prefs", 0)
+
+    assertEquals(2, changes.size)
+    assertEquals("key1", changes[0].key)
+    assertEquals("value1", changes[0].newValue)
+    assertEquals(KeyValueType.STRING, changes[0].type)
+    assertEquals("key2", changes[1].key)
+    assertEquals(42, changes[1].newValue)
+    assertEquals(KeyValueType.INT, changes[1].type)
+  }
+
+  @Test
+  fun `changes are not queued when not listening`() {
+    driver.setPreferences("prefs", mapOf())
+    // Not calling startListening
+
+    driver.putPreference("prefs", "key", "value")
+
+    val changes = driver.getQueuedChanges("prefs", 0)
+    assertTrue(changes.isEmpty())
+  }
+
+  @Test
+  fun `getQueuedChanges removes returned changes from queue`() {
+    driver.setPreferences("prefs", mapOf())
+    driver.startListening("prefs")
+
+    driver.putPreference("prefs", "key1", "value1")
+    driver.putPreference("prefs", "key2", "value2")
+
+    val firstBatch = driver.getQueuedChanges("prefs", 0)
+    assertEquals(2, firstBatch.size)
+
+    val secondBatch = driver.getQueuedChanges("prefs", 0)
+    assertTrue(secondBatch.isEmpty())
+  }
+
+  @Test
+  fun `getQueuedChanges filters by sinceSequence`() {
+    driver.setPreferences("prefs", mapOf())
+    driver.startListening("prefs")
+
+    driver.putPreference("prefs", "key1", "value1")
+    driver.putPreference("prefs", "key2", "value2")
+    driver.putPreference("prefs", "key3", "value3")
+
+    // Get all changes to capture sequence numbers
+    val allChanges = driver.getQueuedChanges("prefs", 0)
+    assertEquals(3, allChanges.size)
+
+    // Re-add changes to test filtering
+    driver.putPreference("prefs", "key4", "value4")
+    driver.putPreference("prefs", "key5", "value5")
+
+    // Get changes since sequence 3 (should only get key4 and key5)
+    val newChanges = driver.getQueuedChanges("prefs", 3)
+    assertEquals(2, newChanges.size)
+    assertEquals("key4", newChanges[0].key)
+    assertEquals("key5", newChanges[1].key)
+  }
+
+  @Test
+  fun `sequence numbers are monotonically increasing`() {
+    driver.setPreferences("prefs", mapOf())
+    driver.startListening("prefs")
+
+    driver.putPreference("prefs", "key1", "value1")
+    driver.putPreference("prefs", "key2", "value2")
+    driver.putPreference("prefs", "key3", "value3")
+
+    val changes = driver.getQueuedChanges("prefs", 0)
+
+    assertTrue(changes[0].sequenceNumber < changes[1].sequenceNumber)
+    assertTrue(changes[1].sequenceNumber < changes[2].sequenceNumber)
+  }
+
+  @Test
+  fun `remove preference queues change with null value`() {
+    driver.setPreferences("prefs", mapOf("key" to "value"))
+    driver.startListening("prefs")
+
+    driver.removePreference("prefs", "key")
+
+    val changes = driver.getQueuedChanges("prefs", 0)
+    assertEquals(1, changes.size)
+    assertEquals("key", changes[0].key)
+    assertNull(changes[0].newValue)
+  }
+
+  @Test
+  fun `clear preferences queues change with null key`() {
+    driver.setPreferences("prefs", mapOf("key1" to "v1", "key2" to "v2"))
+    driver.startListening("prefs")
+
+    driver.clearPreferences("prefs")
+
+    val changes = driver.getQueuedChanges("prefs", 0)
+    assertEquals(1, changes.size)
+    assertNull(changes[0].key)
+    assertNull(changes[0].newValue)
+  }
+
+  @Test
+  fun `stopListening clears change queue for file`() {
+    driver.setPreferences("prefs", mapOf())
+    driver.startListening("prefs")
+    driver.putPreference("prefs", "key", "value")
+
+    driver.stopListening("prefs")
+
+    val changes = driver.getQueuedChanges("prefs", 0)
+    assertTrue(changes.isEmpty())
+  }
 }

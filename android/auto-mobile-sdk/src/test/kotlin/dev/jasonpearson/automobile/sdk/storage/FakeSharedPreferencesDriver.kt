@@ -1,11 +1,18 @@
 package dev.jasonpearson.automobile.sdk.storage
 
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 
 /** Fake implementation of SharedPreferencesDriver for testing. */
 class FakeSharedPreferencesDriver : SharedPreferencesDriver {
   private val preferenceFiles = mutableMapOf<String, MutableMap<String, Any?>>()
   private val listeners = CopyOnWriteArrayList<OnPreferenceChangeListener>()
+  private val listenedFiles = mutableSetOf<String>()
+  private val changeQueues = mutableMapOf<String, CopyOnWriteArrayList<PreferenceChange>>()
+  private val sequenceCounter = AtomicLong(0)
+
+  /** Whether to record changes (simulates listening). */
+  var recordChanges: Boolean = true
 
   /**
    * Sets preferences data for a file.
@@ -26,6 +33,9 @@ class FakeSharedPreferencesDriver : SharedPreferencesDriver {
    */
   fun putPreference(fileName: String, key: String, value: Any?) {
     preferenceFiles.getOrPut(fileName) { mutableMapOf() }[key] = value
+    if (isListening(fileName)) {
+      queueChange(fileName, key, value)
+    }
     notifyListeners(fileName, key)
   }
 
@@ -37,6 +47,9 @@ class FakeSharedPreferencesDriver : SharedPreferencesDriver {
    */
   fun removePreference(fileName: String, key: String) {
     preferenceFiles[fileName]?.remove(key)
+    if (isListening(fileName)) {
+      queueChange(fileName, key, null)
+    }
     notifyListeners(fileName, key)
   }
 
@@ -47,16 +60,98 @@ class FakeSharedPreferencesDriver : SharedPreferencesDriver {
    */
   fun clearPreferences(fileName: String) {
     preferenceFiles[fileName]?.clear()
+    if (isListening(fileName)) {
+      queueChange(fileName, null, null)
+    }
     notifyListeners(fileName, null)
   }
 
-  /** Clears all stored preferences data. */
+  /** Clears all stored preferences data and resets listening state. */
   fun clear() {
     preferenceFiles.clear()
+    listenedFiles.clear()
+    changeQueues.clear()
   }
 
   private fun notifyListeners(fileName: String, key: String?) {
     listeners.forEach { it.onPreferenceChanged(fileName, key) }
+  }
+
+  private fun queueChange(fileName: String, key: String?, value: Any?) {
+    if (!recordChanges) return
+
+    val change =
+      PreferenceChange(
+        fileName = fileName,
+        key = key,
+        newValue = value,
+        type = detectType(value),
+        timestamp = System.currentTimeMillis(),
+        sequenceNumber = sequenceCounter.incrementAndGet(),
+      )
+    changeQueues.getOrPut(fileName) { CopyOnWriteArrayList() }.add(change)
+  }
+
+  /**
+   * Starts listening for changes on a specific preferences file.
+   *
+   * @param fileName The preferences file name
+   */
+  fun startListening(fileName: String) {
+    if (listenedFiles.contains(fileName)) return
+    listenedFiles.add(fileName)
+    changeQueues.getOrPut(fileName) { CopyOnWriteArrayList() }
+  }
+
+  /**
+   * Stops listening for changes on a specific preferences file.
+   *
+   * @param fileName The preferences file name
+   */
+  fun stopListening(fileName: String) {
+    listenedFiles.remove(fileName)
+    changeQueues.remove(fileName)
+  }
+
+  /** Stops listening on all preferences files. */
+  fun stopAllListening() {
+    listenedFiles.clear()
+    changeQueues.clear()
+  }
+
+  /**
+   * Checks if the driver is actively listening for changes on a specific file.
+   *
+   * @param fileName The preferences file name
+   * @return true if listening on this file
+   */
+  fun isListening(fileName: String): Boolean {
+    return listenedFiles.contains(fileName)
+  }
+
+  /**
+   * Returns the list of files currently being listened to.
+   *
+   * @return List of preference file names with active listeners
+   */
+  fun getListenedFiles(): List<String> {
+    return listenedFiles.toList()
+  }
+
+  /**
+   * Returns queued changes for a file since the given sequence number.
+   *
+   * @param fileName The preferences file name
+   * @param sinceSequence Only return changes with sequenceNumber > sinceSequence
+   * @return List of changes since the given sequence number
+   */
+  fun getQueuedChanges(fileName: String, sinceSequence: Long): List<PreferenceChange> {
+    val queue = changeQueues[fileName] ?: return emptyList()
+    val changes = queue.filter { it.sequenceNumber > sinceSequence }
+    if (changes.isNotEmpty()) {
+      queue.removeAll(changes.toSet())
+    }
+    return changes
   }
 
   override fun getPreferenceFiles(): List<PreferenceFileDescriptor> {
