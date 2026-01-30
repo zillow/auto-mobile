@@ -14,7 +14,7 @@ import { normalizePlanDevices } from "../utils/plan/PlanDevices";
 import { ExecutePlanStepDebugInfo } from "../models/ExecutePlanResult";
 import { serverConfig } from "../utils/ServerConfig";
 import { startVideoRecording, stopVideoRecording } from "./videoRecordingManager";
-import { stopTestRecording, getTestRecordingStatus } from "./testRecordingManager";
+import { startTestRecording, stopTestRecording, getTestRecordingStatus } from "./testRecordingManager";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -441,6 +441,39 @@ const executePlanTool = async (device: BootedDevice, params: {
   }
 };
 
+// Start test recording tool schema (empty - uses active device)
+const startTestRecordingSchema = z.object({});
+
+const startTestRecordingResultSchema = z.object({
+  success: z.boolean(),
+  recordingId: z.string().optional(),
+  startedAt: z.string().optional(),
+  deviceId: z.string().optional(),
+  platform: z.string().optional(),
+  error: z.string().optional(),
+});
+
+// Start test recording tool handler
+const startTestRecordingTool = async (device: BootedDevice): Promise<any> => {
+  try {
+    const result = await startTestRecording(device);
+
+    return createStructuredToolResponse({
+      success: true,
+      recordingId: result.recordingId,
+      startedAt: result.startedAt,
+      deviceId: result.deviceId,
+      platform: result.platform,
+    });
+  } catch (error) {
+    logger.error(`[startTestRecording] Failed to start recording: ${error}`);
+    return createStructuredToolResponse({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 // Export plan tool schema
 const exportPlanSchema = z.object({
   recordingId: z.string().optional().describe("Recording ID to export (uses active recording if not specified)"),
@@ -510,6 +543,16 @@ export const registerPlanTools = () => {
     false,
     false,
     { outputSchema: executePlanResultSchema }
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "startTestRecording",
+    "Start test recording mode on the active device. Records user interactions for later export as a test plan. Returns the session ID which can be used with exportPlan.",
+    startTestRecordingSchema,
+    startTestRecordingTool,
+    false,
+    false,
+    { outputSchema: startTestRecordingResultSchema }
   );
 
   ToolRegistry.register(
