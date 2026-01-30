@@ -51,7 +51,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "test_execution_steps"))) {
     await db.schema
       .createTable("test_execution_steps")
-    .ifNotExists()
+      .ifNotExists()
       .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
       .addColumn("execution_id", "integer", col =>
         col.notNull().references("test_executions.id").onDelete("cascade")
@@ -72,7 +72,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_test_execution_steps_execution")
-    .ifNotExists()
+      .ifNotExists()
       .on("test_execution_steps")
       .column("execution_id")
       .execute();
@@ -82,7 +82,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   if (!(await tableExists(db, "test_execution_screens"))) {
     await db.schema
       .createTable("test_execution_screens")
-    .ifNotExists()
+      .ifNotExists()
       .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
       .addColumn("execution_id", "integer", col =>
         col.notNull().references("test_executions.id").onDelete("cascade")
@@ -97,7 +97,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
     await db.schema
       .createIndex("idx_test_execution_screens_execution")
-    .ifNotExists()
+      .ifNotExists()
       .on("test_execution_screens")
       .column("execution_id")
       .execute();

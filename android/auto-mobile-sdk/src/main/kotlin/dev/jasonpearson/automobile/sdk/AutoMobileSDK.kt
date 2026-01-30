@@ -3,6 +3,7 @@ package dev.jasonpearson.automobile.sdk
 import android.content.Context
 import android.content.Intent
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
+import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -61,6 +62,7 @@ object AutoMobileSDK {
     AutoMobileNotifications.initialize(this.context!!)
     DatabaseInspector.initialize(this.context!!)
     SharedPreferencesInspector.initialize(this.context!!)
+    AutoMobileFailures.initialize(this.context!!)
   }
 
   /**

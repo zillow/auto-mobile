@@ -20,6 +20,7 @@ import androidx.navigation3.ui.*
 import androidx.navigation3.ui.NavDisplay
 import dev.jasonpearson.automobile.demos.BugReproScreen
 import dev.jasonpearson.automobile.demos.ContrastDemoScreen
+import dev.jasonpearson.automobile.demos.HandledExceptionDemoScreen
 import dev.jasonpearson.automobile.demos.DemoIndexScreen
 import dev.jasonpearson.automobile.demos.PerformanceDetailScreen
 import dev.jasonpearson.automobile.demos.PerformanceListScreen
@@ -146,7 +147,8 @@ fun determineStartDestinationWithDeepLink(
             is DemoPerformanceDetailDestination,
             is DemoContrastDestination,
             is DemoTapTargetsDestination,
-            is DemoBugReproDestination -> {
+            is DemoBugReproDestination,
+            is DemoHandledExceptionDestination -> {
               // For protected destinations, ensure user is authenticated
               when {
                 !hasCompletedOnboarding -> {
@@ -264,7 +266,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               is DemoPerformanceDetailDestination,
               is DemoContrastDestination,
               is DemoTapTargetsDestination,
-              is DemoBugReproDestination -> {
+              is DemoBugReproDestination,
+              is DemoHandledExceptionDestination -> {
                 // For protected destinations, ensure user is authenticated
                 when {
                   !userPreferences.hasCompletedOnboarding -> {
@@ -555,6 +558,7 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                     onNavigateToContrast = { backStack.add(DemoContrastDestination) },
                     onNavigateToTapTargets = { backStack.add(DemoTapTargetsDestination) },
                     onNavigateToBugRepro = { backStack.add(DemoBugReproDestination) },
+                    onNavigateToHandledException = { backStack.add(DemoHandledExceptionDestination) },
                     onNavigateBack = { backStack.removeLastOrNull() },
                 )
               }
@@ -686,6 +690,19 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               }
               Box(modifier = Modifier.destinationSemanticModifier<DemoBugReproDestination>()) {
                 BugReproScreen(onNavigateBack = { backStack.removeLastOrNull() })
+              }
+            }
+
+            entry<DemoHandledExceptionDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to HandledExceptionDemoScreen")
+                analyticsTracker.trackScreenView("HandledExceptionDemoScreen")
+              }
+              Box(
+                  modifier = Modifier.destinationSemanticModifier<DemoHandledExceptionDestination>()
+              ) {
+                HandledExceptionDemoScreen(onNavigateBack = { backStack.removeLastOrNull() })
               }
             }
           },

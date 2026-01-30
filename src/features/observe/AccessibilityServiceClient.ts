@@ -35,6 +35,8 @@ import {
   ScreenshotCaptureResult,
   computeChecksum,
 } from "./ScreenshotBackoffScheduler";
+import { getFailureRecorder } from "../failures/FailureRecorder";
+import type { StackTraceElement } from "../../server/failuresResources";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -300,6 +302,26 @@ interface PackageEvent {
   userId: number;
   isSystem?: boolean | null;
   removedForAllUsers?: boolean | null;
+}
+
+/**
+ * Interface for handled exception event from SDK
+ */
+interface HandledExceptionEvent {
+  timestamp: number;
+  exceptionClass: string;
+  exceptionMessage?: string;
+  stackTrace: string;
+  customMessage?: string;
+  currentScreen?: string;
+  packageName: string;
+  appVersion?: string;
+  deviceInfo: {
+    model: string;
+    manufacturer: string;
+    osVersion: string;
+    sdkInt: number;
+  };
 }
 
 /**
@@ -1067,6 +1089,85 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
   }
 
+  /**
+   * Handle handled exception event from SDK and record it as a crash
+   */
+  private async handleHandledExceptionEvent(event: HandledExceptionEvent): Promise<void> {
+    logger.info(
+      `[ACCESSIBILITY_SERVICE] Received handled exception: ${event.exceptionClass} from ${event.packageName}`
+    );
+
+    try {
+      const failureRecorder = getFailureRecorder();
+
+      // Parse stack trace into structured format
+      const stackTraceElements = this.parseStackTrace(event.stackTrace, event.packageName);
+
+      // Get current screen from navigation graph if not provided
+      let currentScreen = event.currentScreen;
+      if (!currentScreen) {
+        try {
+          const navManager = NavigationGraphManager.getInstance();
+          currentScreen = navManager.getCurrentScreen() ?? undefined;
+        } catch {
+          // Navigation graph not available, continue without screen
+        }
+      }
+
+      // Build the crash input
+      const crashInput = {
+        exceptionType: event.exceptionClass,
+        exceptionMessage: event.exceptionMessage ?? event.customMessage ?? "Handled exception",
+        stackTrace: stackTraceElements,
+        deviceId: this.device.deviceId,
+        deviceModel: event.deviceInfo.model,
+        os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
+        appVersion: event.appVersion ?? "unknown",
+        sessionId: `handled-${event.packageName}-${Date.now()}`,
+        currentScreen,
+      };
+
+      const occurrenceId = await failureRecorder.recordCrash(crashInput);
+      logger.info(
+        `[ACCESSIBILITY_SERVICE] Recorded handled exception as crash: ${occurrenceId}`
+      );
+    } catch (error) {
+      logger.error(`[ACCESSIBILITY_SERVICE] Failed to record handled exception: ${error}`);
+    }
+  }
+
+  /**
+   * Parse a stack trace string into structured StackTraceElement array
+   */
+  private parseStackTrace(stackTrace: string, packageName: string): StackTraceElement[] {
+    const elements: StackTraceElement[] = [];
+    const lines = stackTrace.split("\n");
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Match patterns like "at com.example.MyClass.myMethod(MyClass.kt:42)"
+      const match = trimmed.match(/^at\s+([a-zA-Z0-9$_.]+)\.([a-zA-Z0-9$_<>]+)\(([^:)]+):?(\d+)?\)$/);
+      if (match) {
+        const [, fullClassName, methodName, fileName, lineNumberStr] = match;
+        const lineNumber = lineNumberStr ? parseInt(lineNumberStr, 10) : undefined;
+
+        // Determine if this is app code (matches package name prefix)
+        const isAppCode = fullClassName.startsWith(packageName) ||
+          fullClassName.includes(packageName.split(".").slice(0, 2).join("."));
+
+        elements.push({
+          className: fullClassName,
+          methodName,
+          fileName: fileName || undefined,
+          lineNumber,
+          isAppCode,
+        });
+      }
+    }
+
+    return elements;
+  }
+
   private async markInstalledAppsStale(reason: string): Promise<void> {
     if (this.device.platform !== "android") {
       return;
@@ -1765,6 +1866,15 @@ export class AccessibilityServiceClient implements AccessibilityService {
         const interaction = interactionMessage.event as InteractionEvent | undefined;
         if (interaction) {
           this.notifyInteractionListeners(interaction);
+        }
+      }
+
+      // Handle handled exception event from SDK
+      if (message.type === "handled_exception_event") {
+        const exceptionMessage = message as any;
+        const event = exceptionMessage.event as HandledExceptionEvent | undefined;
+        if (event) {
+          await this.handleHandledExceptionEvent(event);
         }
       }
     } catch (error) {

@@ -36,6 +36,7 @@ import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.TimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.storage.StorageSubscriptionManager
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
+import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
@@ -243,6 +244,61 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
       }
 
+  private val handledExceptionReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          if (intent == null || intent.action != AutoMobileFailures.ACTION_HANDLED_EXCEPTION) {
+            return
+          }
+
+          try {
+            val timestamp = intent.getLongExtra(AutoMobileFailures.EXTRA_TIMESTAMP, 0L)
+            val exceptionClass =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_EXCEPTION_CLASS) ?: return
+            val exceptionMessage =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_EXCEPTION_MESSAGE)
+            val stackTrace =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_STACK_TRACE) ?: return
+            val customMessage = intent.getStringExtra(AutoMobileFailures.EXTRA_CUSTOM_MESSAGE)
+            val currentScreen = intent.getStringExtra(AutoMobileFailures.EXTRA_CURRENT_SCREEN)
+            val packageName =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_PACKAGE_NAME) ?: return
+            val appVersion = intent.getStringExtra(AutoMobileFailures.EXTRA_APP_VERSION)
+            val deviceModel =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_DEVICE_MODEL) ?: "unknown"
+            val deviceManufacturer =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_DEVICE_MANUFACTURER) ?: "unknown"
+            val osVersion =
+                intent.getStringExtra(AutoMobileFailures.EXTRA_OS_VERSION) ?: "unknown"
+            val sdkInt = intent.getIntExtra(AutoMobileFailures.EXTRA_SDK_INT, 0)
+
+            Log.d(
+                TAG,
+                "Received handled exception: $exceptionClass from $packageName",
+            )
+
+            serviceScope.launch {
+              broadcastHandledExceptionEvent(
+                  timestamp = timestamp,
+                  exceptionClass = exceptionClass,
+                  exceptionMessage = exceptionMessage,
+                  stackTrace = stackTrace,
+                  customMessage = customMessage,
+                  currentScreen = currentScreen,
+                  packageName = packageName,
+                  appVersion = appVersion,
+                  deviceModel = deviceModel,
+                  deviceManufacturer = deviceManufacturer,
+                  osVersion = osVersion,
+                  sdkInt = sdkInt,
+              )
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Error handling handled exception broadcast", e)
+          }
+        }
+      }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
@@ -303,6 +359,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         registerReceiver(packageReceiver, packageFilter)
       }
       Log.d(TAG, "Package receiver registered")
+
+      // Register broadcast receiver for handled exceptions from SDK
+      val handledExceptionFilter =
+          IntentFilter().apply { addAction(AutoMobileFailures.ACTION_HANDLED_EXCEPTION) }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(handledExceptionReceiver, handledExceptionFilter, RECEIVER_EXPORTED)
+      } else {
+        @SuppressLint("UnspecifiedRegisterReceiverFlag")
+        registerReceiver(handledExceptionReceiver, handledExceptionFilter)
+      }
+      Log.d(TAG, "Handled exception receiver registered")
 
       // Initialize the navigation event accumulator
       navigationEventAccumulator.initialize()
@@ -511,6 +579,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       unregisterReceiver(packageReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering package receiver", e)
+    }
+
+    try {
+      unregisterReceiver(handledExceptionReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering handled exception receiver", e)
     }
 
     if (::overlayDrawer.isInitialized) {
@@ -3360,6 +3434,65 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting navigation event", e)
+    }
+  }
+
+  /** Broadcast handled exception event to WebSocket clients */
+  private suspend fun broadcastHandledExceptionEvent(
+      timestamp: Long,
+      exceptionClass: String,
+      exceptionMessage: String?,
+      stackTrace: String,
+      customMessage: String?,
+      currentScreen: String?,
+      packageName: String,
+      appVersion: String?,
+      deviceModel: String,
+      deviceManufacturer: String,
+      osVersion: String,
+      sdkInt: Int,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping handled exception broadcast")
+      return
+    }
+
+    try {
+      // Build JSON message manually to avoid kotlinx.serialization dependency for this data
+      val message = buildString {
+        append("""{"type":"handled_exception_event","timestamp":${System.currentTimeMillis()},"event":{""")
+        append(""""timestamp":$timestamp""")
+        append(""","exceptionClass":"${escapeJsonString(exceptionClass)}"""")
+        if (exceptionMessage != null) {
+          append(""","exceptionMessage":"${escapeJsonString(exceptionMessage)}"""")
+        }
+        append(""","stackTrace":"${escapeJsonString(stackTrace)}"""")
+        if (customMessage != null) {
+          append(""","customMessage":"${escapeJsonString(customMessage)}"""")
+        }
+        if (currentScreen != null) {
+          append(""","currentScreen":"${escapeJsonString(currentScreen)}"""")
+        }
+        append(""","packageName":"${escapeJsonString(packageName)}"""")
+        if (appVersion != null) {
+          append(""","appVersion":"${escapeJsonString(appVersion)}"""")
+        }
+        append(""","deviceInfo":{""")
+        append(""""model":"${escapeJsonString(deviceModel)}"""")
+        append(""","manufacturer":"${escapeJsonString(deviceManufacturer)}"""")
+        append(""","osVersion":"${escapeJsonString(osVersion)}"""")
+        append(""","sdkInt":$sdkInt""")
+        append("""}""")
+        append("""}}""")
+      }
+
+      webSocketServer.broadcast(message)
+      Log.d(
+          TAG,
+          "Broadcasted handled exception to ${webSocketServer.getConnectionCount()} clients: $exceptionClass",
+      )
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting handled exception event", e)
     }
   }
 

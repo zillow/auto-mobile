@@ -46,6 +46,7 @@ fun DemoIndexScreen(
     onNavigateToContrast: () -> Unit,
     onNavigateToTapTargets: () -> Unit,
     onNavigateToBugRepro: () -> Unit,
+    onNavigateToHandledException: () -> Unit = {},
     onNavigateBack: () -> Unit = {},
 ) {
   TrackRecomposition(id = "screen.demo.index", composableName = "DemoIndexScreen") {
@@ -92,6 +93,13 @@ fun DemoIndexScreen(
                 description = "Toggleable bug to reproduce reliably.",
                 buttonLabel = "Open Bug Demo",
                 onClick = onNavigateToBugRepro,
+            ),
+            DemoEntry(
+                id = "demo_handled_exception",
+                title = "Handled Exceptions",
+                description = "Test handled exception reporting API.",
+                buttonLabel = "Open Exception Demo",
+                onClick = onNavigateToHandledException,
             ),
         )
 
