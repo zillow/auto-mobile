@@ -38,6 +38,8 @@ include(":junit-runner")
 
 include(":test-plan-validation")
 
+include(":video-server")
+
 include(":ide-plugin")
 
 include(":playground:analytics")
