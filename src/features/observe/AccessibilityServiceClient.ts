@@ -28,7 +28,7 @@ import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
 import { PortManager } from "../../utils/PortManager";
 import { RequestManager } from "../../utils/RequestManager";
-import { getObservationStreamServer } from "../../daemon/observationStreamSocketServer";
+import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 import {
   ScreenshotBackoffScheduler,
   DefaultScreenshotBackoffScheduler,
@@ -37,6 +37,16 @@ import {
 } from "./ScreenshotBackoffScheduler";
 import { getFailureRecorder } from "../failures/FailureRecorder";
 import type { StackTraceElement } from "../../server/failuresResources";
+import type {
+  PreferenceFile,
+  KeyValueEntry,
+  StorageSubscription,
+  StorageChangedEvent,
+  ListPreferenceFilesResult,
+  GetPreferencesResult,
+  SubscribeStorageResult,
+  UnsubscribeStorageResult,
+} from "../storage/storageTypes";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -806,6 +816,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Highlight handling
   private pendingHighlightResolve: ((result: HighlightOperationResult) => void) | null = null;
   private pendingHighlightRequestId: string | null = null;
+
+  // Storage change listeners
+  private storageChangeListeners: Set<(event: StorageChangedEvent) => void> = new Set();
 
   // WebSocket factory for testing
   private webSocketFactory: (url: string) => WebSocket;
@@ -1820,6 +1833,50 @@ export class AccessibilityServiceClient implements AccessibilityService {
         });
       }
 
+      // Handle storage result messages
+      if (message.type === "list_preference_files_result" && message.requestId) {
+        const storageMessage = message as any;
+        logger.debug(`[ACCESSIBILITY_SERVICE] List preference files result (requestId: ${storageMessage.requestId}, success: ${storageMessage.success})`);
+        this.requestManager.resolve<ListPreferenceFilesResult>(message.requestId, {
+          success: storageMessage.success ?? false,
+          files: storageMessage.files || [],
+          totalTimeMs: storageMessage.totalTimeMs ?? 0,
+          error: storageMessage.error
+        });
+      }
+
+      if (message.type === "get_preferences_result" && message.requestId) {
+        const storageMessage = message as any;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Get preferences result (requestId: ${storageMessage.requestId}, success: ${storageMessage.success})`);
+        this.requestManager.resolve<GetPreferencesResult>(message.requestId, {
+          success: storageMessage.success ?? false,
+          entries: storageMessage.entries || [],
+          totalTimeMs: storageMessage.totalTimeMs ?? 0,
+          error: storageMessage.error
+        });
+      }
+
+      if (message.type === "subscribe_storage_result" && message.requestId) {
+        const storageMessage = message as any;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Subscribe storage result (requestId: ${storageMessage.requestId}, success: ${storageMessage.success})`);
+        this.requestManager.resolve<SubscribeStorageResult>(message.requestId, {
+          success: storageMessage.success ?? false,
+          subscription: storageMessage.subscription,
+          totalTimeMs: storageMessage.totalTimeMs ?? 0,
+          error: storageMessage.error
+        });
+      }
+
+      if (message.type === "unsubscribe_storage_result" && message.requestId) {
+        const storageMessage = message as any;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Unsubscribe storage result (requestId: ${storageMessage.requestId}, success: ${storageMessage.success})`);
+        this.requestManager.resolve<UnsubscribeStorageResult>(message.requestId, {
+          success: storageMessage.success ?? false,
+          totalTimeMs: storageMessage.totalTimeMs ?? 0,
+          error: storageMessage.error
+        });
+      }
+
       // Handle navigation event
       if (message.type === "navigation_event") {
         const navMessage = message as any;
@@ -1877,6 +1934,30 @@ export class AccessibilityServiceClient implements AccessibilityService {
           await this.handleHandledExceptionEvent(event);
         }
       }
+
+      // Handle storage_changed push event
+      if (message.type === "storage_changed") {
+        const storageMessage = message as any;
+        const event: StorageChangedEvent = {
+          packageName: storageMessage.packageName,
+          fileName: storageMessage.fileName,
+          key: storageMessage.key ?? null,
+          value: storageMessage.value ?? null,
+          valueType: storageMessage.valueType ?? "STRING",
+          timestamp: storageMessage.timestamp ?? Date.now(),
+          sequenceNumber: storageMessage.sequenceNumber ?? 0,
+        };
+        logger.debug(`[ACCESSIBILITY_SERVICE] Storage changed: ${event.packageName}/${event.fileName} key=${event.key}`);
+
+        // Notify listeners
+        this.notifyStorageChangeListeners(event);
+
+        // Push to device data stream for IDE plugins
+        const server = getDeviceDataStreamServer();
+        if (server) {
+          server.pushStorageUpdate(this.device.deviceId, event);
+        }
+      }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);
     }
@@ -1904,7 +1985,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * Push hierarchy update to observation stream for IDE plugins.
    */
   private pushHierarchyToObservationStream(hierarchy: ViewHierarchyResult): void {
-    const server = getObservationStreamServer();
+    const server = getDeviceDataStreamServer();
     if (!server) {
       logger.debug(`[ACCESSIBILITY_SERVICE] No observation stream server available for hierarchy push`);
       return;
@@ -1923,7 +2004,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * Push screenshot update to observation stream for IDE plugins.
    */
   private pushScreenshotToObservationStream(screenshotBase64: string): void {
-    const server = getObservationStreamServer();
+    const server = getDeviceDataStreamServer();
     if (!server) {
       return;
     }
@@ -1973,7 +2054,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
 
     // Check if there are any subscribers
-    const server = getObservationStreamServer();
+    const server = getDeviceDataStreamServer();
     if (!server || server.getSubscriberCount() === 0) {
       return { success: false, error: "No subscribers" };
     }
@@ -2020,7 +2101,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
    */
   private startScreenshotBackoff(): void {
     // Check if there are any subscribers before starting
-    const server = getObservationStreamServer();
+    const server = getDeviceDataStreamServer();
     if (!server || server.getSubscriberCount() === 0) {
       logger.debug(`[ACCESSIBILITY_SERVICE] No observation stream subscribers, skipping screenshot backoff`);
       return;
@@ -4673,5 +4754,290 @@ export class AccessibilityServiceClient implements AccessibilityService {
       ...shape,
       bounds: normalizeBounds(shape.bounds)
     };
+  }
+
+  // ========== Storage Inspection Methods ==========
+
+  /**
+   * List all preference files for a package.
+   * Returns SharedPreferences and DataStore files accessible to the app.
+   *
+   * @param packageName - The package name of the app to inspect
+   * @param timeoutMs - Maximum time to wait for response in milliseconds
+   * @returns Promise resolving to array of preference files
+   */
+  async listPreferenceFiles(
+    packageName: string,
+    timeoutMs: number = 5000
+  ): Promise<PreferenceFile[]> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await this.connectWebSocket();
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for listPreferenceFiles");
+        throw new Error("Failed to connect to accessibility service");
+      }
+
+      const requestId = `list_preference_files_${Date.now()}_${generateSecureId()}`;
+
+      // Create promise that will be resolved when we receive the result
+      const resultPromise = this.requestManager.register<ListPreferenceFilesResult>(
+        requestId,
+        "list_preference_files",
+        timeoutMs,
+        (_id, _type, _timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `List preference files timeout after ${timeoutMs}ms`
+        })
+      );
+
+      // Send the request
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      const message = JSON.stringify({
+        type: "list_preference_files",
+        requestId,
+        packageName
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent list_preference_files request (requestId: ${requestId}, packageName: ${packageName})`);
+
+      // Wait for response
+      const result = await resultPromise;
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to list preference files");
+      }
+
+      return result.files || [];
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] listPreferenceFiles failed after ${duration}ms: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all key-value entries from a preference file.
+   *
+   * @param packageName - The package name of the app
+   * @param fileName - Name of the preference file
+   * @param timeoutMs - Maximum time to wait for response in milliseconds
+   * @returns Promise resolving to array of key-value entries
+   */
+  async getPreferenceEntries(
+    packageName: string,
+    fileName: string,
+    timeoutMs: number = 5000
+  ): Promise<KeyValueEntry[]> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await this.connectWebSocket();
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for getPreferenceEntries");
+        throw new Error("Failed to connect to accessibility service");
+      }
+
+      const requestId = `get_preferences_${Date.now()}_${generateSecureId()}`;
+
+      // Create promise that will be resolved when we receive the result
+      const resultPromise = this.requestManager.register<GetPreferencesResult>(
+        requestId,
+        "get_preferences",
+        timeoutMs,
+        (_id, _type, _timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Get preferences timeout after ${timeoutMs}ms`
+        })
+      );
+
+      // Send the request
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      const message = JSON.stringify({
+        type: "get_preferences",
+        requestId,
+        packageName,
+        fileName
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent get_preferences request (requestId: ${requestId}, packageName: ${packageName}, fileName: ${fileName})`);
+
+      // Wait for response
+      const result = await resultPromise;
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to get preference entries");
+      }
+
+      return result.entries || [];
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] getPreferenceEntries failed after ${duration}ms: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Subscribe to storage changes for a preference file.
+   * Returns a subscription that can be used to unsubscribe later.
+   *
+   * @param packageName - The package name of the app
+   * @param fileName - Name of the preference file to observe
+   * @param timeoutMs - Maximum time to wait for response in milliseconds
+   * @returns Promise resolving to the subscription details
+   */
+  async subscribeStorage(
+    packageName: string,
+    fileName: string,
+    timeoutMs: number = 5000
+  ): Promise<StorageSubscription> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await this.connectWebSocket();
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for subscribeStorage");
+        throw new Error("Failed to connect to accessibility service");
+      }
+
+      const requestId = `subscribe_storage_${Date.now()}_${generateSecureId()}`;
+
+      // Create promise that will be resolved when we receive the result
+      const resultPromise = this.requestManager.register<SubscribeStorageResult>(
+        requestId,
+        "subscribe_storage",
+        timeoutMs,
+        (_id, _type, _timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Subscribe storage timeout after ${timeoutMs}ms`
+        })
+      );
+
+      // Send the request
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      const message = JSON.stringify({
+        type: "subscribe_storage",
+        requestId,
+        packageName,
+        fileName
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent subscribe_storage request (requestId: ${requestId}, packageName: ${packageName}, fileName: ${fileName})`);
+
+      // Wait for response
+      const result = await resultPromise;
+
+      if (!result.success || !result.subscription) {
+        throw new Error(result.error || "Failed to subscribe to storage");
+      }
+
+      logger.info(`[ACCESSIBILITY_SERVICE] Subscribed to storage changes: ${packageName}/${fileName} (subscriptionId: ${result.subscription.subscriptionId})`);
+      return result.subscription;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] subscribeStorage failed after ${duration}ms: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Unsubscribe from storage changes.
+   *
+   * @param subscriptionId - The subscription ID returned from subscribeStorage
+   * @param timeoutMs - Maximum time to wait for response in milliseconds
+   */
+  async unsubscribeStorage(
+    subscriptionId: string,
+    timeoutMs: number = 5000
+  ): Promise<void> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await this.connectWebSocket();
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for unsubscribeStorage");
+        throw new Error("Failed to connect to accessibility service");
+      }
+
+      const requestId = `unsubscribe_storage_${Date.now()}_${generateSecureId()}`;
+
+      // Create promise that will be resolved when we receive the result
+      const resultPromise = this.requestManager.register<UnsubscribeStorageResult>(
+        requestId,
+        "unsubscribe_storage",
+        timeoutMs,
+        (_id, _type, _timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Unsubscribe storage timeout after ${timeoutMs}ms`
+        })
+      );
+
+      // Send the request
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      const message = JSON.stringify({
+        type: "unsubscribe_storage",
+        requestId,
+        subscriptionId
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent unsubscribe_storage request (requestId: ${requestId}, subscriptionId: ${subscriptionId})`);
+
+      // Wait for response
+      const result = await resultPromise;
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to unsubscribe from storage");
+      }
+
+      logger.info(`[ACCESSIBILITY_SERVICE] Unsubscribed from storage changes (subscriptionId: ${subscriptionId})`);
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] unsubscribeStorage failed after ${duration}ms: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a listener for storage change events.
+   * The listener will be called for all subscribed storage changes.
+   *
+   * @param callback - Function to call when storage changes occur
+   * @returns Function to remove the listener
+   */
+  addStorageChangeListener(callback: (event: StorageChangedEvent) => void): () => void {
+    this.storageChangeListeners.add(callback);
+    return () => {
+      this.storageChangeListeners.delete(callback);
+    };
+  }
+
+  /**
+   * Notify all storage change listeners of an event.
+   */
+  private notifyStorageChangeListeners(event: StorageChangedEvent): void {
+    for (const listener of this.storageChangeListeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Storage change listener error: ${error}`);
+      }
+    }
   }
 }
