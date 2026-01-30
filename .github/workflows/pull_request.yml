@@ -363,16 +363,21 @@ jobs:
     name: "Interactive Installer (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
+      - name: "Skip for docs-only changes"
+        if: needs.detect-changes.outputs.docs_only == 'true'
+        run: echo "Skipping - documentation only changes"
+
       - name: "Git Checkout"
+        if: needs.detect-changes.outputs.docs_only != 'true'
         uses: actions/checkout@v4
 
       - name: "Run Interactive Installer"
+        if: needs.detect-changes.outputs.docs_only != 'true'
         shell: bash
         continue-on-error: true
         run: |
@@ -383,6 +388,7 @@ jobs:
           echo "INSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
 
       - name: "Run Interactive Uninstaller"
+        if: needs.detect-changes.outputs.docs_only != 'true'
         shell: bash
         continue-on-error: true
         run: |
@@ -393,7 +399,7 @@ jobs:
           echo "UNINSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
 
       - name: "Upload Installer Logs"
-        if: env.INSTALL_EXIT_CODE != '0'
+        if: needs.detect-changes.outputs.docs_only != 'true' && env.INSTALL_EXIT_CODE != '0'
         uses: actions/upload-artifact@v4.4.0
         with:
           name: interactive-installer-${{ matrix.os }}-logs
@@ -401,7 +407,7 @@ jobs:
           retention-days: 7
 
       - name: "Upload Uninstaller Logs"
-        if: env.UNINSTALL_EXIT_CODE != '0'
+        if: needs.detect-changes.outputs.docs_only != 'true' && env.UNINSTALL_EXIT_CODE != '0'
         uses: actions/upload-artifact@v4.4.0
         with:
           name: interactive-uninstaller-${{ matrix.os }}-logs
@@ -409,7 +415,7 @@ jobs:
           retention-days: 7
 
       - name: "Fail if Installer or Uninstaller Failed"
-        if: env.INSTALL_EXIT_CODE != '0' || env.UNINSTALL_EXIT_CODE != '0'
+        if: needs.detect-changes.outputs.docs_only != 'true' && (env.INSTALL_EXIT_CODE != '0' || env.UNINSTALL_EXIT_CODE != '0')
         shell: bash
         run: |
           echo "Installer exit code: ${INSTALL_EXIT_CODE:-0}"
@@ -485,7 +491,6 @@ jobs:
     name: "Node TypeScript Build and Test (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -495,10 +500,16 @@ jobs:
           - macos-latest
           - windows-latest
     steps:
+      - name: "Skip for docs-only or SHA256-only changes"
+        if: needs.detect-changes.outputs.docs_only == 'true' || needs.detect-changes.outputs.sha256_only == 'true'
+        run: echo "Skipping - documentation or SHA256 only changes"
+
       - name: "Git Checkout"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         uses: actions/checkout@v4
 
       - name: "Cache Bun dependencies"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -508,12 +519,16 @@ jobs:
           restore-keys: |
             bun-${{ matrix.os }}-
 
-      - uses: ./.github/actions/setup-auto-mobile-npm-package
+      - name: "Setup Auto Mobile"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+        uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         run: bun run lint
 
       - name: "Run Build"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -521,6 +536,7 @@ jobs:
           bun run build 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
 
       - name: "Run Tests"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         shell: bash
         env:
           # Enable debug logging on Windows to trace what's starting the adb daemon
@@ -533,7 +549,7 @@ jobs:
           bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
       - name: "Upload Build/Test Logs"
-        if: failure() || cancelled() || matrix.os == 'windows-latest'
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true' && (failure() || cancelled() || matrix.os == 'windows-latest')
         uses: actions/upload-artifact@v4.4.0
         with:
           name: mcp-build-test-logs-${{ matrix.os }}

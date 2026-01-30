@@ -92,6 +92,7 @@ nav:
           - 'Observe':
              - 'Overview': design-docs/mcp/observe/index.md
              - 'Appearance Sync': design-docs/mcp/observe/appearance.md
+             - 'Screen Streaming': design-docs/mcp/observe/screen-streaming.md
              - 'Video Recording': design-docs/mcp/observe/video-recording.md
              - 'Vision Fallback': design-docs/mcp/observe/vision-fallback.md
              - 'Visual Highlighting': design-docs/mcp/observe/visual-highlighting.md
@@ -121,6 +122,7 @@ nav:
           - 'Android':
             - 'Overview': design-docs/plat/android/index.md
             - 'Observe': design-docs/plat/android/observe.md
+            - 'Screen Streaming': design-docs/plat/android/screen-streaming.md
             - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
             - 'JUnitRunner': design-docs/plat/android/junitrunner.md
@@ -144,6 +146,7 @@ nav:
               - 'TalkBack simulation': design-docs/plat/android/talkback.md
           - 'iOS':
             - 'Overview': design-docs/plat/ios/index.md
+            - 'Screen Streaming': design-docs/plat/ios/screen-streaming.md
             - 'XCTest Service': design-docs/plat/ios/xctestservice.md
             - 'simctl Integration': design-docs/plat/ios/simctl.md
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
