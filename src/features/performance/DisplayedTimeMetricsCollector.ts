@@ -1,4 +1,6 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { BootedDevice, DisplayedLogcatTag, DisplayedTimeMetric } from "../../models";
 import { NoOpPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
@@ -14,9 +16,16 @@ export class DisplayedTimeMetricsCollector {
   private device: BootedDevice;
   private logcatTagCache: DisplayedLogcatTag | undefined;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device) as AdbClient;
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbClient;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device) as AdbClient;
+    }
   }
 
   async captureDisplayedMetrics(

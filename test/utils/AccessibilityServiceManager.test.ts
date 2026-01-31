@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { AdbClient } from "../../src/utils/android-cmdline-tools/AdbClient";
+import type { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { BootedDevice } from "../../src/models";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -14,8 +15,8 @@ import { FakeAccessibilityDetector } from "../fakes/FakeAccessibilityDetector";
 describe("AccessibilityServiceManager", function() {
   let accessibilityServiceClient: AndroidAccessibilityServiceManager;
   let fakeAdb: FakeAdbExecutor;
+  let fakeAdbFactory: AdbClientFactory;
   let testDevice: BootedDevice;
-  let adbClient: AdbClient;
   let originalApkPathEnv: string | undefined;
   let originalSkipChecksumEnv: string | undefined;
   let originalSkipDownloadEnv: string | undefined;
@@ -28,6 +29,7 @@ describe("AccessibilityServiceManager", function() {
     originalSkipShaEnv = process.env.AUTO_MOBILE_ACCESSIBILITY_SERVICE_SHA_SKIP_CHECK;
     // Create fake ADB instance
     fakeAdb = new FakeAdbExecutor();
+    fakeAdbFactory = { create: () => fakeAdb };
 
     // Create test device
     testDevice = {
@@ -37,21 +39,10 @@ describe("AccessibilityServiceManager", function() {
       name: "Test Device"
     };
 
-    // Create a wrapper function that adapts FakeAdbExecutor to the execAsync signature
-    const fakeExecAsync = async (command: string, maxBuffer?: number) => {
-      // Strip the "adb -s test-device " prefix that AdbClient adds
-      const prefix = "adb -s test-device ";
-      const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-      return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-    };
-
-    // Create AdbClient with fake executor function
-    adbClient = new AdbClient(testDevice, fakeExecAsync);
-
     // Reset singleton instances
     AndroidAccessibilityServiceManager.resetInstances();
 
-    accessibilityServiceClient = AndroidAccessibilityServiceManager.getInstance(testDevice, adbClient);
+    accessibilityServiceClient = AndroidAccessibilityServiceManager.getInstance(testDevice, fakeAdbFactory);
     accessibilityServiceClient.clearAvailabilityCache();
   });
 
@@ -219,34 +210,32 @@ describe("AccessibilityServiceManager", function() {
         includes: (searchString: string) => stdout.includes(searchString)
       });
 
-      const fakeExecAsync = async (command: string) => {
-        const prefix = "adb -s test-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-
-        if (strippedCommand.includes("shell pm path")) {
-          return createExecResult(`package:${expectedApkPath}\n`, "");
-        }
-
-        if (strippedCommand.includes("shell sha256sum")) {
-          throw new Error("sha256sum not available");
-        }
-
-        if (strippedCommand.includes("pull")) {
-          const match = strippedCommand.match(/pull\s+(".*?"|\S+)\s+(".*?"|\S+)/);
-          const localPathRaw = match?.[2]?.replace(/^"(.*)"$/, "$1");
-          if (localPathRaw) {
-            await fs.mkdir(path.dirname(localPathRaw), { recursive: true });
-            await fs.writeFile(localPathRaw, apkContent);
+      const localFakeAdb: any = {
+        executeCommand: async (command: string) => {
+          if (command.includes("shell pm path")) {
+            return createExecResult(`package:${expectedApkPath}\n`, "");
           }
+
+          if (command.includes("shell sha256sum")) {
+            throw new Error("sha256sum not available");
+          }
+
+          if (command.includes("pull")) {
+            const match = command.match(/pull\s+(".*?"|\S+)\s+(".*?"|\S+)/);
+            const localPathRaw = match?.[2]?.replace(/^"(.*)"$/, "$1");
+            if (localPathRaw) {
+              await fs.mkdir(path.dirname(localPathRaw), { recursive: true });
+              await fs.writeFile(localPathRaw, apkContent);
+            }
+            return createExecResult("", "");
+          }
+
           return createExecResult("", "");
         }
-
-        return createExecResult("", "");
       };
 
-      const fallbackAdb = new AdbClient(testDevice, fakeExecAsync);
       AndroidAccessibilityServiceManager.resetInstances();
-      const fallbackClient = AndroidAccessibilityServiceManager.getInstance(testDevice, fallbackAdb);
+      const fallbackClient = AndroidAccessibilityServiceManager.getInstance(testDevice, { create: () => localFakeAdb });
 
       const result = await fallbackClient.getInstalledApkSha256();
       expect(result).toBe(expectedSha);
@@ -278,15 +267,8 @@ describe("AccessibilityServiceManager", function() {
         stderr: ""
       });
 
-      const localExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return localFakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-
-      const localAdbClient = new AdbClient(testDevice, localExecAsync);
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localAdbClient);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, { create: () => localFakeAdb });
 
       const result = await manager.ensureCompatibleVersion();
       expect(result.status).toBe("compatible");
@@ -310,15 +292,8 @@ describe("AccessibilityServiceManager", function() {
       });
       localFakeAdb.setCommandResponse("install -r -d", createExecResult("Success", ""));
 
-      const localExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return localFakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-
-      const localAdbClient = new AdbClient(testDevice, localExecAsync);
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localAdbClient);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, { create: () => localFakeAdb });
       (manager as any).downloadApk = async () => "/tmp/fake-accessibility.apk";
       (manager as any).cleanupApk = async () => undefined;
 
@@ -353,9 +328,12 @@ describe("AccessibilityServiceManager", function() {
         return localFakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
       };
 
+      // Create AdbClient with custom executor that throws on install, wrap in factory
       const localAdbClient = new AdbClient(testDevice, localExecAsync);
+      const localFactory: AdbClientFactory = { create: () => localAdbClient };
+
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localAdbClient);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localFactory);
       (manager as any).downloadApk = async () => "/tmp/fake-accessibility.apk";
       (manager as any).cleanupApk = async () => undefined;
       (manager as any).install = async () => undefined;
@@ -390,15 +368,8 @@ describe("AccessibilityServiceManager", function() {
         stderr: ""
       });
 
-      const localExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return localFakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-
-      const localAdbClient = new AdbClient(testDevice, localExecAsync);
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localAdbClient);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, { create: () => localFakeAdb });
       (manager as any).downloadApk = async () => {
         throw new Error("download should not be called");
       };
@@ -444,9 +415,12 @@ describe("AccessibilityServiceManager", function() {
         return createExecResult("", "");
       };
 
+      // Create AdbClient with custom executor, wrap in factory
       const localAdbClient = new AdbClient(testDevice, localExecAsync);
+      const localFactory: AdbClientFactory = { create: () => localAdbClient };
+
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localAdbClient);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localFactory);
       (manager as any).downloadApk = async () => "/tmp/fake-accessibility.apk";
       (manager as any).cleanupApk = async () => undefined;
       (manager as any).install = async () => undefined;
@@ -474,15 +448,8 @@ describe("AccessibilityServiceManager", function() {
         stderr: ""
       });
 
-      const localExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return localFakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-
-      const localAdbClient = new AdbClient(testDevice, localExecAsync);
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, localAdbClient);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, { create: () => localFakeAdb });
       (manager as any).downloadApk = async () => {
         throw new Error("Could not resolve host");
       };
@@ -1024,28 +991,26 @@ describe("AccessibilityServiceManager", function() {
 
     test("should not cache capabilities when detection errors occur", async function() {
       let callCount = 0;
-      const fakeExecAsync = async (command: string) => {
-        callCount++;
-        // First call fails, second call succeeds
-        if (callCount <= 2) {
-          throw new Error("ADB transient error");
-        }
+      const transientFakeAdb: any = {
+        executeCommand: async (command: string) => {
+          callCount++;
+          // First call fails, second call succeeds
+          if (callCount <= 2) {
+            throw new Error("ADB transient error");
+          }
 
-        const prefix = "adb -s test-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-
-        if (strippedCommand.includes("ro.kernel.qemu")) {
-          return { stdout: "1", stderr: "" };
+          if (command.includes("ro.kernel.qemu")) {
+            return { stdout: "1", stderr: "" };
+          }
+          if (command.includes("ro.build.version.sdk")) {
+            return { stdout: "29", stderr: "" };
+          }
+          return { stdout: "", stderr: "" };
         }
-        if (strippedCommand.includes("ro.build.version.sdk")) {
-          return { stdout: "29", stderr: "" };
-        }
-        return { stdout: "", stderr: "" };
       };
 
-      const testAdb = new AdbClient(testDevice, fakeExecAsync);
       AndroidAccessibilityServiceManager.resetInstances();
-      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, testAdb);
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, { create: () => transientFakeAdb });
 
       // First call - should fail with error and NOT cache
       const capabilities1 = await manager.getToggleCapabilities();

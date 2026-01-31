@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { DeviceDetection } from "../../utils/DeviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
@@ -9,7 +10,7 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { XCTestServiceClient } from "./XCTestServiceClient";
 
 export class GetScreenSize {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
   private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
@@ -17,11 +18,18 @@ export class GetScreenSize {
   /**
    * Create a GetScreenSize instance
    * @param device - Device to get screen size for
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbExecutor;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device);
+    }
   }
 
   /**

@@ -1,5 +1,5 @@
 import path from "path";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { BootedDevice } from "../../models";
 import { createGlobalPerformanceTracker, type PerformanceTracker } from "../../utils/PerformanceTracker";
@@ -19,21 +19,21 @@ export class InstallApp {
   /**
    * Create an InstallApp instance
    * @param device - Optional device
-   * @param adb - Optional AdbExecutor instance for testing
+   * @param adbFactory - Optional AdbClientFactory instance for testing
    * @param hostExecutor - Optional host command executor for testing
    * @param buildToolsLocator - Optional build tools locator for testing
    * @param performanceTrackerFactory - Optional performance tracker factory for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbExecutor | null = null,
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
     hostExecutor: HostCommandExecutor | null = null,
     buildToolsLocator: AndroidBuildToolsLocator | null = null,
     performanceTrackerFactory: () => PerformanceTracker = createGlobalPerformanceTracker,
     simctl: SimCtlClient | null = null
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    this.adb = adbFactory.create(device);
     this.hostExecutor = hostExecutor || new DefaultHostCommandExecutor();
     this.buildToolsLocator = buildToolsLocator || new DefaultAndroidBuildToolsLocator();
     this.createPerformanceTracker = performanceTrackerFactory;

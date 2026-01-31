@@ -3,7 +3,7 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { SetUIState } from "../features/action/SetUIState";
 import { BootedDevice } from "../models";
 import { createStructuredToolResponse } from "../utils/toolUtils";
-import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import {
   elementIdTextFieldsSchema,
@@ -103,7 +103,7 @@ Example usage:
       progress?: ProgressCallback,
       signal?: AbortSignal
     ) => {
-      const adb = device.platform === "android" ? new AdbClient(device) : null;
+      const adb = device.platform === "android" ? defaultAdbClientFactory.create(device) : null;
       const setUIState = new SetUIState(device, adb);
 
       const result = await setUIState.execute(

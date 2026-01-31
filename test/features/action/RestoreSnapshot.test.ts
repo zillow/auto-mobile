@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { RestoreSnapshot } from "../../../src/features/action/RestoreSnapshot";
 import { BootedDevice, DeviceSnapshotManifest } from "../../../src/models";
+import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbClient } from "../../fakes/FakeAdbClient";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { DeviceSnapshotStore } from "../../../src/utils/DeviceSnapshotStore";
@@ -11,6 +12,7 @@ import * as os from "os";
 describe("RestoreSnapshot", () => {
   let device: BootedDevice;
   let fakeAdb: FakeAdbClient;
+  let fakeAdbFactory: AdbClientFactory;
   let fakeTimer: FakeTimer;
   let restoreSnapshot: RestoreSnapshot;
   let store: DeviceSnapshotStore;
@@ -27,6 +29,7 @@ describe("RestoreSnapshot", () => {
 
     // Create fakes
     fakeAdb = new FakeAdbClient();
+    fakeAdbFactory = { create: () => fakeAdb as any };
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
 
@@ -35,7 +38,7 @@ describe("RestoreSnapshot", () => {
     store = new DeviceSnapshotStore(testBasePath);
 
     // Create RestoreSnapshot instance with fakes
-    restoreSnapshot = new RestoreSnapshot(device, fakeAdb as any, undefined, fakeTimer, store);
+    restoreSnapshot = new RestoreSnapshot(device, fakeAdbFactory, undefined, fakeTimer, store);
 
     // Setup default command results
     fakeAdb.setCommandResult("shell pm clear com.example.app", "Success");
@@ -267,7 +270,7 @@ describe("RestoreSnapshot", () => {
 
       const restorePhysical = new RestoreSnapshot(
         physicalDevice,
-        fakeAdb as any,
+        fakeAdbFactory,
         undefined,
         fakeTimer,
         store
@@ -467,7 +470,7 @@ describe("RestoreSnapshot", () => {
         isEmulator: true
       };
 
-      expect(() => new RestoreSnapshot(iosDevice, fakeAdb as any, undefined, fakeTimer))
+      expect(() => new RestoreSnapshot(iosDevice, fakeAdbFactory, undefined, fakeTimer))
         .toThrow("Snapshot restore is currently only supported for Android devices");
     });
 
@@ -718,7 +721,7 @@ describe("RestoreSnapshot", () => {
     it.skip("should handle restore timeout gracefully", async () => {
       // Use manual time control for this test
       const manualTimer = new FakeTimer();
-      restoreSnapshot = new RestoreSnapshot(device, fakeAdb as any, undefined, manualTimer, store);
+      restoreSnapshot = new RestoreSnapshot(device, fakeAdbFactory, undefined, manualTimer, store);
 
       const snapshotName = "test-snapshot-timeout";
 

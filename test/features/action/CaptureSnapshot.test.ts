@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { CaptureSnapshot } from "../../../src/features/action/CaptureSnapshot";
 import { BootedDevice } from "../../../src/models";
+import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbClient } from "../../fakes/FakeAdbClient";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { DeviceSnapshotStore } from "../../../src/utils/DeviceSnapshotStore";
@@ -11,6 +12,7 @@ import * as os from "os";
 describe("CaptureSnapshot", () => {
   let device: BootedDevice;
   let fakeAdb: FakeAdbClient;
+  let fakeAdbFactory: AdbClientFactory;
   let fakeTimer: FakeTimer;
   let captureSnapshot: CaptureSnapshot;
   let store: DeviceSnapshotStore;
@@ -27,6 +29,7 @@ describe("CaptureSnapshot", () => {
 
     // Create fakes
     fakeAdb = new FakeAdbClient();
+    fakeAdbFactory = { create: () => fakeAdb as any };
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
 
@@ -35,7 +38,7 @@ describe("CaptureSnapshot", () => {
     store = new DeviceSnapshotStore(testBasePath);
 
     // Create CaptureSnapshot instance with fakes
-    captureSnapshot = new CaptureSnapshot(device, fakeAdb as any, undefined, fakeTimer, store);
+    captureSnapshot = new CaptureSnapshot(device, fakeAdbFactory, undefined, fakeTimer, store);
 
     // Setup default command results
     fakeAdb.setCommandResult("shell pm list packages", "package:com.example.app\npackage:com.system.app");
@@ -233,7 +236,7 @@ describe("CaptureSnapshot", () => {
 
       const capturePhysical = new CaptureSnapshot(
         physicalDevice,
-        fakeAdb as any,
+        fakeAdbFactory,
         undefined,
         fakeTimer,
         store
@@ -390,7 +393,7 @@ describe("CaptureSnapshot", () => {
         isEmulator: true
       };
 
-      expect(() => new CaptureSnapshot(iosDevice, fakeAdb as any, undefined, fakeTimer))
+      expect(() => new CaptureSnapshot(iosDevice, fakeAdbFactory, undefined, fakeTimer))
         .toThrow("Snapshot capture is currently only supported for Android devices");
     });
 

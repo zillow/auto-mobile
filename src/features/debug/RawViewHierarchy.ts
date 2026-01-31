@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { BootedDevice, RawViewHierarchyResult } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
@@ -22,18 +23,18 @@ export interface RawViewHierarchyOptions {
  */
 export class RawViewHierarchy {
   private device: BootedDevice;
-  private readonly adb: AdbClient;
+  private readonly adb: AdbExecutor;
   private viewHierarchy: ViewHierarchy;
   private accessibilityServiceClient: AccessibilityServiceClient;
 
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null
+    adbFactory: AdbClientFactory = defaultAdbClientFactory
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.viewHierarchy = new ViewHierarchy(device, this.adb);
-    this.accessibilityServiceClient = AccessibilityServiceClient.getInstance(device, this.adb);
+    this.adb = adbFactory.create(device);
+    this.viewHierarchy = new ViewHierarchy(device, adbFactory);
+    this.accessibilityServiceClient = AccessibilityServiceClient.getInstance(device, adbFactory);
   }
 
   /**

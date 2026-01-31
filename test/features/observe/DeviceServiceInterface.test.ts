@@ -15,7 +15,6 @@ import type { DeviceService, AndroidDeviceService } from "../../../src/features/
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
-import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../../src/models";
 import {
   createSuccessWebSocketFactory,
@@ -44,17 +43,11 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      const fakeExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-android-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-      const adbClient = new AdbClient(testDevice, fakeExecAsync);
-
       AccessibilityServiceClient.resetInstances();
+      // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
       const client = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createSuccessWebSocketFactory(),
         fakeTimer
       );
@@ -134,17 +127,11 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      const fakeExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-android-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-      const adbClient = new AdbClient(testDevice, fakeExecAsync);
-
       AccessibilityServiceClient.resetInstances();
+      // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
       const client = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createSuccessWebSocketFactory(),
         fakeTimer
       );
@@ -210,17 +197,11 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      const fakeExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-android-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-      const adbClient = new AdbClient(testDevice, fakeExecAsync);
-
       AccessibilityServiceClient.resetInstances();
+      // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
       const client = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createSuccessWebSocketFactory(fakeTimer),
         fakeTimer
       );
@@ -242,17 +223,11 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      const fakeExecAsync = async (command: string, maxBuffer?: number) => {
-        const prefix = "adb -s test-android-device ";
-        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-        return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-      };
-      const adbClient = new AdbClient(testDevice, fakeExecAsync);
-
       AccessibilityServiceClient.resetInstances();
+      // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
       const client = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createInstantFailureWebSocketFactory(fakeTimer),
         fakeTimer
       );

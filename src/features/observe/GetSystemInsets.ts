@@ -1,21 +1,29 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { BootedDevice, SystemInsets } from "../../models";
 import { ExecResult } from "../../models";
 
 export class GetSystemInsets {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
   /**
    * Create a GetSystemInsets instance
    * @param device - Device to get system insets for
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null
+    adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory
   ) {
-    this.adb = adb || new AdbClient(device);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbExecutor;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device);
+    }
   }
 
   /**

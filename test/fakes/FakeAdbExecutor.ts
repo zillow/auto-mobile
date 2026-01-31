@@ -8,6 +8,7 @@ import { BootedDevice, ExecResult, AndroidUser } from "../../src/models";
 export class FakeAdbExecutor implements AdbExecutor {
   private commandResponses: Map<string, ExecResult> = new Map();
   private defaultResponse: ExecResult = this.createExecResult("", "");
+  private defaultError: Error | null = null;
   private executedCommands: string[] = [];
 
   // Configurable state
@@ -133,6 +134,14 @@ export class FakeAdbExecutor implements AdbExecutor {
     this.defaultResponse = this.ensureExecResultMethods(response);
   }
 
+  /**
+   * Set default error to throw for all commands
+   * @param error - Error to throw
+   */
+  setDefaultError(error: Error): void {
+    this.defaultError = error;
+  }
+
   // Implementation of AdbExecutor interface
 
   async executeCommand(
@@ -143,6 +152,11 @@ export class FakeAdbExecutor implements AdbExecutor {
     _signal?: AbortSignal
   ): Promise<ExecResult> {
     this.executedCommands.push(command);
+
+    // If a default error is configured, throw it
+    if (this.defaultError) {
+      throw this.defaultError;
+    }
 
     // Check for configured responses based on pattern matching
     for (const [pattern, response] of this.commandResponses.entries()) {

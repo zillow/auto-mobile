@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ScreenSize } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -26,15 +27,15 @@ export interface TouchLatencyResult {
  * and measuring the time until UI response is detected via gfxinfo
  */
 export class TouchLatencyTracker {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private device: BootedDevice;
   private idle: Idle;
   private timer: Timer;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, timer: Timer = defaultTimer) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory, timer: Timer = defaultTimer) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.idle = new Idle(device, this.adb);
+    this.adb = adbFactory.create(device);
+    this.idle = new Idle(device, adbFactory);
     this.timer = timer;
   }
 

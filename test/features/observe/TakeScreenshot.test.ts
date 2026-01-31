@@ -4,6 +4,7 @@ import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeFileSystem } from "../../fakes/FakeFileSystem";
 import { FakeTimer } from "../../fakes/FakeTimer";
+import type { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 
 describe("TakeScreenshot", function() {
   describe("Unit Tests for Extracted Methods", function() {
@@ -21,7 +22,8 @@ describe("TakeScreenshot", function() {
 
       // Create a simple fake ADB for unit testing
       fakeAdb = new FakeAdbExecutor();
-      takeScreenshot = new TakeScreenshot(mockDevice, fakeAdb);
+      const fakeFactory: AdbClientFactory = { create: () => fakeAdb };
+      takeScreenshot = new TakeScreenshot(mockDevice, fakeFactory);
     });
 
     test("should generate correct screenshot path with png format", function() {
@@ -69,7 +71,9 @@ describe("TakeScreenshot", function() {
       fakeFileSystem.setDirectory("/tmp/auto-mobile/screenshots");
       fakeFileSystem.setExists("/tmp/auto-mobile/screenshots", true);
 
-      const takeScreenshot = new TakeScreenshot(mockDevice, testFakeAdb);
+      // Create factory that returns testFakeAdb
+      const testFactory: AdbClientFactory = { create: () => testFakeAdb };
+      const takeScreenshot = new TakeScreenshot(mockDevice, testFactory);
 
       // Mock the window dependency to avoid additional ADB calls
       const mockWindow = { getActiveHash: async () => "mock-hash" };

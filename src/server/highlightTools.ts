@@ -14,7 +14,7 @@ import {
 } from "../models";
 import { highlightShapeSchema, VisualHighlightClient } from "../features/debug/VisualHighlight";
 import { recordVideoRecordingHighlightAdded } from "./videoRecordingManager";
-import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { DefaultElementSelector } from "../features/utility/DefaultElementSelector";
 import { ElementFinder } from "../features/utility/ElementFinder";
@@ -215,8 +215,7 @@ const resolveHighlightShapeFromSelector = async (
     throw new ActionableError(UNSUPPORTED_MESSAGE);
   }
 
-  const adb = new AdbClient(device);
-  const accessibilityService = AccessibilityServiceClient.getInstance(device, adb);
+  const accessibilityService = AccessibilityServiceClient.getInstance(device, defaultAdbClientFactory);
   const hierarchyTimeout = args.timeoutMs ?? DEFAULT_HIERARCHY_TIMEOUT_MS;
   const syncResult = await accessibilityService.requestHierarchySync(
     new NoOpPerformanceTracker(),

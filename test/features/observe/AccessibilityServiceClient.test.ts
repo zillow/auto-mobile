@@ -3,7 +3,7 @@ import { AccessibilityServiceClient } from "../../../src/features/observe/Access
 import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
-import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
+import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import { BootedDevice, HighlightShape } from "../../../src/models";
 import {
   FakeWebSocket,
@@ -13,13 +13,14 @@ import {
 } from "../../fakes/FakeWebSocket";
 import { defaultTimer } from "../../../src/utils/SystemTimer";
 import { FakeInstalledAppsRepository } from "../../fakes/FakeInstalledAppsRepository";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("AccessibilityServiceClient", function() {
   let accessibilityServiceClient: AccessibilityServiceClient;
   let fakeAdb: FakeAdbExecutor;
   let testDevice: BootedDevice;
-  let adbClient: AdbClient;
   let fakeTimer = defaultTimer;
+  let fakeAdbFactory: FakeAdbClientFactory;
   const serverPort: number = 8765;
 
   beforeEach(async function() {
@@ -39,28 +40,21 @@ describe("AccessibilityServiceClient", function() {
       name: "Test Device"
     };
 
-    // Create a wrapper function that adapts FakeAdbExecutor to the execAsync signature
-    const fakeExecAsync = async (command: string, maxBuffer?: number) => {
-      // Strip the "adb -s test-device " prefix that AdbClient adds
-      const prefix = "adb -s test-device ";
-      const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
-      return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
-    };
-
-    // Create AdbClient with fake executor function
-    adbClient = new AdbClient(testDevice, fakeExecAsync);
+    // Create FakeAdbClientFactory for AndroidAccessibilityServiceManager
+    fakeAdbFactory = new FakeAdbClientFactory();
 
     // Reset singleton instances for clean test state
     AndroidAccessibilityServiceManager.resetInstances();
     AccessibilityServiceClient.resetInstances();
 
+    // Pass FakeAdbExecutor directly to createForTesting since it implements AdbExecutor
     accessibilityServiceClient = AccessibilityServiceClient.createForTesting(
       testDevice,
-      adbClient,
+      fakeAdb,
       createSuccessWebSocketFactory(),
       fakeTimer
     );
-    AndroidAccessibilityServiceManager.getInstance(testDevice, adbClient).clearAvailabilityCache();
+    AndroidAccessibilityServiceManager.getInstance(testDevice, fakeAdbFactory).clearAvailabilityCache();
 
     // Clear any cached hierarchy data to prevent cache contamination between tests (issue #72)
     accessibilityServiceClient.invalidateCache();
@@ -164,7 +158,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         testTimer
       );
@@ -208,7 +202,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory();
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory
       );
 
@@ -245,7 +239,7 @@ describe("AccessibilityServiceClient", function() {
 
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createSuccessWebSocketFactory(fakeTimer),
         fakeTimer
       );
@@ -268,7 +262,7 @@ describe("AccessibilityServiceClient", function() {
 
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createInstantFailureWebSocketFactory(fakeTimer),
         fakeTimer
       );
@@ -291,7 +285,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory();
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         fakeTimer
       );
@@ -342,7 +336,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory();
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         fakeTimer
       );
@@ -514,7 +508,7 @@ describe("AccessibilityServiceClient", function() {
       // Create a new client with FakeWebSocket that fails instantly and FakeTimer
       const failingClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         createInstantFailureWebSocketFactory(fakeTimer),
         fakeTimer
       );
@@ -538,7 +532,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         timer,
         repo
@@ -601,7 +595,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         timer,
         repo
@@ -660,7 +654,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         timer,
         repo
@@ -700,7 +694,7 @@ describe("AccessibilityServiceClient", function() {
       const { factory, getSocket } = createCapturingWebSocketFactory(highlightTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
-        adbClient,
+        fakeAdb,
         factory,
         highlightTimer
       );

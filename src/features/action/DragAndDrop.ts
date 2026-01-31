@@ -41,8 +41,8 @@ export class DragAndDrop extends BaseVisualChange {
   ) {
     super(device, adb, timer);
     this.elementUtils = new ElementUtils();
-    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
-    this.viewHierarchy = new ViewHierarchy(device, this.adb);
+    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
+    this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
   }
 
   async execute(

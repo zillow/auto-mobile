@@ -1,5 +1,5 @@
 import { BootedDevice, Element, ObserveResult } from "../../models";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { logger } from "../../utils/logger";
 import { SelectedElement } from "../../utils/interfaces/NavigationGraph";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
@@ -12,15 +12,15 @@ export interface ScreenshotCapturer {
 
 export class TakeScreenshotCapturer implements ScreenshotCapturer {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adbFactory: AdbClientFactory;
 
-  constructor(device: BootedDevice, adb: AdbClient) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb;
+    this.adbFactory = adbFactory;
   }
 
   async capture(signal?: AbortSignal): Promise<string | null> {
-    const screenshot = new TakeScreenshot(this.device, this.adb);
+    const screenshot = new TakeScreenshot(this.device, this.adbFactory);
     const result = await screenshot.execute({ format: "png" }, signal);
     if (!result.success || !result.path) {
       return null;

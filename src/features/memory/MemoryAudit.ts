@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -34,17 +35,17 @@ export interface MemoryAuditResult {
  * Detects memory leaks, excessive GC, and memory pressure
  */
 export class MemoryAudit {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private device: BootedDevice;
   private metricsCollector: MemoryMetricsCollector;
   private thresholdManager: MemoryThresholdManager;
   private baselineManager: MemoryBaselineManager;
   private db = getDatabase();
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.metricsCollector = new MemoryMetricsCollector(device, this.adb);
+    this.adb = adbFactory.create(device);
+    this.metricsCollector = new MemoryMetricsCollector(device, adbFactory);
     this.thresholdManager = new MemoryThresholdManager();
     this.baselineManager = new MemoryBaselineManager();
   }

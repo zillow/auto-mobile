@@ -7,7 +7,7 @@ import type {
   CrashEventListener,
   AnrEventListener,
 } from "../interfaces/CrashMonitor";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { logger } from "../logger";
 
 /**
@@ -17,7 +17,8 @@ import { logger } from "../logger";
 export class AccessibilityDialogDetector implements CrashDetector {
   readonly name = "accessibility";
 
-  private adb: AdbExecutor;
+  private adb: AdbExecutor | null = null;
+  private adbFactory: AdbClientFactory;
   private device: BootedDevice | null = null;
   private packageName: string | null = null;
   private running = false;
@@ -29,8 +30,8 @@ export class AccessibilityDialogDetector implements CrashDetector {
   // Dialog detection debounce to prevent duplicate events
   private readonly DIALOG_DEBOUNCE_MS = 5000;
 
-  constructor(adb?: AdbExecutor) {
-    this.adb = adb ?? new AdbClient();
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adbFactory = adbFactory;
   }
 
   async start(device: BootedDevice, packageName: string): Promise<void> {
@@ -40,9 +41,8 @@ export class AccessibilityDialogDetector implements CrashDetector {
     this.lastCrashDialogTime = 0;
     this.lastAnrDialogTime = 0;
 
-    if (this.adb instanceof AdbClient) {
-      this.adb.setDevice(device);
-    }
+    // Create ADB client for this device
+    this.adb = this.adbFactory.create(device);
 
     logger.info(
       `AccessibilityDialogDetector started for package ${packageName} on device ${device.deviceId}`
@@ -57,7 +57,7 @@ export class AccessibilityDialogDetector implements CrashDetector {
   }
 
   async checkForCrashes(): Promise<CrashEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 
@@ -96,7 +96,7 @@ export class AccessibilityDialogDetector implements CrashDetector {
   }
 
   async checkForAnrs(): Promise<AnrEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 

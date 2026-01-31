@@ -1,4 +1,5 @@
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
 import { createWriteStream } from "fs";
@@ -77,7 +78,7 @@ type InstalledApkSha256Result = {
 
 export class AndroidAccessibilityServiceManager implements AccessibilityServiceManager {
   private readonly device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   public static readonly PACKAGE = "dev.jasonpearson.automobile.accessibilityservice";
   public static readonly ACTIVITY = "dev.jasonpearson.automobile.accessibilityservice.MainActivity";
   private static readonly APK_URL = APK_URL;
@@ -104,21 +105,40 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   private static prefetchedApkPath: string | null = null;
   private static prefetchError: Error | null = null;
 
-  private constructor(device: BootedDevice, adb: AdbClient) {
+  // Static factory for creating ADB clients
+  private static adbFactory: AdbClientFactory = defaultAdbClientFactory;
+
+  private constructor(device: BootedDevice, adb: AdbExecutor) {
     // home should either be process.env.HOME or bash resolution of home for current user
     const homeDir = process.env.HOME || require("os").homedir();
     if (!homeDir) {
       throw new Error("Home directory for current user not found");
     }
     this.device = device;
-    this.adb = adb || new AdbClient(this.device);
+    this.adb = adb;
   }
 
-  public static getInstance(device: BootedDevice, adb: AdbClient | null = null): AndroidAccessibilityServiceManager {
+  public static getInstance(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory): AndroidAccessibilityServiceManager {
     if (!AndroidAccessibilityServiceManager.instances.has(device.deviceId)) {
+      let adb: AdbExecutor;
+      let factory: AdbClientFactory;
+      // Detect if the argument is a factory (has create method) or an executor
+      if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+        factory = adbFactoryOrExecutor as AdbClientFactory;
+        adb = factory.create(device);
+      } else if (adbFactoryOrExecutor) {
+        // Legacy path: wrap the executor in a factory for downstream dependencies
+        const executor = adbFactoryOrExecutor as AdbExecutor;
+        adb = executor;
+        factory = { create: () => executor };
+      } else {
+        factory = defaultAdbClientFactory;
+        adb = factory.create(device);
+      }
+      AndroidAccessibilityServiceManager.adbFactory = factory;
       AndroidAccessibilityServiceManager.instances.set(device.deviceId, new AndroidAccessibilityServiceManager(
         device,
-        adb || new AdbClient(device)
+        adb
       ));
     }
     return AndroidAccessibilityServiceManager.instances.get(device.deviceId)!;

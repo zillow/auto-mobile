@@ -71,11 +71,11 @@ export class TapOnElement extends BaseVisualChange {
     super(device, adb, timer);
     this.elementUtils = new ElementUtils();
     this.elementParser = new ElementParser();
-    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
+    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.visionConfig = visionConfig || DEFAULT_VISION_CONFIG;
-    this.viewHierarchy = new ViewHierarchy(device, this.adb);
+    this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
     this.selectionStateTracker = selectionStateTracker ?? new SelectionStateTracker({
-      screenshotCapturer: new TakeScreenshotCapturer(device, this.adb)
+      screenshotCapturer: new TakeScreenshotCapturer(device, this.adbFactory)
     });
     this.accessibilityDetector = accessibilityDetector || defaultAccessibilityDetector;
     this.elementSelector = elementSelector ?? new DefaultElementSelector();
@@ -400,7 +400,7 @@ export class TapOnElement extends BaseVisualChange {
       logger.info("🔍 Element not found after polling, trying vision fallback...");
 
       try {
-        const screenshot = new TakeScreenshot(this.device, this.adb);
+        const screenshot = new TakeScreenshot(this.device, this.adbFactory);
         const screenshotResult = await screenshot.execute({}, signal);
 
         if (!screenshotResult.success || !screenshotResult.path) {

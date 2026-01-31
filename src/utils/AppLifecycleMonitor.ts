@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
-import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
+import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
 import { logger } from "./logger";
 import { BootedDevice } from "../models";
 
@@ -56,16 +55,16 @@ export interface AppLifecycleEventListener {
 export class AppLifecycleMonitor extends EventEmitter implements AppLifecycleMonitor {
   private trackedPackages: Set<string> = new Set();
   private runningPackages: Set<string> = new Set();
-  private adb: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private static instance: AppLifecycleMonitor;
 
   /**
    * Constructor for AppLifecycleMonitor
-   * @param adb - Optional injected AdbClient instance for testing. Defaults to new AdbClient()
+   * @param adbFactory - Optional injected AdbClientFactory for dependency injection. Defaults to defaultAdbClientFactory.
    */
-  constructor(adb?: AdbExecutor) {
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     super();
-    this.adb = adb || new AdbClient();
+    this.adbFactory = adbFactory;
   }
 
   public static getInstance(): AppLifecycleMonitor {
@@ -106,11 +105,9 @@ export class AppLifecycleMonitor extends EventEmitter implements AppLifecycleMon
    */
   public async isPackageRunning(device: BootedDevice, packageName: string): Promise<boolean> {
     try {
-      // Set the device on the shared adb instance
-      if (this.adb instanceof AdbClient) {
-        this.adb.setDevice(device);
-      }
-      const result = await this.adb.executeCommand(`shell pidof ${packageName}`);
+      // Create ADB client for this device
+      const adb = this.adbFactory.create(device);
+      const result = await adb.executeCommand(`shell pidof ${packageName}`);
 
       // pidof returns empty stdout if package is not running
       return result.stdout.trim().length > 0;

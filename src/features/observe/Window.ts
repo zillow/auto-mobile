@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { ActiveWindowInfo } from "../../models/ActiveWindowInfo";
 import { logger } from "../../utils/logger";
 import { NodeCryptoService } from "../../utils/crypto";
@@ -9,7 +10,7 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 
 export class Window {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private cachedActiveWindow: ActiveWindowInfo | null = null;
   private readonly device: BootedDevice;
   private cacheDir: string = getTempDir(TEMP_SUBDIRS.WINDOW);
@@ -17,10 +18,17 @@ export class Window {
   /**
    * Create a Window instance
    * @param device - Optional device
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
-    this.adb = adb || new AdbClient(device);
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbExecutor;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device);
+    }
     this.device = device;
   }
 

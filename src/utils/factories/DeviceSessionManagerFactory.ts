@@ -1,7 +1,6 @@
 import { DeviceSessionManager } from "../DeviceSessionManager";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
 import { MultiPlatformDeviceManager } from "../deviceUtils";
-import { AdbExecutor } from "../android-cmdline-tools/interfaces/AdbExecutor";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { PlatformDeviceManager } from "../interfaces/DeviceUtils";
 import { logger } from "../logger";
 
@@ -12,19 +11,19 @@ import { logger } from "../logger";
  */
 export class DeviceSessionManagerFactory {
   private static instance: DeviceSessionManager | null = null;
-  private static injectedAdbExecutor: AdbExecutor | null = null;
+  private static injectedAdbFactory: AdbClientFactory | null = null;
   private static injectedDeviceUtils: PlatformDeviceManager | null = null;
 
   /**
-   * Set the AdbExecutor instance to inject into DeviceSessionManager
-   * Useful for testing with mock ADB executors
-   * @param adb - The AdbExecutor instance to use (typically a fake for testing)
+   * Set the AdbClientFactory instance to inject into DeviceSessionManager
+   * Useful for testing with mock ADB factories
+   * @param factory - The AdbClientFactory instance to use (typically a fake for testing)
    */
-  public static setAdbExecutor(adb: AdbExecutor): void {
-    DeviceSessionManagerFactory.injectedAdbExecutor = adb;
-    logger.debug("DeviceSessionManager: Injected custom AdbExecutor instance");
+  public static setAdbFactory(factory: AdbClientFactory): void {
+    DeviceSessionManagerFactory.injectedAdbFactory = factory;
+    logger.debug("DeviceSessionManager: Injected custom AdbClientFactory instance");
 
-    // Reset instance to force recreation with new ADB executor
+    // Reset instance to force recreation with new ADB factory
     DeviceSessionManagerFactory.instance = null;
   }
 
@@ -49,13 +48,14 @@ export class DeviceSessionManagerFactory {
   public static getInstance(): DeviceSessionManager {
     if (!DeviceSessionManagerFactory.instance) {
       // Use injected dependencies or create defaults
-      const adb = DeviceSessionManagerFactory.injectedAdbExecutor || new AdbClient();
+      const adbFactory = DeviceSessionManagerFactory.injectedAdbFactory ?? defaultAdbClientFactory;
+      const adb = adbFactory.create();
       const deviceUtils = DeviceSessionManagerFactory.injectedDeviceUtils ||
         new MultiPlatformDeviceManager(adb as any, null, null);
 
       DeviceSessionManagerFactory.instance = DeviceSessionManager.createInstance(adb, deviceUtils);
       logger.debug("DeviceSessionManager: Created new instance with " +
-        (DeviceSessionManagerFactory.injectedAdbExecutor ? "injected" : "default") + " AdbExecutor and " +
+        (DeviceSessionManagerFactory.injectedAdbFactory ? "injected" : "default") + " AdbClientFactory and " +
         (DeviceSessionManagerFactory.injectedDeviceUtils ? "injected" : "default") + " DeviceUtils");
     }
     return DeviceSessionManagerFactory.instance;
@@ -68,7 +68,7 @@ export class DeviceSessionManagerFactory {
    */
   public static reset(): void {
     DeviceSessionManagerFactory.instance = null;
-    DeviceSessionManagerFactory.injectedAdbExecutor = null;
+    DeviceSessionManagerFactory.injectedAdbFactory = null;
     DeviceSessionManagerFactory.injectedDeviceUtils = null;
     logger.debug("DeviceSessionManager: Factory reset");
   }

@@ -1,15 +1,16 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { BootedDevice, ClearAppDataResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class ClearAppData {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    this.adb = adbFactory.create(device);
   }
 
   async execute(

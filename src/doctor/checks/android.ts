@@ -13,7 +13,8 @@ import {
   getCmdlineToolsRoot,
   isHomebrewToolsPath
 } from "../../utils/android-cmdline-tools/detection";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import { DefaultCmdlineToolsInstaller } from "../../utils/android-cmdline-tools/cmdlineToolsInstaller";
 import type { CmdlineToolsInstaller } from "../../utils/android-cmdline-tools/cmdlineToolsInstaller";
@@ -186,9 +187,11 @@ export async function checkJavaHome(): Promise<CheckResult> {
 /**
  * Check ADB installation and get path
  */
-export async function checkAdbInstallation(): Promise<CheckResult> {
+export async function checkAdbInstallation(
+  adbFactory: AdbClientFactory = defaultAdbClientFactory
+): Promise<CheckResult> {
   try {
-    const adb = new AdbClient();
+    const adb = adbFactory.create();
     const adbPath = await adb.getAdbPathOnly();
 
     return {
@@ -211,9 +214,11 @@ export async function checkAdbInstallation(): Promise<CheckResult> {
 /**
  * Check ADB version
  */
-export async function checkAdbVersion(): Promise<CheckResult> {
+export async function checkAdbVersion(
+  adbFactory: AdbClientFactory = defaultAdbClientFactory
+): Promise<CheckResult> {
   try {
-    const adb = new AdbClient();
+    const adb = adbFactory.create();
     const result = await adb.executeCommand("--version", undefined, undefined, true);
 
     // Parse version from output like "Android Debug Bridge version 35.0.0"
@@ -274,9 +279,11 @@ export async function checkEmulator(): Promise<CheckResult> {
 /**
  * Check connected Android devices
  */
-export async function checkConnectedDevices(): Promise<CheckResult> {
+export async function checkConnectedDevices(
+  adbFactory: AdbClientFactory = defaultAdbClientFactory
+): Promise<CheckResult> {
   try {
-    const adb = new AdbClient();
+    const adb = adbFactory.create();
     const devices = await adb.getBootedAndroidDevices();
 
     if (devices.length === 0) {

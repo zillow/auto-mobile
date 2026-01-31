@@ -1,13 +1,27 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { AndroidEmulatorClient } from "../../../src/utils/android-cmdline-tools/AndroidEmulatorClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
-import { ExecResult } from "../../../src/models";
+import { ExecResult, BootedDevice } from "../../../src/models";
 import { FakeTimer } from "../../fakes/FakeTimer";
+import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
+import { AdbExecutor } from "../../../src/utils/android-cmdline-tools/interfaces/AdbExecutor";
+
+/**
+ * A factory that returns a single FakeAdbExecutor instance for all create() calls.
+ */
+class TestAdbClientFactory implements AdbClientFactory {
+  constructor(private readonly fakeExecutor: FakeAdbExecutor) {}
+
+  create(_device?: BootedDevice | null): AdbExecutor {
+    return this.fakeExecutor;
+  }
+}
 
 describe("AndroidEmulatorClient wakeAndUnlock", () => {
   let emulatorClient: AndroidEmulatorClient;
   let fakeAdb: FakeAdbExecutor;
   let fakeTimer: FakeTimer;
+  let fakeFactory: TestAdbClientFactory;
 
   const createExecResult = (stdout: string, stderr: string = ""): ExecResult => ({
     stdout,
@@ -25,7 +39,8 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
     fakeAdb = new FakeAdbExecutor();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    emulatorClient = new AndroidEmulatorClient(mockExecAsync, null, fakeTimer);
+    fakeFactory = new TestAdbClientFactory(fakeAdb);
+    emulatorClient = new AndroidEmulatorClient(mockExecAsync, null, fakeTimer, fakeFactory);
   });
 
   test("should wake device and dismiss keyguard when device is Asleep", async () => {
@@ -34,7 +49,7 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
 
     // Access the private method using bracket notation for testing
     const wakeAndUnlock = (emulatorClient as any).wakeAndUnlock.bind(emulatorClient);
-    await wakeAndUnlock(device, fakeAdb);
+    await wakeAndUnlock(device);
 
     // Verify KEYCODE_WAKEUP was sent since device was Asleep
     expect(fakeAdb.wasCommandExecuted("KEYCODE_WAKEUP")).toBe(true);
@@ -48,7 +63,7 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
     const device = { name: "test-avd", platform: "android" as const, deviceId: "emulator-5554" };
 
     const wakeAndUnlock = (emulatorClient as any).wakeAndUnlock.bind(emulatorClient);
-    await wakeAndUnlock(device, fakeAdb);
+    await wakeAndUnlock(device);
 
     // Verify KEYCODE_WAKEUP was sent since device was Dozing
     expect(fakeAdb.wasCommandExecuted("KEYCODE_WAKEUP")).toBe(true);
@@ -62,7 +77,7 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
     const device = { name: "test-avd", platform: "android" as const, deviceId: "emulator-5554" };
 
     const wakeAndUnlock = (emulatorClient as any).wakeAndUnlock.bind(emulatorClient);
-    await wakeAndUnlock(device, fakeAdb);
+    await wakeAndUnlock(device);
 
     // Verify KEYCODE_WAKEUP was NOT sent since device was already Awake
     expect(fakeAdb.wasCommandExecuted("KEYCODE_WAKEUP")).toBe(false);
@@ -94,7 +109,7 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
     const wakeAndUnlock = (emulatorClient as any).wakeAndUnlock.bind(emulatorClient);
 
     // Should not throw
-    await expect(wakeAndUnlock(device, fakeAdb)).resolves.toBeUndefined();
+    await expect(wakeAndUnlock(device)).resolves.toBeUndefined();
   });
 
   test("should still try to wake when wakefulness check returns null", async () => {
@@ -103,7 +118,7 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
     const device = { name: "test-avd", platform: "android" as const, deviceId: "emulator-5554" };
 
     const wakeAndUnlock = (emulatorClient as any).wakeAndUnlock.bind(emulatorClient);
-    await wakeAndUnlock(device, fakeAdb);
+    await wakeAndUnlock(device);
 
     // When wakefulness is null (unknown), should still try to wake the device
     expect(fakeAdb.wasCommandExecuted("KEYCODE_WAKEUP")).toBe(true);

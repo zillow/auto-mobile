@@ -7,7 +7,7 @@ import type {
   CrashEventListener,
   AnrEventListener,
 } from "../interfaces/CrashMonitor";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { logger } from "../logger";
 
 /**
@@ -17,7 +17,8 @@ import { logger } from "../logger";
 export class DropboxCrashDetector implements CrashDetector {
   readonly name = "dropbox";
 
-  private adb: AdbExecutor;
+  private adb: AdbExecutor | null = null;
+  private adbFactory: AdbClientFactory;
   private device: BootedDevice | null = null;
   private packageName: string | null = null;
   private running = false;
@@ -26,8 +27,8 @@ export class DropboxCrashDetector implements CrashDetector {
   private crashListeners: CrashEventListener[] = [];
   private anrListeners: AnrEventListener[] = [];
 
-  constructor(adb?: AdbExecutor) {
-    this.adb = adb ?? new AdbClient();
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adbFactory = adbFactory;
   }
 
   async start(device: BootedDevice, packageName: string): Promise<void> {
@@ -37,9 +38,8 @@ export class DropboxCrashDetector implements CrashDetector {
     this.lastCheckTime = Date.now();
     this.processedEntries.clear();
 
-    if (this.adb instanceof AdbClient) {
-      this.adb.setDevice(device);
-    }
+    // Create ADB client for this device
+    this.adb = this.adbFactory.create(device);
 
     logger.info(
       `DropboxCrashDetector started for package ${packageName} on device ${device.deviceId}`
@@ -55,7 +55,7 @@ export class DropboxCrashDetector implements CrashDetector {
   }
 
   async checkForCrashes(): Promise<CrashEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 
@@ -121,7 +121,7 @@ export class DropboxCrashDetector implements CrashDetector {
   }
 
   async checkForAnrs(): Promise<AnrEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 

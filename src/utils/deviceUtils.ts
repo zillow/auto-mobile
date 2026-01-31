@@ -1,6 +1,7 @@
 import { ChildProcess } from "child_process";
 import { DeviceInfo, ActionableError, SomePlatform, BootedDevice } from "../models";
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
 import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
 
@@ -54,22 +55,22 @@ export interface PlatformDeviceManager {
 }
 
 export class MultiPlatformDeviceManager implements PlatformDeviceManager {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private emulator: AndroidEmulatorClient;
   private simctl: SimCtlClient;
 
   /**
    * Create a PlatformDeviceManager instance
-   * @param adb - An instance of AdbClient for interacting with Android Debug Bridge
+   * @param adb - An instance of AdbExecutor for interacting with Android Debug Bridge
    * @param idb - An instance of SimCtlClient for interacting with iOS simulator controls
    * @param emulator - An instance of AndroidEmulatorClient for managing Android emulators
    */
   constructor(
-    adb: AdbClient | null = null,
+    adb: AdbExecutor | null = null,
     idb: SimCtlClient | null = null,
     emulator: AndroidEmulatorClient | null = null,
   ) {
-    this.adb = adb || new AdbClient();
+    this.adb = adb || defaultAdbClientFactory.create(null);
     this.simctl = idb || new SimCtlClient();
     this.emulator = emulator || new AndroidEmulatorClient();
   }

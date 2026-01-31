@@ -1,7 +1,8 @@
 import fs from "fs-extra";
 import path from "path";
 import xml2js from "xml2js";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { NodeCryptoService } from "../../utils/crypto";
 import { BootedDevice, ViewHierarchyCache } from "../../models";
@@ -32,7 +33,8 @@ interface ElementBounds {
 
 export class ViewHierarchy {
   private device: BootedDevice;
-  private readonly adb: AdbClient;
+  private readonly adb: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private takeScreenshot: TakeScreenshot;
   private elementUtils: ElementUtils;
   private accessibilityServiceClient: AccessibilityServiceClient;
@@ -45,21 +47,33 @@ export class ViewHierarchy {
   /**
    * Create a ViewHierarchy instance
    * @param device - Optional device
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
    * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
+    adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
     takeScreenshot: TakeScreenshot | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    } else if (adbFactoryOrExecutor) {
+      // Legacy path: wrap the executor in a factory for downstream dependencies
+      const executor = adbFactoryOrExecutor as AdbExecutor;
+      this.adb = executor;
+      this.adbFactory = { create: () => executor };
+    } else {
+      this.adbFactory = defaultAdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    }
+    this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adbFactory);
     this.elementUtils = new ElementUtils();
-    this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, this.adb);
+    this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, this.adbFactory);
 
     // Ensure cache directories exist
     if (!fs.existsSync(ViewHierarchy.cacheDir)) {

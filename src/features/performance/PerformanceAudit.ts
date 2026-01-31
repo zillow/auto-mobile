@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ScreenSize } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -79,19 +80,19 @@ export interface CollectMetricsOptions {
  * Performance audit class for collecting and validating performance metrics
  */
 export class PerformanceAudit {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private device: BootedDevice;
   private idle: Idle;
   private capabilitiesDetector: DeviceCapabilitiesDetector;
   private touchLatencyTracker: TouchLatencyTracker;
   private repository = new PerformanceAuditRepository();
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.idle = new Idle(device, this.adb);
-    this.capabilitiesDetector = new DeviceCapabilitiesDetector(device, this.adb);
-    this.touchLatencyTracker = new TouchLatencyTracker(device, this.adb);
+    this.adb = adbFactory.create(device);
+    this.idle = new Idle(device, adbFactory);
+    this.capabilitiesDetector = new DeviceCapabilitiesDetector(device, adbFactory);
+    this.touchLatencyTracker = new TouchLatencyTracker(device, adbFactory);
   }
 
   /**

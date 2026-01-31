@@ -1,6 +1,5 @@
 import { MultiPlatformDeviceManager } from "../deviceUtils";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
-import { AdbExecutor } from "../android-cmdline-tools/interfaces/AdbExecutor";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { PlatformDeviceManager } from "../interfaces/DeviceUtils";
 import { logger } from "../logger";
 
@@ -12,7 +11,7 @@ import { logger } from "../logger";
 export class PlatformDeviceManagerFactory {
   private static instance: PlatformDeviceManager | null = null;
   private static injectedManager: PlatformDeviceManager | null = null;
-  private static injectedAdbExecutor: AdbExecutor | null = null;
+  private static injectedAdbFactory: AdbClientFactory | null = null;
 
   /**
    * Set the PlatformDeviceManager instance to inject
@@ -27,15 +26,15 @@ export class PlatformDeviceManagerFactory {
   }
 
   /**
-   * Set the AdbExecutor instance to inject when creating a new manager
-   * Useful for testing with mock ADB executors
-   * @param adb - The AdbExecutor instance to use (typically a fake for testing)
+   * Set the AdbClientFactory instance to inject when creating a new manager
+   * Useful for testing with mock ADB factories
+   * @param factory - The AdbClientFactory instance to use (typically a fake for testing)
    */
-  public static setAdbExecutor(adb: AdbExecutor | null): void {
-    PlatformDeviceManagerFactory.injectedAdbExecutor = adb;
-    // Reset cached instance to force recreation with new executor
+  public static setAdbFactory(factory: AdbClientFactory | null): void {
+    PlatformDeviceManagerFactory.injectedAdbFactory = factory;
+    // Reset cached instance to force recreation with new factory
     PlatformDeviceManagerFactory.instance = null;
-    logger.debug("PlatformDeviceManagerFactory: Injected custom AdbExecutor");
+    logger.debug("PlatformDeviceManagerFactory: Injected custom AdbClientFactory");
   }
 
   /**
@@ -49,11 +48,12 @@ export class PlatformDeviceManagerFactory {
         PlatformDeviceManagerFactory.instance = PlatformDeviceManagerFactory.injectedManager;
         logger.debug("PlatformDeviceManagerFactory: Using injected instance");
       } else {
-        // Create default with injected or real AdbExecutor
-        const adb = PlatformDeviceManagerFactory.injectedAdbExecutor || new AdbClient();
+        // Create default with injected or default AdbClientFactory
+        const adbFactory = PlatformDeviceManagerFactory.injectedAdbFactory ?? defaultAdbClientFactory;
+        const adb = adbFactory.create();
         PlatformDeviceManagerFactory.instance = new MultiPlatformDeviceManager(adb as any, null, null);
         logger.debug("PlatformDeviceManagerFactory: Created new instance with " +
-          (PlatformDeviceManagerFactory.injectedAdbExecutor ? "injected" : "default") + " AdbExecutor");
+          (PlatformDeviceManagerFactory.injectedAdbFactory ? "injected" : "default") + " AdbClientFactory");
       }
     }
     return PlatformDeviceManagerFactory.instance;
@@ -67,7 +67,7 @@ export class PlatformDeviceManagerFactory {
   public static reset(): void {
     PlatformDeviceManagerFactory.instance = null;
     PlatformDeviceManagerFactory.injectedManager = null;
-    PlatformDeviceManagerFactory.injectedAdbExecutor = null;
+    PlatformDeviceManagerFactory.injectedAdbFactory = null;
     logger.debug("PlatformDeviceManagerFactory: Factory reset");
   }
 }

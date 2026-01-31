@@ -1,5 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { BootedDevice, Element, ElementBounds, KeyboardResult, ViewHierarchyResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
@@ -47,21 +47,20 @@ export class Keyboard {
 
   constructor(
     device: BootedDevice,
-    adb: AdbExecutor | null = null,
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
     hierarchyProvider?: KeyboardHierarchyProvider,
     timer: Timer = defaultTimer
   ) {
     this.device = device;
-    this.adb = adb ?? new AdbClient(device);
+    this.adb = adbFactory.create(device);
     this.elementUtils = new ElementUtils();
     this.timer = timer;
 
     if (hierarchyProvider) {
       this.hierarchyProvider = hierarchyProvider;
     } else {
-      const adbClient = this.adb instanceof AdbClient ? this.adb : new AdbClient(device);
       this.hierarchyProvider = new DefaultKeyboardHierarchyProvider(
-        new ViewHierarchy(device, adbClient)
+        new ViewHierarchy(device, adbFactory)
       );
     }
   }

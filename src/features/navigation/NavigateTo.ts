@@ -1,5 +1,6 @@
 import { BootedDevice, NavigateToResult } from "../../models";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { ToolRegistry } from "../../server/toolRegistry";
@@ -30,7 +31,7 @@ export interface NavigateToOptions {
  */
 export class NavigateTo {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private navigationManager: NavigationGraphManager;
   private uiStateSetup: UIStateSetup;
   private screenWaiter: ScreenTransitionWaiter;
@@ -41,12 +42,12 @@ export class NavigateTo {
 
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
     uiStateSetup: UIStateSetup | null = null,
     screenWaiter: ScreenTransitionWaiter | null = null
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    this.adb = adbFactory.create(device);
     this.navigationManager = NavigationGraphManager.getInstance();
 
     // Use injected dependencies or create defaults

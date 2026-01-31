@@ -285,7 +285,7 @@ export class LaunchApp extends BaseVisualChange {
     timeoutMs: number = 2000,
     pollIntervalMs: number = 200
   ): Promise<void> {
-    const viewHierarchy = new ViewHierarchy(this.device, this.adb);
+    const viewHierarchy = new ViewHierarchy(this.device, this.adbFactory);
     const startTime = this.timer.now();
     let attempts = 0;
 
@@ -339,7 +339,7 @@ export class LaunchApp extends BaseVisualChange {
   }
 
   private async listInstalledApps(): Promise<string[]> {
-    return (new ListInstalledApps(this.device, this.adb)).execute();
+    return (new ListInstalledApps(this.device, this.adbFactory)).execute();
   }
 
   /**
@@ -478,7 +478,7 @@ export class LaunchApp extends BaseVisualChange {
 
     const captureDisplayedMetrics = serverConfig.isUiPerfModeEnabled();
     const displayedMetricsCollector = captureDisplayedMetrics
-      ? new DisplayedTimeMetricsCollector(this.device, this.adb)
+      ? new DisplayedTimeMetricsCollector(this.device, this.adbFactory)
       : null;
     let displayedMetricsStartMs: number | null = null;
 

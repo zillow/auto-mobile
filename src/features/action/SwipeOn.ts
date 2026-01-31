@@ -95,7 +95,7 @@ export class SwipeOn extends BaseVisualChange {
     super(device, adb);
     this.executeGesture = dependencies.executeGesture ?? new ExecuteGesture(device, adb);
     this.elementUtils = dependencies.elementUtils ?? new ElementUtils();
-    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
+    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.accessibilityDetector = dependencies.accessibilityDetector || defaultAccessibilityDetector;
     if (dependencies.observeScreen) {
       this.observeScreen = dependencies.observeScreen as unknown as ObserveScreen;

@@ -1,5 +1,6 @@
 import { BootedDevice } from "../models";
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "./logger";
 
 export const KEEP_SCREEN_AWAKE_STATE_KEY = "keepScreenAwakeState";
@@ -24,11 +25,11 @@ const MAX_SCREEN_OFF_TIMEOUT_MS = "2147483647";
 
 export class KeepScreenAwakeManager {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb ?? new AdbClient(device);
+    this.adb = adbFactory.create(device);
   }
 
   async apply(keepScreenAwake: boolean): Promise<KeepScreenAwakeState> {

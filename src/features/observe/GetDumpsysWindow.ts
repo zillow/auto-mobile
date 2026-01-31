@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { BootedDevice, ExecResult } from "../../models";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -6,7 +7,7 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 
 export class GetDumpsysWindow {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, { data: ExecResult; timestamp: number }>();
   private static readonly CACHE_TTL_MS = 30000; // 30 seconds
@@ -16,11 +17,18 @@ export class GetDumpsysWindow {
   /**
    * Create a GetDumpsysWindow instance
    * @param device - Optional device
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbExecutor;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device);
+    }
     this.cacheDir = getTempDir(TEMP_SUBDIRS.CACHE);
     this.cacheFilePath = path.join(this.cacheDir, `dumpsys-window-${device.deviceId}.json`);
   }

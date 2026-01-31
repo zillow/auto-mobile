@@ -10,7 +10,8 @@ import { Window } from "./Window";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
 import { GetBackStack } from "./GetBackStack";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
@@ -52,7 +53,8 @@ export class ObserveScreen {
   private screenshotUtil: TakeScreenshot;
   private dumpsysWindow: GetDumpsysWindow;
   private backStack: GetBackStack;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private predictiveUIState: PredictiveUIState;
 
   // Static cache for observe results
@@ -116,17 +118,29 @@ export class ObserveScreen {
 
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null
+    adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.screenSize = new GetScreenSize(device, this.adb);
-    this.systemInsets = new GetSystemInsets(device, this.adb);
-    this.viewHierarchy = new ViewHierarchy(device, this.adb);
-    this.window = new Window(device, this.adb);
-    this.screenshotUtil = new TakeScreenshot(device, this.adb);
-    this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
-    this.backStack = new GetBackStack(this.adb);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    } else if (adbFactoryOrExecutor) {
+      // Legacy path: wrap the executor in a factory for downstream dependencies
+      const executor = adbFactoryOrExecutor as AdbExecutor;
+      this.adb = executor;
+      this.adbFactory = { create: () => executor };
+    } else {
+      this.adbFactory = defaultAdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    }
+    this.screenSize = new GetScreenSize(device, this.adbFactory);
+    this.systemInsets = new GetSystemInsets(device, this.adbFactory);
+    this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
+    this.window = new Window(device, this.adbFactory);
+    this.screenshotUtil = new TakeScreenshot(device, this.adbFactory);
+    this.dumpsysWindow = new GetDumpsysWindow(device, this.adbFactory);
+    this.backStack = new GetBackStack(this.adbFactory, device);
     this.predictiveUIState = new PredictiveUIState();
 
     // Ensure observe result cache directory exists
