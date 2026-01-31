@@ -1,28 +1,23 @@
-import { createServer, Server as NetServer, Socket } from "node:net";
-import { existsSync } from "node:fs";
-import { unlink, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Socket } from "node:net";
 import { logger } from "../utils/logger";
+import { Timer, defaultTimer } from "../utils/SystemTimer";
+import {
+  PushSubscriptionSocketServer,
+  getSocketPath,
+  SocketServerConfig,
+  SubscriptionResponse,
+} from "./socketServer/index";
 import type { ViewHierarchyResult } from "../models";
 import type { StorageChangedEvent } from "../features/storage/storageTypes";
 
-// Use /tmp for socket when running with external emulator (Docker container with mounted home)
 // NOTE: Keep legacy socket path for backward compatibility with IDE plugin
 // (android/ide-plugin/.../ObservationStreamClient.kt hardcodes this path)
-const isExternalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
-const DEFAULT_SOCKET_PATH = isExternalMode
-  ? "/tmp/auto-mobile-observation-stream.sock"
-  : path.join(os.homedir(), ".auto-mobile", "observation-stream.sock");
-
-/**
- * Request format for device data stream socket
- */
-interface DeviceDataStreamRequest {
-  id: string;
-  command: "subscribe" | "unsubscribe" | "request_observation" | "pong";
-  deviceId?: string; // Optional: subscribe to specific device
-}
+const SOCKET_CONFIG: SocketServerConfig = {
+  defaultPath: path.join(os.homedir(), ".auto-mobile", "observation-stream.sock"),
+  externalPath: "/tmp/auto-mobile-observation-stream.sock",
+};
 
 /**
  * Navigation graph summary for streaming to IDE plugins.
@@ -73,7 +68,16 @@ export interface PerformanceStreamData {
  */
 interface DeviceDataStreamMessage {
   id?: string;
-  type: "subscription_response" | "hierarchy_update" | "screenshot_update" | "navigation_update" | "performance_update" | "storage_update" | "ping" | "pong" | "error";
+  type:
+    | "subscription_response"
+    | "hierarchy_update"
+    | "screenshot_update"
+    | "navigation_update"
+    | "performance_update"
+    | "storage_update"
+    | "ping"
+    | "pong"
+    | "error";
   success?: boolean;
   error?: string;
   deviceId?: string;
@@ -88,13 +92,18 @@ interface DeviceDataStreamMessage {
 }
 
 /**
- * Subscriber info
+ * Filter for device data stream subscriptions.
  */
-interface Subscriber {
-  socket: Socket;
+interface DeviceDataFilter {
   deviceId: string | null; // null means subscribe to all devices
-  subscriptionId: string;
-  lastActivity: number; // Timestamp of last activity (subscribe, pong, or successful write)
+}
+
+/**
+ * Push data wrapper - used internally for type safety with base class.
+ */
+interface DeviceDataPush {
+  message: DeviceDataStreamMessage;
+  targetDeviceId: string | null; // null for broadcast to all
 }
 
 /**
@@ -116,20 +125,14 @@ export type OnSubscriberConnectedCallback = (deviceId: string | null) => void;
  * - Server pushes: {"type": "screenshot_update", "deviceId": "emulator-5554", "timestamp": 123, "screenshotBase64": "..."}
  * - Server pushes: {"type": "storage_update", "deviceId": "emulator-5554", "timestamp": 123, "storageEvent": {...}}
  */
-// Keepalive configuration
-const KEEPALIVE_INTERVAL_MS = 10_000; // Send ping every 10 seconds
-const KEEPALIVE_TIMEOUT_MS = 30_000; // Consider dead if no activity for 30 seconds
-
-export class DeviceDataStreamSocketServer {
-  private server: NetServer | null = null;
-  private socketPath: string;
-  private subscribers: Map<string, Subscriber> = new Map();
-  private subscriptionCounter = 0;
+export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
+  DeviceDataFilter,
+  DeviceDataPush
+> {
   private onSubscriberConnected: OnSubscriberConnectedCallback | null = null;
-  private keepaliveInterval: ReturnType<typeof setInterval> | null = null;
 
-  constructor(socketPath: string = DEFAULT_SOCKET_PATH) {
-    this.socketPath = socketPath;
+  constructor(socketPath: string = getSocketPath(SOCKET_CONFIG), timer: Timer = defaultTimer) {
+    super(socketPath, timer, "DeviceDataStream");
   }
 
   /**
@@ -140,141 +143,6 @@ export class DeviceDataStreamSocketServer {
     this.onSubscriberConnected = callback;
   }
 
-  async start(): Promise<void> {
-    const directory = path.dirname(this.socketPath);
-    if (!existsSync(directory)) {
-      await mkdir(directory, { recursive: true });
-    }
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-
-    this.server = createServer(socket => {
-      this.handleConnection(socket);
-    });
-
-    return new Promise((resolve, reject) => {
-      this.server!.listen(this.socketPath, () => {
-        logger.info(`[DeviceDataStream] Socket listening on ${this.socketPath}`);
-        this.startKeepalive();
-        resolve();
-      });
-
-      this.server!.on("error", error => {
-        logger.error(`[DeviceDataStream] Socket error: ${error}`);
-        reject(error);
-      });
-    });
-  }
-
-  /**
-   * Start the keepalive interval to detect dead connections.
-   */
-  private startKeepalive(): void {
-    if (this.keepaliveInterval) {
-      return;
-    }
-
-    this.keepaliveInterval = setInterval(() => {
-      this.checkKeepalive();
-    }, KEEPALIVE_INTERVAL_MS);
-  }
-
-  /**
-   * Stop the keepalive interval.
-   */
-  private stopKeepalive(): void {
-    if (this.keepaliveInterval) {
-      clearInterval(this.keepaliveInterval);
-      this.keepaliveInterval = null;
-    }
-  }
-
-  /**
-   * Check all subscribers for keepalive timeout and send pings.
-   */
-  private checkKeepalive(): void {
-    const now = Date.now();
-    const deadSubscribers: string[] = [];
-
-    for (const [subscriptionId, subscriber] of this.subscribers) {
-      // Check if socket is destroyed
-      if (subscriber.socket.destroyed) {
-        logger.info(`[DeviceDataStream] Subscriber ${subscriptionId} socket destroyed, removing`);
-        deadSubscribers.push(subscriptionId);
-        continue;
-      }
-
-      // Check for timeout (no activity for too long)
-      const timeSinceActivity = now - subscriber.lastActivity;
-      if (timeSinceActivity > KEEPALIVE_TIMEOUT_MS) {
-        logger.warn(`[DeviceDataStream] Subscriber ${subscriptionId} timed out (${timeSinceActivity}ms since last activity), removing`);
-        deadSubscribers.push(subscriptionId);
-        try {
-          subscriber.socket.destroy();
-        } catch {
-          // Ignore errors when destroying
-        }
-        continue;
-      }
-
-      // Send ping to keep connection alive and detect broken pipes
-      const pingMessage: DeviceDataStreamMessage = {
-        type: "ping",
-        timestamp: now,
-      };
-      try {
-        const written = subscriber.socket.write(JSON.stringify(pingMessage) + "\n");
-        if (!written) {
-          // Write was buffered, socket might be slow or dead
-          logger.debug(`[DeviceDataStream] Ping to ${subscriptionId} was buffered (backpressure)`);
-        }
-      } catch (error) {
-        logger.warn(`[DeviceDataStream] Failed to ping ${subscriptionId}: ${error}`);
-        deadSubscribers.push(subscriptionId);
-      }
-    }
-
-    // Remove dead subscribers
-    for (const subscriptionId of deadSubscribers) {
-      this.subscribers.delete(subscriptionId);
-      logger.info(`[DeviceDataStream] Removed dead subscriber ${subscriptionId}`);
-    }
-  }
-
-  async close(): Promise<void> {
-    // Stop keepalive
-    this.stopKeepalive();
-
-    // Close all subscriber connections
-    for (const [, subscriber] of this.subscribers) {
-      try {
-        subscriber.socket.end();
-      } catch {
-        // Ignore errors when closing
-      }
-    }
-    this.subscribers.clear();
-
-    if (!this.server) {
-      return;
-    }
-
-    await new Promise<void>(resolve => {
-      this.server!.close(() => resolve());
-    });
-    this.server = null;
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-  }
-
-  isListening(): boolean {
-    return this.server?.listening ?? false;
-  }
-
   /**
    * Push a hierarchy update to all subscribers interested in this device.
    */
@@ -282,11 +150,14 @@ export class DeviceDataStreamSocketServer {
     const message: DeviceDataStreamMessage = {
       type: "hierarchy_update",
       deviceId,
-      timestamp: hierarchy.updatedAt ?? Date.now(),
+      timestamp: hierarchy.updatedAt ?? this.timer.now(),
       data: hierarchy,
     };
 
-    this.broadcastToSubscribers(deviceId, message);
+    const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
+    if (sentCount > 0) {
+      logger.info(`[DeviceDataStream] Pushed hierarchy_update to ${sentCount} subscribers (device: ${deviceId})`);
+    }
   }
 
   /**
@@ -301,13 +172,16 @@ export class DeviceDataStreamSocketServer {
     const message: DeviceDataStreamMessage = {
       type: "screenshot_update",
       deviceId,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       screenshotBase64,
       screenWidth,
       screenHeight,
     };
 
-    this.broadcastToSubscribers(deviceId, message);
+    const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
+    if (sentCount > 0) {
+      logger.info(`[DeviceDataStream] Pushed screenshot_update to ${sentCount} subscribers (device: ${deviceId})`);
+    }
   }
 
   /**
@@ -317,11 +191,14 @@ export class DeviceDataStreamSocketServer {
   pushNavigationGraphUpdate(navigationGraph: NavigationGraphStreamData): void {
     const message: DeviceDataStreamMessage = {
       type: "navigation_update",
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       navigationGraph,
     };
 
-    this.broadcastToAllSubscribers(message);
+    const sentCount = this.pushToSubscribers({ message, targetDeviceId: null });
+    if (sentCount > 0) {
+      logger.info(`[DeviceDataStream] Pushed navigation_update to ${sentCount} subscribers`);
+    }
   }
 
   /**
@@ -331,11 +208,14 @@ export class DeviceDataStreamSocketServer {
     const message: DeviceDataStreamMessage = {
       type: "performance_update",
       deviceId,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       performanceData,
     };
 
-    this.broadcastToSubscribers(deviceId, message);
+    const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
+    if (sentCount > 0) {
+      logger.info(`[DeviceDataStream] Pushed performance_update to ${sentCount} subscribers (device: ${deviceId})`);
+    }
   }
 
   /**
@@ -345,229 +225,82 @@ export class DeviceDataStreamSocketServer {
     const message: DeviceDataStreamMessage = {
       type: "storage_update",
       deviceId,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       storageEvent: event,
     };
 
-    this.broadcastToSubscribers(deviceId, message);
+    const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
+    if (sentCount > 0) {
+      logger.info(`[DeviceDataStream] Pushed storage_update to ${sentCount} subscribers (device: ${deviceId})`);
+    }
   }
 
   /**
-   * Get the number of active subscribers.
+   * Override processLine to handle additional commands and the onSubscriberConnected callback.
    */
-  getSubscriberCount(): number {
-    return this.subscribers.size;
-  }
+  protected async processLine(socket: Socket, line: string): Promise<void> {
+    const request = this.parseJson<{ id?: string; command: string; deviceId?: string }>(line);
 
-  private broadcastToSubscribers(deviceId: string, message: DeviceDataStreamMessage): void {
-    const json = JSON.stringify(message) + "\n";
-    let sentCount = 0;
-    const deadSubscribers: string[] = [];
-
-    for (const [subscriptionId, subscriber] of this.subscribers) {
-      // Send to subscribers that want all devices or specifically this device
-      if (subscriber.deviceId === null || subscriber.deviceId === deviceId) {
-        // Check if socket is already destroyed
-        if (subscriber.socket.destroyed) {
-          logger.warn(`[DeviceDataStream] Subscriber ${subscriptionId} socket already destroyed, skipping`);
-          deadSubscribers.push(subscriptionId);
-          continue;
-        }
-
-        try {
-          const result = subscriber.socket.write(json);
-          logger.info(`[DeviceDataStream] Write to ${subscriptionId} returned: ${result}, bytes: ${json.length}`);
-          if (result) {
-            // Update last activity on successful write
-            subscriber.lastActivity = Date.now();
-          }
-          sentCount++;
-        } catch (error) {
-          logger.warn(`[DeviceDataStream] Failed to send to subscriber ${subscriptionId}: ${error}`);
-          deadSubscribers.push(subscriptionId);
-        }
-      }
-    }
-
-    // Remove dead subscribers
-    for (const subscriptionId of deadSubscribers) {
-      this.subscribers.delete(subscriptionId);
-      logger.info(`[DeviceDataStream] Removed dead subscriber ${subscriptionId}`);
-    }
-
-    if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed ${message.type} to ${sentCount} subscribers (device: ${deviceId})`);
-    }
-  }
-
-  private broadcastToAllSubscribers(message: DeviceDataStreamMessage): void {
-    const json = JSON.stringify(message) + "\n";
-    let sentCount = 0;
-    const deadSubscribers: string[] = [];
-
-    for (const [subscriptionId, subscriber] of this.subscribers) {
-      // Check if socket is already destroyed
-      if (subscriber.socket.destroyed) {
-        logger.warn(`[DeviceDataStream] Subscriber ${subscriptionId} socket already destroyed, skipping`);
-        deadSubscribers.push(subscriptionId);
-        continue;
-      }
-
-      try {
-        const result = subscriber.socket.write(json);
-        logger.debug(`[DeviceDataStream] Write to ${subscriptionId} returned: ${result}, bytes: ${json.length}`);
-        if (result) {
-          // Update last activity on successful write
-          subscriber.lastActivity = Date.now();
-        }
-        sentCount++;
-      } catch (error) {
-        logger.warn(`[DeviceDataStream] Failed to send to subscriber ${subscriptionId}: ${error}`);
-        deadSubscribers.push(subscriptionId);
-      }
-    }
-
-    // Remove dead subscribers
-    for (const subscriptionId of deadSubscribers) {
-      this.subscribers.delete(subscriptionId);
-      logger.info(`[DeviceDataStream] Removed dead subscriber ${subscriptionId}`);
-    }
-
-    if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed ${message.type} to ${sentCount} subscribers`);
-    }
-  }
-
-  private handleConnection(socket: Socket): void {
-    let buffer = "";
-    let subscriptionId: string | null = null;
-
-    socket.on("data", data => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.trim()) {
-          this.processLine(socket, line).then(result => {
-            if (result?.subscriptionId) {
-              subscriptionId = result.subscriptionId;
-            }
-          }).catch(error => {
-            logger.error(`[DeviceDataStream] Request error: ${error}`);
-          });
-        }
-      }
-    });
-
-    socket.on("close", () => {
-      if (subscriptionId) {
-        this.subscribers.delete(subscriptionId);
-        logger.info(`[DeviceDataStream] Subscriber ${subscriptionId} disconnected`);
-      }
-    });
-
-    socket.on("error", error => {
-      logger.error(`[DeviceDataStream] Connection error: ${error}`);
-      if (subscriptionId) {
-        this.subscribers.delete(subscriptionId);
-      }
-    });
-  }
-
-  private async processLine(
-    socket: Socket,
-    line: string
-  ): Promise<{ subscriptionId?: string } | void> {
-    try {
-      const request = JSON.parse(line) as DeviceDataStreamRequest;
-
-      switch (request.command) {
-        case "subscribe": {
-          const subscriptionId = `sub-${++this.subscriptionCounter}`;
-          this.subscribers.set(subscriptionId, {
-            socket,
-            deviceId: request.deviceId ?? null,
-            subscriptionId,
-            lastActivity: Date.now(),
-          });
-
-          const response: DeviceDataStreamMessage = {
-            id: request.id,
-            type: "subscription_response",
-            success: true,
-          };
-          socket.write(JSON.stringify(response) + "\n");
-
-          logger.info(`[DeviceDataStream] New subscriber ${subscriptionId} (device: ${request.deviceId ?? "all"})`);
-
-          // Trigger device WebSocket connections for real-time updates
-          if (this.onSubscriberConnected) {
-            try {
-              this.onSubscriberConnected(request.deviceId ?? null);
-            } catch (error) {
-              logger.warn(`[DeviceDataStream] Error in onSubscriberConnected callback: ${error}`);
-            }
-          }
-
-          return { subscriptionId };
-        }
-
-        case "unsubscribe": {
-          // Find and remove the subscription for this socket
-          for (const [subId, subscriber] of this.subscribers) {
-            if (subscriber.socket === socket) {
-              this.subscribers.delete(subId);
-              logger.info(`[DeviceDataStream] Unsubscribed ${subId}`);
-              break;
-            }
-          }
-
-          const response: DeviceDataStreamMessage = {
-            id: request.id,
-            type: "subscription_response",
-            success: true,
-          };
-          socket.write(JSON.stringify(response) + "\n");
-          return;
-        }
-
-        case "request_observation": {
-          // This could trigger an immediate observation request
-          // For now, just acknowledge - the caller should use MCP observe tool
-          const response: DeviceDataStreamMessage = {
-            id: request.id,
-            type: "subscription_response",
-            success: true,
-          };
-          socket.write(JSON.stringify(response) + "\n");
-          return;
-        }
-
-        case "pong": {
-          // Client responded to ping - update last activity for their subscription
-          for (const [, subscriber] of this.subscribers) {
-            if (subscriber.socket === socket) {
-              subscriber.lastActivity = Date.now();
-              logger.debug(`[DeviceDataStream] Received pong from ${subscriber.subscriptionId}`);
-              break;
-            }
-          }
-          return;
-        }
-
-        default:
-          throw new Error(`Unknown command: ${(request as DeviceDataStreamRequest).command}`);
-      }
-    } catch (error) {
-      logger.error(`[DeviceDataStream] Parse error: ${error}`);
-      const errorResponse: DeviceDataStreamMessage = {
+    if (!request) {
+      const errorResponse: SubscriptionResponse = {
         type: "error",
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: "Invalid JSON",
       };
-      socket.write(JSON.stringify(errorResponse) + "\n");
+      this.sendJson(socket, errorResponse);
+      return;
     }
+
+    // Handle request_observation command (not in base class)
+    if (request.command === "request_observation") {
+      // This could trigger an immediate observation request
+      // For now, just acknowledge - the caller should use MCP observe tool
+      const response: SubscriptionResponse = {
+        id: request.id,
+        type: "subscription_response",
+        success: true,
+      };
+      this.sendJson(socket, response);
+      return;
+    }
+
+    // Handle subscribe with onSubscriberConnected callback
+    if (request.command === "subscribe") {
+      // Let base class handle the subscription
+      await super.processLine(socket, line);
+
+      // Trigger the callback if set
+      if (this.onSubscriberConnected) {
+        try {
+          this.onSubscriberConnected(request.deviceId ?? null);
+        } catch (error) {
+          logger.warn(`[DeviceDataStream] Error in onSubscriberConnected callback: ${error}`);
+        }
+      }
+      return;
+    }
+
+    // Delegate to base class for standard commands (subscribe, unsubscribe, pong)
+    await super.processLine(socket, line);
+  }
+
+  protected parseSubscriptionFilter(request: Record<string, unknown>): DeviceDataFilter {
+    return {
+      deviceId: (request.deviceId as string) ?? null,
+    };
+  }
+
+  protected matchesFilter(filter: DeviceDataFilter, data: DeviceDataPush): boolean {
+    // If targetDeviceId is null, broadcast to all subscribers
+    if (data.targetDeviceId === null) {
+      return true;
+    }
+    // Send to subscribers that want all devices or specifically this device
+    return filter.deviceId === null || filter.deviceId === data.targetDeviceId;
+  }
+
+  protected createPushMessage(data: DeviceDataPush): DeviceDataStreamMessage {
+    return data.message;
   }
 }
 
@@ -578,9 +311,11 @@ export function getDeviceDataStreamServer(): DeviceDataStreamSocketServer | null
   return socketServer;
 }
 
-export async function startDeviceDataStreamSocketServer(): Promise<DeviceDataStreamSocketServer> {
+export async function startDeviceDataStreamSocketServer(
+  timer: Timer = defaultTimer
+): Promise<DeviceDataStreamSocketServer> {
   if (!socketServer) {
-    socketServer = new DeviceDataStreamSocketServer();
+    socketServer = new DeviceDataStreamSocketServer(getSocketPath(SOCKET_CONFIG), timer);
   }
   if (!socketServer.isListening()) {
     await socketServer.start();

@@ -1,24 +1,19 @@
-import { createServer, Server as NetServer, Socket } from "node:net";
-import { existsSync } from "node:fs";
-import { mkdir, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { logger } from "../utils/logger";
+import { Timer, defaultTimer } from "../utils/SystemTimer";
+import { RequestResponseSocketServer, getSocketPath, SocketServerConfig } from "./socketServer/index";
 import { PerformanceAuditRepository } from "../db/performanceAuditRepository";
 import {
   PerformanceStreamSocketRequest,
   PerformanceStreamSocketResponse,
 } from "./performanceStreamSocketTypes";
 
+const SOCKET_CONFIG: SocketServerConfig = {
+  defaultPath: path.join(os.homedir(), ".auto-mobile", "performance-stream.sock"),
+  externalPath: "/tmp/auto-mobile-performance-stream.sock",
+};
+
 const DEFAULT_LIMIT = 200;
-
-// Use /tmp for socket when running with external emulator (Docker container with mounted home)
-// because Unix sockets don't work on Docker Desktop's mounted volumes
-const isExternalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
-const DEFAULT_SOCKET_PATH = isExternalMode
-  ? "/tmp/auto-mobile-performance-stream.sock"
-  : path.join(os.homedir(), ".auto-mobile", "performance-stream.sock");
-
 const auditRepository = new PerformanceAuditRepository();
 
 const normalizeTimestamp = (value: unknown, label: string): string | undefined => {
@@ -61,141 +56,57 @@ const normalizeSinceId = (value: unknown): number | undefined => {
   return parsed;
 };
 
-export class PerformanceStreamSocketServer {
-  private server: NetServer | null = null;
-  private socketPath: string;
-
-  constructor(socketPath: string = DEFAULT_SOCKET_PATH) {
-    this.socketPath = socketPath;
+/**
+ * Socket server for performance stream polling.
+ * Handles poll command to retrieve performance audit results.
+ */
+export class PerformanceStreamSocketServer extends RequestResponseSocketServer<
+  PerformanceStreamSocketRequest,
+  PerformanceStreamSocketResponse
+> {
+  constructor(socketPath: string = getSocketPath(SOCKET_CONFIG), timer: Timer = defaultTimer) {
+    super(socketPath, timer, "PerformanceStream");
   }
 
-  async start(): Promise<void> {
-    const directory = path.dirname(this.socketPath);
-    if (!existsSync(directory)) {
-      await mkdir(directory, { recursive: true });
-    }
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-
-    this.server = createServer(socket => {
-      this.handleConnection(socket);
-    });
-
-    return new Promise((resolve, reject) => {
-      this.server!.listen(this.socketPath, () => {
-        logger.info(`Performance stream socket listening on ${this.socketPath}`);
-        resolve();
-      });
-
-      this.server!.on("error", error => {
-        logger.error(`Performance stream socket error: ${error}`);
-        reject(error);
-      });
-    });
-  }
-
-  async close(): Promise<void> {
-    if (!this.server) {
-      return;
-    }
-
-    await new Promise<void>(resolve => {
-      this.server!.close(() => resolve());
-    });
-    this.server = null;
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-  }
-
-  isListening(): boolean {
-    return this.server?.listening ?? false;
-  }
-
-  private handleConnection(socket: Socket): void {
-    let buffer = "";
-    let pending = Promise.resolve();
-
-    socket.on("data", data => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        pending = pending
-          .then(() => this.processLine(socket, line))
-          .catch(error => {
-            logger.error(`Performance stream socket request error: ${error}`);
-          });
-      }
-    });
-
-    socket.on("error", error => {
-      logger.error(`Performance stream socket connection error: ${error}`);
-    });
-  }
-
-  private async processLine(socket: Socket, line: string): Promise<void> {
-    if (!line.trim()) {
-      return;
-    }
-
-    try {
-      const request = JSON.parse(line) as PerformanceStreamSocketRequest;
-      const response = await this.handleRequest(request);
-      socket.write(JSON.stringify(response) + "\n");
-    } catch (error) {
-      logger.error(`Performance stream socket request error: ${error}`);
-      const errorResponse: PerformanceStreamSocketResponse = {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-      socket.write(JSON.stringify(errorResponse) + "\n");
-    }
-  }
-
-  private async handleRequest(
+  protected async handleRequest(
     request: PerformanceStreamSocketRequest
   ): Promise<PerformanceStreamSocketResponse> {
-    try {
-      if (request.command !== "poll") {
-        throw new Error(`Unsupported performance stream command: ${String(request.command)}`);
-      }
-
-      const startTime = normalizeTimestamp(request.startTime, "startTime");
-      const endTime = normalizeTimestamp(request.endTime, "endTime");
-      const sinceTimestamp = normalizeTimestamp(request.sinceTimestamp, "sinceTimestamp");
-      const sinceId = normalizeSinceId(request.sinceId);
-      const limit = normalizeLimit(request.limit);
-
-      const results = await auditRepository.listResultsSince({
-        startTime,
-        endTime,
-        limit,
-        deviceId: request.deviceId?.trim() || undefined,
-        sessionId: request.sessionId?.trim() || undefined,
-        packageName: request.packageName?.trim() || undefined,
-        sinceTimestamp,
-        sinceId,
-      });
-
-      const last = results.length > 0 ? results[results.length - 1] : undefined;
-
-      return {
-        success: true,
-        results,
-        lastTimestamp: last?.timestamp ?? sinceTimestamp,
-        lastId: last?.id ?? sinceId,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
+    if (request.command !== "poll") {
+      throw new Error(`Unsupported performance stream command: ${String(request.command)}`);
     }
+
+    const startTime = normalizeTimestamp(request.startTime, "startTime");
+    const endTime = normalizeTimestamp(request.endTime, "endTime");
+    const sinceTimestamp = normalizeTimestamp(request.sinceTimestamp, "sinceTimestamp");
+    const sinceId = normalizeSinceId(request.sinceId);
+    const limit = normalizeLimit(request.limit);
+
+    const results = await auditRepository.listResultsSince({
+      startTime,
+      endTime,
+      limit,
+      deviceId: request.deviceId?.trim() || undefined,
+      sessionId: request.sessionId?.trim() || undefined,
+      packageName: request.packageName?.trim() || undefined,
+      sinceTimestamp,
+      sinceId,
+    });
+
+    const last = results.length > 0 ? results[results.length - 1] : undefined;
+
+    return {
+      success: true,
+      results,
+      lastTimestamp: last?.timestamp ?? sinceTimestamp,
+      lastId: last?.id ?? sinceId,
+    };
+  }
+
+  protected createErrorResponse(_id: string | undefined, error: string): PerformanceStreamSocketResponse {
+    return {
+      success: false,
+      error,
+    };
   }
 }
 

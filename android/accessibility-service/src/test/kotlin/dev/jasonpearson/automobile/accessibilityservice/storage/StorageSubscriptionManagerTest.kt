@@ -65,7 +65,8 @@ class StorageSubscriptionManagerTest {
     val bundle =
         Bundle().apply {
           putBoolean("success", true)
-          putString("result", """{"available":true,"version":1}""")
+          // Response uses kotlinx.serialization sealed class format with type discriminator
+          putString("result", """{"type":"availability","available":true,"version":1}""")
         }
     every { contentResolver.call(any<Uri>(), eq("checkAvailability"), any(), any()) } returns bundle
 
@@ -84,9 +85,10 @@ class StorageSubscriptionManagerTest {
     val bundle =
         Bundle().apply {
           putBoolean("success", true)
+          // Response uses kotlinx.serialization sealed class format with type discriminator
           putString(
               "result",
-              """{"files":[{"name":"auth","path":"/data/auth.xml","entryCount":5},{"name":"settings","path":"/data/settings.xml","entryCount":3}]}""",
+              """{"type":"files","files":[{"name":"auth","path":"/data/auth.xml","entryCount":5},{"name":"settings","path":"/data/settings.xml","entryCount":3}]}""",
           )
         }
     every { contentResolver.call(any<Uri>(), eq("listFiles"), any(), any()) } returns bundle
@@ -119,9 +121,10 @@ class StorageSubscriptionManagerTest {
     val bundle =
         Bundle().apply {
           putBoolean("success", true)
+          // Response uses kotlinx.serialization sealed class format with type discriminator
           putString(
               "result",
-              """{"entries":[{"key":"username","value":"john","type":"STRING"},{"key":"count","value":"42","type":"INT"}]}""",
+              """{"type":"preferences","entries":[{"key":"username","value":"john","type":"STRING"},{"key":"count","value":"42","type":"INT"}]}""",
           )
         }
     every { contentResolver.call(any<Uri>(), eq("getPreferences"), any(), any()) } returns bundle

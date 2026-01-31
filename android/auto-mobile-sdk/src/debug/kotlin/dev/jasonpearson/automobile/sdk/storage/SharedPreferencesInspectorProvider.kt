@@ -5,8 +5,11 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
-import org.json.JSONArray
-import org.json.JSONObject
+import dev.jasonpearson.automobile.protocol.StorageChangeEvent
+import dev.jasonpearson.automobile.protocol.StorageEntry
+import dev.jasonpearson.automobile.protocol.StorageFileInfo
+import dev.jasonpearson.automobile.protocol.StorageProtocolSerializer
+import dev.jasonpearson.automobile.protocol.StorageResponse
 
 /**
  * ContentProvider for SharedPreferences inspection via ADB.
@@ -44,14 +47,14 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
     try {
       // checkAvailability doesn't require the driver to be initialized
       if (method == "checkAvailability") {
-        val response = handleCheckAvailability()
+        val responseJson = handleCheckAvailability()
         result.putBoolean("success", true)
-        result.putString("result", response.toString())
+        result.putString("result", responseJson)
         return result
       }
 
       val driver = SharedPreferencesInspector.getDriver()
-      val response =
+      val responseJson =
         when (method) {
           "listFiles" -> handleListFiles(driver)
           "getPreferences" -> handleGetPreferences(driver, extras)
@@ -62,7 +65,7 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
           else -> throw IllegalArgumentException("Unknown method: $method")
         }
       result.putBoolean("success", true)
-      result.putString("result", response.toString())
+      result.putString("result", responseJson)
     } catch (e: SharedPreferencesError) {
       result.putBoolean("success", false)
       result.putString("errorType", e::class.simpleName ?: "UNKNOWN")
@@ -80,67 +83,60 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
     return result
   }
 
-  private fun handleListFiles(driver: SharedPreferencesDriver): JSONObject {
+  private fun handleListFiles(driver: SharedPreferencesDriver): String {
     val files = driver.getPreferenceFiles()
-    val jsonArray = JSONArray()
-
-    files.forEach { file ->
-      jsonArray.put(
-        JSONObject().apply {
-          put("name", file.name)
-          put("path", file.path)
-          put("entryCount", file.entryCount)
-        }
+    val protocolFiles = files.map { file ->
+      StorageFileInfo(
+        name = file.name,
+        path = file.path,
+        entryCount = file.entryCount,
       )
     }
-
-    return JSONObject().put("files", jsonArray)
+    val response = StorageResponse.FileList(files = protocolFiles)
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
-  private fun handleGetPreferences(driver: SharedPreferencesDriver, extras: Bundle?): JSONObject {
+  private fun handleGetPreferences(driver: SharedPreferencesDriver, extras: Bundle?): String {
     val fileName =
       extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
 
     val entries = driver.getPreferences(fileName)
-    val entriesArray = JSONArray()
-
-    entries.forEach { entry ->
-      entriesArray.put(
-        JSONObject().apply {
-          put("key", entry.key)
-          put("value", serializeValue(entry.value, entry.type))
-          put("type", entry.type.name)
-        }
+    val protocolEntries = entries.map { entry ->
+      StorageEntry(
+        key = entry.key,
+        value = serializeValue(entry.value, entry.type),
+        type = entry.type.name,
       )
     }
 
     // Get file descriptor for response
     val files = driver.getPreferenceFiles()
     val fileDescriptor = files.find { it.name == fileName }
-
-    return JSONObject().apply {
-      if (fileDescriptor != null) {
-        put(
-          "file",
-          JSONObject().apply {
-            put("name", fileDescriptor.name)
-            put("path", fileDescriptor.path)
-            put("entryCount", fileDescriptor.entryCount)
-          },
-        )
-      }
-      put("entries", entriesArray)
+    val protocolFile = fileDescriptor?.let {
+      StorageFileInfo(
+        name = it.name,
+        path = it.path,
+        entryCount = it.entryCount,
+      )
     }
+
+    val response = StorageResponse.Preferences(
+      file = protocolFile,
+      entries = protocolEntries,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
-  private fun serializeValue(value: Any?, type: KeyValueType): Any? {
-    return when (type) {
-      KeyValueType.STRING_SET -> {
-        val jsonArray = JSONArray()
-        @Suppress("UNCHECKED_CAST") (value as? Set<String>)?.forEach { jsonArray.put(it) }
-        jsonArray
+  private fun serializeValue(value: Any?, type: KeyValueType): String? {
+    return when {
+      value == null -> null
+      type == KeyValueType.STRING_SET -> {
+        @Suppress("UNCHECKED_CAST")
+        val set = value as? Set<String> ?: return null
+        // Serialize as JSON array string
+        "[" + set.joinToString(",") { "\"$it\"" } + "]"
       }
-      else -> value ?: JSONObject.NULL
+      else -> value.toString()
     }
   }
 
@@ -151,11 +147,12 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
    * - available: true (always true when inspection is enabled)
    * - version: API version number for compatibility checking
    */
-  private fun handleCheckAvailability(): JSONObject {
-    return JSONObject().apply {
-      put("available", true)
-      put("version", 1)
-    }
+  private fun handleCheckAvailability(): String {
+    val response = StorageResponse.Availability(
+      available = true,
+      version = 1,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
   /**
@@ -164,7 +161,7 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
    * @param extras Must contain "fileName" string
    * @return JSON with success status and subscription info
    */
-  private fun handleSubscribeToFile(driver: SharedPreferencesDriver, extras: Bundle?): JSONObject {
+  private fun handleSubscribeToFile(driver: SharedPreferencesDriver, extras: Bundle?): String {
     val fileName =
       extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
 
@@ -174,10 +171,11 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
 
     driverImpl.startListening(fileName)
 
-    return JSONObject().apply {
-      put("fileName", fileName)
-      put("subscribed", true)
-    }
+    val response = StorageResponse.SubscriptionResult(
+      fileName = fileName,
+      subscribed = true,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
   /**
@@ -189,7 +187,7 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
   private fun handleUnsubscribeFromFile(
     driver: SharedPreferencesDriver,
     extras: Bundle?,
-  ): JSONObject {
+  ): String {
     val fileName =
       extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
 
@@ -199,10 +197,11 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
 
     driverImpl.stopListening(fileName)
 
-    return JSONObject().apply {
-      put("fileName", fileName)
-      put("subscribed", false)
-    }
+    val response = StorageResponse.SubscriptionResult(
+      fileName = fileName,
+      subscribed = false,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
   /**
@@ -211,7 +210,7 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
    * @param extras Must contain "fileName" string, optionally "sinceSequence" long
    * @return JSON with array of changes
    */
-  private fun handleGetChanges(driver: SharedPreferencesDriver, extras: Bundle?): JSONObject {
+  private fun handleGetChanges(driver: SharedPreferencesDriver, extras: Bundle?): String {
     val fileName =
       extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
     val sinceSequence = extras?.getLong("sinceSequence", 0L) ?: 0L
@@ -221,29 +220,22 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
         ?: throw IllegalStateException("Driver must be SharedPreferencesDriverImpl")
 
     val changes = driverImpl.getQueuedChanges(fileName, sinceSequence)
-    val changesArray = JSONArray()
-
-    changes.forEach { change ->
-      changesArray.put(
-        JSONObject().apply {
-          put("fileName", change.fileName)
-          if (change.key != null) {
-            put("key", change.key)
-          } else {
-            put("key", JSONObject.NULL)
-          }
-          put("value", serializeValue(change.newValue, change.type))
-          put("type", change.type.name)
-          put("timestamp", change.timestamp)
-          put("sequenceNumber", change.sequenceNumber)
-        }
+    val protocolChanges = changes.map { change ->
+      StorageChangeEvent(
+        fileName = change.fileName,
+        key = change.key,
+        value = serializeValue(change.newValue, change.type),
+        type = change.type.name,
+        timestamp = change.timestamp,
+        sequenceNumber = change.sequenceNumber,
       )
     }
 
-    return JSONObject().apply {
-      put("fileName", fileName)
-      put("changes", changesArray)
-    }
+    val response = StorageResponse.Changes(
+      fileName = fileName,
+      changes = protocolChanges,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
   /**
@@ -251,16 +243,15 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
    *
    * @return JSON with array of file names
    */
-  private fun handleGetListenedFiles(driver: SharedPreferencesDriver): JSONObject {
+  private fun handleGetListenedFiles(driver: SharedPreferencesDriver): String {
     val driverImpl =
       driver as? SharedPreferencesDriverImpl
         ?: throw IllegalStateException("Driver must be SharedPreferencesDriverImpl")
 
     val files = driverImpl.getListenedFiles()
-    val filesArray = JSONArray()
-    files.forEach { filesArray.put(it) }
 
-    return JSONObject().apply { put("files", filesArray) }
+    val response = StorageResponse.ListenedFiles(files = files)
+    return StorageProtocolSerializer.responseToJson(response)
   }
 
   // Required ContentProvider methods - not used for content call

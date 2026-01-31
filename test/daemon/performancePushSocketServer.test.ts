@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
+import { Socket } from "node:net";
 import {
   PerformancePushSocketServer,
   DEFAULT_THRESHOLDS,
@@ -12,8 +13,6 @@ import { FakeSocket } from "../fakes/FakeNetServer";
  * without requiring real network connections.
  */
 class TestablePerformancePushSocketServer extends PerformancePushSocketServer {
-  private fakeConnections: FakeSocket[] = [];
-
   constructor(timer: FakeTimer) {
     // Use a dummy path since we won't actually create the socket
     super("/fake/path/test.sock", timer);
@@ -26,20 +25,15 @@ class TestablePerformancePushSocketServer extends PerformancePushSocketServer {
     // Mark as listening without creating real socket
     (this as any).server = { listening: true };
     // Start keepalive using injected timer
-    (this as any).startKeepalive();
+    (this as any).onServerStarted();
   }
 
   /**
    * Simulate closing the server
    */
   async closeFake(): Promise<void> {
-    (this as any).stopKeepalive();
-    for (const socket of this.fakeConnections) {
-      socket.end();
-    }
-    this.fakeConnections = [];
+    (this as any).onServerClosing();
     (this as any).server = null;
-    (this as any).subscribers.clear();
   }
 
   /**
@@ -50,17 +44,18 @@ class TestablePerformancePushSocketServer extends PerformancePushSocketServer {
     packageName?: string;
   }): { socket: FakeSocket; subscriptionId: string } {
     const socket = new FakeSocket();
-    this.fakeConnections.push(socket);
 
-    // Create subscription directly
-    const subscriptionId = `perf-${++(this as any).subscriptionCounter}`;
+    // Create subscription directly using protected members
+    const subscriptionId = `performancepush-${++(this as any).subscriptionCounter}`;
     const timer = (this as any).timer as FakeTimer;
-    (this as any).subscribers.set(subscriptionId, {
-      socket,
-      deviceId: options.deviceId ?? null,
-      packageName: options.packageName ?? null,
+    this.subscribers.set(subscriptionId, {
+      socket: socket as unknown as Socket,
       subscriptionId,
       lastActivity: timer.now(),
+      filter: {
+        deviceId: options.deviceId ?? null,
+        packageName: options.packageName ?? null,
+      },
     });
 
     return { socket, subscriptionId };
@@ -70,7 +65,7 @@ class TestablePerformancePushSocketServer extends PerformancePushSocketServer {
    * Simulate a pong response from a subscriber
    */
   simulatePong(subscriptionId: string): void {
-    const subscriber = (this as any).subscribers.get(subscriptionId);
+    const subscriber = this.subscribers.get(subscriptionId);
     if (subscriber) {
       const timer = (this as any).timer as FakeTimer;
       subscriber.lastActivity = timer.now();
@@ -85,11 +80,11 @@ class TestablePerformancePushSocketServer extends PerformancePushSocketServer {
     packageName: string | null;
     lastActivity: number;
   } | null {
-    const subscriber = (this as any).subscribers.get(subscriptionId);
+    const subscriber = this.subscribers.get(subscriptionId);
     if (!subscriber) {return null;}
     return {
-      deviceId: subscriber.deviceId,
-      packageName: subscriber.packageName,
+      deviceId: subscriber.filter.deviceId,
+      packageName: subscriber.filter.packageName,
       lastActivity: subscriber.lastActivity,
     };
   }

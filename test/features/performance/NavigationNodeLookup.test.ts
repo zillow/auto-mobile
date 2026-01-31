@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test";
 import { NavigationNodeLookup, resetNavigationNodeLookup } from "../../../src/features/performance/NavigationNodeLookup";
 import { NavigationRepository } from "../../../src/db/NavigationRepository";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 // Mock NavigationRepository
 const mockRepository = {
@@ -93,16 +94,18 @@ describe("NavigationNodeLookup", () => {
 
   describe("cache expiration", () => {
     it("returns fresh data after cache expires", async () => {
-      // Use a very short cache time for testing
-      const shortCacheLookup = new NavigationNodeLookup(mockRepository, 10); // 10ms
+      // Use FakeTimer to control time without real delays
+      const fakeTimer = new FakeTimer();
+      fakeTimer.setManualMode();
+      const shortCacheLookup = new NavigationNodeLookup(mockRepository, 10, fakeTimer); // 10ms cache
 
       mockRepository.getNode = mock(() => Promise.resolve({ id: 100, screen_name: "Test" }));
 
       await shortCacheLookup.getNodeId("app", "Test");
       expect(mockRepository.getNode).toHaveBeenCalledTimes(1);
 
-      // Wait for cache to expire
-      await new Promise(resolve => setTimeout(resolve, 20));
+      // Advance fake time past cache expiry
+      fakeTimer.advanceTime(20);
 
       // Now a new value should be returned from repository
       mockRepository.getNode = mock(() => Promise.resolve({ id: 200, screen_name: "Test" }));

@@ -1,6 +1,5 @@
 package dev.jasonpearson.automobile.accessibilityservice.storage
 
-import android.content.ContentResolver
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
@@ -8,11 +7,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import dev.jasonpearson.automobile.protocol.StorageProtocolSerializer
+import dev.jasonpearson.automobile.protocol.StorageResponse
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * Manages subscriptions to SharedPreferences changes across multiple target apps.
@@ -73,13 +72,17 @@ class StorageSubscriptionManager(
           Result.failure(StorageError.SdkError(error))
         }
       } else {
-        val json = JSONObject(result.getString("result") ?: "{}")
-        Result.success(
+        val responseJson = result.getString("result") ?: "{}"
+        val response = StorageProtocolSerializer.responseFromJson(responseJson)
+        when (response) {
+          is StorageResponse.Availability -> Result.success(
             SdkAvailabilityInfo(
-                available = json.optBoolean("available", false),
-                version = json.optInt("version", 0),
+              available = response.available,
+              version = response.version,
             )
-        )
+          )
+          else -> Result.failure(StorageError.SdkError("Unexpected response type"))
+        }
       }
     } catch (e: SecurityException) {
       Result.failure(StorageError.SdkNotInstalled(packageName))
@@ -109,18 +112,21 @@ class StorageSubscriptionManager(
         val error = result.getString("error") ?: "Unknown error"
         Result.failure(StorageError.SdkError(error))
       } else {
-        val json = JSONObject(result.getString("result") ?: "{}")
-        val filesArray = json.optJSONArray("files") ?: JSONArray()
-        val files =
-            (0 until filesArray.length()).map { i ->
-              val fileJson = filesArray.getJSONObject(i)
+        val responseJson = result.getString("result") ?: "{}"
+        val response = StorageProtocolSerializer.responseFromJson(responseJson)
+        when (response) {
+          is StorageResponse.FileList -> {
+            val files = response.files.map { file ->
               PreferenceFileInfo(
-                  name = fileJson.getString("name"),
-                  path = fileJson.getString("path"),
-                  entryCount = fileJson.getInt("entryCount"),
+                name = file.name,
+                path = file.path,
+                entryCount = file.entryCount,
               )
             }
-        Result.success(files)
+            Result.success(files)
+          }
+          else -> Result.failure(StorageError.SdkError("Unexpected response type"))
+        }
       }
     } catch (e: SecurityException) {
       Result.failure(StorageError.SdkNotInstalled(packageName))
@@ -155,18 +161,21 @@ class StorageSubscriptionManager(
           Result.failure(StorageError.SdkError(error))
         }
       } else {
-        val json = JSONObject(result.getString("result") ?: "{}")
-        val entriesArray = json.optJSONArray("entries") ?: JSONArray()
-        val entries =
-            (0 until entriesArray.length()).map { i ->
-              val entryJson = entriesArray.getJSONObject(i)
+        val responseJson = result.getString("result") ?: "{}"
+        val response = StorageProtocolSerializer.responseFromJson(responseJson)
+        when (response) {
+          is StorageResponse.Preferences -> {
+            val entries = response.entries.map { entry ->
               PreferenceEntry(
-                  key = entryJson.getString("key"),
-                  value = serializeJsonValue(entryJson.opt("value")),
-                  type = entryJson.getString("type"),
+                key = entry.key,
+                value = entry.value,
+                type = entry.type,
               )
             }
-        Result.success(entries)
+            Result.success(entries)
+          }
+          else -> Result.failure(StorageError.SdkError("Unexpected response type"))
+        }
       }
     } catch (e: SecurityException) {
       Result.failure(StorageError.SdkNotInstalled(packageName))
@@ -337,41 +346,30 @@ class StorageSubscriptionManager(
         val result = context.contentResolver.call(uri, "getChanges", null, extras)
 
         if (result != null && result.getBoolean("success", false)) {
-          val json = JSONObject(result.getString("result") ?: "{}")
-          val changesArray = json.optJSONArray("changes") ?: JSONArray()
+          val responseJson = result.getString("result") ?: "{}"
+          val response = StorageProtocolSerializer.responseFromJson(responseJson)
 
-          for (i in 0 until changesArray.length()) {
-            val changeJson = changesArray.getJSONObject(i)
-            val sequenceNumber = changeJson.getLong("sequenceNumber")
+          if (response is StorageResponse.Changes) {
+            for (change in response.changes) {
+              val event =
+                  PreferenceChangeEvent(
+                      packageName = packageName,
+                      fileName = fileName,
+                      key = change.key,
+                      value = change.value,
+                      type = change.type,
+                      timestamp = change.timestamp,
+                      sequenceNumber = change.sequenceNumber,
+                  )
 
-            val event =
-                PreferenceChangeEvent(
-                    packageName = packageName,
-                    fileName = fileName,
-                    key = if (changeJson.isNull("key")) null else changeJson.getString("key"),
-                    value = serializeJsonValue(changeJson.opt("value")),
-                    type = changeJson.getString("type"),
-                    timestamp = changeJson.getLong("timestamp"),
-                    sequenceNumber = sequenceNumber,
-                )
-
-            _changeEvents.tryEmit(event)
-            subState.lastSequence = maxOf(subState.lastSequence, sequenceNumber)
+              _changeEvents.tryEmit(event)
+              subState.lastSequence = maxOf(subState.lastSequence, change.sequenceNumber)
+            }
           }
         }
       } catch (e: Exception) {
         Log.e(TAG, "Error fetching changes for $packageName:$fileName", e)
       }
-    }
-  }
-
-  /** Converts a JSON value to a String representation for serialization. */
-  private fun serializeJsonValue(value: Any?): String? {
-    return when (value) {
-      null, JSONObject.NULL -> null
-      is JSONArray -> value.toString()
-      is JSONObject -> value.toString()
-      else -> value.toString()
     }
   }
 }

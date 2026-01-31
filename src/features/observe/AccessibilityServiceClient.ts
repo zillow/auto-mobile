@@ -27,7 +27,6 @@ import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
 import { PortManager } from "../../utils/PortManager";
-import { RequestManager } from "../../utils/RequestManager";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 import {
   ScreenshotBackoffScheduler,
@@ -47,6 +46,11 @@ import type {
   SubscribeStorageResult,
   UnsubscribeStorageResult,
 } from "../storage/storageTypes";
+import {
+  DeviceServiceClient,
+  WebSocketFactory,
+  defaultWebSocketFactory,
+} from "./DeviceServiceClient";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -724,7 +728,7 @@ export interface AccessibilityService {
  * Client for interacting with the AutoMobile Accessibility Service via WebSocket
  * Uses singleton pattern per device to maintain persistent WebSocket connection
  */
-export class AccessibilityServiceClient implements AccessibilityService {
+export class AccessibilityServiceClient extends DeviceServiceClient implements AccessibilityService {
   private device: BootedDevice;
   private adb: AdbClient;
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
@@ -736,98 +740,26 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Singleton instances per device
   private static instances: Map<string, AccessibilityServiceClient> = new Map();
 
-  private ws: WebSocket | null = null;
+  // Hierarchy caching
   private cachedHierarchy: CachedHierarchy | null = null;
-  private isConnecting: boolean = false;
-  private connectionAttempts: number = 0;
-  private lastConnectionAttempt: number = 0;
-  private readonly maxConnectionAttempts: number = 3;
-  private static readonly CONNECTION_ATTEMPT_RESET_MS = 10000; // Reset attempts after 10 seconds
+
+  // Android-specific state
   private portForwardingSetup: boolean = false;
   private lastWebSocketTimeout: number = 0;
   private static readonly WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000; // Skip WebSocket wait for 5 seconds after timeout
   private recompositionTrackingConfigured: boolean = false;
   private recompositionTrackingEnabled: boolean = false;
 
-  // Auto-reconnection state
-  private autoReconnectEnabled: boolean = true;
-  private reconnectTimeoutId: ReturnType<Timer["setTimeout"]> | null = null;
-  private static readonly RECONNECT_DELAY_MS = 2000; // Wait 2 seconds before reconnecting
-
-  // Health check state
-  private healthCheckIntervalId: ReturnType<Timer["setInterval"]> | null = null;
-  private static readonly HEALTH_CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
-  private lastHealthCheckTime: number = 0;
-
-  // Screenshot, swipe, and tap_coordinates now use RequestManager
-  // (pending fields removed - RequestManager handles request/response tracking)
-
-  // Drag handling (not yet migrated to RequestManager)
-  private pendingDragResolve: ((result: A11yDragResult) => void) | null = null;
-  private pendingDragRequestId: string | null = null;
-
-  // Pinch handling
-  private pendingPinchResolve: ((result: A11yPinchResult) => void) | null = null;
-  private pendingPinchRequestId: string | null = null;
-
-  // Set text handling
-  private pendingSetTextResolve: ((result: A11ySetTextResult) => void) | null = null;
-  private pendingSetTextRequestId: string | null = null;
-
-  // IME action handling
-  private pendingImeActionResolve: ((result: A11yImeActionResult) => void) | null = null;
-  private pendingImeActionRequestId: string | null = null;
-
-  // Select all handling
-  private pendingSelectAllResolve: ((result: A11ySelectAllResult) => void) | null = null;
-  private pendingSelectAllRequestId: string | null = null;
-
-  // Action handling
-  private pendingActionResolve: ((result: A11yActionResult) => void) | null = null;
-  private pendingActionRequestId: string | null = null;
-
-  // Clipboard handling
-  private pendingClipboardResolve: ((result: A11yClipboardResult) => void) | null = null;
-  private pendingClipboardRequestId: string | null = null;
-
-  // CA certificate handling
-  private pendingCaCertResolve: ((result: A11yCaCertResult) => void) | null = null;
-  private pendingCaCertRequestId: string | null = null;
-
-  // Device owner status handling
-  private pendingDeviceOwnerStatusResolve: ((result: A11yDeviceOwnerStatusResult) => void) | null = null;
-  private pendingDeviceOwnerStatusRequestId: string | null = null;
-
-  // Permission handling
-  private pendingPermissionResolve: ((result: A11yPermissionResult) => void) | null = null;
-  private pendingPermissionRequestId: string | null = null;
+  // All request/response operations use RequestManager for unified tracking with automatic timeouts.
+  // Operations: screenshot, swipe, tap_coordinates, drag, pinch, setText, imeAction, selectAll,
+  // action, clipboard, caCert, deviceOwnerStatus, permission, currentFocus, traversalOrder, highlight
 
   private interactionListeners: Set<(event: InteractionEvent) => void> = new Set();
   private installedAppsRepository: InstalledAppsStore | null = null;
 
-  // Current focus handling
-  private pendingCurrentFocusResolve: ((result: CurrentFocusResult) => void) | null = null;
-  private pendingCurrentFocusRequestId: string | null = null;
-
-  // Traversal order handling
-  private pendingTraversalOrderResolve: ((result: TraversalOrderResult) => void) | null = null;
-  private pendingTraversalOrderRequestId: string | null = null;
-
-  // Highlight handling
-  private pendingHighlightResolve: ((result: HighlightOperationResult) => void) | null = null;
-  private pendingHighlightRequestId: string | null = null;
-
   // Storage change listeners
   private storageChangeListeners: Set<(event: StorageChangedEvent) => void> = new Set();
 
-  // WebSocket factory for testing
-  private webSocketFactory: (url: string) => WebSocket;
-
-  // Timer for testing
-  private timer: Timer;
-
-  // Request manager for unified request/response handling with timeouts
-  private requestManager: RequestManager;
 
   // Hierarchy navigation detector for view hierarchy-based navigation
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
@@ -837,6 +769,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Screenshot backoff scheduler for streaming screenshots after hierarchy updates
   private screenshotBackoffScheduler: ScreenshotBackoffScheduler | null = null;
   private cachedScreenDimensions: { width: number; height: number } | null = null;
+
+  // Logging tag for base class
+  protected readonly logTag = "ACCESSIBILITY_SERVICE";
 
   /**
    * Private constructor - use getInstance() instead
@@ -848,15 +783,13 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private constructor(
     device: BootedDevice,
     adb: AdbClient,
-    webSocketFactory?: (url: string) => WebSocket,
+    webSocketFactory?: WebSocketFactory,
     timer?: Timer,
     installedAppsRepository?: InstalledAppsStore
   ) {
+    super(timer ?? defaultTimer, webSocketFactory ?? defaultWebSocketFactory);
     this.device = device;
     this.adb = adb;
-    this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
-    this.timer = timer || defaultTimer;
-    this.requestManager = new RequestManager(this.timer);
     this.installedAppsRepository = installedAppsRepository ?? null;
     // Allocate a unique local port for this device (supports multiple emulators)
     this.localPort = PortManager.allocate(device.deviceId);
@@ -913,6 +846,57 @@ export class AccessibilityServiceClient implements AccessibilityService {
     return new AccessibilityServiceClient(device, adb, webSocketFactory, timer, installedAppsRepository);
   }
 
+  // ===========================================================================
+  // DeviceServiceClient abstract method implementations
+  // ===========================================================================
+
+  /**
+   * Get the WebSocket URL for connecting to the Android accessibility service.
+   */
+  protected getWebSocketUrl(): string {
+    return `ws://localhost:${this.localPort}/ws`;
+  }
+
+  /**
+   * Handle an incoming WebSocket message.
+   */
+  protected async handleMessage(data: WebSocket.Data): Promise<void> {
+    return this.handleWebSocketMessage(data);
+  }
+
+  /**
+   * Called when WebSocket connection is established.
+   */
+  protected onConnectionEstablished(): void {
+    // No additional setup needed - health check is started by base class
+  }
+
+  /**
+   * Called when WebSocket connection is closed.
+   */
+  protected onConnectionClosed(): void {
+    // Mark installed apps cache as stale since we may have missed package events
+    void this.markInstalledAppsStale("websocket_closed");
+
+    // Dispose hierarchy navigation detector to avoid stale state
+    if (this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector.dispose();
+      this.hierarchyNavigationDetector = null;
+    }
+  }
+
+  /**
+   * Platform-specific setup before WebSocket connection.
+   * Sets up ADB port forwarding from local port to device port.
+   */
+  protected async setupBeforeConnect(perf: PerformanceTracker): Promise<void> {
+    await this.setupPortForwarding(perf);
+  }
+
+  // ===========================================================================
+  // Platform-specific methods
+  // ===========================================================================
+
   /**
    * Get the hierarchy navigation detector, creating it lazily if needed.
    * The detector monitors view hierarchy updates to detect screen changes.
@@ -955,42 +939,6 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
   }
 
-  /**
-   * Check if WebSocket is currently connected
-   */
-  public isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
-  }
-
-  public async waitForConnection(
-    maxAttempts: number = 10,
-    delayMs: number = 300
-  ): Promise<boolean> {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      // Reset connection attempts counter to allow fresh connection attempts
-      this.connectionAttempts = 0;
-
-      const connected = await this.ensureConnected();
-      if (connected) {
-        logger.info(`[ACCESSIBILITY_SERVICE] WebSocket connected after ${attempt} attempt(s) (${(attempt - 1) * delayMs}ms)`);
-        return true;
-      }
-
-      if (attempt < maxAttempts) {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms`);
-        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
-      }
-    }
-
-    logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket not ready after ${maxAttempts} attempts (${maxAttempts * delayMs}ms)`);
-    return false;
-  }
-
-  public async ensureConnected(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<boolean> {
-    return this.connectWebSocket(perf);
-  }
 
   /**
    * Verify the accessibility service is ready to respond to requests.
@@ -1248,188 +1196,6 @@ export class AccessibilityServiceClient implements AccessibilityService {
   }
 
   /**
-   * Connect to the WebSocket server
-   * @param perf - Performance tracker for timing
-   */
-  private async connectWebSocket(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<boolean> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      logger.debug("[ACCESSIBILITY_SERVICE] WebSocket already connected (reusing connection)");
-      return true;
-    }
-
-    // If WebSocket exists but is not OPEN (stale/closing), clean it up and reset attempts
-    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-      logger.info(`[ACCESSIBILITY_SERVICE] Cleaning up stale WebSocket (state: ${this.ws.readyState})`);
-      try {
-        this.ws.close();
-      } catch {
-        // Ignore close errors on stale socket
-      }
-      this.ws = null;
-      this.connectionAttempts = 0; // Reset to allow new connection attempts
-      // Reset port forwarding flag so next attempt will re-setup the forward
-      this.portForwardingSetup = false;
-    }
-
-    if (this.isConnecting) {
-      logger.debug("[ACCESSIBILITY_SERVICE] Connection already in progress, waiting...");
-      // Wait for ongoing connection attempt
-      return new Promise(resolve => {
-        const checkInterval = this.timer.setInterval(() => {
-          if (!this.isConnecting) {
-            this.timer.clearInterval(checkInterval);
-            resolve(this.ws?.readyState === WebSocket.OPEN);
-          }
-        }, 100);
-      });
-    }
-
-    // Reset connection attempts if enough time has passed since last attempt
-    if (this.connectionAttempts >= this.maxConnectionAttempts) {
-      const timeSinceLastAttempt = Date.now() - this.lastConnectionAttempt;
-      if (timeSinceLastAttempt >= AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Resetting connection attempts after ${timeSinceLastAttempt}ms cooldown`);
-        this.connectionAttempts = 0;
-      } else {
-        logger.warn(`[ACCESSIBILITY_SERVICE] Max connection attempts (${this.maxConnectionAttempts}) reached, cooldown remaining: ${AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS - timeSinceLastAttempt}ms`);
-        return false;
-      }
-    }
-
-    this.isConnecting = true;
-    this.connectionAttempts++;
-    this.lastConnectionAttempt = Date.now();
-
-    try {
-      // Ensure port forwarding is setup
-      await perf.track("portForwarding", () => this.setupPortForwarding(perf));
-
-      const wsUrl = `ws://localhost:${this.localPort}/ws`;
-      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${wsUrl} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}, device: ${this.device.deviceId})`);
-
-      return await perf.track("wsConnect", () => new Promise<boolean>((resolve, reject) => {
-        const ws = this.webSocketFactory(wsUrl);
-        const connectionTimeout = this.timer.setTimeout(() => {
-          ws.close();
-          // Reset port forwarding flag so next attempt will re-setup the forward
-          this.portForwardingSetup = false;
-          reject(new Error("WebSocket connection timeout"));
-        }, 5000);
-
-        ws.on("open", () => {
-          this.timer.clearTimeout(connectionTimeout);
-          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connected successfully");
-          this.ws = ws;
-          this.isConnecting = false;
-          this.connectionAttempts = 0; // Reset on successful connection
-
-          // Start health check monitoring
-          this.startHealthCheck();
-
-          resolve(true);
-        });
-
-        ws.on("message", (data: WebSocket.Data) => {
-          this.handleWebSocketMessage(data);
-        });
-
-        ws.on("error", error => {
-          this.timer.clearTimeout(connectionTimeout);
-          logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket error: ${error.message}`);
-          this.isConnecting = false;
-          // Reset port forwarding flag so next attempt will re-setup the forward
-          this.portForwardingSetup = false;
-          reject(error);
-        });
-
-        ws.on("close", () => {
-          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connection closed");
-          this.ws = null;
-          this.isConnecting = false;
-          // Reset connection attempts on close to allow future retries
-          this.connectionAttempts = 0;
-          void this.markInstalledAppsStale("websocket_closed");
-
-          // Stop health check
-          this.stopHealthCheck();
-
-          // Attempt automatic reconnection if enabled
-          if (this.autoReconnectEnabled) {
-            logger.info(`[ACCESSIBILITY_SERVICE] Scheduling reconnection in ${AccessibilityServiceClient.RECONNECT_DELAY_MS}ms`);
-            this.reconnectTimeoutId = this.timer.setTimeout(() => {
-              this.reconnectTimeoutId = null;
-              logger.info("[ACCESSIBILITY_SERVICE] Attempting automatic reconnection...");
-              void this.connectWebSocket(new NoOpPerformanceTracker()).then(connected => {
-                if (connected) {
-                  logger.info("[ACCESSIBILITY_SERVICE] Automatic reconnection successful");
-                } else {
-                  logger.warn("[ACCESSIBILITY_SERVICE] Automatic reconnection failed");
-                }
-              });
-            }, AccessibilityServiceClient.RECONNECT_DELAY_MS);
-          }
-        });
-      }));
-    } catch (error) {
-      this.isConnecting = false;
-      // Reset port forwarding flag so next attempt will re-setup the forward
-      this.portForwardingSetup = false;
-      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to connect to WebSocket: ${error}`);
-      return false;
-    }
-  }
-
-  /**
-   * Start periodic health check to ensure WebSocket stays connected
-   */
-  private startHealthCheck(): void {
-    // Clear any existing health check
-    this.stopHealthCheck();
-
-    logger.debug(`[ACCESSIBILITY_SERVICE] Starting health check (interval: ${AccessibilityServiceClient.HEALTH_CHECK_INTERVAL_MS}ms)`);
-    this.lastHealthCheckTime = Date.now();
-
-    this.healthCheckIntervalId = this.timer.setInterval(() => {
-      const now = Date.now();
-      const timeSinceLastCheck = now - this.lastHealthCheckTime;
-      this.lastHealthCheckTime = now;
-
-      // Check if WebSocket is still connected
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        logger.warn("[ACCESSIBILITY_SERVICE] Health check failed: WebSocket not connected");
-        this.stopHealthCheck();
-
-        // Attempt reconnection if auto-reconnect is enabled and not already connecting
-        if (this.autoReconnectEnabled && !this.isConnecting && !this.reconnectTimeoutId) {
-          logger.info("[ACCESSIBILITY_SERVICE] Health check triggering reconnection...");
-          void this.connectWebSocket(new NoOpPerformanceTracker()).then(connected => {
-            if (connected) {
-              logger.info("[ACCESSIBILITY_SERVICE] Health check reconnection successful");
-            } else {
-              logger.warn("[ACCESSIBILITY_SERVICE] Health check reconnection failed");
-            }
-          });
-        }
-      } else {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Health check passed (time since last: ${timeSinceLastCheck}ms)`);
-      }
-    }, AccessibilityServiceClient.HEALTH_CHECK_INTERVAL_MS);
-  }
-
-  /**
-   * Stop the health check interval
-   */
-  private stopHealthCheck(): void {
-    if (this.healthCheckIntervalId !== null) {
-      logger.debug("[ACCESSIBILITY_SERVICE] Stopping health check");
-      this.timer.clearInterval(this.healthCheckIntervalId);
-      this.healthCheckIntervalId = null;
-    }
-  }
-
-  /**
    * Handle incoming WebSocket message
    */
   private async handleWebSocketMessage(data: WebSocket.Data): Promise<void> {
@@ -1548,15 +1314,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle drag result
-      if (message.type === "drag_result" && this.pendingDragResolve) {
+      if (message.type === "drag_result" && message.requestId) {
         const dragMessage = message as any;
         const perfTiming = dragMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Drag result (requestId: ${dragMessage.requestId}, success: ${dragMessage.success}, totalTimeMs: ${dragMessage.totalTimeMs}, gestureTimeMs: ${dragMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingDragResolve;
-        this.pendingDragResolve = null;
-        this.pendingDragRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yDragResult>(dragMessage.requestId, {
           success: dragMessage.success,
           totalTimeMs: dragMessage.totalTimeMs,
           gestureTimeMs: dragMessage.gestureTimeMs,
@@ -1566,15 +1329,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle pinch result
-      if (message.type === "pinch_result" && this.pendingPinchResolve) {
+      if (message.type === "pinch_result" && message.requestId) {
         const pinchMessage = message as any;
         const perfTiming = pinchMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Pinch result (requestId: ${pinchMessage.requestId}, success: ${pinchMessage.success}, totalTimeMs: ${pinchMessage.totalTimeMs}, gestureTimeMs: ${pinchMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingPinchResolve;
-        this.pendingPinchResolve = null;
-        this.pendingPinchRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yPinchResult>(pinchMessage.requestId, {
           success: pinchMessage.success,
           totalTimeMs: pinchMessage.totalTimeMs,
           gestureTimeMs: pinchMessage.gestureTimeMs,
@@ -1584,7 +1344,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle set text result
-      if (message.type === "set_text_result" && this.pendingSetTextResolve) {
+      if (message.type === "set_text_result" && message.requestId) {
         const setTextMessage = message as any;
         const perfTiming = setTextMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Set text result (requestId: ${setTextMessage.requestId}, success: ${setTextMessage.success}, totalTimeMs: ${setTextMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
@@ -1595,10 +1355,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         // 3. The fresh hierarchy is cached before we receive set_text_result
         // 4. Invalidating here would throw away the fresh data we just received!
 
-        const resolve = this.pendingSetTextResolve;
-        this.pendingSetTextResolve = null;
-        this.pendingSetTextRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11ySetTextResult>(setTextMessage.requestId, {
           success: setTextMessage.success,
           totalTimeMs: setTextMessage.totalTimeMs,
           error: setTextMessage.error,
@@ -1607,7 +1364,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle IME action result
-      if (message.type === "ime_action_result" && this.pendingImeActionResolve) {
+      if (message.type === "ime_action_result" && message.requestId) {
         const imeActionMessage = message as any;
         const perfTiming = imeActionMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] IME action result (requestId: ${imeActionMessage.requestId}, action: ${imeActionMessage.action}, success: ${imeActionMessage.success}, totalTimeMs: ${imeActionMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
@@ -1615,10 +1372,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         // NOTE: We do NOT invalidate cache here - same reason as set_text_result
         // The Android service extracts fresh hierarchy before sending the result
 
-        const resolve = this.pendingImeActionResolve;
-        this.pendingImeActionResolve = null;
-        this.pendingImeActionRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yImeActionResult>(imeActionMessage.requestId, {
           success: imeActionMessage.success,
           action: imeActionMessage.action,
           totalTimeMs: imeActionMessage.totalTimeMs,
@@ -1628,15 +1382,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle select all result
-      if (message.type === "select_all_result" && this.pendingSelectAllResolve) {
+      if (message.type === "select_all_result" && message.requestId) {
         const selectAllMessage = message as any;
         const perfTiming = selectAllMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Select all result (requestId: ${selectAllMessage.requestId}, success: ${selectAllMessage.success}, totalTimeMs: ${selectAllMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingSelectAllResolve;
-        this.pendingSelectAllResolve = null;
-        this.pendingSelectAllRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11ySelectAllResult>(selectAllMessage.requestId, {
           success: selectAllMessage.success,
           totalTimeMs: selectAllMessage.totalTimeMs,
           error: selectAllMessage.error,
@@ -1645,36 +1396,26 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle action result
-      if (message.type === "action_result") {
+      if (message.type === "action_result" && message.requestId) {
         const actionMessage = message as any;
         const perfTiming = actionMessage.perfTiming as AndroidPerfTiming[] | undefined;
 
-        if (this.pendingActionResolve) {
-          const resolve = this.pendingActionResolve;
-          this.pendingActionResolve = null;
-          this.pendingActionRequestId = null;
-          resolve({
-            success: actionMessage.success,
-            action: actionMessage.action,
-            totalTimeMs: actionMessage.totalTimeMs,
-            error: actionMessage.error,
-            perfTiming
-          });
-        } else {
-          logger.warn(`[ACCESSIBILITY_SERVICE] Received action_result but no pending resolve! This is likely a duplicate result that will be ignored.`);
-        }
+        this.requestManager.resolve<A11yActionResult>(actionMessage.requestId, {
+          success: actionMessage.success,
+          action: actionMessage.action,
+          totalTimeMs: actionMessage.totalTimeMs,
+          error: actionMessage.error,
+          perfTiming
+        });
       }
 
       // Handle clipboard result
-      if (message.type === "clipboard_result" && this.pendingClipboardResolve) {
+      if (message.type === "clipboard_result" && message.requestId) {
         const clipboardMessage = message as any;
         const perfTiming = clipboardMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Clipboard result (requestId: ${clipboardMessage.requestId}, action: ${clipboardMessage.action}, success: ${clipboardMessage.success}, totalTimeMs: ${clipboardMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingClipboardResolve;
-        this.pendingClipboardResolve = null;
-        this.pendingClipboardRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yClipboardResult>(clipboardMessage.requestId, {
           success: clipboardMessage.success,
           action: clipboardMessage.action,
           text: clipboardMessage.text,
@@ -1685,15 +1426,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle CA certificate result
-      if (message.type === "ca_cert_result" && this.pendingCaCertResolve) {
+      if (message.type === "ca_cert_result" && message.requestId) {
         const caCertMessage = message as any;
         const perfTiming = caCertMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] CA cert result (requestId: ${caCertMessage.requestId}, action: ${caCertMessage.action}, success: ${caCertMessage.success}, totalTimeMs: ${caCertMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingCaCertResolve;
-        this.pendingCaCertResolve = null;
-        this.pendingCaCertRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yCaCertResult>(caCertMessage.requestId, {
           success: caCertMessage.success,
           action: caCertMessage.action,
           alias: caCertMessage.alias,
@@ -1704,15 +1442,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle device owner status result
-      if (message.type === "device_owner_status_result" && this.pendingDeviceOwnerStatusResolve) {
+      if (message.type === "device_owner_status_result" && message.requestId) {
         const statusMessage = message as any;
         const perfTiming = statusMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Device owner status result (requestId: ${statusMessage.requestId}, success: ${statusMessage.success}, totalTimeMs: ${statusMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingDeviceOwnerStatusResolve;
-        this.pendingDeviceOwnerStatusResolve = null;
-        this.pendingDeviceOwnerStatusRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yDeviceOwnerStatusResult>(statusMessage.requestId, {
           success: statusMessage.success,
           isDeviceOwner: statusMessage.isDeviceOwner ?? false,
           isAdminActive: statusMessage.isAdminActive ?? false,
@@ -1724,15 +1459,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle permission result
-      if (message.type === "permission_result" && this.pendingPermissionResolve) {
+      if (message.type === "permission_result" && message.requestId) {
         const permissionMessage = message as any;
         const perfTiming = permissionMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Permission result (requestId: ${permissionMessage.requestId}, permission: ${permissionMessage.permission}, granted: ${permissionMessage.granted}, totalTimeMs: ${permissionMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingPermissionResolve;
-        this.pendingPermissionResolve = null;
-        this.pendingPermissionRequestId = null;
-        resolve({
+        this.requestManager.resolve<A11yPermissionResult>(permissionMessage.requestId, {
           success: permissionMessage.success ?? false,
           permission: permissionMessage.permission ?? "unknown",
           granted: permissionMessage.granted ?? false,
@@ -1748,21 +1480,17 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle current focus result
-      if (message.type === "current_focus_result" && this.pendingCurrentFocusResolve) {
+      if (message.type === "current_focus_result" && message.requestId) {
         const focusMessage = message as any;
         const perfTiming = focusMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Current focus result (requestId: ${focusMessage.requestId}, totalTimeMs: ${focusMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
-
-        const resolve = this.pendingCurrentFocusResolve;
-        this.pendingCurrentFocusResolve = null;
-        this.pendingCurrentFocusRequestId = null;
 
         // Convert accessibility node to Element if present
         const focusedElement = focusMessage.focusedElement
           ? this.convertAccessibilityNodeToElement(focusMessage.focusedElement)
           : null;
 
-        resolve({
+        this.requestManager.resolve<CurrentFocusResult>(focusMessage.requestId, {
           focusedElement,
           totalTimeMs: focusMessage.totalTimeMs,
           requestId: focusMessage.requestId,
@@ -1771,15 +1499,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle traversal order result
-      if (message.type === "traversal_order_result" && this.pendingTraversalOrderResolve) {
+      if (message.type === "traversal_order_result" && message.requestId) {
         const traversalMessage = message as any;
         const perfTiming = traversalMessage.perfTiming as AndroidPerfTiming[] | undefined;
         const result = traversalMessage.result;
         logger.debug(`[ACCESSIBILITY_SERVICE] Traversal order result (requestId: ${traversalMessage.requestId}, totalCount: ${result?.totalCount}, totalTimeMs: ${traversalMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
-
-        const resolve = this.pendingTraversalOrderResolve;
-        this.pendingTraversalOrderResolve = null;
-        this.pendingTraversalOrderRequestId = null;
 
         if (result && result.elements) {
           // Convert accessibility nodes to Elements
@@ -1787,7 +1511,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
             this.convertAccessibilityNodeToElement(node)
           );
 
-          resolve({
+          this.requestManager.resolve<TraversalOrderResult>(traversalMessage.requestId, {
             elements,
             focusedIndex: result.focusedIndex,
             totalCount: result.totalCount,
@@ -1796,7 +1520,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
             error: traversalMessage.error
           });
         } else {
-          resolve({
+          this.requestManager.resolve<TraversalOrderResult>(traversalMessage.requestId, {
             elements: [],
             focusedIndex: null,
             totalCount: 0,
@@ -1808,24 +1532,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle highlight response
-      if (message.type === "highlight_response") {
+      if (message.type === "highlight_response" && message.requestId) {
         const highlightMessage = message as any;
-        if (!this.pendingHighlightResolve) {
-          logger.debug("[ACCESSIBILITY_SERVICE] Received highlight_response with no pending request");
-          return;
-        }
-        if (
-          this.pendingHighlightRequestId
-          && highlightMessage.requestId
-          && highlightMessage.requestId !== this.pendingHighlightRequestId
-        ) {
-          logger.debug(`[ACCESSIBILITY_SERVICE] Ignoring highlight_response for requestId ${highlightMessage.requestId}`);
-          return;
-        }
-        const resolve = this.pendingHighlightResolve;
-        this.pendingHighlightResolve = null;
-        this.pendingHighlightRequestId = null;
-        resolve({
+
+        this.requestManager.resolve<HighlightOperationResult>(highlightMessage.requestId, {
           success: highlightMessage.success ?? false,
           error: highlightMessage.error,
           requestId: highlightMessage.requestId,
@@ -2859,34 +2569,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
    */
   async close(): Promise<void> {
     try {
-      // Disable auto-reconnect before closing
-      this.autoReconnectEnabled = false;
+      // Call base class close which handles:
+      // - Disabling auto-reconnect
+      // - Clearing reconnection timeout
+      // - Stopping health check
+      // - Canceling pending requests
+      // - Closing WebSocket
+      // - Calling onConnectionClosed() for hierarchy detector cleanup
+      await super.close();
 
-      // Clear any pending reconnection timeout
-      if (this.reconnectTimeoutId !== null) {
-        this.timer.clearTimeout(this.reconnectTimeoutId);
-        this.reconnectTimeoutId = null;
-      }
-
-      // Stop health check
-      this.stopHealthCheck();
-
-      // Cancel all pending requests
-      this.requestManager.cancelAll(new Error("WebSocket connection closed"));
-
-      if (this.ws) {
-        logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
-        this.ws.close();
-        this.ws = null;
-      }
-
-      // Dispose hierarchy navigation detector
-      if (this.hierarchyNavigationDetector) {
-        this.hierarchyNavigationDetector.dispose();
-        this.hierarchyNavigationDetector = null;
-      }
-
-      // Remove port forwarding for this device
+      // Android-specific cleanup: remove port forwarding
       if (this.portForwardingSetup) {
         await this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {
           // Ignore errors
@@ -3295,23 +2987,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `drag_${Date.now()}_${generateSecureId()}`;
-      this.pendingDragRequestId = requestId;
+      const requestId = this.requestManager.generateId("drag");
 
-      const dragPromise = new Promise<A11yDragResult>(resolve => {
-        this.pendingDragResolve = resolve;
-        this.timer.setTimeout(() => {
-          if (this.pendingDragResolve === resolve) {
-            this.pendingDragResolve = null;
-            this.pendingDragRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Drag timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const dragPromise = this.requestManager.register<A11yDragResult>(
+        requestId,
+        "drag",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Drag timeout after ${timeout}ms`
+        })
+      );
 
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         throw new Error("WebSocket not connected");
@@ -3379,24 +3067,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `pinch_${Date.now()}_${generateSecureId()}`;
-      this.pendingPinchRequestId = requestId;
+      const requestId = this.requestManager.generateId("pinch");
 
-      const pinchPromise = new Promise<A11yPinchResult>(resolve => {
-        this.pendingPinchResolve = resolve;
-
-        this.timer.setTimeout(() => {
-          if (this.pendingPinchResolve === resolve) {
-            this.pendingPinchResolve = null;
-            this.pendingPinchRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Pinch timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const pinchPromise = this.requestManager.register<A11yPinchResult>(
+        requestId,
+        "pinch",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Pinch timeout after ${timeout}ms`
+        })
+      );
 
       await perf.track("sendRequest", async () => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -3473,26 +3156,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send set text request
-      const requestId = `setText_${Date.now()}_${generateSecureId()}`;
-      this.pendingSetTextRequestId = requestId;
+      const requestId = this.requestManager.generateId("setText");
 
-      // Create promise that will be resolved when we receive the set text result
-      const setTextPromise = new Promise<A11ySetTextResult>(resolve => {
-        this.pendingSetTextResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingSetTextResolve === resolve) {
-            this.pendingSetTextResolve = null;
-            this.pendingSetTextRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Set text timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const setTextPromise = this.requestManager.register<A11ySetTextResult>(
+        requestId,
+        "setText",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Set text timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -3587,27 +3263,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send IME action request
-      const requestId = `imeAction_${Date.now()}_${generateSecureId()}`;
-      this.pendingImeActionRequestId = requestId;
+      const requestId = this.requestManager.generateId("imeAction");
 
-      // Create promise that will be resolved when we receive the IME action result
-      const imeActionPromise = new Promise<A11yImeActionResult>(resolve => {
-        this.pendingImeActionResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingImeActionResolve === resolve) {
-            this.pendingImeActionResolve = null;
-            this.pendingImeActionRequestId = null;
-            resolve({
-              success: false,
-              action,
-              totalTimeMs: Date.now() - startTime,
-              error: `IME action timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const imeActionPromise = this.requestManager.register<A11yImeActionResult>(
+        requestId,
+        "imeAction",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          action,
+          totalTimeMs: Date.now() - startTime,
+          error: `IME action timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -3677,26 +3346,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send select all request
-      const requestId = `selectAll_${Date.now()}_${generateSecureId()}`;
-      this.pendingSelectAllRequestId = requestId;
+      const requestId = this.requestManager.generateId("selectAll");
 
-      // Create promise that will be resolved when we receive the select all result
-      const selectAllPromise = new Promise<A11ySelectAllResult>(resolve => {
-        this.pendingSelectAllResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingSelectAllResolve === resolve) {
-            this.pendingSelectAllResolve = null;
-            this.pendingSelectAllRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Select all timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const selectAllPromise = this.requestManager.register<A11ySelectAllResult>(
+        requestId,
+        "selectAll",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Select all timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -3767,28 +3429,21 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send action request
-      const requestId = `action_${Date.now()}_${generateSecureId()}`;
-      this.pendingActionRequestId = requestId;
+      const requestId = this.requestManager.generateId("action");
       logger.info(`[ACCESSIBILITY_SERVICE] Creating action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
 
-      // Create promise that will be resolved when we receive the action result
-      const actionPromise = new Promise<A11yActionResult>(resolve => {
-        this.pendingActionResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingActionResolve === resolve) {
-            this.pendingActionResolve = null;
-            this.pendingActionRequestId = null;
-            resolve({
-              success: false,
-              action,
-              totalTimeMs: Date.now() - startTime,
-              error: `Action timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const actionPromise = this.requestManager.register<A11yActionResult>(
+        requestId,
+        "action",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          action,
+          totalTimeMs: Date.now() - startTime,
+          error: `Action timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -3870,27 +3525,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send clipboard request
-      const requestId = `clipboard_${Date.now()}_${generateSecureId()}`;
-      this.pendingClipboardRequestId = requestId;
+      const requestId = this.requestManager.generateId("clipboard");
 
-      // Create promise that will be resolved when we receive the clipboard result
-      const clipboardPromise = new Promise<A11yClipboardResult>(resolve => {
-        this.pendingClipboardResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingClipboardResolve === resolve) {
-            this.pendingClipboardResolve = null;
-            this.pendingClipboardRequestId = null;
-            resolve({
-              success: false,
-              action,
-              totalTimeMs: Date.now() - startTime,
-              error: `Clipboard ${action} timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const clipboardPromise = this.requestManager.register<A11yClipboardResult>(
+        requestId,
+        "clipboard",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          action,
+          totalTimeMs: Date.now() - startTime,
+          error: `Clipboard ${action} timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -3963,25 +3611,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `ca_cert_install_${Date.now()}_${generateSecureId()}`;
-      this.pendingCaCertRequestId = requestId;
+      const requestId = this.requestManager.generateId("caCertInstall");
 
-      const caCertPromise = new Promise<A11yCaCertResult>(resolve => {
-        this.pendingCaCertResolve = resolve;
-
-        this.timer.setTimeout(() => {
-          if (this.pendingCaCertResolve === resolve) {
-            this.pendingCaCertResolve = null;
-            this.pendingCaCertRequestId = null;
-            resolve({
-              success: false,
-              action: "install",
-              totalTimeMs: Date.now() - startTime,
-              error: `CA cert install timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const caCertPromise = this.requestManager.register<A11yCaCertResult>(
+        requestId,
+        "caCertInstall",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          action: "install",
+          totalTimeMs: Date.now() - startTime,
+          error: `CA cert install timeout after ${timeout}ms`
+        })
+      );
 
       await perf.track("sendRequest", async () => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -4074,25 +3717,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `ca_cert_install_${Date.now()}_${generateSecureId()}`;
-      this.pendingCaCertRequestId = requestId;
+      const requestId = this.requestManager.generateId("caCertInstallFromPath");
 
-      const caCertPromise = new Promise<A11yCaCertResult>(resolve => {
-        this.pendingCaCertResolve = resolve;
-
-        this.timer.setTimeout(() => {
-          if (this.pendingCaCertResolve === resolve) {
-            this.pendingCaCertResolve = null;
-            this.pendingCaCertRequestId = null;
-            resolve({
-              success: false,
-              action: "install",
-              totalTimeMs: Date.now() - startTime,
-              error: `CA cert install timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const caCertPromise = this.requestManager.register<A11yCaCertResult>(
+        requestId,
+        "caCertInstallFromPath",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          action: "install",
+          totalTimeMs: Date.now() - startTime,
+          error: `CA cert install timeout after ${timeout}ms`
+        })
+      );
 
       await perf.track("sendRequest", async () => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -4237,26 +3875,21 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `device_owner_status_${Date.now()}_${generateSecureId()}`;
-      this.pendingDeviceOwnerStatusRequestId = requestId;
+      const requestId = this.requestManager.generateId("deviceOwnerStatus");
 
-      const statusPromise = new Promise<A11yDeviceOwnerStatusResult>(resolve => {
-        this.pendingDeviceOwnerStatusResolve = resolve;
-
-        this.timer.setTimeout(() => {
-          if (this.pendingDeviceOwnerStatusResolve === resolve) {
-            this.pendingDeviceOwnerStatusResolve = null;
-            this.pendingDeviceOwnerStatusRequestId = null;
-            resolve({
-              success: false,
-              isDeviceOwner: false,
-              isAdminActive: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Device owner status timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const statusPromise = this.requestManager.register<A11yDeviceOwnerStatusResult>(
+        requestId,
+        "deviceOwnerStatus",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          isDeviceOwner: false,
+          isAdminActive: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Device owner status timeout after ${timeout}ms`
+        })
+      );
 
       await perf.track("sendRequest", async () => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -4334,29 +3967,24 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `permission_${Date.now()}_${generateSecureId()}`;
-      this.pendingPermissionRequestId = requestId;
+      const requestId = this.requestManager.generateId("permission");
 
-      const permissionPromise = new Promise<A11yPermissionResult>(resolve => {
-        this.pendingPermissionResolve = resolve;
-
-        this.timer.setTimeout(() => {
-          if (this.pendingPermissionResolve === resolve) {
-            this.pendingPermissionResolve = null;
-            this.pendingPermissionRequestId = null;
-            resolve({
-              success: false,
-              permission: trimmedPermission,
-              granted: false,
-              totalTimeMs: Date.now() - startTime,
-              requestLaunched: false,
-              canRequest: false,
-              requiresSettings: false,
-              error: `Permission request timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const permissionPromise = this.requestManager.register<A11yPermissionResult>(
+        requestId,
+        "permission",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          permission: trimmedPermission,
+          granted: false,
+          totalTimeMs: Date.now() - startTime,
+          requestLaunched: false,
+          canRequest: false,
+          requiresSettings: false,
+          error: `Permission request timeout after ${timeout}ms`
+        })
+      );
 
       await perf.track("sendRequest", async () => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -4493,26 +4121,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send current focus request
-      const requestId = `current_focus_${Date.now()}_${generateSecureId()}`;
-      this.pendingCurrentFocusRequestId = requestId;
+      const requestId = this.requestManager.generateId("currentFocus");
 
-      // Create promise that will be resolved when we receive the result
-      const focusPromise = new Promise<CurrentFocusResult>(resolve => {
-        this.pendingCurrentFocusResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingCurrentFocusResolve === resolve) {
-            this.pendingCurrentFocusResolve = null;
-            this.pendingCurrentFocusRequestId = null;
-            resolve({
-              focusedElement: null,
-              totalTimeMs: Date.now() - startTime,
-              error: `Current focus timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const focusPromise = this.requestManager.register<CurrentFocusResult>(
+        requestId,
+        "currentFocus",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          focusedElement: null,
+          totalTimeMs: Date.now() - startTime,
+          error: `Current focus timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -4573,28 +4194,21 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Send traversal order request
-      const requestId = `traversal_order_${Date.now()}_${generateSecureId()}`;
-      this.pendingTraversalOrderRequestId = requestId;
+      const requestId = this.requestManager.generateId("traversalOrder");
 
-      // Create promise that will be resolved when we receive the result
-      const traversalPromise = new Promise<TraversalOrderResult>(resolve => {
-        this.pendingTraversalOrderResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingTraversalOrderResolve === resolve) {
-            this.pendingTraversalOrderResolve = null;
-            this.pendingTraversalOrderRequestId = null;
-            resolve({
-              elements: [],
-              focusedIndex: null,
-              totalCount: 0,
-              totalTimeMs: Date.now() - startTime,
-              error: `Traversal order timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const traversalPromise = this.requestManager.register<TraversalOrderResult>(
+        requestId,
+        "traversalOrder",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          elements: [],
+          focusedIndex: null,
+          totalCount: 0,
+          totalTimeMs: Date.now() - startTime,
+          error: `Traversal order timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -4665,23 +4279,18 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `highlight_${Date.now()}_${generateSecureId()}`;
-      this.pendingHighlightRequestId = requestId;
+      const requestId = this.requestManager.generateId("highlight");
 
-      const highlightPromise = new Promise<HighlightOperationResult>(resolve => {
-        this.pendingHighlightResolve = resolve;
-
-        this.timer.setTimeout(() => {
-          if (this.pendingHighlightResolve === resolve) {
-            this.pendingHighlightResolve = null;
-            this.pendingHighlightRequestId = null;
-            resolve({
-              success: false,
-              error: `Highlight request timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const highlightPromise = this.requestManager.register<HighlightOperationResult>(
+        requestId,
+        "highlight",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          error: `Highlight request timeout after ${timeout}ms`
+        })
+      );
 
       await perf.track("sendRequest", async () => {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {

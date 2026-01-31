@@ -380,9 +380,6 @@ describe("ObserveScreen", function() {
       // First observation
       const firstResult = await observeScreen.execute();
 
-      // Wait for tiny delay
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       // Second observation
       const secondResult = await observeScreen.execute();
 

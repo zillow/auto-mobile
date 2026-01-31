@@ -2,6 +2,9 @@ package dev.jasonpearson.automobile.sdk
 
 import android.content.Context
 import android.content.Intent
+import dev.jasonpearson.automobile.protocol.NavigationSourceType
+import dev.jasonpearson.automobile.protocol.SdkEventSerializer
+import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
@@ -110,11 +113,28 @@ object AutoMobileSDK {
     // Broadcast event for cross-process communication (e.g., to accessibility service)
     context?.let { ctx ->
       try {
+        val timestamp = System.currentTimeMillis()
+
+        // Create protocol event for type-safe serialization
+        val sdkEvent = SdkNavigationEvent(
+          timestamp = timestamp,
+          applicationId = ctx.packageName,
+          destination = event.destination,
+          source = event.source.toProtocolType(),
+          arguments = event.arguments.mapValues { it.value?.toString() ?: "null" },
+          metadata = event.metadata,
+        )
+
         val intent =
             Intent(ACTION_NAVIGATION_EVENT).apply {
+              // Type-safe serialized event (new protocol)
+              putExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON, SdkEventSerializer.toJson(sdkEvent))
+              putExtra(SdkEventSerializer.EXTRA_SDK_EVENT_TYPE, SdkEventSerializer.EventTypes.NAVIGATION)
+
+              // Legacy extras for backward compatibility with older AccessibilityService versions
               putExtra(EXTRA_DESTINATION, event.destination)
               putExtra(EXTRA_SOURCE, event.source.name)
-              putExtra(EXTRA_TIMESTAMP, System.currentTimeMillis())
+              putExtra(EXTRA_TIMESTAMP, timestamp)
               putExtra(EXTRA_APPLICATION_ID, ctx.packageName)
               // Serialize arguments as strings
               event.arguments.forEach { (key, value) ->
@@ -127,6 +147,20 @@ object AutoMobileSDK {
       } catch (e: Exception) {
         e.printStackTrace()
       }
+    }
+  }
+
+  /**
+   * Convert SDK NavigationSource to protocol NavigationSourceType.
+   */
+  private fun NavigationSource.toProtocolType(): NavigationSourceType {
+    return when (this) {
+      NavigationSource.NAVIGATION_COMPONENT -> NavigationSourceType.NAVIGATION_COMPONENT
+      NavigationSource.COMPOSE_NAVIGATION -> NavigationSourceType.COMPOSE_NAVIGATION
+      NavigationSource.CIRCUIT -> NavigationSourceType.CIRCUIT
+      NavigationSource.CUSTOM -> NavigationSourceType.CUSTOM
+      NavigationSource.DEEP_LINK -> NavigationSourceType.DEEP_LINK
+      NavigationSource.ACTIVITY -> NavigationSourceType.ACTIVITY
     }
   }
 

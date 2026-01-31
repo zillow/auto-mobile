@@ -36,6 +36,9 @@ android {
 version = "0.0.8-SNAPSHOT"
 
 dependencies {
+  // Protocol module for type-safe event serialization
+  implementation(project(":protocol"))
+
   // Android core libraries
   implementation(libs.androidx.core)
   implementation(libs.androidx.appcompat)
@@ -56,6 +59,7 @@ dependencies {
   testImplementation(libs.kotlin.test)
   testImplementation(libs.junit)
   testImplementation(libs.bundles.unit.test)
+  testImplementation(libs.robolectric)
 }
 
 // Configure Kotlin compilation options

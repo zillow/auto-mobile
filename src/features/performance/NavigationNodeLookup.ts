@@ -1,5 +1,6 @@
 import { NavigationRepository } from "../../db/NavigationRepository";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Cache entry for navigation node lookup
@@ -17,13 +18,16 @@ export class NavigationNodeLookup {
   private repository: NavigationRepository;
   private cache: Map<string, NodeCacheEntry> = new Map();
   private readonly cacheMaxAgeMs: number;
+  private readonly timer: Timer;
 
   constructor(
     repository?: NavigationRepository,
-    cacheMaxAgeMs: number = 60000 // 1 minute default
+    cacheMaxAgeMs: number = 60000, // 1 minute default
+    timer: Timer = defaultTimer
   ) {
     this.repository = repository ?? new NavigationRepository();
     this.cacheMaxAgeMs = cacheMaxAgeMs;
+    this.timer = timer;
   }
 
   /**
@@ -36,7 +40,7 @@ export class NavigationNodeLookup {
     }
 
     const cacheKey = `${appId}:${screenName}`;
-    const now = Date.now();
+    const now = this.timer.now();
 
     // Check cache
     const cached = this.cache.get(cacheKey);
@@ -73,7 +77,7 @@ export class NavigationNodeLookup {
    * Remove stale entries from the cache.
    */
   pruneCache(): void {
-    const now = Date.now();
+    const now = this.timer.now();
     for (const [key, entry] of this.cache) {
       if (now - entry.timestamp >= this.cacheMaxAgeMs) {
         this.cache.delete(key);

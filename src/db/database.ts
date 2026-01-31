@@ -121,6 +121,16 @@ export async function closeDatabase(): Promise<void> {
 }
 
 /**
+ * Reset all database state including migration tracking.
+ * This is primarily for tests to ensure clean state between test files.
+ */
+export function resetDatabaseState(): void {
+  dbInstance = null;
+  migrationsRun = false;
+  migrationsPromise = null;
+}
+
+/**
  * Get the database file path.
  */
 export function getDatabasePath(): string {

@@ -1,20 +1,13 @@
-import { createServer, Server as NetServer, Socket } from "node:net";
-import { existsSync } from "node:fs";
-import { unlink, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { logger } from "../utils/logger";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
+import { PushSubscriptionSocketServer, getSocketPath, SocketServerConfig } from "./socketServer/index";
 
-// Use /tmp for socket when running with external emulator (Docker container with mounted home)
-const isExternalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
-const DEFAULT_SOCKET_PATH = isExternalMode
-  ? "/tmp/auto-mobile-performance-push.sock"
-  : path.join(os.homedir(), ".auto-mobile", "performance-push.sock");
-
-// Keepalive configuration
-const KEEPALIVE_INTERVAL_MS = 10_000; // Send ping every 10 seconds
-const KEEPALIVE_TIMEOUT_MS = 30_000; // Consider dead if no activity for 30 seconds
+const SOCKET_CONFIG: SocketServerConfig = {
+  defaultPath: path.join(os.homedir(), ".auto-mobile", "performance-push.sock"),
+  externalPath: "/tmp/auto-mobile-performance-push.sock",
+};
 
 /**
  * Performance thresholds for health status calculation
@@ -81,36 +74,20 @@ export interface LivePerformanceData {
 }
 
 /**
- * Request format for performance push socket
+ * Filter for performance push subscriptions.
  */
-interface PerformancePushRequest {
-  id: string;
-  command: "subscribe" | "unsubscribe" | "pong";
-  deviceId?: string;
-  packageName?: string;
+interface PerformanceFilter {
+  deviceId: string | null;
+  packageName: string | null;
 }
 
 /**
- * Response/push message format
+ * Push message format.
  */
 interface PerformancePushMessage {
-  id?: string;
-  type: "subscription_response" | "performance_push" | "ping" | "pong" | "error";
-  success?: boolean;
-  error?: string;
-  data?: LivePerformanceData;
-  timestamp?: number;
-}
-
-/**
- * Subscriber info
- */
-interface Subscriber {
-  socket: Socket;
-  deviceId: string | null; // null means subscribe to all devices
-  packageName: string | null; // null means subscribe to all packages
-  subscriptionId: string;
-  lastActivity: number;
+  type: "performance_push";
+  timestamp: number;
+  data: LivePerformanceData;
 }
 
 /**
@@ -123,179 +100,19 @@ interface Subscriber {
  * - Server sends ping every 10s: {"type": "ping", "timestamp": 123}
  * - Client responds: {"id": "x", "command": "pong"}
  */
-export class PerformancePushSocketServer {
-  private server: NetServer | null = null;
-  private socketPath: string;
-  private subscribers: Map<string, Subscriber> = new Map();
-  private subscriptionCounter = 0;
-  private keepaliveInterval: ReturnType<typeof setInterval> | null = null;
-  private timer: Timer;
-
-  constructor(socketPath: string = DEFAULT_SOCKET_PATH, timer: Timer = defaultTimer) {
-    this.socketPath = socketPath;
-    this.timer = timer;
-  }
-
-  async start(): Promise<void> {
-    const directory = path.dirname(this.socketPath);
-    if (!existsSync(directory)) {
-      await mkdir(directory, { recursive: true });
-    }
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-
-    this.server = createServer(socket => {
-      this.handleConnection(socket);
-    });
-
-    return new Promise((resolve, reject) => {
-      this.server!.listen(this.socketPath, () => {
-        logger.info(`[PerformancePush] Socket listening on ${this.socketPath}`);
-        this.startKeepalive();
-        resolve();
-      });
-
-      this.server!.on("error", error => {
-        logger.error(`[PerformancePush] Socket error: ${error}`);
-        reject(error);
-      });
-    });
-  }
-
-  private startKeepalive(): void {
-    if (this.keepaliveInterval) {
-      return;
-    }
-
-    this.keepaliveInterval = this.timer.setInterval(() => {
-      this.checkKeepalive();
-    }, KEEPALIVE_INTERVAL_MS);
-  }
-
-  private stopKeepalive(): void {
-    if (this.keepaliveInterval) {
-      this.timer.clearInterval(this.keepaliveInterval);
-      this.keepaliveInterval = null;
-    }
-  }
-
-  private checkKeepalive(): void {
-    const now = this.timer.now();
-    const deadSubscribers: string[] = [];
-
-    for (const [subscriptionId, subscriber] of this.subscribers) {
-      if (subscriber.socket.destroyed) {
-        logger.info(`[PerformancePush] Subscriber ${subscriptionId} socket destroyed, removing`);
-        deadSubscribers.push(subscriptionId);
-        continue;
-      }
-
-      const timeSinceActivity = now - subscriber.lastActivity;
-      if (timeSinceActivity > KEEPALIVE_TIMEOUT_MS) {
-        logger.warn(`[PerformancePush] Subscriber ${subscriptionId} timed out, removing`);
-        deadSubscribers.push(subscriptionId);
-        try {
-          subscriber.socket.destroy();
-        } catch {
-          // Ignore errors when destroying
-        }
-        continue;
-      }
-
-      // Send ping
-      const pingMessage: PerformancePushMessage = {
-        type: "ping",
-        timestamp: now,
-      };
-      try {
-        subscriber.socket.write(JSON.stringify(pingMessage) + "\n");
-      } catch (error) {
-        logger.warn(`[PerformancePush] Failed to ping ${subscriptionId}: ${error}`);
-        deadSubscribers.push(subscriptionId);
-      }
-    }
-
-    for (const subscriptionId of deadSubscribers) {
-      this.subscribers.delete(subscriptionId);
-    }
-  }
-
-  async close(): Promise<void> {
-    this.stopKeepalive();
-
-    for (const [, subscriber] of this.subscribers) {
-      try {
-        subscriber.socket.end();
-      } catch {
-        // Ignore errors when closing
-      }
-    }
-    this.subscribers.clear();
-
-    if (!this.server) {
-      return;
-    }
-
-    await new Promise<void>(resolve => {
-      this.server!.close(() => resolve());
-    });
-    this.server = null;
-
-    if (existsSync(this.socketPath)) {
-      await unlink(this.socketPath);
-    }
-  }
-
-  isListening(): boolean {
-    return this.server?.listening ?? false;
+export class PerformancePushSocketServer extends PushSubscriptionSocketServer<
+  PerformanceFilter,
+  LivePerformanceData
+> {
+  constructor(socketPath: string = getSocketPath(SOCKET_CONFIG), timer: Timer = defaultTimer) {
+    super(socketPath, timer, "PerformancePush");
   }
 
   /**
    * Push live performance data to all interested subscribers.
    */
   pushPerformanceData(data: LivePerformanceData): void {
-    const message: PerformancePushMessage = {
-      type: "performance_push",
-      timestamp: this.timer.now(),
-      data,
-    };
-
-    const json = JSON.stringify(message) + "\n";
-    let sentCount = 0;
-    const deadSubscribers: string[] = [];
-
-    for (const [subscriptionId, subscriber] of this.subscribers) {
-      // Filter by deviceId and packageName
-      const matchesDevice = subscriber.deviceId === null || subscriber.deviceId === data.deviceId;
-      const matchesPackage = subscriber.packageName === null || subscriber.packageName === data.packageName;
-
-      if (!matchesDevice || !matchesPackage) {
-        continue;
-      }
-
-      if (subscriber.socket.destroyed) {
-        deadSubscribers.push(subscriptionId);
-        continue;
-      }
-
-      try {
-        const result = subscriber.socket.write(json);
-        if (result) {
-          subscriber.lastActivity = this.timer.now();
-        }
-        sentCount++;
-      } catch (error) {
-        logger.warn(`[PerformancePush] Failed to send to ${subscriptionId}: ${error}`);
-        deadSubscribers.push(subscriptionId);
-      }
-    }
-
-    for (const subscriptionId of deadSubscribers) {
-      this.subscribers.delete(subscriptionId);
-    }
-
+    const sentCount = this.pushToSubscribers(data);
     if (sentCount > 0) {
       logger.debug(`[PerformancePush] Pushed data to ${sentCount} subscribers`);
     }
@@ -347,117 +164,25 @@ export class PerformancePushSocketServer {
     return "healthy";
   }
 
-  getSubscriberCount(): number {
-    return this.subscribers.size;
+  protected parseSubscriptionFilter(request: Record<string, unknown>): PerformanceFilter {
+    return {
+      deviceId: (request.deviceId as string) ?? null,
+      packageName: (request.packageName as string) ?? null,
+    };
   }
 
-  private handleConnection(socket: Socket): void {
-    let buffer = "";
-    let subscriptionId: string | null = null;
-
-    socket.on("data", data => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.trim()) {
-          this.processLine(socket, line).then(result => {
-            if (result?.subscriptionId) {
-              subscriptionId = result.subscriptionId;
-            }
-          }).catch(error => {
-            logger.error(`[PerformancePush] Request error: ${error}`);
-          });
-        }
-      }
-    });
-
-    socket.on("close", () => {
-      if (subscriptionId) {
-        this.subscribers.delete(subscriptionId);
-        logger.info(`[PerformancePush] Subscriber ${subscriptionId} disconnected`);
-      }
-    });
-
-    socket.on("error", error => {
-      logger.error(`[PerformancePush] Connection error: ${error}`);
-      if (subscriptionId) {
-        this.subscribers.delete(subscriptionId);
-      }
-    });
+  protected matchesFilter(filter: PerformanceFilter, data: LivePerformanceData): boolean {
+    const matchesDevice = filter.deviceId === null || filter.deviceId === data.deviceId;
+    const matchesPackage = filter.packageName === null || filter.packageName === data.packageName;
+    return matchesDevice && matchesPackage;
   }
 
-  private async processLine(
-    socket: Socket,
-    line: string
-  ): Promise<{ subscriptionId?: string } | void> {
-    try {
-      const request = JSON.parse(line) as PerformancePushRequest;
-
-      switch (request.command) {
-        case "subscribe": {
-          const subscriptionId = `perf-${++this.subscriptionCounter}`;
-          this.subscribers.set(subscriptionId, {
-            socket,
-            deviceId: request.deviceId ?? null,
-            packageName: request.packageName ?? null,
-            subscriptionId,
-            lastActivity: this.timer.now(),
-          });
-
-          const response: PerformancePushMessage = {
-            id: request.id,
-            type: "subscription_response",
-            success: true,
-          };
-          socket.write(JSON.stringify(response) + "\n");
-
-          logger.info(`[PerformancePush] New subscriber ${subscriptionId} (device: ${request.deviceId ?? "all"}, package: ${request.packageName ?? "all"})`);
-          return { subscriptionId };
-        }
-
-        case "unsubscribe": {
-          for (const [subId, subscriber] of this.subscribers) {
-            if (subscriber.socket === socket) {
-              this.subscribers.delete(subId);
-              logger.info(`[PerformancePush] Unsubscribed ${subId}`);
-              break;
-            }
-          }
-
-          const response: PerformancePushMessage = {
-            id: request.id,
-            type: "subscription_response",
-            success: true,
-          };
-          socket.write(JSON.stringify(response) + "\n");
-          return;
-        }
-
-        case "pong": {
-          for (const [, subscriber] of this.subscribers) {
-            if (subscriber.socket === socket) {
-              subscriber.lastActivity = this.timer.now();
-              logger.debug(`[PerformancePush] Received pong from ${subscriber.subscriptionId}`);
-              break;
-            }
-          }
-          return;
-        }
-
-        default:
-          throw new Error(`Unknown command: ${(request as PerformancePushRequest).command}`);
-      }
-    } catch (error) {
-      logger.error(`[PerformancePush] Parse error: ${error}`);
-      const errorResponse: PerformancePushMessage = {
-        type: "error",
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-      socket.write(JSON.stringify(errorResponse) + "\n");
-    }
+  protected createPushMessage(data: LivePerformanceData): PerformancePushMessage {
+    return {
+      type: "performance_push",
+      timestamp: this.timer.now(),
+      data,
+    };
   }
 }
 

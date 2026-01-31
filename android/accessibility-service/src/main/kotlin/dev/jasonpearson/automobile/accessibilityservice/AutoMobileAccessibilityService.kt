@@ -35,6 +35,14 @@ import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.TimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.storage.StorageSubscriptionManager
+import dev.jasonpearson.automobile.protocol.DeviceInfo
+import dev.jasonpearson.automobile.protocol.HandledExceptionData
+import dev.jasonpearson.automobile.protocol.HandledExceptionEvent
+import dev.jasonpearson.automobile.protocol.NavigationEventData
+import dev.jasonpearson.automobile.protocol.NavigationEventResponse
+import dev.jasonpearson.automobile.protocol.SdkEventSerializer
+import dev.jasonpearson.automobile.protocol.SdkHandledExceptionEvent
+import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import java.io.ByteArrayOutputStream
@@ -139,6 +147,24 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           }
 
           try {
+            // Try type-safe deserialization first (new protocol)
+            val eventJson = intent.getStringExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON)
+            if (eventJson != null) {
+              val event = SdkEventSerializer.navigationEventFromJson(eventJson)
+              if (event != null) {
+                Log.d(TAG, "Received navigation event (protocol): ${event.destination} from ${event.source} (app: ${event.applicationId})")
+                navigationEventAccumulator.addEvent(
+                    event.destination,
+                    event.source.name,
+                    event.arguments ?: emptyMap(),
+                    event.metadata ?: emptyMap(),
+                    event.applicationId,
+                )
+                return
+              }
+            }
+
+            // Fallback to legacy extras for backward compatibility
             val destination = intent.getStringExtra(AutoMobileSDK.EXTRA_DESTINATION) ?: return
             val source = intent.getStringExtra(AutoMobileSDK.EXTRA_SOURCE) ?: return
             val applicationId = intent.getStringExtra(AutoMobileSDK.EXTRA_APPLICATION_ID)
@@ -162,7 +188,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               }
             }
 
-            Log.d(TAG, "Received navigation event: $destination from $source (app: $applicationId)")
+            Log.d(TAG, "Received navigation event (legacy): $destination from $source (app: $applicationId)")
             navigationEventAccumulator.addEvent(
                 destination,
                 source,
@@ -252,6 +278,34 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           }
 
           try {
+            // Try type-safe deserialization first (new protocol)
+            val eventJson = intent.getStringExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON)
+            if (eventJson != null) {
+              val event = SdkEventSerializer.handledExceptionEventFromJson(eventJson)
+              if (event != null) {
+                Log.d(TAG, "Received handled exception (protocol): ${event.exceptionClass} from ${event.applicationId}")
+
+                serviceScope.launch {
+                  broadcastHandledExceptionEvent(
+                      timestamp = event.timestamp,
+                      exceptionClass = event.exceptionClass,
+                      exceptionMessage = event.exceptionMessage,
+                      stackTrace = event.stackTrace,
+                      customMessage = event.customMessage,
+                      currentScreen = event.currentScreen,
+                      packageName = event.applicationId ?: "unknown",
+                      appVersion = event.appVersion,
+                      deviceModel = event.deviceInfo?.model ?: "unknown",
+                      deviceManufacturer = event.deviceInfo?.manufacturer ?: "unknown",
+                      osVersion = event.deviceInfo?.osVersion ?: "unknown",
+                      sdkInt = event.deviceInfo?.sdkInt ?: 0,
+                  )
+                }
+                return
+              }
+            }
+
+            // Fallback to legacy extras for backward compatibility
             val timestamp = intent.getLongExtra(AutoMobileFailures.EXTRA_TIMESTAMP, 0L)
             val exceptionClass =
                 intent.getStringExtra(AutoMobileFailures.EXTRA_EXCEPTION_CLASS) ?: return
@@ -272,10 +326,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                 intent.getStringExtra(AutoMobileFailures.EXTRA_OS_VERSION) ?: "unknown"
             val sdkInt = intent.getIntExtra(AutoMobileFailures.EXTRA_SDK_INT, 0)
 
-            Log.d(
-                TAG,
-                "Received handled exception: $exceptionClass from $packageName",
-            )
+            Log.d(TAG, "Received handled exception (legacy): $exceptionClass from $packageName")
 
             serviceScope.launch {
               broadcastHandledExceptionEvent(
@@ -3405,7 +3456,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
-  /** Broadcast navigation event to WebSocket clients */
+  /** Broadcast navigation event to WebSocket clients using typed protocol */
   private suspend fun broadcastNavigationEvent(event: TimestampedNavigationEvent) {
     if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
       Log.d(TAG, "WebSocket server not running, skipping navigation event broadcast")
@@ -3413,21 +3464,19 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
 
     try {
-      // Serialize the event to JSON
-      val eventJson = jsonCompact.encodeToString(event)
+      val response = NavigationEventResponse(
+        timestamp = System.currentTimeMillis(),
+        event = NavigationEventData(
+          destination = event.destination,
+          source = event.source,
+          arguments = event.arguments.takeIf { it.isNotEmpty() },
+          metadata = event.metadata.takeIf { it.isNotEmpty() },
+          applicationId = event.applicationId,
+          sequenceNumber = event.sequenceNumber,
+        ),
+      )
 
-      webSocketServer.broadcastWithPerf { perfTiming ->
-        buildString {
-          append(
-              """{"type":"navigation_event","timestamp":${System.currentTimeMillis()},"event":"""
-          )
-          append(eventJson)
-          if (perfTiming != null) {
-            append(""","perfTiming":$perfTiming""")
-          }
-          append("}")
-        }
-      }
+      webSocketServer.broadcast(response)
       Log.d(
           TAG,
           "Broadcasted navigation event to ${webSocketServer.getConnectionCount()} clients: ${event.destination}",
@@ -3437,7 +3486,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
-  /** Broadcast handled exception event to WebSocket clients */
+  /** Broadcast handled exception event to WebSocket clients using typed protocol */
   private suspend fun broadcastHandledExceptionEvent(
       timestamp: Long,
       exceptionClass: String,
@@ -3458,35 +3507,26 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
 
     try {
-      // Build JSON message manually to avoid kotlinx.serialization dependency for this data
-      val message = buildString {
-        append("""{"type":"handled_exception_event","timestamp":${System.currentTimeMillis()},"event":{""")
-        append(""""timestamp":$timestamp""")
-        append(""","exceptionClass":"${escapeJsonString(exceptionClass)}"""")
-        if (exceptionMessage != null) {
-          append(""","exceptionMessage":"${escapeJsonString(exceptionMessage)}"""")
-        }
-        append(""","stackTrace":"${escapeJsonString(stackTrace)}"""")
-        if (customMessage != null) {
-          append(""","customMessage":"${escapeJsonString(customMessage)}"""")
-        }
-        if (currentScreen != null) {
-          append(""","currentScreen":"${escapeJsonString(currentScreen)}"""")
-        }
-        append(""","packageName":"${escapeJsonString(packageName)}"""")
-        if (appVersion != null) {
-          append(""","appVersion":"${escapeJsonString(appVersion)}"""")
-        }
-        append(""","deviceInfo":{""")
-        append(""""model":"${escapeJsonString(deviceModel)}"""")
-        append(""","manufacturer":"${escapeJsonString(deviceManufacturer)}"""")
-        append(""","osVersion":"${escapeJsonString(osVersion)}"""")
-        append(""","sdkInt":$sdkInt""")
-        append("""}""")
-        append("""}}""")
-      }
+      val response = HandledExceptionEvent(
+        timestamp = System.currentTimeMillis(),
+        event = HandledExceptionData(
+          exceptionClass = exceptionClass,
+          message = exceptionMessage,
+          stackTrace = stackTrace,
+          customMessage = customMessage,
+          currentScreen = currentScreen,
+          packageName = packageName,
+          appVersion = appVersion,
+          deviceInfo = DeviceInfo(
+            model = deviceModel,
+            manufacturer = deviceManufacturer,
+            osVersion = osVersion,
+            sdkInt = sdkInt,
+          ),
+        ),
+      )
 
-      webSocketServer.broadcast(message)
+      webSocketServer.broadcast(response)
       Log.d(
           TAG,
           "Broadcasted handled exception to ${webSocketServer.getConnectionCount()} clients: $exceptionClass",
