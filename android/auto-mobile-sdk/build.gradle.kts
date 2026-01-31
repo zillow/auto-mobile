@@ -59,6 +59,7 @@ dependencies {
   testImplementation(libs.kotlin.test)
   testImplementation(libs.junit)
   testImplementation(libs.bundles.unit.test)
+  testImplementation(libs.robolectric)
 }
 
 // Configure Kotlin compilation options
