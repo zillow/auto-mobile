@@ -7,7 +7,7 @@ import { UIStateExtractor } from "../features/navigation/UIStateExtractor";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { serverConfig } from "../utils/ServerConfig";
 import { MemoryAudit } from "../features/memory/MemoryAudit";
-import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { logger } from "../utils/logger";
 import { DaemonState } from "../daemon/daemonState";
@@ -93,7 +93,7 @@ class ToolRegistryClass {
   // Helper: Get foreground app package name
   private async getForegroundPackageName(device: BootedDevice): Promise<string | null> {
     try {
-      const adb = new AdbClient(device);
+      const adb = defaultAdbClientFactory.create(device);
       const { stdout } = await adb.executeCommand(
         "shell dumpsys window | grep mCurrentFocus"
       );

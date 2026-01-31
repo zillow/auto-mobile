@@ -4,7 +4,7 @@ import { ActionableError, BootedDevice } from "../models";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { DatabaseInspector } from "../features/database/DatabaseInspector";
-import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { notifyDatabaseChanged } from "./databaseResources";
 
 // Schema for sqlQuery tool
@@ -144,7 +144,7 @@ export function registerDatabaseTools() {
     validateAndroidDevice(device);
 
     try {
-      const adb = new AdbClient(device);
+      const adb = defaultAdbClientFactory.create(device);
       const inspector = new DatabaseInspector(device, adb);
       const result = await inspector.executeSQL(
         args.appId,

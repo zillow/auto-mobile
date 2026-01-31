@@ -1,6 +1,6 @@
 import { logger } from "./logger";
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
-import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
+import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import {
   DeepLinkResult,
   IntentFilter,
@@ -51,14 +51,23 @@ export interface DeepLinkManager {
 }
 
 export class DeepLinkManager implements DeepLinkManager {
-  private adbUtils: AdbClient | AdbExecutor;
+  private adbUtils: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice | null = null, adb?: AdbExecutor) {
-    if (adb) {
-      this.adbUtils = adb as AdbClient;
+  constructor(device: BootedDevice | null = null, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
+      this.adbUtils = this.adbFactory.create(device);
+    } else if (adbFactoryOrExecutor) {
+      // Legacy path: wrap the executor in a factory for downstream dependencies
+      const executor = adbFactoryOrExecutor as AdbExecutor;
+      this.adbUtils = executor;
+      this.adbFactory = { create: () => executor };
     } else {
-      this.adbUtils = new AdbClient(device);
+      this.adbFactory = defaultAdbClientFactory;
+      this.adbUtils = this.adbFactory.create(device);
     }
     this.elementUtils = new ElementUtils();
   }
@@ -68,9 +77,7 @@ export class DeepLinkManager implements DeepLinkManager {
      * @param deviceId - Device identifier
      */
   setDeviceId(device: BootedDevice): void {
-    if ("setDevice" in this.adbUtils) {
-      (this.adbUtils as AdbClient).setDevice(device);
-    }
+    this.adbUtils = this.adbFactory.create(device);
   }
 
   /**

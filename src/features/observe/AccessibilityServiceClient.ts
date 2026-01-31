@@ -3,7 +3,8 @@ import fs from "fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "crypto";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import {
   BootedDevice,
@@ -730,7 +731,7 @@ export interface AccessibilityService {
  */
 export class AccessibilityServiceClient extends DeviceServiceClient implements AccessibilityService {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
   private static readonly DEVICE_CERT_DIR = "/sdcard/Download/automobile/ca_certs";
 
@@ -782,7 +783,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
    */
   private constructor(
     device: BootedDevice,
-    adb: AdbClient,
+    adb: AdbExecutor,
     webSocketFactory?: WebSocketFactory,
     timer?: Timer,
     installedAppsRepository?: InstalledAppsStore
@@ -793,7 +794,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     this.installedAppsRepository = installedAppsRepository ?? null;
     // Allocate a unique local port for this device (supports multiple emulators)
     this.localPort = PortManager.allocate(device.deviceId);
-    AndroidAccessibilityServiceManager.getInstance(device, adb);
+    AndroidAccessibilityServiceManager.getInstance(device);
   }
 
   /**
@@ -802,13 +803,13 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
    * @param adb - Optional AdbClient instance
    * @returns AccessibilityServiceClient instance
    */
-  public static getInstance(device: BootedDevice, adb: AdbClient | null = null): AccessibilityServiceClient {
+  public static getInstance(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory): AccessibilityServiceClient {
     const deviceId = device.deviceId;
     if (!AccessibilityServiceClient.instances.has(deviceId)) {
       logger.debug(`[ACCESSIBILITY_SERVICE] Creating singleton for device: ${deviceId}`);
       AccessibilityServiceClient.instances.set(
         deviceId,
-        new AccessibilityServiceClient(device, adb || new AdbClient(device))
+        new AccessibilityServiceClient(device, adbFactory.create(device))
       );
     }
     return AccessibilityServiceClient.instances.get(deviceId)!;

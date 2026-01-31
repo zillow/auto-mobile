@@ -3,7 +3,8 @@ import path from "node:path";
 import type { WriteStream } from "node:fs";
 import fs from "fs-extra";
 import { ActionableError, BootedDevice } from "../../models";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { logger } from "../../utils/logger";
 import type {
@@ -129,6 +130,8 @@ function clampBitrateKbps(config: VideoCaptureConfig): number {
 }
 
 export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
+  constructor(private readonly adbFactory: AdbClientFactory = defaultAdbClientFactory) {}
+
   async start(config: VideoCaptureConfig): Promise<RecordingHandle> {
     const device = config.device;
     if (!device) {
@@ -197,7 +200,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
     if (backendHandle.kind === "android") {
       // Pull the file from the device
       logger.info(`[VideoCapture] Pulling file from device: ${backendHandle.deviceTempPath} -> ${handle.outputPath}`);
-      const adb = new AdbClient(backendHandle.device);
+      const adb = this.adbFactory.create(backendHandle.device);
       const { adbPath, baseArgs } = await adb.getBaseCommandParts();
 
       const pullArgs = [...baseArgs, "pull", backendHandle.deviceTempPath, handle.outputPath];
@@ -263,7 +266,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
     device: BootedDevice,
     config: VideoCaptureConfig
   ): Promise<RecordingHandle> {
-    const adb = new AdbClient(device);
+    const adb = this.adbFactory.create(device);
     const { adbPath, baseArgs } = await adb.getBaseCommandParts();
     const bitrateKbps = clampBitrateKbps(config);
     const bitrateBps = Math.max(1, Math.round(bitrateKbps * 1000));

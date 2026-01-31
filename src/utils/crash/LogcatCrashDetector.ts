@@ -9,7 +9,7 @@ import type {
   ParsedCrash,
   ParsedAnr,
 } from "../interfaces/CrashMonitor";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { logger } from "../logger";
 
 /**
@@ -19,7 +19,8 @@ import { logger } from "../logger";
 export class LogcatCrashDetector implements CrashDetector {
   readonly name = "logcat";
 
-  private adb: AdbExecutor;
+  private adb: AdbExecutor | null = null;
+  private adbFactory: AdbClientFactory;
   private device: BootedDevice | null = null;
   private packageName: string | null = null;
   private running = false;
@@ -30,8 +31,8 @@ export class LogcatCrashDetector implements CrashDetector {
   private processedCrashHashes = new Set<string>();
   private processedAnrHashes = new Set<string>();
 
-  constructor(adb?: AdbExecutor) {
-    this.adb = adb ?? new AdbClient();
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adbFactory = adbFactory;
   }
 
   async start(device: BootedDevice, packageName: string): Promise<void> {
@@ -43,10 +44,8 @@ export class LogcatCrashDetector implements CrashDetector {
     this.processedCrashHashes.clear();
     this.processedAnrHashes.clear();
 
-    // Set device on ADB client if applicable
-    if (this.adb instanceof AdbClient) {
-      this.adb.setDevice(device);
-    }
+    // Create ADB client for this device
+    this.adb = this.adbFactory.create(device);
 
     // Clear logcat buffers to start fresh
     try {
@@ -69,7 +68,7 @@ export class LogcatCrashDetector implements CrashDetector {
   }
 
   async checkForCrashes(): Promise<CrashEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 
@@ -127,7 +126,7 @@ export class LogcatCrashDetector implements CrashDetector {
   }
 
   async checkForAnrs(): Promise<AnrEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 

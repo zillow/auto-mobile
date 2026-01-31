@@ -7,7 +7,7 @@ import type {
   CrashEventListener,
   AnrEventListener,
 } from "../interfaces/CrashMonitor";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { logger } from "../logger";
 
 /**
@@ -17,7 +17,8 @@ import { logger } from "../logger";
 export class ProcessStateCrashDetector implements CrashDetector {
   readonly name = "process_monitor";
 
-  private adb: AdbExecutor;
+  private adb: AdbExecutor | null = null;
+  private adbFactory: AdbClientFactory;
   private device: BootedDevice | null = null;
   private packageName: string | null = null;
   private running = false;
@@ -26,8 +27,8 @@ export class ProcessStateCrashDetector implements CrashDetector {
   private crashListeners: CrashEventListener[] = [];
   private anrListeners: AnrEventListener[] = [];
 
-  constructor(adb?: AdbExecutor) {
-    this.adb = adb ?? new AdbClient();
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adbFactory = adbFactory;
   }
 
   async start(device: BootedDevice, packageName: string): Promise<void> {
@@ -37,9 +38,8 @@ export class ProcessStateCrashDetector implements CrashDetector {
     this.lastKnownPid = null;
     this.wasRunning = false;
 
-    if (this.adb instanceof AdbClient) {
-      this.adb.setDevice(device);
-    }
+    // Create ADB client for this device
+    this.adb = this.adbFactory.create(device);
 
     // Get initial process state
     const pid = await this.getProcessPid(packageName);
@@ -63,7 +63,7 @@ export class ProcessStateCrashDetector implements CrashDetector {
   }
 
   async checkForCrashes(): Promise<CrashEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 

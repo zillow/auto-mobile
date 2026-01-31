@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { Idle } from "./Idle";
 import { BootedDevice, GfxMetrics } from "../../models";
@@ -6,7 +7,8 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { throwIfAborted } from "../../utils/toolUtils";
 
 export class AwaitIdle {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private idle: Idle;
 
   private stabilityThresholdMs = 60;
@@ -15,11 +17,23 @@ export class AwaitIdle {
   /**
    * Create a AwaitIdle instance
    * @param device - Optional device
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
-    this.adb = adb || new AdbClient(device);
-    this.idle = new Idle(device, this.adb);
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    } else if (adbFactoryOrExecutor) {
+      // Legacy path: wrap the executor in a factory for downstream dependencies
+      const executor = adbFactoryOrExecutor as AdbExecutor;
+      this.adb = executor;
+      this.adbFactory = { create: () => executor };
+    } else {
+      this.adbFactory = defaultAdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    }
+    this.idle = new Idle(device, this.adbFactory);
   }
 
   /**

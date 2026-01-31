@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { ActionableError, BootedDevice, InstalledAppsByProfile, SystemInstalledApp } from "../../models";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
@@ -15,7 +16,7 @@ interface ListInstalledAppsOptions {
 }
 
 export class ListInstalledApps {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private simctl: SimCtlClient;
   private device: BootedDevice;
   private installedAppsRepository: InstalledAppsStore;
@@ -24,21 +25,29 @@ export class ListInstalledApps {
   /**
    * Create an ListInstalledApps instance
    * @param device - Optional device
-   * @param adb - Optional AdbClient instance for testing
+   * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    * @param simctl - Optional SimCtlClient instance for testing
    * @param options - Optional cache configuration
    */
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
+    adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
     simctl: SimCtlClient | null = null,
     options: ListInstalledAppsOptions = {}
   ) {
-    this.adb = adb || new AdbClient(device);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbExecutor;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device);
+    }
     this.simctl = simctl || new SimCtlClient(device);
     this.device = device;
     this.installedAppsRepository = options.installedAppsRepository ?? new InstalledAppsRepository();
-    const defaultCacheEnabled = this.adb instanceof AdbClient;
+    // Enable caching by default when using the production factory
+    const defaultCacheEnabled = adbFactoryOrExecutor === defaultAdbClientFactory;
     this.cacheEnabled = options.cacheEnabled ?? defaultCacheEnabled;
     this.timer = options.timer ?? defaultTimer;
   }

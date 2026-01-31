@@ -8,7 +8,7 @@ import type {
   AnrEventListener,
   ParsedCrash,
 } from "../interfaces/CrashMonitor";
-import { AdbClient } from "../android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../android-cmdline-tools/AdbClientFactory";
 import { logger } from "../logger";
 
 /**
@@ -18,7 +18,8 @@ import { logger } from "../logger";
 export class TombstoneAnalyzer implements CrashDetector {
   readonly name = "tombstone";
 
-  private adb: AdbExecutor;
+  private adb: AdbExecutor | null = null;
+  private adbFactory: AdbClientFactory;
   private device: BootedDevice | null = null;
   private packageName: string | null = null;
   private running = false;
@@ -27,8 +28,8 @@ export class TombstoneAnalyzer implements CrashDetector {
   private anrListeners: AnrEventListener[] = [];
   private startTime = 0;
 
-  constructor(adb?: AdbExecutor) {
-    this.adb = adb ?? new AdbClient();
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adbFactory = adbFactory;
   }
 
   async start(device: BootedDevice, packageName: string): Promise<void> {
@@ -38,9 +39,8 @@ export class TombstoneAnalyzer implements CrashDetector {
     this.processedTombstones.clear();
     this.startTime = Date.now();
 
-    if (this.adb instanceof AdbClient) {
-      this.adb.setDevice(device);
-    }
+    // Create ADB client for this device
+    this.adb = this.adbFactory.create(device);
 
     // Get list of existing tombstones to ignore them
     await this.initializeExistingTombstones();
@@ -59,7 +59,7 @@ export class TombstoneAnalyzer implements CrashDetector {
   }
 
   async checkForCrashes(): Promise<CrashEvent[]> {
-    if (!this.running || !this.device || !this.packageName) {
+    if (!this.running || !this.device || !this.packageName || !this.adb) {
       return [];
     }
 

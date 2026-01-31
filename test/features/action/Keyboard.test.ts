@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Keyboard } from "../../../src/features/action/Keyboard";
 import { BootedDevice, ViewHierarchyResult } from "../../../src/models";
+import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeKeyboardHierarchyProvider } from "../../fakes/FakeKeyboardHierarchyProvider";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("Keyboard", () => {
   let fakeAdb: FakeAdbExecutor;
+  let fakeAdbFactory: AdbClientFactory;
   let fakeHierarchy: FakeKeyboardHierarchyProvider;
   let fakeTimer: FakeTimer;
 
@@ -58,6 +60,7 @@ describe("Keyboard", () => {
 
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
+    fakeAdbFactory = { create: () => fakeAdb };
     fakeHierarchy = new FakeKeyboardHierarchyProvider();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
@@ -65,7 +68,7 @@ describe("Keyboard", () => {
 
   test("detect returns bounds from input method window", async () => {
     fakeHierarchy.setResults([keyboardWindowHierarchy()]);
-    const keyboard = new Keyboard(testDevice, fakeAdb, fakeHierarchy, fakeTimer);
+    const keyboard = new Keyboard(testDevice, fakeAdbFactory, fakeHierarchy, fakeTimer);
 
     const result = await keyboard.execute("detect");
 
@@ -78,7 +81,7 @@ describe("Keyboard", () => {
 
   test("detect falls back to hierarchy when window info is missing", async () => {
     fakeHierarchy.setResults([keyboardNodeHierarchy()]);
-    const keyboard = new Keyboard(testDevice, fakeAdb, fakeHierarchy, fakeTimer);
+    const keyboard = new Keyboard(testDevice, fakeAdbFactory, fakeHierarchy, fakeTimer);
 
     const result = await keyboard.execute("detect");
 
@@ -89,7 +92,7 @@ describe("Keyboard", () => {
 
   test("open taps focused input when keyboard is closed", async () => {
     fakeHierarchy.setResults([focusedInputHierarchy(), keyboardWindowHierarchy()]);
-    const keyboard = new Keyboard(testDevice, fakeAdb, fakeHierarchy, fakeTimer);
+    const keyboard = new Keyboard(testDevice, fakeAdbFactory, fakeHierarchy, fakeTimer);
 
     const result = await keyboard.execute("open");
 
@@ -100,7 +103,7 @@ describe("Keyboard", () => {
 
   test("open is idempotent when keyboard is already open", async () => {
     fakeHierarchy.setResults([keyboardWindowHierarchy()]);
-    const keyboard = new Keyboard(testDevice, fakeAdb, fakeHierarchy, fakeTimer);
+    const keyboard = new Keyboard(testDevice, fakeAdbFactory, fakeHierarchy, fakeTimer);
 
     const result = await keyboard.execute("open");
 
@@ -111,7 +114,7 @@ describe("Keyboard", () => {
 
   test("close sends back keyevent when keyboard is open", async () => {
     fakeHierarchy.setResults([keyboardWindowHierarchy(), baseHierarchy()]);
-    const keyboard = new Keyboard(testDevice, fakeAdb, fakeHierarchy, fakeTimer);
+    const keyboard = new Keyboard(testDevice, fakeAdbFactory, fakeHierarchy, fakeTimer);
 
     const result = await keyboard.execute("close");
 

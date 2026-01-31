@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
+import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
+import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
@@ -25,7 +27,7 @@ const teardownReadFileMock = () => {
 describe("ViewHierarchy", function() {
   describe("Unit Tests for Public Methods", function() {
     let viewHierarchy: ViewHierarchy;
-    let fakeAdb: FakeAdbExecutor;
+    let fakeAdbFactory: FakeAdbClientFactory;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -37,7 +39,7 @@ describe("ViewHierarchy", function() {
         platform: "android"
       };
       // Create fakes for testing
-      fakeAdb = new FakeAdbExecutor();
+      fakeAdbFactory = new FakeAdbClientFactory();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -50,7 +52,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdbFactory, mockTakeScreenshot, mockAccessibilityServiceClient);
       setupReadFileMock();
     });
 
@@ -221,6 +223,7 @@ describe("ViewHierarchy", function() {
   describe("Cache Management Tests", function() {
     let viewHierarchy: ViewHierarchy;
     let fakeAdb: FakeAdbExecutor;
+    let fakeAdbFactory: AdbClientFactory;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -233,6 +236,7 @@ describe("ViewHierarchy", function() {
       };
       // Create fakes for testing
       fakeAdb = new FakeAdbExecutor();
+      fakeAdbFactory = { create: () => fakeAdb };
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -245,7 +249,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdbFactory, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     test("should return null from checkInMemoryCache when no cache exists", async function() {

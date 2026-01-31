@@ -3,7 +3,8 @@ import { platform } from "node:os";
 import path from "node:path";
 import fs from "fs-extra";
 import { ActionableError, type BootedDevice } from "../../models";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { logger } from "../../utils/logger";
 import type {
@@ -130,6 +131,8 @@ export class FfmpegVideoProcessingBackend implements VideoCaptureBackend {
   private ffmpegPath: string = "ffmpeg";
   private hwAccelCache: Map<string, HardwareAccelInfo> = new Map();
 
+  constructor(private readonly adbFactory: AdbClientFactory = defaultAdbClientFactory) {}
+
   async start(config: VideoCaptureConfig): Promise<RecordingHandle> {
     await this.ensureFfmpegAvailable();
 
@@ -197,7 +200,7 @@ export class FfmpegVideoProcessingBackend implements VideoCaptureBackend {
     device: BootedDevice,
     config: VideoCaptureConfig
   ): Promise<RecordingHandle> {
-    const adb = new AdbClient(device);
+    const adb = this.adbFactory.create(device);
     const { adbPath, baseArgs } = await adb.getBaseCommandParts();
 
     const screenrecordArgs = [

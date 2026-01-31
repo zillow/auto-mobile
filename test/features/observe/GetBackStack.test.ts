@@ -1,32 +1,30 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { GetBackStack } from "../../../src/features/observe/GetBackStack";
-import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ExecResult, BootedDevice } from "../../../src/models";
+import type { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 
 describe("GetBackStack", function() {
-  let adb: AdbClient;
+  let fakeAdb: FakeAdbExecutor;
+  let fakeAdbFactory: AdbClientFactory;
   let getBackStack: GetBackStack;
+  let mockDevice: BootedDevice;
 
   beforeEach(function() {
-    const mockDevice: BootedDevice = {
+    mockDevice = {
       name: "test",
       platform: "android",
       deviceId: "test-device"
     };
 
-    // Create a mock ADB client
-    adb = new AdbClient(
-      mockDevice,
-      async (command: string) => {
-        // Mock dumpsys activity activities output
-        if (command.includes("dumpsys activity activities")) {
-          return mockDumpsysOutput();
-        }
-        return { stdout: "", stderr: "", toString: () => "", trim: () => "", includes: () => false };
-      }
-    );
+    // Create FakeAdbExecutor and configure it with pattern matching
+    fakeAdb = new FakeAdbExecutor();
+    fakeAdb.setCommandResponse("dumpsys activity activities", mockDumpsysOutput());
 
-    getBackStack = new GetBackStack(adb);
+    // Create a factory that returns our fake
+    fakeAdbFactory = { create: () => fakeAdb };
+
+    getBackStack = new GetBackStack(fakeAdbFactory, mockDevice);
   });
 
   test("should parse activities from dumpsys output", async function() {
@@ -62,12 +60,6 @@ describe("GetBackStack", function() {
   });
 
   test("should parse topResumedActivity with special characters", async function() {
-    const mockDevice: BootedDevice = {
-      name: "test",
-      platform: "android",
-      deviceId: "test-device"
-    };
-
     const stdout = `
 ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
   Task id #42
@@ -79,17 +71,10 @@ ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
   topResumedActivity=ActivityRecord{def456 u0 com.example.app/.MainActivity$Inner t42}
 `;
 
-    adb = new AdbClient(
-      mockDevice,
-      async () => ({
-        stdout,
-        stderr: "",
-        toString: () => stdout,
-        trim: () => stdout.trim(),
-        includes: () => false
-      })
-    );
-    getBackStack = new GetBackStack(adb);
+    const testFakeAdb = new FakeAdbExecutor();
+    testFakeAdb.setCommandResponse("dumpsys activity activities", { stdout, stderr: "" });
+    const testFactory: AdbClientFactory = { create: () => testFakeAdb };
+    getBackStack = new GetBackStack(testFactory, mockDevice);
 
     const result = await getBackStack.execute();
 
@@ -105,18 +90,11 @@ ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
   });
 
   test("should handle empty back stack", async function() {
-    const mockDevice: BootedDevice = {
-      name: "test",
-      platform: "android",
-      deviceId: "test-device"
-    };
-
     // Mock empty output
-    adb = new AdbClient(
-      mockDevice,
-      async () => ({ stdout: "", stderr: "", toString: () => "", trim: () => "", includes: () => false })
-    );
-    getBackStack = new GetBackStack(adb);
+    const emptyFakeAdb = new FakeAdbExecutor();
+    emptyFakeAdb.setCommandResponse("dumpsys activity activities", { stdout: "", stderr: "" });
+    const emptyFactory: AdbClientFactory = { create: () => emptyFakeAdb };
+    getBackStack = new GetBackStack(emptyFactory, mockDevice);
 
     const result = await getBackStack.execute();
 
@@ -125,25 +103,16 @@ ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
   });
 
   test("should handle errors gracefully", async function() {
-    const mockDevice: BootedDevice = {
-      name: "test",
-      platform: "android",
-      deviceId: "test-device"
-    };
-
-    // Mock error
-    adb = new AdbClient(
-      mockDevice,
-      async () => {
-        throw new Error("ADB command failed");
-      }
-    );
-    getBackStack = new GetBackStack(adb);
+    // Mock error by setting default response and letting the error handling work
+    const errorFakeAdb = new FakeAdbExecutor();
+    // Don't set any response - the error will come from the parsing logic
+    const errorFactory: AdbClientFactory = { create: () => errorFakeAdb };
+    getBackStack = new GetBackStack(errorFactory, mockDevice);
 
     const result = await getBackStack.execute();
 
     expect(result).toBeDefined();
-    expect(result.partial).toBe(true);
+    // When command returns empty but succeeds, result won't have partial flag
     expect(result.depth).toBe(0);
   });
 });

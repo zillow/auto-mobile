@@ -1,5 +1,6 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { BackStackInfo, ActivityInfo, TaskInfo } from "../../models";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
+import { BackStackInfo, ActivityInfo, TaskInfo, BootedDevice } from "../../models";
 import { logger } from "../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
@@ -7,10 +8,17 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
  * Extracts back stack information from Android device using dumpsys activity
  */
 export class GetBackStack {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
-  constructor(adb: AdbClient) {
-    this.adb = adb;
+  constructor(adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, device?: BootedDevice) {
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
+    } else if (adbFactoryOrExecutor) {
+      this.adb = adbFactoryOrExecutor as AdbExecutor;
+    } else {
+      this.adb = defaultAdbClientFactory.create(device);
+    }
   }
 
   /**

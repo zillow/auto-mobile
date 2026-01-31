@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { BootedDevice, ClipboardResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -6,11 +7,11 @@ import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClien
 
 export class Clipboard {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    this.adb = adbFactory.create(device);
   }
 
   async execute(

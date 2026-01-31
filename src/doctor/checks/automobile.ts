@@ -7,7 +7,8 @@ import { CheckResult } from "../types";
 import { DaemonManager } from "../../daemon/manager";
 import { getDaemonHealthReport } from "../../daemon/debugTools";
 import { RELEASE_VERSION } from "../../constants/release";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { logger } from "../../utils/logger";
 
@@ -99,9 +100,11 @@ export async function checkDaemonConnectivity(): Promise<CheckResult> {
 /**
  * Check accessibility service status on connected devices
  */
-export async function checkAccessibilityService(): Promise<CheckResult> {
+export async function checkAccessibilityService(
+  adbFactory: AdbClientFactory = defaultAdbClientFactory
+): Promise<CheckResult> {
   try {
-    const adb = new AdbClient();
+    const adb = adbFactory.create();
     const devices = await adb.getBootedAndroidDevices();
 
     if (devices.length === 0) {
@@ -114,7 +117,10 @@ export async function checkAccessibilityService(): Promise<CheckResult> {
 
     // Check first connected device
     const device = devices[0];
-    const serviceManager = new AndroidAccessibilityServiceManager(device);
+    // Reset cached instances to ensure fresh ADB reads for doctor diagnostics
+    // (getInstance memoizes isInstalled/isEnabled for 30 minutes which can report stale state)
+    AndroidAccessibilityServiceManager.resetInstances();
+    const serviceManager = AndroidAccessibilityServiceManager.getInstance(device);
 
     const versionResult = await serviceManager.ensureCompatibleVersion();
     const isInstalled = await serviceManager.isInstalled();

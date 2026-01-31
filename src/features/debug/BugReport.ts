@@ -2,7 +2,8 @@ import fs from "fs-extra";
 import os from "os";
 import path from "path";
 import { randomBytes } from "crypto";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import {
   BootedDevice,
@@ -84,7 +85,7 @@ export interface BugReportOptions {
  */
 export class BugReport {
   private device: BootedDevice;
-  private readonly adb: AdbClient;
+  private readonly adb: AdbExecutor;
   private viewHierarchy: ViewHierarchy;
   private takeScreenshot: TakeScreenshot;
   private visualHighlight: VisualHighlight;
@@ -92,13 +93,13 @@ export class BugReport {
 
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null
+    adbFactory: AdbClientFactory = defaultAdbClientFactory
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.viewHierarchy = new ViewHierarchy(device, this.adb);
-    this.takeScreenshot = new TakeScreenshot(device, this.adb);
-    this.visualHighlight = new VisualHighlight(device, this.adb);
+    this.adb = adbFactory.create(device);
+    this.viewHierarchy = new ViewHierarchy(device, adbFactory);
+    this.takeScreenshot = new TakeScreenshot(device, adbFactory);
+    this.visualHighlight = new VisualHighlight(device, adbFactory);
     this.elementUtils = new ElementUtils();
   }
 

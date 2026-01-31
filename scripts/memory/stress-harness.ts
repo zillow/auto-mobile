@@ -269,6 +269,11 @@ export async function createStressHarness(): Promise<StressHarness> {
   const fakeAccessibilityDetector = new FakeAccessibilityDetector();
   fakeAccessibilityDetector.setTalkBackEnabled(false);
 
+  // Create a factory that returns the fake ADB executor
+  const fakeAdbFactory: AdbClientFactory = {
+    create: () => fakeAdb,
+  };
+
   const fakeA11yClient = createFakeAccessibilityClient();
   const originalGetInstance = AccessibilityServiceClient.getInstance;
   (AccessibilityServiceClient as unknown as { getInstance: () => unknown }).getInstance = () => fakeA11yClient;
@@ -281,13 +286,13 @@ export async function createStressHarness(): Promise<StressHarness> {
 
   const viewHierarchy = new ViewHierarchy(
     device,
-    fakeAdb as unknown as any,
+    fakeAdbFactory,
     null,
     mockTakeScreenshot as unknown as any,
     fakeA11yClient as unknown as any
   );
 
-  const observeScreen = new ObserveScreen(device, fakeAdb as unknown as any);
+  const observeScreen = new ObserveScreen(device, fakeAdbFactory);
   (observeScreen as unknown as { viewHierarchy: ViewHierarchy }).viewHierarchy = viewHierarchy;
 
   const tapOnElement = new TapOnElement(

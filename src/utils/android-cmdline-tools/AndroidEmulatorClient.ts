@@ -2,8 +2,7 @@ import { ChildProcess, exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
 import { BootedDevice, DeviceInfo, ExecResult, ActionableError } from "../../models";
-import { AdbClient } from "./AdbClient";
-import { AdbExecutor } from "./interfaces/AdbExecutor";
+import { AdbClientFactory, defaultAdbClientFactory } from "./AdbClientFactory";
 import { arch } from "os";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
 import { defaultTimer, Timer } from "../SystemTimer";
@@ -97,25 +96,25 @@ export class AndroidEmulatorClient implements AndroidEmulator {
   private spawnFn: typeof spawn;
   private emulatorPath: string;
   private timer: Timer;
-  private adbExecutor: AdbExecutor | null;
+  private adbFactory: AdbClientFactory;
 
   /**
    * Create an AndroidEmulatorClient instance
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
    * @param timer - Timer for delays
-   * @param adbExecutor - Optional AdbExecutor for device operations (for testing)
+   * @param adbFactory - Factory for creating AdbClient instances (for testing)
    */
   constructor(
     execAsyncFn: ((command: string) => Promise<ExecResult>) | null = null,
     spawnFn: typeof spawn | null = null,
     timer: Timer = defaultTimer,
-    adbExecutor: AdbExecutor | null = null
+    adbFactory: AdbClientFactory = defaultAdbClientFactory
   ) {
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
     this.timer = timer;
-    this.adbExecutor = adbExecutor;
+    this.adbFactory = adbFactory;
     // Only set a fallback emulator path here; proper detection happens lazily
     this.emulatorPath = this.getFallbackEmulatorPath();
   }
@@ -525,7 +524,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    */
   async getBootedDevices(onlyEmulators: boolean = false): Promise<BootedDevice[]> {
     try {
-      const adb = this.adbExecutor || new AdbClient();
+      const adb = this.adbFactory.create(null);
       const devices = await adb.getBootedAndroidDevices();
       const runningDevices: BootedDevice[] = [];
       const externalMode = this.isExternalEmulatorMode();
@@ -539,7 +538,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
         const deviceId = device.deviceId;
         try {
           // Try to get the AVD name from the running emulator
-          const adbWithDevice = new AdbClient(device);
+          const adbWithDevice = this.adbFactory.create(device);
           const result = await adbWithDevice.executeCommand("emu avd name", infoTimeoutMs, undefined, true);
           const avdName = result.stdout.trim().replace(/\r?\n.*$/, ""); // Remove any trailing newlines and additional text
 
@@ -566,7 +565,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       for (const device of physicalDevices) {
         if (externalMode) {
           try {
-            const adbWithDevice = new AdbClient(device);
+            const adbWithDevice = this.adbFactory.create(device);
             const result = await adbWithDevice.executeCommand("emu avd name", infoTimeoutMs, undefined, true);
             const avdName = result.stdout.trim().replace(/\r?\n.*$/, "");
 
@@ -589,7 +588,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
 
         try {
           // Try to get the actual device model name
-          const adbWithDevice = new AdbClient(device);
+          const adbWithDevice = this.adbFactory.create(device);
           const result = await adbWithDevice.executeCommand(
             "shell getprop ro.product.model",
             infoTimeoutMs,
@@ -820,7 +819,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
     }
 
     // Use ADB to stop the emulator
-    const adb = new AdbClient(emulator);
+    const adb = this.adbFactory.create(emulator);
     await adb.executeCommand("emu kill");
 
     logger.info(`Killed emulator '${device.name}'`);
@@ -876,7 +875,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
               // Check if the device is online and ready
               // Run device state and package manager checks in parallel for faster detection
               logger.info(`[PARALLEL] Running device state and package manager checks for ${emulator.deviceId}...`);
-              const adb = new AdbClient(emulator);
+              const adb = this.adbFactory.create(emulator);
               try {
                 const [deviceStateResult, packageManagerResult] = await Promise.allSettled([
                   adb.executeCommand("get-state"),
@@ -958,10 +957,9 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    * Wake up the emulator and dismiss the lock screen after boot.
    * This ensures the device is immediately usable for automation.
    * @param device - The booted device to wake and unlock
-   * @param adb - Optional AdbExecutor for testing (defaults to new AdbClient)
    */
-  private async wakeAndUnlock(device: BootedDevice, adb?: AdbExecutor): Promise<void> {
-    const executor = adb ?? new AdbClient(device);
+  private async wakeAndUnlock(device: BootedDevice): Promise<void> {
+    const executor = this.adbFactory.create(device);
 
     try {
       // Check wakefulness state

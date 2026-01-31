@@ -2,11 +2,13 @@ import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { DeepLinkManager } from "../../src/utils/DeepLinkManager";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
 import { ViewHierarchyResult, BootedDevice } from "../../src/models";
+import { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 
 describe("DeepLinkManager", () => {
   let deepLinkManager: DeepLinkManager;
   let fakeAdb: FakeAdbExecutor;
+  let fakeAdbFactory: AdbClientFactory;
   let mockElementUtils: ElementUtils;
   let testDevice: BootedDevice;
 
@@ -20,6 +22,7 @@ describe("DeepLinkManager", () => {
 
     // Create fakes for testing
     fakeAdb = new FakeAdbExecutor();
+    fakeAdbFactory = { create: () => fakeAdb };
 
     // Set up default responses for dumpsys package
     fakeAdb.setCommandResponse("dumpsys package com.example.app", {
@@ -87,7 +90,7 @@ Receiver Resolver Table:
     });
 
     // Create deep link manager
-    deepLinkManager = new DeepLinkManager(testDevice, fakeAdb);
+    deepLinkManager = new DeepLinkManager(testDevice, fakeAdbFactory);
 
     // Create mock element utils
     mockElementUtils = new ElementUtils();
@@ -100,12 +103,12 @@ Receiver Resolver Table:
 
   describe("constructor", () => {
     test("should create DeepLinkManager with device ID", () => {
-      const manager = new DeepLinkManager(testDevice, fakeAdb);
+      const manager = new DeepLinkManager(testDevice, fakeAdbFactory);
       expect(manager).toBeInstanceOf(DeepLinkManager);
     });
 
     test("should create DeepLinkManager without device ID", () => {
-      const manager = new DeepLinkManager(null, fakeAdb);
+      const manager = new DeepLinkManager(null, fakeAdbFactory);
       expect(manager).toBeInstanceOf(DeepLinkManager);
     });
   });

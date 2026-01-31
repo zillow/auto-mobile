@@ -2,6 +2,7 @@ import { expect, describe, test, beforeEach } from "bun:test";
 import { InstallApp } from "../../../src/features/action/InstallApp";
 import { createPerformanceTracker, type TimingEntry } from "../../../src/utils/PerformanceTracker";
 import type { BootedDevice, ExecResult } from "../../../src/models";
+import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeHostCommandExecutor } from "../../fakes/FakeHostCommandExecutor";
 import { FakeAndroidBuildToolsLocator } from "../../fakes/FakeAndroidBuildToolsLocator";
@@ -29,12 +30,14 @@ describe("InstallApp", () => {
   };
 
   let fakeAdb: FakeAdbExecutor;
+  let fakeAdbFactory: AdbClientFactory;
   let fakeHost: FakeHostCommandExecutor;
   let fakeLocator: FakeAndroidBuildToolsLocator;
   let fakeTimer: FakeTimer;
 
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
+    fakeAdbFactory = { create: () => fakeAdb };
     fakeHost = new FakeHostCommandExecutor();
     fakeLocator = new FakeAndroidBuildToolsLocator();
     fakeTimer = new FakeTimer();
@@ -57,7 +60,7 @@ describe("InstallApp", () => {
 
     const installApp = new InstallApp(
       device,
-      fakeAdb,
+      fakeAdbFactory,
       fakeHost,
       fakeLocator,
       () => perf
@@ -124,7 +127,7 @@ describe("InstallApp", () => {
 
     const installApp = new InstallApp(
       device,
-      sequencedAdb,
+      { create: () => sequencedAdb },
       fakeHost,
       fakeLocator,
       () => perf
@@ -150,7 +153,7 @@ describe("InstallApp", () => {
 
     const installApp = new InstallApp(
       device,
-      fakeAdb,
+      fakeAdbFactory,
       fakeHost,
       fakeLocator,
       () => perf
@@ -189,7 +192,7 @@ describe("InstallApp", () => {
 
     const installApp = new InstallApp(
       iosDevice,
-      null,
+      fakeAdbFactory, // Unused for iOS but required by constructor
       null,
       null,
       () => perf,

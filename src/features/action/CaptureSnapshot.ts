@@ -1,5 +1,6 @@
 import { BootedDevice, ActionableError, DeviceSnapshotManifest, DeviceSnapshotType } from "../../models";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import {
   buildVmSnapshotCommand,
@@ -37,14 +38,14 @@ export interface CaptureSnapshotResult {
  */
 export class CaptureSnapshot {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private emulator: AndroidEmulatorClient;
   private store: DeviceSnapshotStore;
   private timer: Timer;
 
   constructor(
     device: BootedDevice,
-    adb?: AdbClient,
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
     emulator?: AndroidEmulatorClient,
     timer: Timer = defaultTimer,
     store: DeviceSnapshotStore = new DeviceSnapshotStore()
@@ -54,7 +55,7 @@ export class CaptureSnapshot {
     }
 
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    this.adb = adbFactory.create(device);
     this.emulator = emulator || new AndroidEmulatorClient();
     this.store = store;
     this.timer = timer;

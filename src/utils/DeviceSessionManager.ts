@@ -1,13 +1,13 @@
 import { ActionableError, BootedDevice, Platform, SomePlatform } from "../models";
 import { MultiPlatformDeviceManager } from "./deviceUtils";
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { AndroidAccessibilityServiceManager } from "./AccessibilityServiceManager";
 import { IOSXCTestServiceManager } from "./XCTestServiceManager";
 import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
-import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
+import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../features/observe/XCTestServiceClient";
@@ -30,14 +30,19 @@ export interface DeviceClientProvider {
  * Default provider that lazily creates real clients
  */
 export class DefaultDeviceClientProvider implements DeviceClientProvider {
-  private _adb: AdbClient | undefined;
+  private _adb: AdbExecutor | undefined;
+  private _adbFactory: AdbClientFactory;
   private _simctl: SimCtlClient | undefined;
   private _androidEmulator: AndroidEmulatorClient | undefined;
   private _deviceUtils: PlatformDeviceManager | undefined;
 
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this._adbFactory = adbFactory;
+  }
+
   getAdb(): AdbExecutor {
     if (!this._adb) {
-      this._adb = new AdbClient(null);
+      this._adb = this._adbFactory.create(null);
     }
     return this._adb;
   }
@@ -144,14 +149,16 @@ export class DeviceSessionManager implements DeviceSessionManager {
   private static instance: DeviceSessionManager;
   private static defaultProvider: DeviceClientProvider | undefined;
   private readonly provider: DeviceClientProvider;
+  private readonly adbFactory: AdbClientFactory;
   private _adb: AdbExecutor | undefined;
   private window: Window | undefined;
 
   // Track devices that have push update listeners registered
   private static pushUpdateListenersRegistered: Set<string> = new Set();
 
-  private constructor(provider: DeviceClientProvider) {
+  private constructor(provider: DeviceClientProvider, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.provider = provider;
+    this.adbFactory = adbFactory;
   }
 
   private get adb(): AdbExecutor {
@@ -210,7 +217,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
     if (platform === "android") {
       // Update AdbClient with new device ID - need a fresh client for the new device
-      this._adb = new AdbClient(device);
+      this._adb = this.adbFactory.create(device);
     }
 
     // Reset window when device changes

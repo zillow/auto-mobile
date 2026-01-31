@@ -1,7 +1,7 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
 import { DatabaseInspector, DatabaseInfo, TableStructureResult } from "../features/database/DatabaseInspector";
-import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { BootedDevice } from "../models";
 import { logger } from "../utils/logger";
 
@@ -122,7 +122,7 @@ async function getDatabasesResource(params: Record<string, string>): Promise<Res
       };
     }
 
-    const adb = new AdbClient(device);
+    const adb = defaultAdbClientFactory.create(device);
     const inspector = new DatabaseInspector(device, adb);
     const databases = await inspector.listDatabases(appId);
     const lastUpdated = new Date().toISOString();
@@ -178,7 +178,7 @@ async function getTablesResource(params: Record<string, string>): Promise<Resour
       };
     }
 
-    const adb = new AdbClient(device);
+    const adb = defaultAdbClientFactory.create(device);
     const inspector = new DatabaseInspector(device, adb);
     const tables = await inspector.listTables(appId, decodedPath);
     const lastUpdated = new Date().toISOString();
@@ -228,7 +228,7 @@ async function getTableDataResource(params: Record<string, string>): Promise<Res
       };
     }
 
-    const adb = new AdbClient(device);
+    const adb = defaultAdbClientFactory.create(device);
     const inspector = new DatabaseInspector(device, adb);
     const data = await inspector.getTableData(appId, decodedPath, decodedTable, limit, offset);
     const lastUpdated = new Date().toISOString();
@@ -278,7 +278,7 @@ async function getTableStructureResource(params: Record<string, string>): Promis
       };
     }
 
-    const adb = new AdbClient(device);
+    const adb = defaultAdbClientFactory.create(device);
     const inspector = new DatabaseInspector(device, adb);
     const structure = await inspector.getTableStructure(appId, decodedPath, decodedTable);
     const lastUpdated = new Date().toISOString();

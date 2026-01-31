@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import {
   BootedDevice,
@@ -22,11 +23,11 @@ const DEFAULT_CALENDAR_SYSTEM = "gregory";
 
 export class SystemConfigurationManager {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
     this.device = device;
-    this.adb = adb ?? new AdbClient(device);
+    this.adb = adbFactory.create(device);
   }
 
   async setLocale(languageTag: string, options: { broadcast?: boolean } = {}): Promise<SetLocaleResult> {

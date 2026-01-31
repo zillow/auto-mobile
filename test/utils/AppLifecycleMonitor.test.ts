@@ -2,16 +2,27 @@ import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { AppLifecycleMonitor, AppLifecycleEvent } from "../../src/utils/AppLifecycleMonitor";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { AppLifecycleMonitorFactory } from "../../src/utils/factories/AppLifecycleMonitorFactory";
+import type { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";
+import type { BootedDevice } from "../../src/models";
 
 describe("AppLifecycleMonitor", () => {
   let monitor: AppLifecycleMonitor;
   let fakeAdb: FakeAdbExecutor;
+  const testDevice: BootedDevice = {
+    deviceId: "test-device-id",
+    name: "Test Device",
+    platform: "android",
+  };
 
   beforeEach(() => {
     // Create fakes for testing
     fakeAdb = new FakeAdbExecutor();
 
-    AppLifecycleMonitorFactory.setAdbClient(fakeAdb);
+    // Create a factory that returns our FakeAdbExecutor
+    const fakeFactory: AdbClientFactory = {
+      create: () => fakeAdb,
+    };
+    AppLifecycleMonitorFactory.setAdbFactory(fakeFactory);
     monitor = AppLifecycleMonitorFactory.getInstance();
   });
 
@@ -19,7 +30,7 @@ describe("AppLifecycleMonitor", () => {
     // Clean up singleton state
     const trackedPackages = monitor.getTrackedPackages();
     for (const pkg of trackedPackages) {
-      await monitor.untrackPackage("test-device", pkg);
+      await monitor.untrackPackage(testDevice, pkg);
     }
 
     // Clear all event listeners
@@ -42,15 +53,15 @@ describe("AppLifecycleMonitor", () => {
     test("should track packages", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.trackPackage(testDevice, "com.example.app");
       expect(monitor.getTrackedPackages()).toContain("com.example.app");
     });
 
     test("should untrack packages", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
-      await monitor.untrackPackage("test-device", "com.example.app");
+      await monitor.trackPackage(testDevice, "com.example.app");
+      await monitor.untrackPackage(testDevice, "com.example.app");
       expect(monitor.getTrackedPackages()).not.toContain("com.example.app");
     });
 
@@ -58,8 +69,8 @@ describe("AppLifecycleMonitor", () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app1", { stdout: "", stderr: "" });
       fakeAdb.setCommandResponse("shell pidof com.example.app2", { stdout: "", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app1");
-      await monitor.trackPackage("test-device", "com.example.app2");
+      await monitor.trackPackage(testDevice, "com.example.app1");
+      await monitor.trackPackage(testDevice, "com.example.app2");
       expect(monitor.getTrackedPackages()).toHaveLength(2);
       expect(monitor.getTrackedPackages()).toContain("com.example.app1");
       expect(monitor.getTrackedPackages()).toContain("com.example.app2");
@@ -70,21 +81,21 @@ describe("AppLifecycleMonitor", () => {
     test("should return true when package is running", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
-      const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
+      const isRunning = await monitor.isPackageRunning(testDevice, "com.example.app");
       expect(isRunning).toBe(true);
     });
 
     test("should return false when package is not running", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
-      const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
+      const isRunning = await monitor.isPackageRunning(testDevice, "com.example.app");
       expect(isRunning).toBe(false);
     });
 
     test("should return false when pidof command fails", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "pidof failed" });
 
-      const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
+      const isRunning = await monitor.isPackageRunning(testDevice, "com.example.app");
       expect(isRunning).toBe(false);
     });
   });
@@ -97,8 +108,8 @@ describe("AppLifecycleMonitor", () => {
     test("should return running packages after checkForChanges", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
-      await monitor.checkForChanges("test-device");
+      await monitor.trackPackage(testDevice, "com.example.app");
+      await monitor.checkForChanges(testDevice);
       expect(monitor.getRunningPackages()).toContain("com.example.app");
     });
   });
@@ -123,10 +134,10 @@ describe("AppLifecycleMonitor", () => {
     test("should emit launch event for new package", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.trackPackage(testDevice, "com.example.app");
 
       // Explicitly check for changes
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
 
       expect(launchEvents).toHaveLength(1);
       expect(launchEvents[0].type).toBe("launch");
@@ -137,10 +148,10 @@ describe("AppLifecycleMonitor", () => {
     test("should emit terminate event when package stops", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.trackPackage(testDevice, "com.example.app");
 
       // Check for changes to establish running state
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
 
       // Clear events from the launch
       launchEvents.length = 0;
@@ -149,7 +160,7 @@ describe("AppLifecycleMonitor", () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
       // Check for changes to detect termination
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
 
       expect(terminateEvents).toHaveLength(1);
       expect(terminateEvents[0].type).toBe("terminate");
@@ -161,11 +172,11 @@ describe("AppLifecycleMonitor", () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app1", { stdout: "12345", stderr: "" });
       fakeAdb.setCommandResponse("shell pidof com.example.app2", { stdout: "12345", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app1");
-      await monitor.trackPackage("test-device", "com.example.app2");
+      await monitor.trackPackage(testDevice, "com.example.app1");
+      await monitor.trackPackage(testDevice, "com.example.app2");
 
       // Check for changes to detect launches
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
 
       expect(launchEvents).toHaveLength(2);
       expect(launchEvents.map(e => e.appId)).toContain("com.example.app1");
@@ -189,16 +200,16 @@ describe("AppLifecycleMonitor", () => {
     test("should detect package state changes", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.trackPackage(testDevice, "com.example.app");
 
       // Initially package is not running
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
       expect(monitor.getRunningPackages()).not.toContain("com.example.app");
 
       // Package starts running
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
       expect(monitor.getRunningPackages()).toContain("com.example.app");
     });
   });
@@ -207,7 +218,7 @@ describe("AppLifecycleMonitor", () => {
     test("should handle event emission errors gracefully", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
-      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.trackPackage(testDevice, "com.example.app");
 
       // Add listener that throws
       monitor.addEventListener("launch", async () => {
@@ -215,7 +226,7 @@ describe("AppLifecycleMonitor", () => {
       });
 
       // Should not throw
-      await monitor.checkForChanges("test-device");
+      await monitor.checkForChanges(testDevice);
     });
   });
 });

@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
@@ -9,12 +10,12 @@ import { logger } from "../../utils/logger";
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
   private device: BootedDevice;
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private simctl: SimCtlClient;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, simctl: SimCtlClient | null = null) {
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory, simctl: SimCtlClient | null = null) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    this.adb = adbFactory.create(device);
     this.simctl = simctl || new SimCtlClient(device);
   }
 

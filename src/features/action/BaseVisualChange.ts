@@ -1,4 +1,5 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { AwaitIdle } from "../observe/AwaitIdle";
 import { ObserveScreen } from "../observe/ObserveScreen";
 import { Window } from "../observe/Window";
@@ -37,7 +38,8 @@ export interface ObservedChangeOptions {
 
 export class BaseVisualChange {
   device: BootedDevice;
-  adb: AdbClient;
+  adb: AdbExecutor;
+  protected adbFactory: AdbClientFactory;
   awaitIdle: AwaitIdle;
   observeScreen: ObserveScreen;
   window: Window;
@@ -46,20 +48,32 @@ export class BaseVisualChange {
 
   /**
    * Create an BaseVisualChange instance
-   * @param device - Optional device
-   * @param adb - Optional AdbClient instance for testing
+   * @param device - The target device
+   * @param adbFactoryOrExecutor - AdbClientFactory instance, AdbExecutor instance, or null (uses default factory)
    * @param timer - Optional timer for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
+    adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
     timer: Timer = defaultTimer
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
-    this.awaitIdle = new AwaitIdle(device, this.adb);
-    this.observeScreen = new ObserveScreen(device, this.adb);
-    this.window = new Window(device, this.adb);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    } else if (adbFactoryOrExecutor) {
+      // Legacy path: wrap the executor in a factory for downstream dependencies
+      const executor = adbFactoryOrExecutor as AdbExecutor;
+      this.adb = executor;
+      this.adbFactory = { create: () => executor };
+    } else {
+      this.adbFactory = defaultAdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    }
+    this.awaitIdle = new AwaitIdle(device, this.adbFactory);
+    this.observeScreen = new ObserveScreen(device, this.adbFactory);
+    this.window = new Window(device, this.adbFactory);
     this.predictionAnalyzer = new PredictionAnalyzer();
     this.timer = timer;
   }

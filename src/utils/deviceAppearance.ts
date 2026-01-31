@@ -1,5 +1,5 @@
 import type { AppearanceMode, BootedDevice } from "../models";
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
 import { logger } from "./logger";
 
@@ -8,7 +8,7 @@ export async function applyAppearanceToDevice(
   mode: AppearanceMode
 ): Promise<void> {
   if (device.platform === "android") {
-    const adb = new AdbClient(device);
+    const adb = defaultAdbClientFactory.create(device);
     const setting = mode === "dark" ? "yes" : "no";
     await adb.executeCommand(`shell cmd uimode night ${setting}`);
     logger.info(`[Appearance] Set Android appearance to ${mode} for ${device.deviceId}`);

@@ -1,4 +1,5 @@
-import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "./logger";
 import { BootedDevice } from "../models";
 
@@ -14,10 +15,10 @@ export interface DeviceCapabilities {
  * Utility class to detect device capabilities
  */
 export class DeviceCapabilitiesDetector {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
-    this.adb = adb || new AdbClient(device);
+  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adb = adbFactory.create(device);
   }
 
   /**

@@ -2,7 +2,7 @@ import type { Element } from "../../models/Element";
 import type { ScreenSize } from "../../models/ScreenSize";
 import { ActionableError, type BootedDevice, type CurrentFocusResult, type TraversalOrderResult } from "../../models";
 import type { ElementSelector as FocusElementSelector } from "../../utils/AccessibilityFocusTracker";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { DeviceDetection } from "../../utils/DeviceDetection";
 import { defaultTimer, type Timer } from "../../utils/SystemTimer";
 import { logger } from "../../utils/logger";
@@ -82,10 +82,15 @@ class DefaultFocusNavigationDriver implements FocusNavigationDriver {
 }
 
 class DefaultFocusNavigationDriverFactory implements FocusNavigationDriverFactory {
+  private adbFactory: AdbClientFactory;
+
+  constructor(adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+    this.adbFactory = adbFactory;
+  }
+
   createDriver(device: BootedDevice): FocusNavigationDriver {
-    const adb = new AdbClient(device);
-    const accessibilityService = AccessibilityServiceClient.getInstance(device, adb);
-    const screenSizeProvider = new GetScreenSize(device, adb);
+    const accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
+    const screenSizeProvider = new GetScreenSize(device, this.adbFactory);
     return new DefaultFocusNavigationDriver(accessibilityService, screenSizeProvider);
   }
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { DeviceSessionManager } from "../../utils/DeviceSessionManager";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
@@ -128,18 +129,31 @@ export interface HighlightOperationOptions {
 
 export class VisualHighlight {
   private device: BootedDevice;
-  private readonly adb: AdbClient;
+  private readonly adb: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private accessibilityServiceClient: AccessibilityServiceClient;
 
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
+    adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
     accessibilityServiceClient?: AccessibilityServiceClient
   ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    // Detect if the argument is a factory (has create method) or an executor
+    if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
+      this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    } else if (adbFactoryOrExecutor) {
+      // Legacy path: wrap the executor in a factory for downstream dependencies
+      const executor = adbFactoryOrExecutor as AdbExecutor;
+      this.adb = executor;
+      this.adbFactory = { create: () => executor };
+    } else {
+      this.adbFactory = defaultAdbClientFactory;
+      this.adb = this.adbFactory.create(device);
+    }
     this.accessibilityServiceClient = accessibilityServiceClient
-      || AccessibilityServiceClient.getInstance(device, this.adb);
+      || AccessibilityServiceClient.getInstance(device, this.adbFactory);
   }
 
   async addHighlight(
