@@ -3,6 +3,12 @@ import { NewMemoryThresholds, MemoryThresholds } from "../../db/types";
 import { logger } from "../../utils/logger";
 import { sql } from "kysely";
 import { MemoryBaseline } from "../../db/types";
+import {
+  adjustWeight,
+  calculateWeightedAverage,
+  WEIGHT_BOUNDS,
+  DEFAULT_TTL,
+} from "../shared/MetricsUtils";
 
 /**
  * Default memory thresholds for different app profiles
@@ -100,28 +106,39 @@ export class MemoryThresholdManager {
       return null;
     }
 
-    const totalWeight = thresholds.reduce((sum, t) => sum + t.weight, 0);
+    const getWeight = (t: MemoryThresholds) => t.weight;
 
-    if (totalWeight === 0) {
-      return null;
-    }
-
-    const weightedAvg = (field: keyof MemoryThresholds) => {
-      const sum = thresholds.reduce(
-        (acc, t) => acc + (t[field] as number) * t.weight,
-        0
-      );
-      return sum / totalWeight;
-    };
+    const heapGrowth = calculateWeightedAverage(
+      thresholds,
+      t => t.heap_growth_threshold_mb,
+      getWeight
+    );
+    if (heapGrowth === null) {return null;}
 
     return {
-      heap_growth_threshold_mb: weightedAvg("heap_growth_threshold_mb"),
-      native_heap_growth_threshold_mb: weightedAvg("native_heap_growth_threshold_mb"),
-      gc_count_threshold: Math.round(weightedAvg("gc_count_threshold")),
-      gc_duration_threshold_ms: weightedAvg("gc_duration_threshold_ms"),
-      unreachable_objects_threshold: Math.round(weightedAvg("unreachable_objects_threshold")),
-      weight: 1.0,
-      ttl_hours: 24,
+      heap_growth_threshold_mb: heapGrowth,
+      native_heap_growth_threshold_mb: calculateWeightedAverage(
+        thresholds,
+        t => t.native_heap_growth_threshold_mb,
+        getWeight
+      )!,
+      gc_count_threshold: Math.round(
+        calculateWeightedAverage(thresholds, t => t.gc_count_threshold, getWeight)!
+      ),
+      gc_duration_threshold_ms: calculateWeightedAverage(
+        thresholds,
+        t => t.gc_duration_threshold_ms,
+        getWeight
+      )!,
+      unreachable_objects_threshold: Math.round(
+        calculateWeightedAverage(
+          thresholds,
+          t => t.unreachable_objects_threshold,
+          getWeight
+        )!
+      ),
+      weight: WEIGHT_BOUNDS.max / 2, // Start at 1.0
+      ttl_hours: DEFAULT_TTL.thresholdHours,
     };
   }
 
@@ -276,9 +293,7 @@ export class MemoryThresholdManager {
       // Update the most recent threshold
       const mostRecent = thresholds[0];
       const currentWeight = mostRecent.weight;
-      const newWeight = passed
-        ? Math.min(currentWeight * 1.1, 2.0) // Increase up to 2.0
-        : Math.max(currentWeight * 0.9, 0.1); // Decrease down to 0.1
+      const newWeight = adjustWeight(currentWeight, passed);
 
       await this.db
         .updateTable("memory_thresholds")

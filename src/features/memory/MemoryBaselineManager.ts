@@ -2,6 +2,13 @@ import { getDatabase } from "../../db/database";
 import { MemoryBaseline, NewMemoryBaseline, MemoryBaselineUpdate } from "../../db/types";
 import { logger } from "../../utils/logger";
 import { MemoryMetrics } from "./MemoryMetricsCollector";
+import {
+  exponentialMovingAverage,
+  safeDivide,
+  getCutoffDate,
+  DEFAULT_EMA_ALPHA,
+  DEFAULT_TTL,
+} from "../shared/MetricsUtils";
 
 /**
  * Manages adaptive memory baselines per app/device/tool combination
@@ -42,7 +49,7 @@ export class MemoryBaselineManager {
     packageName: string,
     toolName: string,
     metrics: MemoryMetrics,
-    alpha: number = 0.3 // Weight for new sample (0.3 = 30% new, 70% old)
+    alpha: number = DEFAULT_EMA_ALPHA
   ): Promise<void> {
     try {
       const existingBaseline = await this.getBaseline(deviceId, packageName, toolName);
@@ -50,27 +57,27 @@ export class MemoryBaselineManager {
       if (existingBaseline) {
         // Update existing baseline with exponential moving average
         const updated: MemoryBaselineUpdate = {
-          java_heap_baseline_mb: this.exponentialMovingAverage(
+          java_heap_baseline_mb: exponentialMovingAverage(
             existingBaseline.java_heap_baseline_mb,
             metrics.postSnapshot.javaHeapMb,
             alpha
           ),
-          native_heap_baseline_mb: this.exponentialMovingAverage(
+          native_heap_baseline_mb: exponentialMovingAverage(
             existingBaseline.native_heap_baseline_mb,
             metrics.postSnapshot.nativeHeapMb,
             alpha
           ),
-          gc_count_baseline: this.exponentialMovingAverage(
+          gc_count_baseline: exponentialMovingAverage(
             existingBaseline.gc_count_baseline,
             metrics.gcCount,
             alpha
           ),
-          gc_duration_baseline_ms: this.exponentialMovingAverage(
+          gc_duration_baseline_ms: exponentialMovingAverage(
             existingBaseline.gc_duration_baseline_ms,
             metrics.gcTotalDurationMs,
             alpha
           ),
-          unreachable_objects_baseline: this.exponentialMovingAverage(
+          unreachable_objects_baseline: exponentialMovingAverage(
             existingBaseline.unreachable_objects_baseline,
             metrics.unreachableObjects?.count || 0,
             alpha
@@ -119,17 +126,6 @@ export class MemoryBaselineManager {
   }
 
   /**
-   * Calculate exponential moving average
-   */
-  private exponentialMovingAverage(
-    oldValue: number,
-    newValue: number,
-    alpha: number
-  ): number {
-    return alpha * newValue + (1 - alpha) * oldValue;
-  }
-
-  /**
    * Check if metrics are anomalous compared to baseline
    * Returns multiplier of how much the current metrics exceed baseline
    */
@@ -143,14 +139,6 @@ export class MemoryBaselineManager {
     gcDurationMultiplier: number;
     unreachableObjectsMultiplier: number;
   } {
-    // Calculate how many times the current value exceeds baseline
-    const safeDivide = (current: number, baseline: number): number => {
-      if (baseline === 0) {
-        return current > 0 ? Infinity : 1.0;
-      }
-      return current / baseline;
-    };
-
     return {
       javaHeapMultiplier: safeDivide(
         metrics.postSnapshot.javaHeapMb,
@@ -178,14 +166,13 @@ export class MemoryBaselineManager {
   /**
    * Delete old baselines that haven't been updated in a long time
    */
-  async cleanupStaleBaselines(daysOld: number = 30): Promise<void> {
+  async cleanupStaleBaselines(daysOld: number = DEFAULT_TTL.baselineDays): Promise<void> {
     try {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+      const cutoffDate = getCutoffDate(daysOld);
 
       const deleted = await this.db
         .deleteFrom("memory_baselines")
-        .where("last_updated", "<", cutoffDate.toISOString())
+        .where("last_updated", "<", cutoffDate)
         .execute();
 
       if (deleted.length > 0) {

@@ -10,51 +10,7 @@ describe("MemoryBaselineManager - Unit Tests", function() {
     manager = new MemoryBaselineManager();
   });
 
-  describe("exponentialMovingAverage", function() {
-    test("should calculate EMA with alpha 0.3", function() {
-      const oldValue = 100;
-      const newValue = 150;
-      const alpha = 0.3;
-
-      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
-
-      // Expected: 0.3 * 150 + 0.7 * 100 = 45 + 70 = 115
-      expect(result).toBe(115);
-    });
-
-    test("should calculate EMA with alpha 0.5 (simple average)", function() {
-      const oldValue = 100;
-      const newValue = 200;
-      const alpha = 0.5;
-
-      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
-
-      // Expected: 0.5 * 200 + 0.5 * 100 = 100 + 50 = 150
-      expect(result).toBe(150);
-    });
-
-    test("should calculate EMA with alpha 1.0 (full replacement)", function() {
-      const oldValue = 100;
-      const newValue = 200;
-      const alpha = 1.0;
-
-      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
-
-      // Expected: 1.0 * 200 + 0.0 * 100 = 200
-      expect(result).toBe(200);
-    });
-
-    test("should calculate EMA with alpha 0.0 (no change)", function() {
-      const oldValue = 100;
-      const newValue = 200;
-      const alpha = 0.0;
-
-      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
-
-      // Expected: 0.0 * 200 + 1.0 * 100 = 100
-      expect(result).toBe(100);
-    });
-  });
+  // Note: exponentialMovingAverage tests moved to MetricsUtils.test.ts
 
   describe("calculateAnomalyMultiplier", function() {
     test("should calculate multipliers correctly for normal growth", function() {
