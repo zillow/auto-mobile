@@ -9,6 +9,7 @@ import { BootedDevice } from "../../models";
 import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { getTempDir, TEMP_SUBDIRS, SECURE_DIR_MODE } from "../../utils/tempDir";
+import type { ScreenshotService } from "./interfaces/ScreenshotService";
 
 export interface ScreenshotOptions {
   format?: "png" | "webp";
@@ -16,7 +17,7 @@ export interface ScreenshotOptions {
   lossless?: boolean;
 }
 
-export class TakeScreenshot {
+export class TakeScreenshot implements ScreenshotService {
   private readonly device: BootedDevice;
   private adb: AdbClient;
   private window: Window;

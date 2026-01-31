@@ -2,6 +2,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import type { MemoryMetricsProvider } from "./interfaces/MemoryMetricsProvider";
 
 /**
  * Memory snapshot from dumpsys meminfo
@@ -51,7 +52,7 @@ export interface MemoryMetrics {
 /**
  * Collector for memory metrics via ADB commands
  */
-export class MemoryMetricsCollector {
+export class MemoryMetricsCollector implements MemoryMetricsProvider {
   private adb: AdbClient;
   private device: BootedDevice;
 
