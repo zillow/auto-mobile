@@ -1,4 +1,6 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
+import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
+import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { logger } from "../../utils/logger";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -53,12 +55,25 @@ export interface MemoryMetrics {
  * Collector for memory metrics via ADB commands
  */
 export class MemoryMetricsCollector implements MemoryMetricsProvider {
-  private adb: AdbClient;
+  private adb: AdbExecutor;
   private device: BootedDevice;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(
+    device: BootedDevice,
+    adbOrFactory: AdbExecutor | AdbClientFactory | null = null
+  ) {
     this.device = device;
-    this.adb = adb || new AdbClient(device);
+    // Support both direct AdbExecutor injection and factory injection
+    if (adbOrFactory && "create" in adbOrFactory) {
+      // It's a factory
+      this.adb = adbOrFactory.create(device);
+    } else if (adbOrFactory) {
+      // It's an AdbExecutor
+      this.adb = adbOrFactory;
+    } else {
+      // Use default factory
+      this.adb = defaultAdbClientFactory.create(device);
+    }
   }
 
   /**
