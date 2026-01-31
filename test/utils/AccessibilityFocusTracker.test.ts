@@ -65,7 +65,6 @@ describe("AccessibilityFocusTracker", () => {
   beforeEach(() => {
     originalDateNow = Date.now;
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     Date.now = () => fakeTimer.now();
 
     tracker = AccessibilityFocusTracker.getInstance();

@@ -72,7 +72,6 @@ describe("LaunchApp", () => {
   });
 
   test("waits for foreground before returning observation", async () => {
-    fakeTimer.setManualMode();
     fakeAdb.setForegroundApp(null);
     fakeAdb.setCommandResponse(`shell ps | grep ${packageName}`, { stdout: "0\n", stderr: "" });
 
@@ -95,7 +94,6 @@ describe("LaunchApp", () => {
   });
 
   test("runs target user detection and install check in parallel", async () => {
-    fakeTimer.setManualMode();
 
     const targetUserDetector = new FakeTargetUserDetector(fakeTimer, {
       delayMs: 50,
@@ -133,7 +131,6 @@ describe("LaunchApp", () => {
   });
 
   test("waits for both preflight tasks to settle when one fails", async () => {
-    fakeTimer.setManualMode();
 
     const targetUserDetector = new FakeTargetUserDetector(fakeTimer, {
       delayMs: 50,
@@ -166,7 +163,6 @@ describe("LaunchApp", () => {
   });
 
   test("records perf timing for both preflight tasks when one fails", async () => {
-    fakeTimer.setManualMode();
 
     const perfTracker = new DefaultPerformanceTracker(fakeTimer);
     const targetUserDetector = new FakeTargetUserDetector(fakeTimer, {
@@ -206,6 +202,7 @@ describe("LaunchApp", () => {
   });
 
   test("launches iOS system apps even when installed list is empty", async () => {
+    fakeTimer.enableAutoAdvance();
     const iosDevice: BootedDevice = { name: "test-ios-device", platform: "ios", deviceId: "ios-123" };
     const systemBundleId = "com.apple.Preferences";
     const fakeXCTestService = new FakeXCTestService();

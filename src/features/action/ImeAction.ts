@@ -6,7 +6,7 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { AccessibilityService } from "../observe/interfaces/AccessibilityService";
-import { Timer } from "../../utils/interfaces/Timer";
+import { Timer } from "../../utils/SystemTimer";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class ImeAction extends BaseVisualChange {

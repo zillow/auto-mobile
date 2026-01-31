@@ -96,7 +96,6 @@ describe("NavigationNodeLookup", () => {
     it("returns fresh data after cache expires", async () => {
       // Use FakeTimer to control time without real delays
       const fakeTimer = new FakeTimer();
-      fakeTimer.setManualMode();
       const shortCacheLookup = new NavigationNodeLookup(mockRepository, 10, fakeTimer); // 10ms cache
 
       mockRepository.getNode = mock(() => Promise.resolve({ id: 100, screen_name: "Test" }));

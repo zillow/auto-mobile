@@ -3,6 +3,13 @@ import { NewPerformanceThresholds, PerformanceThresholds } from "../../db/types"
 import { logger } from "../../utils/logger";
 import { DeviceCapabilities, DeviceCapabilitiesDetector } from "../../utils/DeviceCapabilities";
 import { sql } from "kysely";
+import {
+  adjustWeight,
+  calculateWeightedAverage,
+  calculateMode,
+  WEIGHT_BOUNDS,
+  DEFAULT_TTL,
+} from "../shared/MetricsUtils";
 
 /**
  * Manages performance thresholds with TTL and weighted averaging
@@ -78,42 +85,40 @@ export class ThresholdManager {
       return null;
     }
 
-    // Calculate total weight
-    const totalWeight = thresholds.reduce((sum, t) => sum + t.weight, 0);
+    const getWeight = (t: PerformanceThresholds) => t.weight;
 
-    if (totalWeight === 0) {
-      return null;
-    }
-
-    // Calculate weighted averages for each threshold
-    const weightedAvg = (field: keyof PerformanceThresholds) => {
-      const sum = thresholds.reduce(
-        (acc, t) => acc + (t[field] as number) * t.weight,
-        0
-      );
-      return sum / totalWeight;
-    };
+    const frameTime = calculateWeightedAverage(
+      thresholds,
+      t => t.frame_time_threshold_ms,
+      getWeight
+    );
+    if (frameTime === null) {return null;}
 
     // Use the most common refresh rate (mode)
-    const refreshRates = thresholds.map(t => t.refresh_rate);
-    const refreshRate = refreshRates.sort(
-      (a, b) =>
-        refreshRates.filter(r => r === a).length -
-        refreshRates.filter(r => r === b).length
-    )[0];
+    const refreshRate = calculateMode(thresholds.map(t => t.refresh_rate)) ?? 60;
 
     return {
       refresh_rate: refreshRate,
-      frame_time_threshold_ms: weightedAvg("frame_time_threshold_ms"),
-      p50_threshold_ms: weightedAvg("p50_threshold_ms"),
-      p90_threshold_ms: weightedAvg("p90_threshold_ms"),
-      p95_threshold_ms: weightedAvg("p95_threshold_ms"),
-      p99_threshold_ms: weightedAvg("p99_threshold_ms"),
-      jank_count_threshold: Math.round(weightedAvg("jank_count_threshold")),
-      cpu_usage_threshold_percent: weightedAvg("cpu_usage_threshold_percent"),
-      touch_latency_threshold_ms: weightedAvg("touch_latency_threshold_ms"),
-      weight: 1.0, // New thresholds start with weight 1.0
-      ttl_hours: 24, // Default 24 hour TTL
+      frame_time_threshold_ms: frameTime,
+      p50_threshold_ms: calculateWeightedAverage(thresholds, t => t.p50_threshold_ms, getWeight)!,
+      p90_threshold_ms: calculateWeightedAverage(thresholds, t => t.p90_threshold_ms, getWeight)!,
+      p95_threshold_ms: calculateWeightedAverage(thresholds, t => t.p95_threshold_ms, getWeight)!,
+      p99_threshold_ms: calculateWeightedAverage(thresholds, t => t.p99_threshold_ms, getWeight)!,
+      jank_count_threshold: Math.round(
+        calculateWeightedAverage(thresholds, t => t.jank_count_threshold, getWeight)!
+      ),
+      cpu_usage_threshold_percent: calculateWeightedAverage(
+        thresholds,
+        t => t.cpu_usage_threshold_percent,
+        getWeight
+      )!,
+      touch_latency_threshold_ms: calculateWeightedAverage(
+        thresholds,
+        t => t.touch_latency_threshold_ms,
+        getWeight
+      )!,
+      weight: WEIGHT_BOUNDS.max / 2, // New thresholds start with weight 1.0
+      ttl_hours: DEFAULT_TTL.thresholdHours,
     };
   }
 
@@ -243,13 +248,9 @@ export class ThresholdManager {
         return;
       }
 
-      // Adjust weight based on result
-      // Successful audits increase weight slightly (up to 2.0 max)
-      // Failed audits decrease weight (down to 0.1 min)
+      // Adjust weight based on result using shared utility
       const currentWeight = threshold.weight;
-      const newWeight = passed
-        ? Math.min(currentWeight * 1.1, 2.0)
-        : Math.max(currentWeight * 0.9, 0.1);
+      const newWeight = adjustWeight(currentWeight, passed);
 
       await this.db
         .updateTable("performance_thresholds")

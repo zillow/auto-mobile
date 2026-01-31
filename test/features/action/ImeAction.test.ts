@@ -32,6 +32,7 @@ describe("ImeAction", () => {
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeA11yService = new FakeAccessibilityService();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Set up default fake responses
     fakeWindow.setCachedActiveWindow(null);

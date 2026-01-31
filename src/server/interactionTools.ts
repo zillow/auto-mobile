@@ -19,22 +19,12 @@ import { Keyboard } from "../features/action/Keyboard";
 import {
   ActionableError,
   BootedDevice,
-  Element,
-  ElementSelectionStrategy,
-  ExecResult,
-  ObserveResult,
-  ViewHierarchyResult
 } from "../models";
-import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse, createStructuredToolResponse } from "../utils/toolUtils";
-import { Platform } from "../models";
 import { resolveSwipeDirection } from "../utils/swipeOnUtils";
 import { RecompositionTracker } from "../features/performance/RecompositionTracker";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
-import { ElementUtils } from "../features/utility/ElementUtils";
-import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
-import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import {
   createElementIdTextSelectorSchema,
   elementContainerSchema,
@@ -49,149 +39,86 @@ import {
   selectedElementSchema
 } from "./toolOutputSchemas";
 
-// Type definitions for better TypeScript support
-export interface ClearTextArgs {
-  platform: Platform;
-}
+// Import from extracted modules
+import type {
+  ClearTextArgs,
+  SelectAllTextArgs,
+  PressButtonArgs,
+  SystemTrayNotificationArgs,
+  SystemTrayArgs,
+  PressKeyArgs,
+  InputTextArgs,
+  OpenLinkArgs,
+  TapOnArgs,
+  DragAndDropArgs,
+  SwipeOnArgs,
+  PinchOnArgs,
+  ShakeArgs,
+  ImeActionArgs,
+  KeyboardArgs,
+  RecentAppsArgs,
+  RotateArgs,
+  ClipboardArgs,
+} from "./interactionToolTypes";
 
-export interface SelectAllTextArgs {
-  platform: Platform;
-}
+import {
+  SystemTrayObserver,
+  SystemTrayAdb,
+  SystemTrayDependencies,
+  setSystemTrayDependencies,
+  resetSystemTrayDependencies,
+  getSystemTrayDependencies,
+  waitForNotificationMatch,
+  resolveSystemTrayAwaitTimeout,
+  ensureSystemTrayOpen,
+  resolveNotificationTapElement,
+  resolveNotificationSwipeElement,
+  tapElementWithAdb,
+  swipeElementWithAdb,
+  resolveAppLabel,
+  SYSTEM_TRAY_CLEAR_MAX_ITERATIONS,
+  SYSTEM_TRAY_NOTIFICATION_SWIPE_DURATION_MS,
+} from "./systemTrayHelpers";
 
-export interface PressButtonArgs {
-  button: "home" | "back" | "menu" | "power" | "volume_up" | "volume_down" | "recent";
-  platform: Platform;
-}
+// Re-export types for backward compatibility
+export type {
+  ClearTextArgs,
+  SelectAllTextArgs,
+  PressButtonArgs,
+  SystemTrayNotificationArgs,
+  SystemTrayArgs,
+  PressKeyArgs,
+  InputTextArgs,
+  OpenLinkArgs,
+  TapOnArgs,
+  DragAndDropArgs,
+  SwipeOnArgs,
+  PinchOnArgs,
+  ShakeArgs,
+  ImeActionArgs,
+  KeyboardArgs,
+  RecentAppsArgs,
+  RotateArgs,
+  ClipboardArgs,
+};
 
-export interface SystemTrayNotificationArgs {
-  title?: string;
-  body?: string;
-  appId?: string;
-  tapActionLabel?: string;
-}
+// Re-export system tray helpers for backward compatibility
+export type {
+  SystemTrayObserver,
+  SystemTrayAdb,
+  SystemTrayDependencies,
+};
 
-export interface SystemTrayArgs {
-  action: "open" | "find" | "tap" | "dismiss" | "clearAll";
-  notification?: SystemTrayNotificationArgs;
-  awaitTimeout?: number;
-  platform: Platform;
-}
+export {
+  setSystemTrayDependencies,
+  resetSystemTrayDependencies,
+  waitForNotificationMatch,
+};
 
-export interface PressKeyArgs {
-  key: "home" | "back" | "menu" | "power" | "volume_up" | "volume_down" | "recent";
-  platform: Platform;
-}
+// ============================================================================
+// Schema Definitions
+// ============================================================================
 
-export interface InputTextArgs {
-  text: string;
-  imeAction?: "done" | "next" | "search" | "send" | "go" | "previous";
-  platform: Platform;
-}
-
-export interface OpenLinkArgs {
-  url: string;
-  platform: Platform;
-}
-
-export interface TapOnArgs {
-  container?: {
-    elementId?: string;
-    text?: string;
-  };
-  elementId?: string;
-  text?: string;
-  selectionStrategy?: ElementSelectionStrategy;
-  action: "tap" | "doubleTap" | "longPress" | "focus";
-  duration?: number;
-  searchUntil?: {
-    duration?: number;
-  };
-  platform: Platform;
-}
-
-export interface DragAndDropArgs {
-  source: {
-    text?: string;
-    elementId?: string;
-  };
-  target: {
-    text?: string;
-    elementId?: string;
-  };
-  pressDurationMs?: number;
-  dragDurationMs?: number;
-  holdDurationMs?: number;
-  platform: Platform;
-}
-
-export interface SwipeOnArgs {
-  includeSystemInsets?: boolean;
-  container?: {
-    elementId?: string;
-    text?: string;
-  };
-  autoTarget?: boolean;
-  direction: "up" | "down" | "left" | "right";
-  gestureType?: "swipeFingerTowardsDirection" | "scrollTowardsDirection";
-  lookFor?: {
-    elementId?: string;
-    text?: string;
-  };
-  boomerang?: boolean;
-  apexPause?: number;
-  returnSpeed?: number;
-  speed?: "slow" | "normal" | "fast";
-  platform: Platform;
-}
-
-export interface PinchOnArgs {
-  direction: "in" | "out";
-  distanceStart?: number;
-  distanceEnd?: number;
-  scale?: number;
-  duration?: number;
-  rotationDegrees?: number;
-  includeSystemInsets?: boolean;
-  container?: {
-    elementId?: string;
-    text?: string;
-  };
-  autoTarget?: boolean;
-  platform: Platform;
-}
-
-export interface ShakeArgs {
-  duration?: number;
-  intensity?: number;
-  platform: Platform;
-}
-
-export interface ImeActionArgs {
-  action: "done" | "next" | "search" | "send" | "go" | "previous";
-  platform: Platform;
-}
-
-export interface KeyboardArgs {
-  action: "open" | "close" | "detect";
-  platform: Platform;
-}
-
-export interface RecentAppsArgs {
-  platform: Platform;
-}
-
-export interface RotateArgs {
-  orientation: "portrait" | "landscape";
-  platform: Platform;
-}
-
-export interface ClipboardArgs {
-  action: "copy" | "paste" | "clear" | "get";
-  text?: string;
-  platform: Platform;
-}
-
-// Schema definitions for tool arguments
 export const shakeSchema = addDeviceTargetingToSchema(z.object({
   duration: z.number().optional().describe("Shake duration in ms (default: 1000)"),
   intensity: z.number().optional().describe("Shake acceleration intensity (default: 100)"),
@@ -298,39 +225,34 @@ export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
 }));
 
 export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
-  includeSystemInsets: z.boolean().optional().describe("Include system bars (default false)"),
-  container: elementContainerSchema
-    .optional()
-    .describe(
-      "Container to swipe within (elementId or text). REQUIRED for lists. Omit for full-screen swipes."
-    ),
-  autoTarget: z.boolean().optional().describe("Auto-target scrollable container (default true)"),
-  direction: z.enum(["up", "down", "left", "right"]).describe(
-    `Finger movement direction. up=finger up/reveals above, down=finger down/reveals below, left/right=finger left/right`
+  includeSystemInsets: z.boolean().optional().describe("Use full screen including status/nav bars"),
+  container: elementContainerSchema.optional().describe(
+    "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
-  gestureType: z.enum(["swipeFingerTowardsDirection", "scrollTowardsDirection"]).optional().describe(
-    `swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction`
-  ),
-  lookFor: swipeOnLookForSchema.optional().describe("Swipe until we find a match"),
-  boomerang: z.boolean().optional().describe("Return to the starting point after swiping (default false)"),
-  apexPause: z.number().min(0).optional().describe("Pause at the furthest point in ms (default 100)"),
-  returnSpeed: z.number().positive().optional().describe("Return speed multiplier (default 1.0)"),
-  speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
+  autoTarget: z.boolean().optional().describe("Auto-target scrollable containers (default: true)"),
+  direction: z.enum(["up", "down", "left", "right"]).describe("Swipe/scroll direction"),
+  gestureType: z.enum(["swipeFingerTowardsDirection", "scrollTowardsDirection"]).optional()
+    .describe("swipeFingerTowardsDirection: finger moves in direction (e.g., 'up' = finger up = content scrolls down). scrollTowardsDirection: content moves in direction (e.g., 'up' = content up = see content below). Default: scrollTowardsDirection."),
+  lookFor: swipeOnLookForSchema.optional().describe("Element to look for during swipe"),
+  boomerang: z.boolean().optional().describe("Return to start position after swipe apex"),
+  apexPause: z.number().min(0).max(3000).optional().describe("Pause duration at swipe apex in ms (0-3000)"),
+  returnSpeed: z.number().min(0.1).max(3.0).optional().describe("Speed multiplier for return swipe (0.1-3.0)"),
+  speed: z.enum(["slow", "normal", "fast"]).optional().describe("Swipe speed preset"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
-const pinchOnContainerSchema = elementContainerSchema;
-
 export const pinchOnSchema = addDeviceTargetingToSchema(z.object({
-  direction: z.enum(["in", "out"]).describe("Pinch direction (in=zoom out, out=zoom in)"),
-  distanceStart: z.number().optional().describe("Start distance px"),
-  distanceEnd: z.number().optional().describe("End distance px"),
-  scale: z.number().optional().describe("Scale multiplier"),
-  duration: z.number().optional().describe("Duration ms (default: 300)"),
-  rotationDegrees: z.number().optional().describe("Rotation degrees (+ = clockwise)"),
-  includeSystemInsets: z.boolean().optional().describe("Include system bars (default false)"),
-  container: pinchOnContainerSchema.optional().describe("Container to pinch within"),
-  autoTarget: z.boolean().optional().describe("Auto-target surface (default true)"),
+  direction: z.enum(["in", "out"]).describe("Pinch direction"),
+  distanceStart: z.number().optional().describe("Initial finger distance (px, default: 400)"),
+  distanceEnd: z.number().optional().describe("Final finger distance (px, default: 100)"),
+  scale: z.number().optional().describe("Scale factor (overrides distances)"),
+  duration: z.number().optional().describe("Gesture duration (ms)"),
+  rotationDegrees: z.number().optional().describe("Rotation during pinch (degrees)"),
+  includeSystemInsets: z.boolean().optional().describe("Use full screen including status/nav bars"),
+  container: elementContainerSchema.optional().describe(
+    "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
+  ),
+  autoTarget: z.boolean().optional().describe("Auto-target pinchable containers"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
@@ -349,53 +271,34 @@ export const pressButtonSchema = addDeviceTargetingToSchema(z.object({
 }));
 
 const systemTrayNotificationSchema = z.object({
-  title: z.string().optional().describe("Notification title (case-insensitive, partial match)"),
-  body: z.string().optional().describe("Notification body (case-insensitive, partial match)"),
-  appId: z.string().optional().describe("Notification app package ID (Android only)"),
-  tapActionLabel: z.string().optional().describe("Notification action button label to tap (tap only)")
+  title: z.string().optional().describe("Notification title to match"),
+  body: z.string().optional().describe("Notification body to match"),
+  appId: z.string().optional().describe("App package ID to match"),
+  tapActionLabel: z.string().optional().describe("Action button label to tap (for 'tap' action)")
 });
 
 const systemTraySchemaBase = z.object({
-  action: z.enum(["open", "find", "tap", "dismiss", "clearAll"]).describe("System tray action"),
-  notification: systemTrayNotificationSchema.optional().describe("Notification match criteria"),
-  awaitTimeout: z.number().int().nonnegative().optional().describe("Wait timeout ms (default: 5000)"),
+  action: z.enum(["open", "find", "tap", "dismiss", "clearAll"]).describe(
+    "Action: open=expand tray, find=search for notification, tap=tap notification, dismiss=swipe away, clearAll=dismiss all for app"
+  ),
+  notification: systemTrayNotificationSchema.optional().describe("Notification criteria to match"),
+  awaitTimeout: z.number().optional().describe("Timeout in ms to wait for notification (default: 5000)"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 });
 
 export const systemTraySchema = addDeviceTargetingToSchema(systemTraySchemaBase).superRefine((value, ctx) => {
-  const notification = value.notification;
-  const hasCriteria = Boolean(notification?.title || notification?.body || notification?.appId || notification?.tapActionLabel);
+  const notification = value.notification ?? {};
 
   if (value.action === "open") {
     return;
   }
 
-  if (!notification || !hasCriteria) {
+  const hasCriteria = notification.title || notification.body || notification.appId;
+  if (!hasCriteria) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "notification with title/body/appId/tapActionLabel is required for this action"
+      message: `${value.action} action requires at least one notification criteria (title, body, or appId)`
     });
-    return;
-  }
-
-  if (value.action === "tap") {
-    const hasTapTarget = Boolean(notification.title || notification.body || notification.tapActionLabel);
-    if (!hasTapTarget) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "tap action requires notification.title, notification.body, or notification.tapActionLabel"
-      });
-    }
-  }
-
-  if (value.action === "dismiss") {
-    const hasDismissTarget = Boolean(notification.title || notification.body);
-    if (!hasDismissTarget) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "dismiss action requires notification.title or notification.body"
-      });
-    }
   }
 
   if (value.action === "clearAll" && !notification.appId) {
@@ -466,1021 +369,10 @@ export const clipboardSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
-export interface SystemTrayObserver {
-  execute(
-    queryOptions?: unknown,
-    perf?: unknown,
-    skipWaitForFresh?: boolean,
-    minTimestamp?: number,
-    signal?: AbortSignal
-  ): Promise<ObserveResult>;
-}
+// ============================================================================
+// Tool Registration
+// ============================================================================
 
-export interface SystemTrayAdb {
-  executeCommand(
-    command: string,
-    timeoutMs?: number,
-    maxBuffer?: number,
-    noRetry?: boolean,
-    signal?: AbortSignal
-  ): Promise<ExecResult>;
-  getDeviceTimestampMs(): Promise<number>;
-}
-
-export interface SystemTrayDependencies {
-  observeScreenFactory: (device: BootedDevice) => SystemTrayObserver;
-  adbFactory: (device: BootedDevice) => SystemTrayAdb;
-  timer: Timer;
-}
-
-let systemTrayDependencies: SystemTrayDependencies | null = null;
-
-const getSystemTrayDependencies = (): SystemTrayDependencies => {
-  if (!systemTrayDependencies) {
-    systemTrayDependencies = {
-      observeScreenFactory: device => new ObserveScreen(device),
-      adbFactory: device => new AdbClient(device),
-      timer: defaultTimer
-    };
-  }
-  return systemTrayDependencies;
-};
-
-export const setSystemTrayDependencies = (overrides: Partial<SystemTrayDependencies>): void => {
-  const current = getSystemTrayDependencies();
-  systemTrayDependencies = {
-    observeScreenFactory: overrides.observeScreenFactory ?? current.observeScreenFactory,
-    adbFactory: overrides.adbFactory ?? current.adbFactory,
-    timer: overrides.timer ?? current.timer
-  };
-};
-
-export const resetSystemTrayDependencies = (): void => {
-  systemTrayDependencies = null;
-};
-
-const SYSTEM_TRAY_PACKAGE = "com.android.systemui";
-const SYSTEM_TRAY_RESOURCE_ID_HINTS = [
-  "notification_panel",
-  "notification_stack",
-  "notification_stack_scroller",
-  "status_bar_expanded",
-  "quick_settings",
-  "quick_settings_panel",
-  "quick_settings_container",
-  "qs_panel",
-  "qs_frame",
-  "qs_header",
-  "shade_header",
-  "expanded_status_bar"
-];
-const SYSTEM_TRAY_CLASS_HINTS = [
-  "NotificationPanel",
-  "NotificationShade",
-  "NotificationStack",
-  "QSPanel",
-  "QuickSettings",
-  "StatusBarExpanded"
-];
-const NOTIFICATION_ROW_RESOURCE_ID_HINTS = [
-  "notification_row",
-  "status_bar_notification",
-  "notification_container",
-  "notification_content",
-  "notification_main_column",
-  "notification_template"
-];
-const NOTIFICATION_ROW_CLASS_HINTS = [
-  "ExpandableNotificationRow",
-  "NotificationRow",
-  "StatusBarNotification",
-  "NotificationContentView"
-];
-const NOTIFICATION_ROW_RESOURCE_ID_EXCLUDES = [
-  ...SYSTEM_TRAY_RESOURCE_ID_HINTS,
-  "notification_shelf",
-  "notification_stack_scroll"
-];
-const DEFAULT_SYSTEM_TRAY_AWAIT_TIMEOUT_MS = 5000;
-const SYSTEM_TRAY_POLL_INTERVAL_MS = 250;
-const SYSTEM_TRAY_CLEAR_MAX_ITERATIONS = 25;
-const SYSTEM_TRAY_NOTIFICATION_SWIPE_DURATION_MS = 300;
-
-const getNodeProperties = (node: any): Record<string, any> | null => {
-  if (!node || typeof node !== "object") {
-    return null;
-  }
-  if ("$" in node && node.$) {
-    return node.$ as Record<string, any>;
-  }
-  return node as Record<string, any>;
-};
-
-const nodeHasSystemTrayHint = (node: any): boolean => {
-  const props = getNodeProperties(node);
-  if (!props) {
-    return false;
-  }
-
-  const resourceId = String(props["resource-id"] ?? props.resourceId ?? "");
-  const className = String(props.className ?? props.class ?? "");
-  const packageName = String(props.packageName ?? props.package ?? "");
-  const isSystemUi = packageName === SYSTEM_TRAY_PACKAGE || resourceId.includes(SYSTEM_TRAY_PACKAGE);
-
-  if (!isSystemUi) {
-    return false;
-  }
-
-  const matchesResourceId = SYSTEM_TRAY_RESOURCE_ID_HINTS.some(hint => resourceId.includes(hint));
-  const matchesClassName = SYSTEM_TRAY_CLASS_HINTS.some(hint => className.includes(hint));
-
-  return matchesResourceId || matchesClassName;
-};
-
-const traverseForSystemTray = (node: any): boolean => {
-  if (!node) {
-    return false;
-  }
-
-  if (nodeHasSystemTrayHint(node)) {
-    return true;
-  }
-
-  const children = node.node;
-  if (Array.isArray(children)) {
-    for (const child of children) {
-      if (traverseForSystemTray(child)) {
-        return true;
-      }
-    }
-  } else if (children && typeof children === "object") {
-    if (traverseForSystemTray(children)) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-const getHierarchyRoots = (viewHierarchy: ViewHierarchyResult): any[] => {
-  if (!viewHierarchy?.hierarchy || (viewHierarchy.hierarchy as any).error) {
-    return [];
-  }
-
-  const hierarchy: any = viewHierarchy.hierarchy;
-  if (hierarchy.node) {
-    return Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
-  }
-  if (hierarchy.hierarchy) {
-    return [hierarchy.hierarchy];
-  }
-
-  return [hierarchy];
-};
-
-const isSystemTrayOpen = (viewHierarchy?: ViewHierarchyResult): boolean => {
-  if (!viewHierarchy) {
-    return false;
-  }
-
-  const rootNodes = getHierarchyRoots(viewHierarchy);
-  for (const rootNode of rootNodes) {
-    if (traverseForSystemTray(rootNode)) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-type SystemTrayMatchType = "exact" | "partial";
-
-interface SystemTrayTextMatch {
-  text: string;
-  matchType: SystemTrayMatchType;
-}
-
-interface SystemTrayMatchResult {
-  matched: boolean;
-  matches: {
-    title?: SystemTrayTextMatch;
-    body?: SystemTrayTextMatch;
-    app?: SystemTrayTextMatch;
-    action?: SystemTrayTextMatch;
-  };
-}
-
-type SystemTrayMatchKey = keyof SystemTrayMatchResult["matches"];
-
-interface SystemTrayNotificationCandidate {
-  node: any;
-  depth: number;
-  element?: Element;
-}
-
-interface SystemTrayNotificationMatch {
-  candidate: SystemTrayNotificationCandidate;
-  match: SystemTrayMatchResult;
-  subHierarchy: ViewHierarchyResult;
-}
-
-interface SystemTrayElementMatch {
-  text: string;
-  matchType: SystemTrayMatchType;
-  element: Element;
-}
-
-const sleep = (ms: number) => getSystemTrayDependencies().timer.sleep(ms);
-
-const resolveSystemTrayAwaitTimeout = (awaitTimeout?: number): number => {
-  return awaitTimeout ?? DEFAULT_SYSTEM_TRAY_AWAIT_TIMEOUT_MS;
-};
-
-const resolveSystemTrayObservationTimestamp = async (device: BootedDevice): Promise<number> => {
-  const { adbFactory, timer } = getSystemTrayDependencies();
-  if (device.platform !== "android") {
-    return timer.now();
-  }
-  const adb = adbFactory(device);
-  return adb.getDeviceTimestampMs();
-};
-
-const expandSystemTray = async (device: BootedDevice): Promise<void> => {
-  if (device.platform !== "android") {
-    return;
-  }
-
-  try {
-    const { adbFactory } = getSystemTrayDependencies();
-    const adb = adbFactory(device);
-    await adb.executeCommand("shell cmd statusbar expand-notifications");
-  } catch (error) {
-    throw new ActionableError(`Failed to expand system tray: ${error}`);
-  }
-};
-
-const parseAppLabelFromDumpsys = (stdout: string): string | null => {
-  const lines = stdout.split("\n").map(line => line.trim()).filter(Boolean);
-  const parseLine = (line: string): string | null => {
-    const match = line.match(/application-label(?:-[^:]+)?:\s*(?:'([^']+)'|"([^"]+)"|(.+))/);
-    if (!match) {
-      return null;
-    }
-    const label = match[1] ?? match[2] ?? match[3];
-    return label ? label.trim() : null;
-  };
-
-  for (const line of lines) {
-    if (line.startsWith("application-label:")) {
-      const label = parseLine(line);
-      if (label) {
-        return label;
-      }
-    }
-  }
-
-  for (const line of lines) {
-    if (line.startsWith("application-label-")) {
-      const label = parseLine(line);
-      if (label) {
-        return label;
-      }
-    }
-  }
-
-  return null;
-};
-
-const resolveAppLabel = async (device: BootedDevice, appId: string): Promise<string | null> => {
-  if (device.platform !== "android") {
-    return null;
-  }
-
-  try {
-    const { adbFactory } = getSystemTrayDependencies();
-    const adb = adbFactory(device);
-    const result = await adb.executeCommand(`shell dumpsys package ${appId}`, undefined, undefined, true);
-    return parseAppLabelFromDumpsys(result.stdout);
-  } catch (error) {
-    return null;
-  }
-};
-
-const createSubHierarchy = (node: any): ViewHierarchyResult => {
-  return {
-    hierarchy: {
-      node
-    }
-  };
-};
-
-const getNotificationCriteriaCount = (criteria: SystemTrayNotificationArgs): number => {
-  return [criteria.title, criteria.body, criteria.appId, criteria.tapActionLabel].filter(Boolean).length;
-};
-
-const nodeHasNotificationRowHint = (node: any): boolean => {
-  const props = getNodeProperties(node);
-  if (!props) {
-    return false;
-  }
-
-  const resourceId = String(props["resource-id"] ?? props.resourceId ?? "").toLowerCase();
-  const className = String(props.className ?? props.class ?? "").toLowerCase();
-  const packageName = String(props.packageName ?? props.package ?? "").toLowerCase();
-  const isSystemUi = packageName === SYSTEM_TRAY_PACKAGE || resourceId.includes(SYSTEM_TRAY_PACKAGE);
-
-  if (!isSystemUi) {
-    return false;
-  }
-
-  if (NOTIFICATION_ROW_RESOURCE_ID_EXCLUDES.some(hint => resourceId.includes(hint))) {
-    return false;
-  }
-
-  const matchesResourceId = NOTIFICATION_ROW_RESOURCE_ID_HINTS.some(hint => resourceId.includes(hint));
-  const matchesClassName = NOTIFICATION_ROW_CLASS_HINTS.some(hint => className.includes(hint.toLowerCase()));
-
-  return matchesResourceId || matchesClassName;
-};
-
-const collectNotificationCandidates = (viewHierarchy: ViewHierarchyResult): SystemTrayNotificationCandidate[] => {
-  const candidates: SystemTrayNotificationCandidate[] = [];
-  const elementUtils = new ElementUtils();
-
-  const visit = (node: any, depth: number): void => {
-    if (!node) {
-      return;
-    }
-
-    if (nodeHasNotificationRowHint(node)) {
-      const element = elementUtils.parseNodeBounds(node) ?? undefined;
-      candidates.push({ node, depth, element });
-      return;
-    }
-
-    const children = node.node;
-    if (Array.isArray(children)) {
-      for (const child of children) {
-        visit(child, depth + 1);
-      }
-    } else if (children && typeof children === "object") {
-      visit(children, depth + 1);
-    }
-  };
-
-  const rootNodes = getHierarchyRoots(viewHierarchy);
-  for (const rootNode of rootNodes) {
-    visit(rootNode, 0);
-  }
-
-  return candidates;
-};
-
-type NormalizedSearchText = { text: string; normalized: string };
-
-const buildNormalizedSearchText = (text?: string): NormalizedSearchText | null => {
-  if (typeof text !== "string") {
-    return null;
-  }
-
-  return { text, normalized: text.toLowerCase() };
-};
-
-const buildNormalizedSearchTexts = (texts: string[]): NormalizedSearchText[] => {
-  return texts
-    .map(text => text.trim())
-    .filter(Boolean)
-    .map(text => ({ text, normalized: text.toLowerCase() }));
-};
-
-const extractNodeTextCandidates = (node: any): string[] => {
-  const props = getNodeProperties(node);
-  if (!props) {
-    return [];
-  }
-
-  const candidates = [
-    props.text,
-    props["content-desc"],
-    props["ios-accessibility-label"]
-  ];
-
-  return candidates.filter((value): value is string => typeof value === "string" && value.length > 0);
-};
-
-const resolveMatchForSearchText = (
-  nodeTextCandidatesLower: string[],
-  searchText: NormalizedSearchText
-): SystemTrayTextMatch | null => {
-  if (nodeTextCandidatesLower.some(text => text === searchText.normalized)) {
-    return { text: searchText.text, matchType: "exact" };
-  }
-
-  if (nodeTextCandidatesLower.some(text => text.includes(searchText.normalized))) {
-    return { text: searchText.text, matchType: "partial" };
-  }
-
-  return null;
-};
-
-const resolveMatchForSearchTexts = (
-  nodeTextCandidatesLower: string[],
-  searchTexts: NormalizedSearchText[]
-): SystemTrayTextMatch | null => {
-  for (const searchText of searchTexts) {
-    if (nodeTextCandidatesLower.some(text => text === searchText.normalized)) {
-      return { text: searchText.text, matchType: "exact" };
-    }
-  }
-
-  for (const searchText of searchTexts) {
-    if (nodeTextCandidatesLower.some(text => text.includes(searchText.normalized))) {
-      return { text: searchText.text, matchType: "partial" };
-    }
-  }
-
-  return null;
-};
-
-const mergeTextMatch = (
-  currentMatch: SystemTrayTextMatch | undefined,
-  nextMatch: SystemTrayTextMatch | undefined
-): SystemTrayTextMatch | undefined => {
-  if (!nextMatch) {
-    return currentMatch;
-  }
-  if (!currentMatch) {
-    return nextMatch;
-  }
-  if (currentMatch.matchType === "exact") {
-    return currentMatch;
-  }
-  if (nextMatch.matchType === "exact") {
-    return nextMatch;
-  }
-  return currentMatch;
-};
-
-const mergeMatchMaps = (
-  base: SystemTrayMatchResult["matches"],
-  incoming: SystemTrayMatchResult["matches"]
-): SystemTrayMatchResult["matches"] => {
-  for (const [key, value] of Object.entries(incoming) as [SystemTrayMatchKey, SystemTrayTextMatch][]) {
-    base[key] = mergeTextMatch(base[key], value);
-  }
-  return base;
-};
-
-const collectCompositeNotificationCandidates = (
-  viewHierarchy: ViewHierarchyResult,
-  criteria: SystemTrayNotificationArgs,
-  appMatchTexts: string[]
-): SystemTrayNotificationCandidate[] => {
-  const rootNodes = getHierarchyRoots(viewHierarchy);
-  if (rootNodes.length === 0) {
-    return [];
-  }
-
-  const titleText = buildNormalizedSearchText(criteria.title);
-  const bodyText = buildNormalizedSearchText(criteria.body);
-  const actionText = buildNormalizedSearchText(criteria.tapActionLabel);
-  const appSearchTexts = criteria.appId
-    ? buildNormalizedSearchTexts(appMatchTexts.length > 0 ? appMatchTexts : [criteria.appId])
-    : [];
-
-  const requiredKeys: SystemTrayMatchKey[] = [];
-  if (titleText) {
-    requiredKeys.push("title");
-  }
-  if (bodyText) {
-    requiredKeys.push("body");
-  }
-  if (actionText) {
-    requiredKeys.push("action");
-  }
-  if (criteria.appId) {
-    requiredKeys.push("app");
-  }
-
-  if (requiredKeys.length === 0) {
-    return [];
-  }
-
-  const candidates: SystemTrayNotificationCandidate[] = [];
-  const elementUtils = new ElementUtils();
-
-  const resolveNodeMatches = (node: any): SystemTrayMatchResult["matches"] => {
-    const nodeTextCandidates = extractNodeTextCandidates(node);
-    if (nodeTextCandidates.length === 0) {
-      return {};
-    }
-
-    const nodeTextCandidatesLower = nodeTextCandidates.map(text => text.toLowerCase());
-    const matches: SystemTrayMatchResult["matches"] = {};
-
-    if (titleText) {
-      const match = resolveMatchForSearchText(nodeTextCandidatesLower, titleText);
-      if (match) {
-        matches.title = match;
-      }
-    }
-
-    if (bodyText) {
-      const match = resolveMatchForSearchText(nodeTextCandidatesLower, bodyText);
-      if (match) {
-        matches.body = match;
-      }
-    }
-
-    if (actionText) {
-      const match = resolveMatchForSearchText(nodeTextCandidatesLower, actionText);
-      if (match) {
-        matches.action = match;
-      }
-    }
-
-    if (appSearchTexts.length > 0) {
-      const match = resolveMatchForSearchTexts(nodeTextCandidatesLower, appSearchTexts);
-      if (match) {
-        matches.app = match;
-      }
-    }
-
-    return matches;
-  };
-
-  const visit = (
-    node: any,
-    depth: number
-  ): { matches: SystemTrayMatchResult["matches"]; hasAll: boolean } => {
-    if (!node) {
-      return { matches: {}, hasAll: false };
-    }
-
-    let combinedMatches = resolveNodeMatches(node);
-    let childHasAll = false;
-
-    const children = node.node;
-    if (Array.isArray(children)) {
-      for (const child of children) {
-        const childResult = visit(child, depth + 1);
-        combinedMatches = mergeMatchMaps(combinedMatches, childResult.matches);
-        if (childResult.hasAll) {
-          childHasAll = true;
-        }
-      }
-    } else if (children && typeof children === "object") {
-      const childResult = visit(children, depth + 1);
-      combinedMatches = mergeMatchMaps(combinedMatches, childResult.matches);
-      if (childResult.hasAll) {
-        childHasAll = true;
-      }
-    }
-
-    const hasAll = requiredKeys.every(key => Boolean(combinedMatches[key]));
-    if (hasAll && !childHasAll) {
-      const element = elementUtils.parseNodeBounds(node) ?? undefined;
-      candidates.push({ node, depth, element });
-    }
-
-    return { matches: combinedMatches, hasAll };
-  };
-
-  for (const rootNode of rootNodes) {
-    visit(rootNode, 0);
-  }
-
-  return candidates;
-};
-
-const findTextMatch = (
-  elementUtils: ElementUtils,
-  viewHierarchy: ViewHierarchyResult,
-  text: string
-): SystemTrayTextMatch | null => {
-  const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
-  if (exactMatch) {
-    return { text, matchType: "exact" };
-  }
-
-  const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
-  if (partialMatch) {
-    return { text, matchType: "partial" };
-  }
-
-  return null;
-};
-
-const findFirstTextMatch = (
-  elementUtils: ElementUtils,
-  viewHierarchy: ViewHierarchyResult,
-  texts: string[]
-): SystemTrayTextMatch | null => {
-  const candidates = texts.map(text => text.trim()).filter(Boolean);
-  for (const text of candidates) {
-    const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
-    if (exactMatch) {
-      return { text, matchType: "exact" };
-    }
-  }
-
-  for (const text of candidates) {
-    const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
-    if (partialMatch) {
-      return { text, matchType: "partial" };
-    }
-  }
-
-  return null;
-};
-
-const findElementMatch = (
-  elementUtils: ElementUtils,
-  viewHierarchy: ViewHierarchyResult,
-  text: string
-): SystemTrayElementMatch | null => {
-  const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
-  if (exactMatch) {
-    return { text, matchType: "exact", element: exactMatch };
-  }
-
-  const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
-  if (partialMatch) {
-    return { text, matchType: "partial", element: partialMatch };
-  }
-
-  return null;
-};
-
-const findFirstElementMatch = (
-  elementUtils: ElementUtils,
-  viewHierarchy: ViewHierarchyResult,
-  texts: string[]
-): SystemTrayElementMatch | null => {
-  const candidates = texts.map(text => text.trim()).filter(Boolean);
-  for (const text of candidates) {
-    const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
-    if (exactMatch) {
-      return { text, matchType: "exact", element: exactMatch };
-    }
-  }
-
-  for (const text of candidates) {
-    const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
-    if (partialMatch) {
-      return { text, matchType: "partial", element: partialMatch };
-    }
-  }
-
-  return null;
-};
-
-const buildNotificationMatch = (
-  viewHierarchy: ViewHierarchyResult,
-  criteria: SystemTrayNotificationArgs,
-  appMatchTexts: string[]
-): SystemTrayMatchResult => {
-  const elementUtils = new ElementUtils();
-  const matches: SystemTrayMatchResult["matches"] = {};
-  let matched = true;
-
-  if (criteria.title) {
-    const titleMatch = findTextMatch(elementUtils, viewHierarchy, criteria.title);
-    if (!titleMatch) {
-      matched = false;
-    } else {
-      matches.title = titleMatch;
-    }
-  }
-
-  if (criteria.body) {
-    const bodyMatch = findTextMatch(elementUtils, viewHierarchy, criteria.body);
-    if (!bodyMatch) {
-      matched = false;
-    } else {
-      matches.body = bodyMatch;
-    }
-  }
-
-  if (criteria.tapActionLabel) {
-    const actionMatch = findTextMatch(elementUtils, viewHierarchy, criteria.tapActionLabel);
-    if (!actionMatch) {
-      matched = false;
-    } else {
-      matches.action = actionMatch;
-    }
-  }
-
-  if (criteria.appId) {
-    const appMatch = findFirstTextMatch(elementUtils, viewHierarchy, appMatchTexts);
-    if (!appMatch) {
-      matched = false;
-    } else {
-      matches.app = appMatch;
-    }
-  }
-
-  return { matched, matches };
-};
-
-const getMatchCounts = (matches: SystemTrayMatchResult["matches"]): { exact: number; partial: number } => {
-  const values = Object.values(matches);
-  let exact = 0;
-  let partial = 0;
-  for (const match of values) {
-    if (!match) {
-      continue;
-    }
-    if (match.matchType === "exact") {
-      exact += 1;
-    } else {
-      partial += 1;
-    }
-  }
-  return { exact, partial };
-};
-
-const getCandidateArea = (candidate: SystemTrayNotificationCandidate): number => {
-  const bounds = candidate.element?.bounds;
-  if (!bounds) {
-    return 0;
-  }
-  return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
-};
-
-const selectBestNotificationMatch = (
-  matches: SystemTrayNotificationMatch[]
-): SystemTrayNotificationMatch | null => {
-  if (matches.length === 0) {
-    return null;
-  }
-
-  return matches
-    .slice()
-    .sort((left, right) => {
-      const leftCounts = getMatchCounts(left.match.matches);
-      const rightCounts = getMatchCounts(right.match.matches);
-      if (leftCounts.exact !== rightCounts.exact) {
-        return rightCounts.exact - leftCounts.exact;
-      }
-      if (leftCounts.partial !== rightCounts.partial) {
-        return rightCounts.partial - leftCounts.partial;
-      }
-      const leftArea = getCandidateArea(left.candidate);
-      const rightArea = getCandidateArea(right.candidate);
-      if (leftArea !== rightArea) {
-        return rightArea - leftArea;
-      }
-      return left.candidate.depth - right.candidate.depth;
-    })[0];
-};
-
-const findNotificationMatches = (
-  viewHierarchy: ViewHierarchyResult,
-  criteria: SystemTrayNotificationArgs,
-  appMatchTexts: string[]
-): SystemTrayNotificationMatch[] => {
-  const elementUtils = new ElementUtils();
-  const candidates = collectNotificationCandidates(viewHierarchy);
-  const criteriaCount = getNotificationCriteriaCount(criteria);
-  const matchCandidates = (candidateList: SystemTrayNotificationCandidate[]): SystemTrayNotificationMatch[] => {
-    return candidateList
-      .map(candidate => {
-        const subHierarchy = createSubHierarchy(candidate.node);
-        const match = buildNotificationMatch(subHierarchy, criteria, appMatchTexts);
-        return { candidate, match, subHierarchy };
-      })
-      .filter(entry => entry.match.matched);
-  };
-
-  let matches = matchCandidates(candidates);
-  if (matches.length > 0) {
-    return matches;
-  }
-
-  let fallbackCandidates: SystemTrayNotificationCandidate[] = [];
-  if (criteriaCount <= 1) {
-    if (candidates.length === 0) {
-      fallbackCandidates = getHierarchyRoots(viewHierarchy).map(node => ({
-        node,
-        depth: 0,
-        element: elementUtils.parseNodeBounds(node) ?? undefined
-      }));
-    }
-  } else {
-    fallbackCandidates = collectCompositeNotificationCandidates(viewHierarchy, criteria, appMatchTexts);
-  }
-
-  if (fallbackCandidates.length === 0) {
-    return matches;
-  }
-
-  matches = matchCandidates(fallbackCandidates);
-  return matches;
-};
-
-const findBestNotificationMatch = (
-  viewHierarchy: ViewHierarchyResult,
-  criteria: SystemTrayNotificationArgs,
-  appMatchTexts: string[]
-): SystemTrayNotificationMatch | null => {
-  const matches = findNotificationMatches(viewHierarchy, criteria, appMatchTexts);
-  return selectBestNotificationMatch(matches);
-};
-
-const waitForSystemTrayOpen = async (
-  observeScreen: SystemTrayObserver,
-  minTimestamp: number,
-  awaitTimeoutMs: number
-): Promise<ObserveResult> => {
-  const { timer } = getSystemTrayDependencies();
-  const startTime = timer.now();
-  let observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
-
-  while (timer.now() - startTime < awaitTimeoutMs) {
-    if (isSystemTrayOpen(observation.viewHierarchy)) {
-      return observation;
-    }
-    await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
-    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
-  }
-
-  return observation;
-};
-
-const ensureSystemTrayOpen = async (
-  device: BootedDevice,
-  awaitTimeoutMs: number = DEFAULT_SYSTEM_TRAY_AWAIT_TIMEOUT_MS,
-  _progress?: ProgressCallback
-): Promise<{
-  observation?: ObserveResult;
-  opened: boolean;
-  skipped: boolean;
-  minTimestamp: number;
-}> => {
-  const { observeScreenFactory } = getSystemTrayDependencies();
-  const observeScreen = observeScreenFactory(device);
-  let observation: ObserveResult | undefined;
-  let minTimestamp = 0;
-
-  if (device.platform === "android") {
-    minTimestamp = await resolveSystemTrayObservationTimestamp(device);
-    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
-    if (isSystemTrayOpen(observation.viewHierarchy)) {
-      return { observation, opened: false, skipped: true, minTimestamp };
-    }
-  }
-
-  await expandSystemTray(device);
-  if (device.platform === "android") {
-    minTimestamp = await resolveSystemTrayObservationTimestamp(device);
-  }
-
-  if (device.platform !== "android") {
-    return {
-      observation,
-      opened: true,
-      skipped: false,
-      minTimestamp
-    };
-  }
-
-  const awaitedObservation = await waitForSystemTrayOpen(
-    observeScreen,
-    minTimestamp,
-    awaitTimeoutMs
-  );
-
-  return {
-    observation: awaitedObservation ?? observation,
-    opened: true,
-    skipped: false,
-    minTimestamp
-  };
-};
-
-export const waitForNotificationMatch = async (
-  device: BootedDevice,
-  criteria: SystemTrayNotificationArgs,
-  appMatchTexts: string[],
-  awaitTimeoutMs: number,
-  progress?: ProgressCallback
-): Promise<{ observation: ObserveResult; match: SystemTrayNotificationMatch | null }> => {
-  const { observeScreenFactory, timer } = getSystemTrayDependencies();
-  const observeScreen = observeScreenFactory(device);
-  const deadlineMs = timer.now() + awaitTimeoutMs;
-  const remainingMs = Math.max(0, deadlineMs - timer.now());
-  const result = await ensureSystemTrayOpen(device, remainingMs, progress);
-  let observation = result.observation;
-  const minTimestamp = result.minTimestamp;
-  if (!observation) {
-    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
-  }
-
-  while (true) {
-    if (timer.now() >= deadlineMs) {
-      return { observation, match: null };
-    }
-
-    const viewHierarchy = observation.viewHierarchy;
-    if (viewHierarchy && isSystemTrayOpen(viewHierarchy)) {
-      const match = findBestNotificationMatch(viewHierarchy, criteria, appMatchTexts);
-      if (match) {
-        return { observation, match };
-      }
-    }
-
-    await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
-    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
-  }
-};
-
-const resolveNotificationTapElement = (
-  match: SystemTrayNotificationMatch,
-  criteria: SystemTrayNotificationArgs
-): SystemTrayElementMatch | null => {
-  const elementUtils = new ElementUtils();
-  const subHierarchy = match.subHierarchy;
-
-  if (criteria.tapActionLabel) {
-    const actionMatch = findElementMatch(elementUtils, subHierarchy, criteria.tapActionLabel);
-    if (actionMatch) {
-      return actionMatch;
-    }
-  }
-
-  if (criteria.title) {
-    const titleMatch = findElementMatch(elementUtils, subHierarchy, criteria.title);
-    if (titleMatch) {
-      return titleMatch;
-    }
-  }
-
-  if (criteria.body) {
-    const bodyMatch = findElementMatch(elementUtils, subHierarchy, criteria.body);
-    if (bodyMatch) {
-      return bodyMatch;
-    }
-  }
-
-  return null;
-};
-
-const resolveNotificationSwipeElement = (
-  match: SystemTrayNotificationMatch,
-  criteria: SystemTrayNotificationArgs,
-  appMatchTexts: string[]
-): Element | null => {
-  if (match.candidate.element) {
-    return match.candidate.element;
-  }
-
-  const elementUtils = new ElementUtils();
-  const subHierarchy = match.subHierarchy;
-
-  if (criteria.title) {
-    const titleMatch = findElementMatch(elementUtils, subHierarchy, criteria.title);
-    if (titleMatch) {
-      return titleMatch.element;
-    }
-  }
-
-  if (criteria.body) {
-    const bodyMatch = findElementMatch(elementUtils, subHierarchy, criteria.body);
-    if (bodyMatch) {
-      return bodyMatch.element;
-    }
-  }
-
-  if (criteria.appId) {
-    const appMatch = findFirstElementMatch(elementUtils, subHierarchy, appMatchTexts);
-    if (appMatch) {
-      return appMatch.element;
-    }
-  }
-
-  return null;
-};
-
-const tapElementWithAdb = async (device: BootedDevice, element: Element): Promise<void> => {
-  const elementUtils = new ElementUtils();
-  const center = elementUtils.getElementCenter(element);
-  const { adbFactory } = getSystemTrayDependencies();
-  const adb = adbFactory(device);
-  await adb.executeCommand(`shell input tap ${center.x} ${center.y}`);
-};
-
-const swipeElementWithAdb = async (device: BootedDevice, element: Element): Promise<void> => {
-  const elementUtils = new ElementUtils();
-  const { startX, startY, endX, endY } = elementUtils.getSwipeWithinBounds("left", element.bounds);
-  const { adbFactory } = getSystemTrayDependencies();
-  const adb = adbFactory(device);
-  await adb.executeCommand(
-    `shell input swipe ${Math.floor(startX)} ${Math.floor(startY)} ${Math.floor(endX)} ${Math.floor(endY)} ${SYSTEM_TRAY_NOTIFICATION_SWIPE_DURATION_MS}`
-  );
-};
-
-// Register tools
 export function registerInteractionTools() {
   // Tap on handler
   const tapOnHandler = async (device: BootedDevice, args: TapOnArgs, progress?: ProgressCallback) => {
@@ -1678,7 +570,8 @@ export function registerInteractionTools() {
           match: match.match.matches,
           tapTarget: {
             text: tapMatch.text,
-            matchType: tapMatch.matchType
+            matchType: tapMatch.matchType,
+            bounds: tapMatch.element.bounds
           },
           observation: nextObservation,
           success: true
@@ -1700,7 +593,7 @@ export function registerInteractionTools() {
 
         const swipeElement = resolveNotificationSwipeElement(match, notification, appMatchTexts);
         if (!swipeElement) {
-          throw new ActionableError("No notification dismiss target was resolved within the matched notification.");
+          throw new ActionableError("No swipeable notification element was resolved within the matched notification.");
         }
 
         await swipeElementWithAdb(device, swipeElement);
@@ -1717,154 +610,86 @@ export function registerInteractionTools() {
       }
 
       if (args.action === "clearAll") {
-        const appId = notification.appId;
-        if (!appId) {
-          throw new ActionableError("clearAll requires notification.appId.");
-        }
+        let dismissed = 0;
+        const { timer } = getSystemTrayDependencies();
 
-        if (appMatchTexts.length === 0) {
-          appMatchTexts = [appId];
-        }
-
-        const { observeScreenFactory, timer } = getSystemTrayDependencies();
-        const observeScreen = observeScreenFactory(device);
-        const startTime = timer.now();
-        let clearedCount = 0;
-        let lastMatchText: string | undefined;
-        let lastObservation = (await ensureSystemTrayOpen(device, awaitTimeoutMs, progress)).observation;
-
-        if (!lastObservation) {
-          lastObservation = await observeScreen.execute();
-        }
-
-        while (clearedCount < SYSTEM_TRAY_CLEAR_MAX_ITERATIONS) {
-          const viewHierarchy = lastObservation.viewHierarchy;
-          const match = viewHierarchy
-            ? selectBestNotificationMatch(findNotificationMatches(viewHierarchy, notification, appMatchTexts))
-            : null;
+        for (let i = 0; i < SYSTEM_TRAY_CLEAR_MAX_ITERATIONS; i++) {
+          const { match } = await waitForNotificationMatch(
+            device,
+            notification,
+            appMatchTexts,
+            500,
+            progress
+          );
 
           if (!match) {
-            if (clearedCount > 0 || timer.now() - startTime >= awaitTimeoutMs) {
-              break;
-            }
-            await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
-            lastObservation = await observeScreen.execute();
-            continue;
+            break;
           }
 
           const swipeElement = resolveNotificationSwipeElement(match, notification, appMatchTexts);
           if (!swipeElement) {
-            throw new ActionableError("Matched notification but could not resolve a swipe target.");
+            break;
           }
 
-          lastMatchText = match.match.matches.app?.text;
           await swipeElementWithAdb(device, swipeElement);
-          clearedCount += 1;
-          lastObservation = await observeScreen.execute();
-          await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
+          dismissed++;
+          await timer.sleep(SYSTEM_TRAY_NOTIFICATION_SWIPE_DURATION_MS + 100);
         }
 
+        const { observeScreenFactory } = getSystemTrayDependencies();
+        const observeScreen = observeScreenFactory(device);
+        const nextObservation = await observeScreen.execute();
+
         return createJSONToolResponse({
-          message: clearedCount > 0
-            ? `Cleared ${clearedCount} notification(s) for ${appId}`
-            : `No matching notifications found for ${appId}`,
-          clearedCount,
-          appId,
-          appLabel,
-          matchText: lastMatchText,
-          observation: lastObservation,
+          message: dismissed > 0
+            ? `Cleared ${dismissed} notification(s) for ${notification.appId}`
+            : `No notifications found for ${notification.appId}`,
+          dismissedCount: dismissed,
+          observation: nextObservation,
           success: true
         });
       }
 
-      throw new ActionableError(`Unsupported systemTray action: ${args.action}`);
+      throw new ActionableError(`Unknown systemTray action: ${args.action}`);
     } catch (error) {
-      throw new ActionableError(`Failed to execute system tray action: ${error}`);
+      if (error instanceof ActionableError) {
+        throw error;
+      }
+      throw new ActionableError(`systemTray failed: ${error}`);
     }
   };
 
-  // SwipeOn handler - unified swipe/scroll tool
+  // Swipe on handler
   const swipeOnHandler = async (device: BootedDevice, args: SwipeOnArgs, progress?: ProgressCallback) => {
     RecompositionTracker.getInstance().recordInteraction();
     const swipeOn = new SwipeOn(device);
-
-    // Resolve direction based on gestureType
-    const resolved = resolveSwipeDirection({
-      direction: args.direction,
-      gestureType: args.gestureType
-    });
-
-    if (resolved.error) {
-      return createStructuredToolResponse({
-        message: resolved.error,
-        success: false,
-        error: resolved.error
-      });
-    }
-
-    // Convert SwipeOnArgs to SwipeOnOptions (direction resolution happens in SwipeOn)
-    const options: import("../models").SwipeOnOptions = {
-      includeSystemInsets: args.includeSystemInsets,
+    const resolvedDirection = resolveSwipeDirection(args.direction, args.gestureType);
+    const result = await swipeOn.execute({
       container: args.container,
-      autoTarget: args.autoTarget,
-      direction: args.direction,
-      gestureType: args.gestureType,
+      autoTarget: args.autoTarget ?? true,
+      direction: resolvedDirection,
       lookFor: args.lookFor,
       speed: args.speed,
+      includeSystemInsets: args.includeSystemInsets ?? false,
       boomerang: args.boomerang,
       apexPause: args.apexPause,
       returnSpeed: args.returnSpeed
-      // duration and scrollMode are internal-only
-    };
-
-    const result = await swipeOn.execute(options, progress);
-
-    const directionLabel = resolved.direction ?? "unknown";
-
-    // Determine message based on operation type
-    let message = "";
-    if (!result.success && result.error) {
-      message = `Swipe failed: ${result.error}`;
-    } else if (result.found !== undefined) {
-      // Scroll-until-visible operation
-      if (result.found) {
-        const target = args.lookFor?.text
-          ? `text "${args.lookFor.text}"`
-          : `element with id "${args.lookFor?.elementId}"`;
-        message = `Scrolled until ${target} became visible (${result.scrollIterations} iterations, ${result.elapsedMs}ms)`;
-      } else {
-        message = `Element not found after scrolling`;
-      }
-    } else {
-      // Use the descriptive message from resolution, then add context
-      const gestureDesc = resolved.message ?? `Swiped ${directionLabel}`;
-      if (!args.container) {
-        // No container = screen swipe
-        message = `${gestureDesc} on screen`;
-      } else if (args.container.text) {
-        message = `${gestureDesc} in container with text "${args.container.text}"`;
-      } else if (args.container.elementId) {
-        message = `${gestureDesc} in container with id "${args.container.elementId}"`;
-      } else {
-        message = gestureDesc;
-      }
-    }
-
-    if (result.warning) {
-      message = `${message} Warning: ${result.warning}`;
-    }
+    }, progress);
 
     return createStructuredToolResponse({
-      message,
+      message: result.found
+        ? `Swiped ${args.direction} and found element after ${result.scrollIterations ?? 1} swipe(s)`
+        : `Swiped ${args.direction}`,
+      observation: result.observation,
       ...result
     });
   };
 
+  // Pinch on handler
   const pinchOnHandler = async (device: BootedDevice, args: PinchOnArgs, progress?: ProgressCallback) => {
     RecompositionTracker.getInstance().recordInteraction();
     const pinchOn = new PinchOn(device);
-
-    const options: import("../models").PinchOnOptions = {
+    const result = await pinchOn.execute({
       direction: args.direction,
       distanceStart: args.distanceStart,
       distanceEnd: args.distanceEnd,
@@ -1874,29 +699,11 @@ export function registerInteractionTools() {
       includeSystemInsets: args.includeSystemInsets,
       container: args.container,
       autoTarget: args.autoTarget
-    };
-
-    const result = await pinchOn.execute(options, progress);
-
-    let message = `Pinched ${args.direction}`;
-    if (result.targetType === "container" && result.container?.text) {
-      message = `Pinched ${args.direction} in container with text "${result.container.text}"`;
-    } else if (result.targetType === "container" && result.container?.elementId) {
-      message = `Pinched ${args.direction} in container with id "${result.container.elementId}"`;
-    } else if (result.targetType === "screen") {
-      message = `Pinched ${args.direction} on screen`;
-    }
-
-    if (!result.success && result.error) {
-      message = `Pinch failed: ${result.error}`;
-    }
-
-    if (result.warning) {
-      message = `${message} Warning: ${result.warning}`;
-    }
+    }, progress);
 
     return createJSONToolResponse({
-      message,
+      message: `Pinched ${args.direction}`,
+      observation: result.observation,
       ...result
     });
   };

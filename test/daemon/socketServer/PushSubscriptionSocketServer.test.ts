@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Socket } from "node:net";
 import { PushSubscriptionSocketServer } from "../../../src/daemon/socketServer/PushSubscriptionSocketServer";
-import { FakeTimer } from "../../../src/utils/SystemTimer";
+import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeSocket } from "../../fakes/FakeNetServer";
 
 interface TestFilter {

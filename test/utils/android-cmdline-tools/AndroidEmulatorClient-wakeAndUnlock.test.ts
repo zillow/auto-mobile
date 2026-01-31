@@ -24,6 +24,7 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
     emulatorClient = new AndroidEmulatorClient(mockExecAsync, null, fakeTimer);
   });
 

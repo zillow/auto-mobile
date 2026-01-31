@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { Timer } from "../../src/utils/interfaces/Timer";
+import { Timer } from "../../src/utils/SystemTimer";
 import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
@@ -28,10 +28,10 @@ export class FakeWebSocket extends EventEmitter {
     this.connectTimeoutMs = connectTimeoutMs;
     this.timer = timer;
 
-    // Schedule connection attempt using timer
-    this.timer.setTimeout(() => {
+    // Schedule connection attempt immediately (use setImmediate for 0-delay to work with FakeTimer)
+    setImmediate(() => {
       this.handleConnection();
-    }, 0);
+    });
   }
 
   private handleConnection(): void {
@@ -66,10 +66,11 @@ export class FakeWebSocket extends EventEmitter {
   close(): void {
     if (this.readyState === WebSocketState.OPEN || this.readyState === WebSocketState.CONNECTING) {
       this.readyState = WebSocketState.CLOSING;
-      this.timer.setTimeout(() => {
+      // Use setImmediate for 0-delay close to work with FakeTimer
+      setImmediate(() => {
         this.readyState = WebSocketState.CLOSED;
         this.emit("close");
-      }, 0);
+      });
     }
   }
 

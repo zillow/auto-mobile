@@ -67,7 +67,6 @@ describe("iOS doctor checks", () => {
 
   test("passes when Command Line Tools are already installed via install flag", async () => {
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     const execCalls: string[] = [];
 
     const execFile = async () => {

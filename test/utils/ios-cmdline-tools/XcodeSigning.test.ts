@@ -56,6 +56,7 @@ const buildFingerprint = (certBase64: string): string => {
 
 const createFakeDependencies = (options?: { identities?: string; profiles?: string[] }) => {
   const fakeTimer = new FakeTimer();
+  fakeTimer.enableAutoAdvance();
   const writtenFiles: string[] = [];
   const exec = async (command: string) => {
     if (command.includes("security cms -D -i")) {

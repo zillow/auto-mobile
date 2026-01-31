@@ -3,7 +3,7 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ShakeOptions, ShakeResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { Timer } from "../../utils/interfaces/Timer";
+import { Timer } from "../../utils/SystemTimer";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class Shake extends BaseVisualChange {

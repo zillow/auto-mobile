@@ -11,7 +11,6 @@ describe("CriticalSectionCoordinator", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
 
     originalSetTimeout = global.setTimeout;
     originalClearTimeout = global.clearTimeout;

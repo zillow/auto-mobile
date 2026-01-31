@@ -60,7 +60,6 @@ describe("TouchLatencyTracker - Unit Tests", function() {
 
     perf = new NoOpPerformanceTracker();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
   });
 
   describe("selectSafeTouchLocation", function() {

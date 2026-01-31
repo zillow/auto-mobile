@@ -14,7 +14,6 @@ describe("ScreenshotUtils", function() {
     // Create test directory
     await fs.ensureDir(testDir);
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
   });
 
   afterEach(async function() {

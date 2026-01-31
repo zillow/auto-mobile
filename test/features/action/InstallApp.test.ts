@@ -38,7 +38,7 @@ describe("InstallApp", () => {
     fakeHost = new FakeHostCommandExecutor();
     fakeLocator = new FakeAndroidBuildToolsLocator();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
+    fakeTimer.enableAutoAdvance();
   });
 
   test("installs using aapt2 and targets work profile user", async () => {

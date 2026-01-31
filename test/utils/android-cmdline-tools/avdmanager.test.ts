@@ -111,7 +111,9 @@ describe("AVDManager", function() {
   }
 
   function createFakeTimer(): FakeTimer {
-    return new FakeTimer();
+    const timer = new FakeTimer();
+    timer.enableAutoAdvance();
+    return timer;
   }
 
   async function resolveWithFakeTimer<T>(

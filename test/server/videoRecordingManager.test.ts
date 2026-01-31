@@ -31,7 +31,6 @@ describe("videoRecordingManager", () => {
 
   beforeEach(async () => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     fakeBackend = new FakeVideoCaptureBackend();
     fakeBackend.setNowProvider(() => new Date(fakeTimer.now()));
     fakeHighlightClient = new FakeHighlightClient();

@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 import { RequestResponseSocketServer, getSocketPath, SocketServerConfig } from "./socketServer/index";
-import { FailuresRepository } from "../db/failuresRepository";
+import { FailureAnalyticsRepository } from "../db/failureAnalyticsRepository";
 import type {
   FailuresStreamSocketRequest,
   FailuresStreamSocketResponse,
@@ -17,7 +17,7 @@ const SOCKET_CONFIG: SocketServerConfig = {
 
 const DEFAULT_LIMIT = 100;
 const STREAM_LIMIT_MAX = 500;
-const failuresRepository = new FailuresRepository();
+const failureAnalyticsRepository = new FailureAnalyticsRepository();
 
 /**
  * Get duration in ms for a date range preset
@@ -185,7 +185,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
       startTime = endTime - getDateRangeDuration(dateRange);
     }
 
-    const result = await failuresRepository.getNotificationsSince({
+    const result = await failureAnalyticsRepository.getNotificationsSince({
       sinceTimestamp,
       sinceId,
       startTime,
@@ -217,7 +217,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
       startTime = endTime - getDateRangeDuration(dateRange);
     }
 
-    const result = await failuresRepository.getAggregatedGroups({
+    const result = await failureAnalyticsRepository.getAggregatedGroups({
       startTime,
       endTime,
       type: request.type,
@@ -252,7 +252,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
       startTime = startTime ?? (endTime - 24 * 60 * 60 * 1000);
     }
 
-    const result = await failuresRepository.getTimelineData({
+    const result = await failureAnalyticsRepository.getTimelineData({
       startTime,
       endTime,
       aggregation,
@@ -280,7 +280,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
       }
     }
 
-    await failuresRepository.acknowledgeNotifications(ids);
+    await failureAnalyticsRepository.acknowledgeNotifications(ids);
 
     return {
       success: true,

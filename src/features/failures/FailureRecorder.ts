@@ -1,4 +1,4 @@
-import { FailuresRepository, RecordFailureInput } from "../../db/failuresRepository";
+import { FailureAnalyticsRepository, RecordFailureInput } from "../../db/failureAnalyticsRepository";
 import type {
   FailureSeverity,
   StackTraceElement,
@@ -6,6 +6,7 @@ import type {
 } from "../../server/failuresResources";
 import { logger } from "../../utils/logger";
 import crypto from "node:crypto";
+import type { FailureRecorderService } from "./interfaces/FailureRecorderService";
 
 /**
  * Input for recording a tool failure
@@ -97,12 +98,12 @@ export interface RecordAnrInput {
  * FailureRecorder provides a high-level API for recording various types of failures.
  * It handles signature generation, severity calculation, and stores failures in the database.
  */
-export class FailureRecorder {
-  private repository: FailuresRepository;
+export class FailureRecorder implements FailureRecorderService {
+  private repository: FailureAnalyticsRepository;
   private static instance: FailureRecorder | null = null;
 
-  constructor(repository?: FailuresRepository) {
-    this.repository = repository ?? new FailuresRepository();
+  constructor(repository?: FailureAnalyticsRepository) {
+    this.repository = repository ?? new FailureAnalyticsRepository();
   }
 
   /**

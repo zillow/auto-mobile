@@ -5,7 +5,7 @@ import {
   DEFAULT_THRESHOLDS,
   type LivePerformanceData,
 } from "../../src/daemon/performancePushSocketServer";
-import { FakeTimer } from "../../src/utils/SystemTimer";
+import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeSocket } from "../fakes/FakeNetServer";
 
 /**

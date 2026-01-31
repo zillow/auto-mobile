@@ -103,7 +103,7 @@ export interface FailuresStreamResponse {
 
 const STREAM_LIMIT_MAX = 500;
 
-export class FailuresRepository {
+export class FailureAnalyticsRepository {
   /**
    * Record a new failure occurrence, creating or updating the group as needed
    */
@@ -241,7 +241,7 @@ export class FailuresRepository {
 
       return occurrenceId;
     } catch (error) {
-      logger.error(`[FailuresRepository] Failed to record failure: ${error}`);
+      logger.error(`[FailureAnalyticsRepository] Failed to record failure: ${error}`);
       throw error;
     }
   }
@@ -862,7 +862,7 @@ export class FailuresRepository {
         )
         .execute();
     } catch (error) {
-      logger.warn(`[FailuresRepository] Retention cleanup failed: ${error}`);
+      logger.warn(`[FailureAnalyticsRepository] Retention cleanup failed: ${error}`);
     } finally {
       cleanupInProgress = false;
     }

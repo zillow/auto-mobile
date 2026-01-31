@@ -8,7 +8,6 @@ describe("SessionManager", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     sessionManager = new SessionManager(fakeTimer);
   });
 

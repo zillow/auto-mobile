@@ -18,7 +18,7 @@ describe("TerminateApp (iOS)", () => {
   beforeEach(() => {
     fakeSimctl = new FakeSimctl();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
+    fakeTimer.enableAutoAdvance();
   });
 
   test("terminates installed app via simctl", async () => {
@@ -90,7 +90,7 @@ describe("TerminateApp (Android)", () => {
   beforeEach(() => {
     fakeAdb = new FakeAdbClient();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
+    fakeTimer.enableAutoAdvance();
   });
 
   test("terminates installed foreground app", async () => {

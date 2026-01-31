@@ -16,6 +16,7 @@ describe("TapOnElement TalkBack mode detection", () => {
     fakeAccessibilityDetector = new FakeAccessibilityDetector();
     fakeAdb = new FakeAdbClient();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Create a minimal TapOnElement instance for testing
     tapOnElement = new TapOnElement(

@@ -28,6 +28,7 @@ describe("CaptureSnapshot", () => {
     // Create fakes
     fakeAdb = new FakeAdbClient();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Create secure temporary directory for tests
     testBasePath = await fs.mkdtemp(path.join(os.tmpdir(), "snapshot-test-"));

@@ -33,6 +33,7 @@ describe("DeviceService Interface Compliance", () => {
       // This test verifies at compile-time that AccessibilityServiceClient
       // is assignable to the DeviceService interface
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
       const fakeAdb = new FakeAdbExecutor();
       fakeAdb.setCommandResponse("forward", { stdout: "8765", stderr: "" });
 
@@ -83,6 +84,7 @@ describe("DeviceService Interface Compliance", () => {
       // This test verifies at compile-time that XCTestServiceClient
       // is assignable to the DeviceService interface
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
 
       const testDevice: BootedDevice = {
         deviceId: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
@@ -121,6 +123,7 @@ describe("DeviceService Interface Compliance", () => {
 
     test("AccessibilityServiceClient implements AndroidDeviceService interface", () => {
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
       const fakeAdb = new FakeAdbExecutor();
       fakeAdb.setCommandResponse("forward", { stdout: "8765", stderr: "" });
 
@@ -162,6 +165,7 @@ describe("DeviceService Interface Compliance", () => {
 
     test("XCTestServiceClient has Apple-specific methods", () => {
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
 
       const testDevice: BootedDevice = {
         deviceId: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
@@ -195,6 +199,7 @@ describe("DeviceService Interface Compliance", () => {
   describe("Connection State (Android)", () => {
     test("isConnected returns false before connection", () => {
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
       const fakeAdb = new FakeAdbExecutor();
       fakeAdb.setCommandResponse("forward", { stdout: "8765", stderr: "" });
 
@@ -226,6 +231,7 @@ describe("DeviceService Interface Compliance", () => {
 
     test("ensureConnected returns false on connection failure", async () => {
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
       const fakeAdb = new FakeAdbExecutor();
       fakeAdb.setCommandResponse("forward", { stdout: "8765", stderr: "" });
 
@@ -262,6 +268,7 @@ describe("DeviceService Interface Compliance", () => {
   describe("Connection State (iOS)", () => {
     test("isConnected returns false before connection", () => {
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
 
       const testDevice: BootedDevice = {
         deviceId: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
@@ -283,6 +290,7 @@ describe("DeviceService Interface Compliance", () => {
 
     test("ensureConnected returns false on connection failure", async () => {
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
 
       const testDevice: BootedDevice = {
         deviceId: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",

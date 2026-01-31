@@ -60,6 +60,7 @@ describe("Keyboard", () => {
     fakeAdb = new FakeAdbExecutor();
     fakeHierarchy = new FakeKeyboardHierarchyProvider();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
   });
 
   test("detect returns bounds from input method window", async () => {

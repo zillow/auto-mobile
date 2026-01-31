@@ -56,6 +56,7 @@ describe("PinchOn", () => {
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
     fakeA11yService = new FakeAccessibilityService();
     fakeAdb = new FakeAdbExecutor();
 

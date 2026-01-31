@@ -4,6 +4,7 @@
 
 import { getDatabase } from "../../db/database";
 import type { WcagViolation } from "../../models/AccessibilityAudit";
+import { getCutoffDate, DEFAULT_TTL } from "../shared/MetricsUtils";
 
 interface BaselineData {
   screenId: string;
@@ -114,11 +115,9 @@ export class BaselineManager {
   /**
    * Clean up old baselines (older than specified days)
    */
-  async cleanupOldBaselines(daysOld: number): Promise<number> {
+  async cleanupOldBaselines(daysOld: number = DEFAULT_TTL.baselineDays): Promise<number> {
     const db = getDatabase();
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-    const cutoffIso = cutoffDate.toISOString();
+    const cutoffIso = getCutoffDate(daysOld);
 
     const result = await db
       .deleteFrom("accessibility_baselines")
