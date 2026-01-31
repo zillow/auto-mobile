@@ -27,7 +27,6 @@ import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
 import { PortManager } from "../../utils/PortManager";
-import { RequestManager } from "../../utils/RequestManager";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 import {
   ScreenshotBackoffScheduler,
