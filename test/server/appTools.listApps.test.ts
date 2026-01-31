@@ -73,7 +73,6 @@ describe("listApps tool", () => {
     setListAppsToolDependencies({ toolResponseFormatter: fakeToolUtils });
 
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
 
     const result = await resolveWithFakeTimer(tool!.handler({}), fakeTimer);
 

@@ -25,7 +25,6 @@ describe("HierarchyNavigationDetector", () => {
 
     // Use FakeTimer in manual mode for deterministic timing
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
 
     detector = new HierarchyNavigationDetector(manager, {
       debounceMs: 50,
@@ -181,7 +180,6 @@ describe("HierarchyNavigationDetector", () => {
       // Create detector with long debounce, short timeout
       detector.dispose();
       const longDebounceTimer = new FakeTimer();
-      longDebounceTimer.setManualMode();
       detector = new HierarchyNavigationDetector(manager, {
         debounceMs: 1000, // Long debounce
         stabilityTimeoutMs: 100, // Short timeout

@@ -73,7 +73,6 @@ describe("listDevices tool", () => {
     expect(tool).toBeDefined();
 
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
 
     const response = await resolveWithFakeTimer(tool!.handler({}), fakeTimer);
 
@@ -109,7 +108,6 @@ describe("listDevices tool", () => {
     expect(tool).toBeDefined();
 
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
 
     const response = await resolveWithFakeTimer(tool!.handler({ platform: "android" }), fakeTimer);
 

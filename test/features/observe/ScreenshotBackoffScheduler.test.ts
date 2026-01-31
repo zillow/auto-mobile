@@ -5,7 +5,7 @@ import {
   ScreenshotCaptureResult,
   computeChecksum,
 } from "../../../src/features/observe/ScreenshotBackoffScheduler";
-import { FakeTimer } from "../../../src/utils/SystemTimer";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("computeChecksum", () => {
   it("returns consistent checksum for same data", () => {

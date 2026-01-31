@@ -30,6 +30,7 @@ describe("Shake", () => {
     fakeWindow = new FakeWindow();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Configure default responses
     fakeWindow.setCachedActiveWindow(null);

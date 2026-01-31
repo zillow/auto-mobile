@@ -18,6 +18,7 @@ describe("Explore", () => {
   beforeEach(() => {
     fakeGraph = new FakeNavigationGraphManager();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
     getInstanceSpy = spyOn(NavigationGraphManager, "getInstance").mockReturnValue(
       fakeGraph as unknown as NavigationGraphManager
     );

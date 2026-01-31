@@ -49,6 +49,7 @@ describe("Rotate", () => {
     fakeObserveScreen = new FakeObserveScreen();
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Configure default responses
     fakeWindow.setCachedActiveWindow(null);

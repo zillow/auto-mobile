@@ -165,7 +165,6 @@ describe("MCP Resources Read", () => {
   test("reading latest screenshot waits for pending capture when none cached", async function() {
     const { client } = fixture.getContext();
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     ScreenshotJobTracker.setTimer(fakeTimer);
 
     const mockDevice: BootedDevice = {

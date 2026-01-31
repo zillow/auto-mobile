@@ -304,10 +304,11 @@ describe("DeviceServiceUtils", () => {
         fakeTimer
       );
 
-      // Advance time for first retry delay
-      await fakeTimer.advanceTime(100);
-      // Advance time for second retry delay
-      await fakeTimer.advanceTime(100);
+      // Interleave time advancement with async execution
+      for (let i = 0; i < 5; i++) {
+        fakeTimer.advanceTime(100);
+        await new Promise(r => setImmediate(r));
+      }
 
       const result = await promise;
 
@@ -328,9 +329,11 @@ describe("DeviceServiceUtils", () => {
         fakeTimer
       );
 
-      // Advance time for all delays
-      await fakeTimer.advanceTime(100);
-      await fakeTimer.advanceTime(100);
+      // Interleave time advancement with async execution
+      for (let i = 0; i < 5; i++) {
+        fakeTimer.advanceTime(100);
+        await new Promise(r => setImmediate(r));
+      }
 
       const result = await promise;
 
@@ -342,7 +345,7 @@ describe("DeviceServiceUtils", () => {
       const fakeTimer = new FakeTimer();
       let callCount = 0;
 
-      const result = await waitWithRetry(
+      const promise = waitWithRetry(
         async () => {
           callCount++;
           return callCount >= 2;
@@ -351,8 +354,13 @@ describe("DeviceServiceUtils", () => {
         fakeTimer
       );
 
-      // Advance time for delay between first and second attempt
-      await fakeTimer.advanceTime(100);
+      // Interleave time advancement with async execution
+      for (let i = 0; i < 5; i++) {
+        fakeTimer.advanceTime(100);
+        await new Promise(r => setImmediate(r));
+      }
+
+      const result = await promise;
 
       expect(result).toBe(true);
     });

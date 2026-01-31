@@ -72,7 +72,6 @@ describe("Parallel Execution Across Multiple Devices", function() {
 
     test("should throw error when exceeding device capacity after timeout", async function() {
       // Use manual mode so we can control time advancement
-      fakeTimer.setManualMode();
 
       // Assign devices to all three sessions
       const session1Id = "session-uuid-1";

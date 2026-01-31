@@ -30,7 +30,7 @@ describe("snapshot tool", () => {
     configRepository = new FakeDeviceSnapshotConfigRepository();
     store = new FakeDeviceSnapshotStore();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
+    fakeTimer.enableAutoAdvance();
     captureCalls = [];
     restoreCalls = [];
 

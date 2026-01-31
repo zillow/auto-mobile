@@ -22,7 +22,6 @@ describe("PerformanceTracker", function() {
 
     beforeEach(function() {
       fakeTimer = new FakeTimer();
-      fakeTimer.setManualMode();
       tracker = new DefaultPerformanceTracker(fakeTimer);
     });
 

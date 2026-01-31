@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Socket } from "node:net";
 import { RequestResponseSocketServer } from "../../../src/daemon/socketServer/RequestResponseSocketServer";
 import { SocketRequest, SocketResponse } from "../../../src/daemon/socketServer/SocketServerTypes";
-import { FakeTimer } from "../../../src/utils/SystemTimer";
+import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeSocket } from "../../fakes/FakeNetServer";
 
 interface TestRequest extends SocketRequest {
@@ -92,6 +92,7 @@ describe("RequestResponseSocketServer", () => {
 
   beforeEach(async () => {
     timer = new FakeTimer();
+    timer.enableAutoAdvance();
     server = new TestableRequestResponseServer(timer);
     await server.startFake();
     socket = new FakeSocket();

@@ -142,7 +142,6 @@ describe("systemTray find", () => {
 
   test("waits for the tray to open before matching", async () => {
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     const fakeAdb = new SequencedFakeAdbExecutor([1000, 2000]);
     const fakeObserveScreen = new SequencedObserveScreen([
       createObservation(createClosedHierarchy()),
@@ -178,7 +177,6 @@ describe("systemTray find", () => {
 
   test("does not return matches while the tray is closed", async () => {
     const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     const fakeAdb = new SequencedFakeAdbExecutor([1000, 2000]);
     const fakeObserveScreen = new SequencedObserveScreen([
       createObservation(createClosedHierarchy("Test Notification")),

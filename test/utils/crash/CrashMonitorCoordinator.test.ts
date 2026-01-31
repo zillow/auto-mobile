@@ -14,8 +14,8 @@ describe("CrashMonitorCoordinator", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
     // Use manual mode so setInterval doesn't fire automatically
-    fakeTimer.setManualMode();
     fakeLogcatDetector = new FakeCrashDetector("logcat");
     fakeProcessDetector = new FakeCrashDetector("process_monitor");
 

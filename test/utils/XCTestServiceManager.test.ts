@@ -136,7 +136,6 @@ describe("IOSXCTestServiceManager", function() {
     });
 
     test("restarts iproxy after unexpected exit", async function() {
-      fakeTimer.setManualMode();
       const fakeProcess = new FakeChildProcess();
       fakeExecutor.setNextSpawnProcess(fakeProcess);
       const manager = IOSXCTestServiceManager.createForTestingWithDeps(

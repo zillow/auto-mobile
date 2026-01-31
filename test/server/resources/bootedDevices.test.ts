@@ -321,6 +321,7 @@ describe("MCP Booted Device Resources", () => {
       fakeDeviceUtils.setBootedDevices("android", [mockAndroidDevice1, mockAndroidDevice2]);
 
       const fakeTimer = new FakeTimer();
+      fakeTimer.enableAutoAdvance();
       const sessionManager = new SessionManager(fakeTimer);
       const { FakeInstalledAppsRepository } = await import("../../fakes/FakeInstalledAppsRepository");
       const fakeAppsRepo = new FakeInstalledAppsRepository();

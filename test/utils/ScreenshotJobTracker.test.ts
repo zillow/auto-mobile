@@ -8,7 +8,6 @@ describe("ScreenshotJobTracker", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     ScreenshotJobTracker.setTimer(fakeTimer);
   });
 

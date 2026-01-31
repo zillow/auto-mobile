@@ -281,7 +281,6 @@ describe("ListInstalledApps", function() {
     test("should use cached apps when fresh", async function() {
       const repo = new FakeInstalledAppsRepository();
       const timer = new FakeTimer();
-      timer.setManualMode();
       timer.advanceTime(1000);
       const now = timer.now();
       const entries: NewInstalledApp[] = [
@@ -322,7 +321,6 @@ describe("ListInstalledApps", function() {
     test("should rebuild cache when stale", async function() {
       const repo = new FakeInstalledAppsRepository();
       const timer = new FakeTimer();
-      timer.setManualMode();
       const staleTime = timer.now();
       await repo.replaceInstalledApps(mockDevice.deviceId, [
         {

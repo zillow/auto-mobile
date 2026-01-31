@@ -32,6 +32,7 @@ describe("BiometricAuth", () => {
     fakeWindow = new FakeWindow();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Create a mock device
     device = {

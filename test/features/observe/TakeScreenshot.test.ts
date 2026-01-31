@@ -46,7 +46,6 @@ describe("TakeScreenshot", function() {
 
     test("should generate different timestamps for consecutive calls", async function() {
       const fakeTimer = new FakeTimer();
-      fakeTimer.setManualMode();
       const timestamp1 = fakeTimer.now();
       const options = { format: "png" as const };
 

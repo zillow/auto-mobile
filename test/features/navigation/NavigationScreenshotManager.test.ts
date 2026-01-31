@@ -116,7 +116,6 @@ describe("NavigationScreenshotManager", () => {
     NavigationScreenshotManager.resetInstance();
     fakeFs = new FakeFileSystem();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode(); // Use manual mode for controlled time
 
     manager = NavigationScreenshotManager.createForTesting({
       screenshotDir,

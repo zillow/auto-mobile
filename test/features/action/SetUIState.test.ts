@@ -64,6 +64,7 @@ describe("SetUIState", () => {
     fakeObserve = new FakeObserveScreenForSetUIState();
     fakeFieldTypeDetector = new FakeFieldTypeDetector();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
   });
 
   describe("text field handling", () => {

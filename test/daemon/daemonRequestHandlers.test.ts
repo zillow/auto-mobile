@@ -76,7 +76,7 @@ describe("handleDaemonRequest", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
+    fakeTimer.enableAutoAdvance();
     sessionManager = new SessionManager(fakeTimer);
   });
 

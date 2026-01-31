@@ -1,4 +1,4 @@
-import { Timer } from "../../src/utils/interfaces/Timer";
+import { Timer } from "../../src/utils/SystemTimer";
 
 /**
  * Pending sleep call information
@@ -31,75 +31,59 @@ interface PendingInterval {
 }
 
 /**
- * Fake Timer implementation for testing
- * Allows tests to control time advancement without real delays
+ * Fake Timer implementation for testing.
  *
- * Modes:
- * 1. Instant mode (default): sleeps complete immediately
- * 2. Manual mode: sleeps are pending until advanceTime() or resolveAll() is called
- * 3. Delayed mode: sleeps use real setTimeout with configured duration
+ * All time-related operations are controlled manually:
+ * - sleep() pends until advanceTime() is called
+ * - setTimeout() stores callbacks that fire when time advances past their delay
+ * - setInterval() stores callbacks that fire repeatedly as time advances
+ * - now() returns the fake currentTime
+ *
+ * Tests must explicitly advance time using advanceTime() or resolveAll().
+ *
+ * For tests that don't need time control, call enableAutoAdvance() to make
+ * sleeps resolve immediately via setImmediate.
  */
 export class FakeTimer implements Timer {
   private pendingSleeps: PendingSleep[] = [];
   private sleepHistory: number[] = [];
   private currentTime: number = 0;
-  private mode: "instant" | "manual" | "delayed" = "instant";
-  private sleepDuration: number = 0;
   private pendingTimeouts: PendingTimeout[] = [];
   private pendingIntervals: PendingInterval[] = [];
   private nextTimeoutId: number = 1;
   private nextIntervalId: number = 1000000;
-  private delayedModeStartTime?: number;
-  private delayedModeFakeStartTime: number = 0;
+  private autoAdvance: boolean = false;
 
   /**
-   * Configure the sleep duration (for delayed mode)
-   * Sets mode to "delayed" if duration > 0, "instant" if duration = 0
+   * Enable auto-advance mode where sleeps and timeouts resolve immediately.
+   * Use this for tests that don't need to control time explicitly.
    */
-  setSleepDuration(ms: number): void {
-    this.sleepDuration = ms;
-    this.mode = ms > 0 ? "delayed" : "instant";
-    // Reset delayed mode time tracking
-    this.delayedModeStartTime = undefined;
-    this.delayedModeFakeStartTime = 0;
+  enableAutoAdvance(): void {
+    this.autoAdvance = true;
   }
 
   /**
-   * Set mode to manual (sleeps are pending until resolved)
-   */
-  setManualMode(): void {
-    this.mode = "manual";
-  }
-
-  /**
-   * Record a sleep call and handle it based on current mode
-   * - instant: resolves immediately
-   * - manual: pending until advanceTime() or resolveAll()
-   * - delayed: uses real setTimeout with configured duration
+   * Sleep for the specified duration.
+   * In normal mode: pends until advanceTime() is called.
+   * In auto-advance mode: resolves immediately via setImmediate.
    */
   async sleep(ms: number): Promise<void> {
     this.sleepHistory.push(ms);
-
-    if (this.mode === "instant") {
-      // Instant completion
-      return Promise.resolve();
-    } else if (this.mode === "delayed") {
-      // Real delay with configured duration
-      return new Promise(resolve => setTimeout(resolve, this.sleepDuration));
-    } else {
-      // Manual mode - pending until resolved
-      return new Promise<void>(resolve => {
-        this.pendingSleeps.push({
-          ms,
-          resolve,
-          timestamp: this.currentTime
-        });
-      });
+    if (this.autoAdvance) {
+      this.currentTime += ms;
+      return new Promise<void>(resolve => setImmediate(resolve));
     }
+    return new Promise<void>(resolve => {
+      this.pendingSleeps.push({
+        ms,
+        resolve,
+        timestamp: this.currentTime
+      });
+    });
   }
 
   /**
-   * Advance time and resolve all pending sleeps, fire timeouts, and intervals that have elapsed
+   * Advance time and resolve all pending sleeps, fire timeouts, and intervals that have elapsed.
    * @param ms - Milliseconds to advance
    */
   advanceTime(ms: number): void {
@@ -141,13 +125,16 @@ export class FakeTimer implements Timer {
     toFireIntervals.forEach(interval => interval.callback());
   }
 
+  /**
+   * Get the current fake time.
+   */
   now(): number {
     return this.currentTime;
   }
 
   /**
-   * Resolve all pending sleeps immediately regardless of time
-   * Useful for tests that don't care about timing
+   * Resolve all pending sleeps immediately regardless of time.
+   * Useful for tests that don't care about timing details.
    */
   resolveAll(): void {
     const toResolve = [...this.pendingSleeps];
@@ -156,56 +143,81 @@ export class FakeTimer implements Timer {
   }
 
   /**
-   * Get all pending sleep durations
+   * Get all pending sleep durations.
    */
   getPendingSleeps(): number[] {
     return this.pendingSleeps.map(s => s.ms);
   }
 
   /**
-   * Get count of pending sleeps
+   * Get count of pending sleeps.
    */
   getPendingSleepCount(): number {
     return this.pendingSleeps.length;
   }
 
   /**
-   * Get history of all sleep calls (including resolved ones)
+   * Get history of all sleep calls (including resolved ones).
    */
   getSleepHistory(): number[] {
     return [...this.sleepHistory];
   }
 
   /**
-   * Get total number of sleep calls made
+   * Get total number of sleep calls made.
    */
   getSleepCallCount(): number {
     return this.sleepHistory.length;
   }
 
   /**
-   * Check if a specific sleep duration was called
+   * Check if a specific sleep duration was called.
    */
   wasSleepCalled(ms: number): boolean {
     return this.sleepHistory.includes(ms);
   }
 
   /**
-   * Backward compatibility alias for wasSleepCalled
+   * Backward compatibility alias for wasSleepCalled.
    */
   wasCalledWithDuration(ms: number): boolean {
     return this.wasSleepCalled(ms);
   }
 
   /**
-   * Get current fake time
+   * Get current fake time.
    */
   getCurrentTime(): number {
     return this.currentTime;
   }
 
   /**
-   * Reset all state (clears pending sleeps, timeouts, intervals, history, and time)
+   * Set the current time directly (useful for specific test scenarios).
+   */
+  setCurrentTime(time: number): void {
+    this.currentTime = time;
+  }
+
+  /**
+   * Synchronous alias for advanceTime.
+   * Provided for compatibility with tests that expect this method name.
+   */
+  advanceTimersByTime(ms: number): void {
+    this.advanceTime(ms);
+  }
+
+  /**
+   * Async version of advanceTime.
+   * Advances time and awaits a microtask to let any async callbacks complete.
+   */
+  async advanceTimersByTimeAsync(ms: number): Promise<void> {
+    this.advanceTime(ms);
+    // Give any async callbacks a chance to complete
+    await Promise.resolve();
+  }
+
+  /**
+   * Reset all state (clears pending sleeps, timeouts, intervals, history, and time).
    */
   reset(): void {
     // Resolve all pending sleeps before clearing to avoid hanging promises
@@ -216,167 +228,99 @@ export class FakeTimer implements Timer {
     this.pendingIntervals = [];
     this.nextTimeoutId = 1;
     this.nextIntervalId = 1000000;
-    this.delayedModeStartTime = undefined;
-    this.delayedModeFakeStartTime = 0;
   }
 
   /**
-   * Clear sleep history but keep pending sleeps and time
+   * Clear sleep history but keep pending sleeps and time.
    */
   clearHistory(): void {
     this.sleepHistory = [];
   }
 
   /**
-   * Schedule a callback to be executed after a specified delay
-   * - instant mode: executes via setImmediate
-   * - manual mode: stores as pending timeout
-   * - delayed mode: uses real setTimeout
+   * Schedule a callback to be executed after a specified delay.
+   * In normal mode: fires when advanceTime() moves past the delay.
+   * In auto-advance mode: fires immediately via setImmediate.
    */
   setTimeout(callback: () => void, ms: number): NodeJS.Timeout {
-    if (this.mode === "instant") {
-      // Execute immediately via setImmediate
+    const id = this.nextTimeoutId as unknown as NodeJS.Timeout;
+    this.nextTimeoutId++;
+    if (this.autoAdvance) {
+      this.currentTime += ms;
       setImmediate(callback);
-      // Return a fake handle (number cast to timeout type)
-      const fakeHandle = this.nextTimeoutId as unknown as NodeJS.Timeout;
-      this.nextTimeoutId++;
-      return fakeHandle;
-    } else if (this.mode === "delayed") {
-      // Use real setTimeout with configured duration
-      return global.setTimeout(callback, this.sleepDuration);
-    } else {
-      // Manual mode - store as pending timeout
-      const id = this.nextTimeoutId as unknown as NodeJS.Timeout;
-      this.nextTimeoutId++;
-      this.pendingTimeouts.push({
-        id,
-        callback,
-        ms,
-        timestamp: this.currentTime
-      });
       return id;
     }
+    this.pendingTimeouts.push({
+      id,
+      callback,
+      ms,
+      timestamp: this.currentTime
+    });
+    return id;
   }
 
   /**
-   * Clear a pending timeout
+   * Clear a pending timeout.
    */
   clearTimeout(handle: NodeJS.Timeout): void {
-    // In instant mode, this is a no-op (callback already fired or is scheduled via setImmediate)
-    if (this.mode === "instant") {
-      return;
-    }
-
-    // In delayed mode, use the real clearTimeout
-    if (this.mode === "delayed") {
-      global.clearTimeout(handle);
-      return;
-    }
-
-    // In manual mode, remove from pending timeouts
     this.pendingTimeouts = this.pendingTimeouts.filter(t => t.id !== handle);
   }
 
   /**
-   * Schedule a callback to be executed repeatedly at a specified interval
-   * - instant mode: executes once via setImmediate
-   * - manual mode: stores as pending interval
-   * - delayed mode: uses real setInterval
+   * Schedule a callback to be executed repeatedly at a specified interval.
+   * In normal mode: fires each time advanceTime() moves past the interval.
+   * In auto-advance mode: fires once via setImmediate (intervals should not repeat in tests).
    */
   setInterval(callback: () => void, ms: number): NodeJS.Timeout {
-    if (this.mode === "instant") {
-      // Execute once immediately via setImmediate
+    const id = this.nextIntervalId as unknown as NodeJS.Timeout;
+    this.nextIntervalId++;
+    if (this.autoAdvance) {
+      this.currentTime += ms;
       setImmediate(callback);
-      // Return a fake handle (number cast to interval type)
-      const fakeHandle = this.nextIntervalId as unknown as NodeJS.Timeout;
-      this.nextIntervalId++;
-      return fakeHandle;
-    } else if (this.mode === "delayed") {
-      // Use real setInterval with configured duration
-      return global.setInterval(callback, this.sleepDuration);
-    } else {
-      // Manual mode - store as pending interval
-      const id = this.nextIntervalId as unknown as NodeJS.Timeout;
-      this.nextIntervalId++;
-      this.pendingIntervals.push({
-        id,
-        callback,
-        ms,
-        timestamp: this.currentTime,
-        lastFiredAt: this.currentTime
-      });
       return id;
     }
+    this.pendingIntervals.push({
+      id,
+      callback,
+      ms,
+      timestamp: this.currentTime,
+      lastFiredAt: this.currentTime
+    });
+    return id;
   }
 
   /**
-   * Clear a pending interval
+   * Clear a pending interval.
    */
   clearInterval(handle: NodeJS.Timeout): void {
-    // In instant mode, this is a no-op (callback already fired)
-    if (this.mode === "instant") {
-      return;
-    }
-
-    // In delayed mode, use the real clearInterval
-    if (this.mode === "delayed") {
-      global.clearInterval(handle);
-      return;
-    }
-
-    // In manual mode, remove from pending intervals
     this.pendingIntervals = this.pendingIntervals.filter(i => i.id !== handle);
   }
 
   /**
-   * Get all pending timeout durations
+   * Get all pending timeout durations.
    */
   getPendingTimeouts(): number[] {
     return this.pendingTimeouts.map(t => t.ms);
   }
 
   /**
-   * Get all pending interval durations
+   * Get all pending interval durations.
    */
   getPendingIntervals(): number[] {
     return this.pendingIntervals.map(i => i.ms);
   }
 
   /**
-   * Get count of pending timeouts
+   * Get count of pending timeouts.
    */
   getPendingTimeoutCount(): number {
     return this.pendingTimeouts.length;
   }
 
   /**
-   * Get count of pending intervals
+   * Get count of pending intervals.
    */
   getPendingIntervalCount(): number {
     return this.pendingIntervals.length;
-  }
-
-  /**
-   * Get the current time
-   * In manual/delayed modes, returns fake time that advances automatically
-   * In instant mode, returns real time
-   */
-  now(): number {
-    if (this.mode === "manual") {
-      return this.currentTime;
-    } else if (this.mode === "delayed") {
-      // In delayed mode, use fake time that advances much faster than real time
-      // This allows tests to run fast (using 1ms sleep) while appearing to take seconds
-      if (!this.delayedModeStartTime) {
-        this.delayedModeStartTime = Date.now();
-        this.delayedModeFakeStartTime = this.currentTime;
-      }
-      const realElapsed = Date.now() - this.delayedModeStartTime;
-      // Make fake time advance 1000x faster than real time
-      // So 1ms real time = 1000ms fake time
-      const fakeElapsed = realElapsed * 1000;
-      return this.delayedModeFakeStartTime + fakeElapsed;
-    }
-    return Date.now();
   }
 }

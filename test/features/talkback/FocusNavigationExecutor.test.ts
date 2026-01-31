@@ -45,10 +45,20 @@ describe("FocusNavigationExecutor", () => {
     };
     const executor = new FocusNavigationExecutor({ timer, driverFactory });
 
-    const result = await executor.navigateToElement("device-1", targetSelector, path, {
+    // Start navigation (non-blocking)
+    const resultPromise = executor.navigateToElement("device-1", targetSelector, path, {
       verificationInterval: 1,
       swipeDelay: 123
     });
+
+    // Interleave time advancement with async execution
+    // Each iteration: advance time, then let async code run
+    for (let i = 0; i < 10; i++) {
+      timer.advanceTime(200);
+      await new Promise(r => setImmediate(r));
+    }
+
+    const result = await resultPromise;
 
     expect(result).toBe(true);
     expect(driver.getSwipeCount()).toBe(2);
@@ -80,12 +90,24 @@ describe("FocusNavigationExecutor", () => {
     };
     const executor = new FocusNavigationExecutor({ timer, driverFactory });
 
-    await expect(
-      executor.navigateToElement("device-1", targetSelector, path, {
-        verificationInterval: 1,
-        swipeDelay: 0
-      })
-    ).rejects.toThrow("Focus did not move");
+    let thrownError: Error | null = null;
+    const resultPromise = executor.navigateToElement("device-1", targetSelector, path, {
+      verificationInterval: 1,
+      swipeDelay: 0
+    }).catch(e => {
+      thrownError = e as Error;
+    });
+
+    // Interleave time advancement with async execution
+    for (let i = 0; i < 10; i++) {
+      timer.advanceTime(100);
+      await new Promise(r => setImmediate(r));
+    }
+
+    await resultPromise;
+
+    expect(thrownError).not.toBeNull();
+    expect(thrownError!.message).toContain("Focus did not move after multiple swipes");
   });
 
   test("recalculates when traversal order moves target farther away", async () => {
@@ -113,10 +135,18 @@ describe("FocusNavigationExecutor", () => {
     };
     const executor = new FocusNavigationExecutor({ timer, driverFactory });
 
-    const result = await executor.navigateToElement("device-1", targetSelector, path, {
+    const resultPromise = executor.navigateToElement("device-1", targetSelector, path, {
       verificationInterval: 1,
       swipeDelay: 0
     });
+
+    // Interleave time advancement with async execution
+    for (let i = 0; i < 10; i++) {
+      timer.advanceTime(100);
+      await new Promise(r => setImmediate(r));
+    }
+
+    const result = await resultPromise;
 
     expect(result).toBe(true);
     expect(driver.getSwipeCount()).toBe(4);

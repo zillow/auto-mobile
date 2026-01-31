@@ -94,7 +94,6 @@ describe("AccessibilityDetector - Unit Tests", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     detector = new DefaultAccessibilityDetector(fakeTimer);
     fakeAdb = new FakeAdbExecutor();
     fakeFeatureFlags = new FakeFeatureFlagService();
@@ -172,7 +171,6 @@ describe("AccessibilityDetector - Unit Tests", () => {
     test("cache expires after TTL using FakeTimer", async () => {
       // Create detector with manual mode timer for time-based testing
       const manualTimer = new FakeTimer();
-      manualTimer.setManualMode();
       const timedDetector = new DefaultAccessibilityDetector(manualTimer);
 
       fakeAdb.setResponse("com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService");
@@ -192,7 +190,6 @@ describe("AccessibilityDetector - Unit Tests", () => {
     test("cache does not expire within TTL using FakeTimer", async () => {
       // Create detector with manual mode timer for time-based testing
       const manualTimer = new FakeTimer();
-      manualTimer.setManualMode();
       const timedDetector = new DefaultAccessibilityDetector(manualTimer);
 
       fakeAdb.setResponse("com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService");

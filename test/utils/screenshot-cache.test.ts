@@ -15,7 +15,6 @@ describe("ScreenshotCache", function() {
   beforeEach(async function() {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "screenshot-cache-"));
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     ScreenshotCache.clearCache();
   });
 

@@ -1,6 +1,6 @@
 import type { BootedDevice } from "../models";
 import type { AdbExecutor } from "../utils/android-cmdline-tools/interfaces/AdbExecutor";
-import type { Timer } from "../utils/interfaces/Timer";
+import type { Timer } from "../utils/SystemTimer";
 import type { CrashEvent, AnrEvent } from "../utils/interfaces/CrashMonitor";
 import { CrashMonitorCoordinator } from "../utils/crash/CrashMonitorCoordinator";
 import { getFailureRepository } from "../db/failureRepository";

@@ -66,6 +66,7 @@ describe("DragAndDrop", () => {
     fakeA11yService = new FakeAccessibilityService();
     fakeAdb = new FakeAdbExecutor();
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     fakeObserveScreen.setObserveResult(() => createObserveResult());
     fakeWindow.setCachedActiveWindow(null);

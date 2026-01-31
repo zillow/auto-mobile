@@ -83,7 +83,6 @@ describe("DevicePool", () => {
 
     test("should throw error when no devices available after timeout", async () => {
       // Use manual mode so we can control time advancement
-      fakeTimer.setManualMode();
 
       await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       await devicePool.assignDeviceToSession("session-1");
@@ -110,7 +109,6 @@ describe("DevicePool", () => {
 
     test("should wait and succeed when device becomes available", async () => {
       // Use manual mode so we can control time advancement
-      fakeTimer.setManualMode();
 
       await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const device1 = await devicePool.assignDeviceToSession("session-1");

@@ -507,16 +507,11 @@ describe("AccessibilityServiceManager", function() {
     }
 
     class FakeShellCommandExecutor implements ShellCommandExecutor {
-      private timer: FakeTimer;
       private handlers: Array<{
         matcher: (command: string) => boolean;
         handler: (command: string) => Promise<ShellCommandResult>;
       }> = [];
       private executedCommands: string[] = [];
-
-      constructor(timer: FakeTimer) {
-        this.timer = timer;
-      }
 
       on(
         matcher: (command: string) => boolean,
@@ -527,7 +522,8 @@ describe("AccessibilityServiceManager", function() {
 
       async exec(command: string): Promise<ShellCommandResult> {
         this.executedCommands.push(command);
-        await this.timer.sleep(1);
+        // Use setImmediate to simulate async behavior without depending on timer
+        await new Promise(resolve => setImmediate(resolve));
 
         const match = this.handlers.find(entry => entry.matcher(command));
         if (!match) {
@@ -589,7 +585,8 @@ describe("AccessibilityServiceManager", function() {
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
       const timer = new FakeTimer();
-      const shell = new FakeShellCommandExecutor(timer);
+      timer.enableAutoAdvance();
+      const shell = new FakeShellCommandExecutor();
       let downloadedPath: string | null = null;
 
       shell.on(command => command.startsWith("curl "), async command => {
@@ -629,7 +626,8 @@ describe("AccessibilityServiceManager", function() {
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
       const timer = new FakeTimer();
-      const shell = new FakeShellCommandExecutor(timer);
+      timer.enableAutoAdvance();
+      const shell = new FakeShellCommandExecutor();
       let downloadedPath: string | null = null;
 
       shell.on(command => command.startsWith("curl "), async command => {
@@ -667,7 +665,8 @@ describe("AccessibilityServiceManager", function() {
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
       const timer = new FakeTimer();
-      const shell = new FakeShellCommandExecutor(timer);
+      timer.enableAutoAdvance();
+      const shell = new FakeShellCommandExecutor();
 
       shell.on(command => command.startsWith("curl "), async command => {
         const outputPath = getCurlOutputPath(command);
@@ -692,7 +691,8 @@ describe("AccessibilityServiceManager", function() {
       const payload = Buffer.alloc(250, 5);
 
       const timer = new FakeTimer();
-      const shell = new FakeShellCommandExecutor(timer);
+      timer.enableAutoAdvance();
+      const shell = new FakeShellCommandExecutor();
 
       shell.on(command => command.startsWith("curl "), async command => {
         const outputPath = getCurlOutputPath(command);
@@ -711,7 +711,8 @@ describe("AccessibilityServiceManager", function() {
 
     test("should fail when curl download errors", async function() {
       const timer = new FakeTimer();
-      const shell = new FakeShellCommandExecutor(timer);
+      timer.enableAutoAdvance();
+      const shell = new FakeShellCommandExecutor();
 
       shell.on(command => command.startsWith("curl "), async () => {
         throw new Error("curl failed");

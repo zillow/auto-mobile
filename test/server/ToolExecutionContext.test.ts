@@ -25,6 +25,7 @@ describe("ToolExecutionContext", () => {
 
   beforeEach(async () => {
     fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
     sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
     const fakeDeviceManager = new FakeDeviceManager();

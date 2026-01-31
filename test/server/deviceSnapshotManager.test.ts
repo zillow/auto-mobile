@@ -32,7 +32,6 @@ describe("deviceSnapshotManager", () => {
 
   beforeEach(async () => {
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
     repository = new FakeDeviceSnapshotRepository();
     configRepository = new FakeDeviceSnapshotConfigRepository();
     store = new FakeDeviceSnapshotStore();
