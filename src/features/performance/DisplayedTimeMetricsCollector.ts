@@ -1,4 +1,3 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
@@ -11,8 +10,11 @@ export interface DisplayedTimeCaptureOptions {
   endTimestampMs: number;
 }
 
+// AdbExecutor extended with optional AdbClient-specific methods
+type ExtendedAdbExecutor = AdbExecutor & { getAndroidApiLevel?: () => Promise<number | null> };
+
 export class DisplayedTimeMetricsCollector {
-  private adb: AdbClient;
+  private adb: ExtendedAdbExecutor;
   private device: BootedDevice;
   private logcatTagCache: DisplayedLogcatTag | undefined;
 
@@ -20,11 +22,11 @@ export class DisplayedTimeMetricsCollector {
     this.device = device;
     // Detect if the argument is a factory (has create method) or an executor
     if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
-      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device) as AdbClient;
+      this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
     } else if (adbFactoryOrExecutor) {
-      this.adb = adbFactoryOrExecutor as AdbClient;
+      this.adb = adbFactoryOrExecutor as ExtendedAdbExecutor;
     } else {
-      this.adb = defaultAdbClientFactory.create(device) as AdbClient;
+      this.adb = defaultAdbClientFactory.create(device);
     }
   }
 
@@ -57,7 +59,11 @@ export class DisplayedTimeMetricsCollector {
       return this.logcatTagCache;
     }
 
-    const apiLevel = await this.adb.getAndroidApiLevel();
+    // Guard: getAndroidApiLevel is AdbClient-specific, not part of AdbExecutor interface
+    let apiLevel: number | null = null;
+    if (typeof this.adb.getAndroidApiLevel === "function") {
+      apiLevel = await this.adb.getAndroidApiLevel();
+    }
     this.logcatTagCache = apiLevel !== null && apiLevel >= 29
       ? "ActivityTaskManager"
       : "ActivityManager";

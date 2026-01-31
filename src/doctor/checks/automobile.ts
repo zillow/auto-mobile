@@ -117,6 +117,9 @@ export async function checkAccessibilityService(
 
     // Check first connected device
     const device = devices[0];
+    // Reset cached instances to ensure fresh ADB reads for doctor diagnostics
+    // (getInstance memoizes isInstalled/isEnabled for 30 minutes which can report stale state)
+    AndroidAccessibilityServiceManager.resetInstances();
     const serviceManager = AndroidAccessibilityServiceManager.getInstance(device);
 
     const versionResult = await serviceManager.ensureCompatibleVersion();
