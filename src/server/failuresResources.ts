@@ -1,13 +1,13 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { logger } from "../utils/logger";
-import { FailuresRepository } from "../db/failuresRepository";
+import { FailureAnalyticsRepository } from "../db/failureAnalyticsRepository";
 
 export const FAILURES_RESOURCE_URIS = {
   BASE: "automobile:failures",
   TIMELINE: "automobile:failures/timeline",
 } as const;
 
-const failuresRepository = new FailuresRepository();
+const failureAnalyticsRepository = new FailureAnalyticsRepository();
 
 // Type definitions matching IDE plugin models
 
@@ -129,7 +129,7 @@ export interface TimelineResponse {
 
 async function getFailuresResource(uri: string): Promise<ResourceContent> {
   try {
-    const groups = await failuresRepository.getFailureGroups();
+    const groups = await failureAnalyticsRepository.getFailureGroups();
 
     const response: FailuresResponse = {
       groups,
@@ -178,7 +178,7 @@ async function getTimelineResource(params: Record<string, string>): Promise<Reso
     const startTime = now - duration;
     const endTime = now;
 
-    const result = await failuresRepository.getTimelineData({
+    const result = await failureAnalyticsRepository.getTimelineData({
       startTime,
       endTime,
       aggregation,

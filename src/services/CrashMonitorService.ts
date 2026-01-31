@@ -3,7 +3,7 @@ import type { AdbExecutor } from "../utils/android-cmdline-tools/interfaces/AdbE
 import type { Timer } from "../utils/SystemTimer";
 import type { CrashEvent, AnrEvent } from "../utils/interfaces/CrashMonitor";
 import { CrashMonitorCoordinator } from "../utils/crash/CrashMonitorCoordinator";
-import { getFailureRepository } from "../db/failureRepository";
+import { getFailureEventRepository } from "../db/failureEventRepository";
 import { defaultTimer } from "../utils/SystemTimer";
 import { logger } from "../utils/logger";
 
@@ -203,7 +203,7 @@ export class CrashMonitorService {
    */
   private async handleCrash(event: CrashEvent): Promise<void> {
     try {
-      const repo = getFailureRepository();
+      const repo = getFailureEventRepository();
       const id = await repo.saveCrash(event);
 
       logger.info(
@@ -219,7 +219,7 @@ export class CrashMonitorService {
    */
   private async handleAnr(event: AnrEvent): Promise<void> {
     try {
-      const repo = getFailureRepository();
+      const repo = getFailureEventRepository();
       const id = await repo.saveAnr(event);
 
       logger.info(

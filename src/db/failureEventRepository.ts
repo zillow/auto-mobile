@@ -64,7 +64,7 @@ export interface FailureRecord {
 /**
  * Repository for failure data (crashes, ANRs, tool call failures)
  */
-export class FailureRepository {
+export class FailureEventRepository {
   /**
    * Save a crash event to the database
    */
@@ -462,11 +462,11 @@ export class FailureRepository {
 }
 
 // Singleton instance
-let failureRepositoryInstance: FailureRepository | null = null;
+let failureRepositoryInstance: FailureEventRepository | null = null;
 
-export function getFailureRepository(): FailureRepository {
+export function getFailureEventRepository(): FailureEventRepository {
   if (!failureRepositoryInstance) {
-    failureRepositoryInstance = new FailureRepository();
+    failureRepositoryInstance = new FailureEventRepository();
   }
   return failureRepositoryInstance;
 }

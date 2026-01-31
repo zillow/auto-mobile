@@ -1,4 +1,4 @@
-import { FailuresRepository, RecordFailureInput } from "../../db/failuresRepository";
+import { FailureAnalyticsRepository, RecordFailureInput } from "../../db/failureAnalyticsRepository";
 import type {
   FailureSeverity,
   StackTraceElement,
@@ -99,11 +99,11 @@ export interface RecordAnrInput {
  * It handles signature generation, severity calculation, and stores failures in the database.
  */
 export class FailureRecorder implements FailureRecorderService {
-  private repository: FailuresRepository;
+  private repository: FailureAnalyticsRepository;
   private static instance: FailureRecorder | null = null;
 
-  constructor(repository?: FailuresRepository) {
-    this.repository = repository ?? new FailuresRepository();
+  constructor(repository?: FailureAnalyticsRepository) {
+    this.repository = repository ?? new FailureAnalyticsRepository();
   }
 
   /**
