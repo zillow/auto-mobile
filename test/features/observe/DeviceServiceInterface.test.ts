@@ -10,8 +10,8 @@
  * 3. Connection lifecycle - shared connection management works correctly
  */
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { DeviceService, AndroidDeviceService, AppleDeviceService } from "../../../src/features/observe/DeviceService";
+import { describe, expect, test } from "bun:test";
+import type { DeviceService, AndroidDeviceService } from "../../../src/features/observe/DeviceService";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
