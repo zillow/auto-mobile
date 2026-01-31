@@ -163,7 +163,29 @@ export class DefaultRetryExecutor implements RetryExecutor {
           onRetry?.(lastError, attempt, delay);
 
           if (delay > 0) {
-            await this.timer.sleep(delay);
+            // Race sleep against abort signal for prompt cancellation
+            if (signal) {
+              const aborted = await Promise.race([
+                this.timer.sleep(delay).then(() => false),
+                new Promise<boolean>(resolve => {
+                  if (signal.aborted) {
+                    resolve(true);
+                    return;
+                  }
+                  signal.addEventListener("abort", () => resolve(true), { once: true });
+                }),
+              ]);
+              if (aborted) {
+                return {
+                  success: false,
+                  error: new Error("Operation aborted"),
+                  attempts: attempt,
+                  totalTimeMs: this.timer.now() - startTime,
+                };
+              }
+            } else {
+              await this.timer.sleep(delay);
+            }
           }
         }
       }

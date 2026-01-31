@@ -99,8 +99,8 @@ export class FakeRetryExecutor implements RetryExecutor {
         try {
           // Still call the operation to simulate real behavior
           await operation(attempt);
-        } catch (err) {
-          lastError = err instanceof Error ? err : new Error(String(err));
+        } catch {
+          // Ignore operation errors - we use the configured errorToThrow
         }
         lastError = this.errorToThrow;
       }

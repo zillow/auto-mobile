@@ -186,10 +186,15 @@ export class TTLCache<K, V> implements Cache<K, V> {
       }
     }
 
-    // Check entry count constraints
-    while (this.entries.size >= this.maxEntries) {
+    // Check entry count constraints (guard against maxEntries <= 0)
+    while (this.maxEntries > 0 && this.entries.size >= this.maxEntries && this.entries.size > 0) {
       this.evictOldest();
       this.stats.sizeEvictions++;
+    }
+
+    // Skip caching if maxEntries is 0 or negative (caching disabled)
+    if (this.maxEntries <= 0) {
+      return;
     }
 
     // Add new entry
