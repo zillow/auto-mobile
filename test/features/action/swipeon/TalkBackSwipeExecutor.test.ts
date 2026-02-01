@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, spyOn } from "bun:test";
-import { SwipeOn } from "../../../src/features/action/SwipeOn";
-import { FakeAccessibilityDetector } from "../../fakes/FakeAccessibilityDetector";
-import { SwipeDirection } from "../../../src/models";
-import { NoOpPerformanceTracker } from "../../../src/utils/PerformanceTracker";
+import { SwipeOn } from "../../../../src/features/action/swipeon";
+import { FakeAccessibilityDetector } from "../../../fakes/FakeAccessibilityDetector";
+import { SwipeDirection } from "../../../../src/models";
+import { NoOpPerformanceTracker } from "../../../../src/utils/PerformanceTracker";
 
 describe("SwipeOn TalkBack mode detection", () => {
   let fakeAccessibilityDetector: FakeAccessibilityDetector;
@@ -39,7 +39,7 @@ describe("SwipeOn TalkBack mode detection", () => {
 
     // Spy on the private methods to verify dispatch logic
     executeAndroidSwipeWithAccessibility = spyOn(
-      swipeOn as any,
+      (swipeOn as any).talkBackExecutor,
       "executeAndroidSwipeWithAccessibility"
     ).mockResolvedValue({
       success: true,
@@ -69,7 +69,7 @@ describe("SwipeOn TalkBack mode detection", () => {
     });
 
     test("dispatches to standard swipe method", async () => {
-      await (swipeOn as any).executeSwipeGesture(
+      await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
         100,
         500,
         100,
@@ -91,7 +91,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         executeGestureSwipe.mockClear();
         executeAndroidSwipeWithAccessibility.mockClear();
 
-        await (swipeOn as any).executeSwipeGesture(
+        await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
           100,
           500,
           100,
@@ -114,7 +114,7 @@ describe("SwipeOn TalkBack mode detection", () => {
     });
 
     test("dispatches to accessibility-aware swipe method", async () => {
-      await (swipeOn as any).executeSwipeGesture(
+      await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
         100,
         500,
         100,
@@ -136,7 +136,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         "scrollable": true
       } as any;
 
-      await (swipeOn as any).executeSwipeGesture(
+      await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
         100,
         500,
         100,
@@ -166,7 +166,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         executeGestureSwipe.mockClear();
         executeAndroidSwipeWithAccessibility.mockClear();
 
-        await (swipeOn as any).executeSwipeGesture(
+        await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
           100,
           500,
           100,
@@ -186,7 +186,7 @@ describe("SwipeOn TalkBack mode detection", () => {
       const mockAccessibilityService = {
         requestAction: async () => ({ success: true })
       };
-      (swipeOn as any).accessibilityService = mockAccessibilityService;
+      (swipeOn as any).talkBackExecutor.accessibilityService = mockAccessibilityService;
       const requestActionSpy = spyOn(mockAccessibilityService, "requestAction")
         .mockResolvedValue({ success: true });
 
@@ -194,7 +194,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         "resource-id": "test:id/scrollView"
       } as any;
 
-      await (swipeOn as any).executeSwipeGesture(
+      await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
         100,
         500,
         100,
@@ -221,7 +221,7 @@ describe("SwipeOn TalkBack mode detection", () => {
     test("re-checks TalkBack state on subsequent swipes", async () => {
       // First swipe with TalkBack disabled
       fakeAccessibilityDetector.setTalkBackEnabled(false);
-      await (swipeOn as any).executeSwipeGesture(
+      await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
         100, 500, 100, 200,
         "up" as SwipeDirection,
         null,
@@ -238,7 +238,7 @@ describe("SwipeOn TalkBack mode detection", () => {
       fakeAccessibilityDetector.invalidateCache();
 
       // Second swipe should use accessibility method
-      await (swipeOn as any).executeSwipeGesture(
+      await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
         100, 500, 100, 200,
         "up" as SwipeDirection,
         null,
@@ -290,7 +290,7 @@ describe("SwipeOn TalkBack mode detection", () => {
       // Even with TalkBack "enabled", iOS should use standard swipe
       fakeAccessibilityDetector.setTalkBackEnabled(true);
 
-      await (iosSwipeOn as any).executeSwipeGesture(
+      await (iosSwipeOn as any).talkBackExecutor.executeSwipeGesture(
         100, 500, 100, 200,
         "up" as SwipeDirection,
         null,
@@ -319,7 +319,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         })
       };
 
-      (swipeOn as any).accessibilityService = mockAccessibilityService;
+      (swipeOn as any).talkBackExecutor.accessibilityService = mockAccessibilityService;
     });
 
     test("tries ACTION_SCROLL when container has resource-id", async () => {
@@ -332,7 +332,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         "scrollable": true
       } as any;
 
-      await (swipeOn as any).executeAndroidSwipeWithAccessibility(
+      await (swipeOn as any).talkBackExecutor.executeAndroidSwipeWithAccessibility(
         100, 500, 100, 200,
         "down" as SwipeDirection,
         containerElement,
@@ -352,7 +352,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         "resource-id": "test:id/scrollView"
       } as any;
 
-      await (swipeOn as any).executeAndroidSwipeWithAccessibility(
+      await (swipeOn as any).talkBackExecutor.executeAndroidSwipeWithAccessibility(
         100, 500, 100, 700,
         "up" as SwipeDirection,
         containerElement,
@@ -377,7 +377,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         "resource-id": "test:id/scrollView"
       } as any;
 
-      await (swipeOn as any).executeAndroidSwipeWithAccessibility(
+      await (swipeOn as any).talkBackExecutor.executeAndroidSwipeWithAccessibility(
         100, 500, 100, 200,
         "up" as SwipeDirection,
         containerElement,
@@ -408,7 +408,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         // No resource-id
       } as any;
 
-      await (swipeOn as any).executeAndroidSwipeWithAccessibility(
+      await (swipeOn as any).talkBackExecutor.executeAndroidSwipeWithAccessibility(
         100, 500, 100, 200,
         "up" as SwipeDirection,
         containerElement,
@@ -430,7 +430,7 @@ describe("SwipeOn TalkBack mode detection", () => {
           gestureTimeMs: 50
         });
 
-      await (swipeOn as any).executeAndroidSwipeWithAccessibility(
+      await (swipeOn as any).talkBackExecutor.executeAndroidSwipeWithAccessibility(
         100, 500, 100, 200,
         "up" as SwipeDirection,
         null, // No container

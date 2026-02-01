@@ -586,7 +586,7 @@ export class SetUIState extends BaseVisualChange {
     if (this.dependencies.swipeOn) {
       return this.dependencies.swipeOn;
     }
-    const { SwipeOn } = require("./SwipeOn");
+    const { SwipeOn } = require("./swipeon");
     return new SwipeOn(this.device, this.adb);
   }
 

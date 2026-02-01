@@ -1,7 +1,7 @@
 import { GestureOptions } from "../../src/models";
 import { SwipeResult } from "../../src/models/SwipeResult";
 import { PerformanceTracker } from "../../src/utils/PerformanceTracker";
-import { GestureExecutor } from "../../src/features/action/SwipeOn";
+import { GestureExecutor } from "../../src/features/action/swipeon";
 
 export class FakeGestureExecutor implements GestureExecutor {
   private swipeCalls: Array<{

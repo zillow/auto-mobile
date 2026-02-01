@@ -5,7 +5,7 @@ import { defaultTimer } from "../../src/utils/SystemTimer";
 import { RealObserveScreen } from "../../src/features/observe/ObserveScreen";
 import type { ObserveScreen } from "../../src/features/observe/interfaces/ObserveScreen";
 import { TapOnElement } from "../../src/features/action/TapOnElement";
-import { SwipeOn } from "../../src/features/action/SwipeOn";
+import { SwipeOn } from "../../src/features/action/swipeon";
 import { InputText } from "../../src/features/action/InputText";
 import { ViewHierarchy } from "../../src/features/observe/ViewHierarchy";
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
@@ -349,7 +349,7 @@ export async function createStressHarness(): Promise<StressHarness> {
       );
     },
     swipeOn: async () => {
-      await (swipeOn as unknown as any).executeSwipeGesture(
+      await (swipeOn as unknown as any).talkBackExecutor.executeSwipeGesture(
         10,
         10,
         200,

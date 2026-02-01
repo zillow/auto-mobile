@@ -6,7 +6,7 @@ import { ClearText } from "../features/action/ClearText";
 import { SelectAllText } from "../features/action/SelectAllText";
 import { PressButton } from "../features/action/PressButton";
 import { DragAndDrop } from "../features/action/DragAndDrop";
-import { SwipeOn } from "../features/action/SwipeOn";
+import { SwipeOn } from "../features/action/swipeon";
 import { PinchOn } from "../features/action/PinchOn";
 import { Shake } from "../features/action/Shake";
 import { ImeAction } from "../features/action/ImeAction";
