@@ -5,8 +5,9 @@ import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { ToolRegistry } from "../../server/toolRegistry";
 import {
-  NavigationGraphManager,
-  ToolCallInteraction
+  defaultNavigationGraphManager,
+  ToolCallInteraction,
+  type NavigationGraphService
 } from "./NavigationGraphManager";
 import { ProgressCallback } from "../../server/toolRegistry";
 import { SmartNavigationHelper } from "./SmartNavigationHelper";
@@ -32,7 +33,7 @@ export interface NavigateToOptions {
 export class NavigateTo {
   private device: BootedDevice;
   private adb: AdbExecutor;
-  private navigationManager: NavigationGraphManager;
+  private navigationManager: NavigationGraphService;
   private uiStateSetup: UIStateSetup;
   private screenWaiter: ScreenTransitionWaiter;
 
@@ -44,11 +45,12 @@ export class NavigateTo {
     device: BootedDevice,
     adbFactory: AdbClientFactory = defaultAdbClientFactory,
     uiStateSetup: UIStateSetup | null = null,
-    screenWaiter: ScreenTransitionWaiter | null = null
+    screenWaiter: ScreenTransitionWaiter | null = null,
+    navigationManager?: NavigationGraphService
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
-    this.navigationManager = NavigationGraphManager.getInstance();
+    this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
 
     // Use injected dependencies or create defaults
     this.uiStateSetup = uiStateSetup || new DefaultUIStateSetup(this.device, this.adb);

@@ -56,6 +56,64 @@ export type {
   UIState,
 };
 
+/**
+ * Interface for navigation graph management operations.
+ * Provides methods for tracking screen visits, recording navigation events,
+ * and querying navigation paths.
+ */
+export interface NavigationGraphService extends NavigationGraph, NavigationGraphSummaryProvider, NavigationGraphHistoryProvider, NavigationGraphNodeResourceProvider {
+  // App management
+  setCurrentApp(appId: string): Promise<void>;
+  getCurrentAppId(): string | null;
+
+  // Screen tracking
+  getCurrentScreen(): string | null;
+  recordBackStack(backStack: BackStackInfo): Promise<void>;
+
+  // Navigation events
+  recordNavigationEvent(event: NavigationEvent): Promise<void>;
+  recordHierarchyNavigation(event: HierarchyNavigationEvent): Promise<void>;
+
+  // Tool call correlation
+  recordToolCall(toolName: string, args: Record<string, any>, uiState?: UIState): void;
+  updateScrollPosition(scrollPosition: ScrollPosition): void;
+
+  // Pathfinding
+  findPath(targetScreen: string): Promise<PathResult>;
+
+  // Graph queries
+  getKnownScreens(): Promise<string[]>;
+  getNode(screenName: string): Promise<NavigationNode | undefined>;
+  getNodeResourceById(nodeId: number): Promise<NavigationGraphNodeResource | null>;
+  getNodeResourceByScreen(screenName: string): Promise<NavigationGraphNodeResource | null>;
+  getEdgesFrom(screenName: string): Promise<NavigationEdge[]>;
+  getEdgesTo(screenName: string): Promise<NavigationEdge[]>;
+  getStats(): Promise<NavigationGraphStats>;
+
+  // Graph operations
+  clearCurrentGraph(): Promise<void>;
+  clearAllGraphs(): Promise<void>;
+  exportGraph(): Promise<ExportedGraph>;
+  exportGraphSummary(): Promise<NavigationGraphSummary>;
+  exportGraphSummaryForApp(appId: string | null): Promise<NavigationGraphSummary>;
+  exportGraphHistory(options?: { cursor?: string; limit?: number }): Promise<NavigationGraphHistoryPage>;
+
+  // Screenshot management
+  updateNodeScreenshot(appId: string, screenName: string, screenshotPath: string | null): Promise<void>;
+
+  // Suggestions
+  getSuggestions(): Promise<NavigationSuggestionInfo[]>;
+  promoteSuggestion(suggestionId: number, screenName: string): Promise<void>;
+
+  // Test coverage
+  startTestSession(sessionUuid: string): Promise<void>;
+  endTestSession(): Promise<void>;
+  getActiveTestSession(): TestCoverageSession | null;
+
+  // Listeners
+  setGraphUpdateListener(listener: (() => void | Promise<void>) | null): void;
+}
+
 type HistoryCursor = {
   timestamp: number;
   id: number;
@@ -65,7 +123,7 @@ type HistoryCursor = {
  * Manages the navigation graph with SQLite persistence.
  * Tracks screen visits and correlates navigation events with tool calls.
  */
-export class NavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider, NavigationGraphHistoryProvider, NavigationGraphNodeResourceProvider {
+export class NavigationGraphManager implements NavigationGraphService {
   private static instance: NavigationGraphManager | null = null;
 
   private repository: NavigationRepository;
@@ -98,9 +156,12 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
     startTime: number;
   } | null = null;
 
-  private constructor() {
-    this.repository = new NavigationRepository();
-    this.testCoverageRepository = new TestCoverageRepository();
+  constructor(
+    repository?: NavigationRepository,
+    testCoverageRepository?: TestCoverageRepository
+  ) {
+    this.repository = repository ?? new NavigationRepository();
+    this.testCoverageRepository = testCoverageRepository ?? new TestCoverageRepository();
   }
 
   /**
@@ -118,6 +179,16 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
    */
   public static resetInstance(): void {
     NavigationGraphManager.instance = null;
+  }
+
+  /**
+   * Create a new instance for testing with injected dependencies.
+   */
+  public static createForTesting(
+    repository?: NavigationRepository,
+    testCoverageRepository?: TestCoverageRepository
+  ): NavigationGraphManager {
+    return new NavigationGraphManager(repository, testCoverageRepository);
   }
 
   /**
@@ -1286,3 +1357,9 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
     return Math.min(normalized, this.HISTORY_PAGE_MAX);
   }
 }
+
+/**
+ * Default singleton instance of NavigationGraphManager.
+ * Use this for production code. For testing, use NavigationGraphManager.createForTesting().
+ */
+export const defaultNavigationGraphManager: NavigationGraphService = NavigationGraphManager.getInstance();

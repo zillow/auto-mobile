@@ -4,6 +4,53 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "./PerformanceTracker
 import { logger } from "./logger";
 
 /**
+ * Interface for accessibility focus tracking operations.
+ * Provides methods for tracking TalkBack cursor position and navigating the accessibility tree.
+ */
+export interface AccessibilityFocusService {
+  /**
+   * Get the current accessibility focus element (TalkBack cursor position).
+   */
+  getCurrentFocus(
+    deviceId: string,
+    useCache?: boolean,
+    perf?: PerformanceTracker
+  ): Promise<Element | null>;
+
+  /**
+   * Build accessibility tree in TalkBack traversal order.
+   */
+  buildTraversalOrder(
+    deviceId: string,
+    useCache?: boolean,
+    perf?: PerformanceTracker
+  ): Promise<Element[]>;
+
+  /**
+   * Find the index of an element in the traversal order.
+   */
+  findElementIndex(
+    target: ElementSelector,
+    orderedElements: Element[]
+  ): Promise<number | null>;
+
+  /**
+   * Invalidate cached focus state for a device.
+   */
+  invalidateFocus(deviceId: string): void;
+
+  /**
+   * Invalidate cached traversal order for a device.
+   */
+  invalidateTraversalOrder(deviceId: string): void;
+
+  /**
+   * Invalidate all caches for a device.
+   */
+  invalidateAll(deviceId: string): void;
+}
+
+/**
  * Cached focus state for a device
  */
 interface FocusState {
@@ -74,7 +121,7 @@ export interface ElementSelector {
  * - Caching focus state to reduce redundant queries
  * - Finding element positions in traversal order
  */
-export class AccessibilityFocusTracker {
+export class AccessibilityFocusTracker implements AccessibilityFocusService {
   /** Cache of focus states by device ID */
   private focusCache: Map<string, FocusState> = new Map();
 
@@ -87,8 +134,7 @@ export class AccessibilityFocusTracker {
   /** Singleton instance */
   private static instance: AccessibilityFocusTracker | null = null;
 
-  /** Private constructor for singleton pattern */
-  private constructor() {}
+  constructor() {}
 
   /**
    * Get the singleton instance
@@ -98,6 +144,20 @@ export class AccessibilityFocusTracker {
       AccessibilityFocusTracker.instance = new AccessibilityFocusTracker();
     }
     return AccessibilityFocusTracker.instance;
+  }
+
+  /**
+   * Reset the singleton instance (for testing).
+   */
+  static resetInstance(): void {
+    AccessibilityFocusTracker.instance = null;
+  }
+
+  /**
+   * Create a new instance for testing.
+   */
+  static createForTesting(): AccessibilityFocusTracker {
+    return new AccessibilityFocusTracker();
   }
 
   /**
@@ -354,3 +414,9 @@ export class AccessibilityFocusTracker {
     );
   }
 }
+
+/**
+ * Default singleton instance of AccessibilityFocusTracker.
+ * Use this for production code. For testing, use AccessibilityFocusTracker.createForTesting().
+ */
+export const defaultAccessibilityFocusTracker: AccessibilityFocusService = AccessibilityFocusTracker.getInstance();
