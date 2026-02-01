@@ -24,8 +24,9 @@ data class TimelineDataPoint(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 ) {
-    val total: Int get() = crashes + anrs + toolFailures
+    val total: Int get() = crashes + anrs + toolFailures + nonfatals
 }
 
 /**
@@ -35,6 +36,7 @@ data class PeriodTotals(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 )
 
 /**
@@ -163,12 +165,13 @@ class McpFailuresDataSource(
             DataSourceResult.Success(
                 TimelineData(
                     dataPoints = response.dataPoints.map {
-                        TimelineDataPoint(it.label, it.crashes, it.anrs, it.toolFailures)
+                        TimelineDataPoint(it.label, it.crashes, it.anrs, it.toolFailures, it.nonfatals)
                     },
                     previousPeriodTotals = PeriodTotals(
                         response.previousPeriodTotals.crashes,
                         response.previousPeriodTotals.anrs,
                         response.previousPeriodTotals.toolFailures,
+                        response.previousPeriodTotals.nonfatals,
                     ),
                 )
             )
@@ -216,6 +219,7 @@ private data class FailureGroupDto(
             "crash" -> FailureType.Crash
             "anr" -> FailureType.ANR
             "tool_failure" -> FailureType.ToolCallFailure
+            "nonfatal" -> FailureType.NonFatal
             else -> FailureType.Crash
         },
         signature = signature,
@@ -370,6 +374,7 @@ private data class TimelineDataPointDto(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 )
 
 @Serializable
@@ -377,6 +382,7 @@ private data class PeriodTotalsDto(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 )
 
 // Maximum number of buckets we can reasonably display
@@ -412,12 +418,14 @@ internal fun generateMockTimelineData(
         }
         val baseAnrs = baseCrashes / 3
         val baseToolFailures = baseCrashes / 2
+        val baseNonfatals = baseCrashes * 2 // Non-fatals are typically more common
 
         TimelineDataPoint(
             label = label,
             crashes = baseCrashes,
             anrs = baseAnrs,
             toolFailures = baseToolFailures,
+            nonfatals = baseNonfatals,
         )
     }
 }

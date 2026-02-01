@@ -520,6 +520,7 @@ fun AutoMobileToolWindowContent() {
                       dev.jasonpearson.automobile.ide.failures.FailureType.Crash -> "Crash"
                       dev.jasonpearson.automobile.ide.failures.FailureType.ANR -> "ANR"
                       dev.jasonpearson.automobile.ide.failures.FailureType.ToolCallFailure -> "Tool Failure"
+                      dev.jasonpearson.automobile.ide.failures.FailureType.NonFatal -> "Non-Fatal"
                   }
                   showNotification(
                       "New $typeLabel Detected",

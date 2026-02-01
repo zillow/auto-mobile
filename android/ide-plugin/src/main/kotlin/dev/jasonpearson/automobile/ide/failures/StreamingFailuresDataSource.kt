@@ -48,12 +48,12 @@ class StreamingFailuresDataSource(
             )
 
             val dataPoints = response.dataPoints?.map {
-                TimelineDataPoint(it.label, it.crashes, it.anrs, it.toolFailures)
+                TimelineDataPoint(it.label, it.crashes, it.anrs, it.toolFailures, it.nonfatals)
             } ?: emptyList()
 
             val previousTotals = response.previousPeriodTotals?.let {
-                PeriodTotals(it.crashes, it.anrs, it.toolFailures)
-            } ?: PeriodTotals(0, 0, 0)
+                PeriodTotals(it.crashes, it.anrs, it.toolFailures, it.nonfatals)
+            } ?: PeriodTotals(0, 0, 0, 0)
 
             DataSourceResult.Success(TimelineData(dataPoints, previousTotals))
         } catch (e: McpConnectionException) {
@@ -82,8 +82,8 @@ class StreamingFailuresDataSource(
 
             val groups = response.groups?.map { it.toModel() } ?: emptyList()
             val totals = response.totals?.let {
-                FailureTotals(it.crashes, it.anrs, it.toolFailures)
-            } ?: FailureTotals(0, 0, 0)
+                FailureTotals(it.crashes, it.anrs, it.toolFailures, it.nonfatals)
+            } ?: FailureTotals(0, 0, 0, 0)
 
             DataSourceResult.Success(FailureGroupsWithTotals(groups, totals))
         } catch (e: McpConnectionException) {
@@ -208,8 +208,9 @@ data class FailureTotals(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 ) {
-    val total: Int get() = crashes + anrs + toolFailures
+    val total: Int get() = crashes + anrs + toolFailures + nonfatals
 }
 
 /**
@@ -232,6 +233,7 @@ private fun FailureType.toQueryParam(): String = when (this) {
     FailureType.Crash -> "crash"
     FailureType.ANR -> "anr"
     FailureType.ToolCallFailure -> "tool_failure"
+    FailureType.NonFatal -> "nonfatal"
 }
 
 private fun FailureSeverity.toQueryParam(): String = when (this) {
@@ -249,6 +251,7 @@ private fun FailureNotificationEntry.toModel(): FailureNotification = FailureNot
         "crash" -> FailureType.Crash
         "anr" -> FailureType.ANR
         "tool_failure" -> FailureType.ToolCallFailure
+        "nonfatal" -> FailureType.NonFatal
         else -> FailureType.Crash
     },
     severity = when (severity) {

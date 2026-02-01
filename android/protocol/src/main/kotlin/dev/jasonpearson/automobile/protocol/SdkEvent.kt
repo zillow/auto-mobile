@@ -130,3 +130,62 @@ data class SdkRecompositionSnapshotEvent(
   /** JSON string containing the recomposition tracking data */
   val snapshotJson: String,
 ) : SdkEvent()
+
+// =============================================================================
+// Crash Events
+// =============================================================================
+
+/**
+ * Represents an unhandled crash detected by the SDK's UncaughtExceptionHandler.
+ * This is a fatal crash that will terminate the app.
+ */
+@Serializable
+@SerialName("crash")
+data class SdkCrashEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Fully qualified class name of the exception (e.g., "java.lang.NullPointerException") */
+  val exceptionClass: String,
+  /** Exception message, if any */
+  val exceptionMessage: String?,
+  /** Full stack trace as a string */
+  val stackTrace: String,
+  /** Thread name where the crash occurred */
+  val threadName: String,
+  /** Current screen/destination at the time of the crash */
+  val currentScreen: String? = null,
+  /** Application version name, if available */
+  val appVersion: String? = null,
+  /** Device information */
+  val deviceInfo: SdkDeviceInfo? = null,
+) : SdkEvent()
+
+// =============================================================================
+// ANR Events
+// =============================================================================
+
+/**
+ * Represents an ANR (Application Not Responding) detected via ApplicationExitInfo API.
+ * This is captured on app restart after an ANR occurred in a previous session.
+ * Requires Android 11+ (API 30).
+ */
+@Serializable
+@SerialName("anr")
+data class SdkAnrEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Process ID that experienced the ANR */
+  val pid: Int,
+  /** Process name */
+  val processName: String,
+  /** Process importance when ANR occurred (FOREGROUND, VISIBLE, CACHED, etc.) */
+  val importance: String,
+  /** Full thread dump from ApplicationExitInfo.traceInputStream */
+  val trace: String?,
+  /** Human-readable reason description */
+  val reason: String,
+  /** Application version name, if available */
+  val appVersion: String? = null,
+  /** Device information */
+  val deviceInfo: SdkDeviceInfo? = null,
+) : SdkEvent()

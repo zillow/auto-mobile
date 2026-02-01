@@ -61,8 +61,8 @@ class CompositeFailuresDataSourceTest {
     @Test
     fun `getTimelineData uses MCP when available`() = runBlocking {
         val mcpTimeline = TimelineData(
-            dataPoints = listOf(TimelineDataPoint("1h", 5, 2, 1)),
-            previousPeriodTotals = PeriodTotals(3, 1, 0)
+            dataPoints = listOf(TimelineDataPoint("1h", 5, 2, 1, 0)),
+            previousPeriodTotals = PeriodTotals(crashes = 3, anrs = 1, toolFailures = 0, nonfatals = 0)
         )
 
         val mcpDataSource = FakeFailuresDataSourceImpl(
@@ -113,7 +113,7 @@ class CompositeFailuresDataSourceTest {
     @Test
     fun `failureGroupsFlow returns streaming flow when available`() = runBlocking {
         val groups = listOf(createTestFailureGroup("test-1"))
-        val totals = FailureTotals(1, 0, 0)
+        val totals = FailureTotals(crashes = 1, anrs = 0, toolFailures = 0, nonfatals = 0)
         val streamingDataSource = FakeStreamingFailuresDataSource(
             failureGroupsFlowResult = flowOf(DataSourceResult.Success(FailureGroupsWithTotals(groups, totals)))
         )
@@ -143,7 +143,7 @@ class CompositeFailuresDataSourceTest {
     private class FakeFailuresDataSourceImpl(
         private val getFailureGroupsResult: DataSourceResult<List<FailureGroup>> = DataSourceResult.Success(emptyList()),
         private val getTimelineDataResult: DataSourceResult<TimelineData> = DataSourceResult.Success(
-            TimelineData(emptyList(), PeriodTotals(0, 0, 0))
+            TimelineData(emptyList(), PeriodTotals(crashes = 0, anrs = 0, toolFailures = 0, nonfatals = 0))
         ),
     ) : FailuresDataSource {
         override suspend fun getFailureGroups(): DataSourceResult<List<FailureGroup>> = getFailureGroupsResult
@@ -156,7 +156,7 @@ class CompositeFailuresDataSourceTest {
     private class FakeStreamingFailuresDataSource(
         private val getFailureGroupsResult: DataSourceResult<List<FailureGroup>> = DataSourceResult.Success(emptyList()),
         private val getTimelineDataResult: DataSourceResult<TimelineData> = DataSourceResult.Success(
-            TimelineData(emptyList(), PeriodTotals(0, 0, 0))
+            TimelineData(emptyList(), PeriodTotals(crashes = 0, anrs = 0, toolFailures = 0, nonfatals = 0))
         ),
         private val notificationsFlowResult: Flow<DataSourceResult<List<FailureNotification>>> = emptyFlow(),
         private val failureGroupsFlowResult: Flow<DataSourceResult<FailureGroupsWithTotals>> = emptyFlow(),

@@ -1,12 +1,14 @@
 import { FailureAnalyticsRepository, RecordFailureInput } from "../../db/failureAnalyticsRepository";
 import type {
   FailureSeverity,
+  FailureType,
   StackTraceElement,
   AggregatedToolCallInfo,
 } from "../../server/failuresResources";
 import { logger } from "../../utils/logger";
 import crypto from "node:crypto";
 import type { FailureRecorderService } from "./interfaces/FailureRecorderService";
+import { getFailuresPushServer, FailureNotificationPush } from "../../daemon/failuresPushSocketServer";
 
 /**
  * Input for recording a tool failure
@@ -73,6 +75,35 @@ export interface RecordAnrInput {
   reason: string;
   stackTrace?: StackTraceElement[];
   durationMs?: number;
+
+  // Device context
+  deviceId?: string;
+  deviceModel: string;
+  os: string;
+  appVersion: string;
+  sessionId: string;
+
+  // Screen context
+  currentScreen?: string;
+  screensVisited?: string[];
+
+  // Test context
+  testName?: string;
+  testExecutionId?: number;
+
+  // Capture
+  screenshotPath?: string;
+  videoPath?: string;
+}
+
+/**
+ * Input for recording a non-fatal (handled) exception
+ */
+export interface RecordNonFatalInput {
+  exceptionType: string;
+  exceptionMessage: string;
+  stackTrace: StackTraceElement[];
+  customMessage?: string;
 
   // Device context
   deviceId?: string;
@@ -179,6 +210,17 @@ export class FailureRecorder implements FailureRecorderService {
     try {
       const occurrenceId = await this.repository.recordFailure(failureInput);
       logger.debug(`[FailureRecorder] Recorded tool failure: ${input.toolName} (${occurrenceId})`);
+
+      // Push notification to connected IDE plugins
+      this.pushFailureNotification(
+        occurrenceId,
+        signature, // groupId is based on signature
+        "tool_failure",
+        severity,
+        failureInput.title,
+        input.errorMessage
+      );
+
       return occurrenceId;
     } catch (error) {
       logger.error(`[FailureRecorder] Failed to record tool failure: ${error}`);
@@ -218,6 +260,17 @@ export class FailureRecorder implements FailureRecorderService {
     try {
       const occurrenceId = await this.repository.recordFailure(failureInput);
       logger.debug(`[FailureRecorder] Recorded crash: ${title} (${occurrenceId})`);
+
+      // Push notification to connected IDE plugins
+      this.pushFailureNotification(
+        occurrenceId,
+        signature,
+        "crash",
+        severity,
+        title,
+        `${input.exceptionType}: ${input.exceptionMessage}`
+      );
+
       return occurrenceId;
     } catch (error) {
       logger.error(`[FailureRecorder] Failed to record crash: ${error}`);
@@ -257,6 +310,17 @@ export class FailureRecorder implements FailureRecorderService {
     try {
       const occurrenceId = await this.repository.recordFailure(failureInput);
       logger.debug(`[FailureRecorder] Recorded ANR: ${title} (${occurrenceId})`);
+
+      // Push notification to connected IDE plugins
+      this.pushFailureNotification(
+        occurrenceId,
+        signature,
+        "anr",
+        "high", // ANRs are always high severity
+        title,
+        input.reason
+      );
+
       return occurrenceId;
     } catch (error) {
       logger.error(`[FailureRecorder] Failed to record ANR: ${error}`);
@@ -264,7 +328,88 @@ export class FailureRecorder implements FailureRecorderService {
     }
   }
 
+  /**
+   * Record a non-fatal (handled) exception
+   */
+  async recordNonFatal(input: RecordNonFatalInput): Promise<string> {
+    const signature = this.generateNonFatalSignature(input.exceptionType, input.stackTrace);
+    const severity = this.calculateNonFatalSeverity(input.exceptionType);
+    const title = this.generateNonFatalTitle(input.exceptionType, input.stackTrace);
+
+    const failureInput: RecordFailureInput = {
+      type: "nonfatal",
+      signature,
+      title,
+      message: input.customMessage
+        ? `${input.exceptionType}: ${input.exceptionMessage} - ${input.customMessage}`
+        : `${input.exceptionType}: ${input.exceptionMessage}`,
+      severity,
+      stackTrace: input.stackTrace,
+      occurrence: {
+        deviceId: input.deviceId,
+        deviceModel: input.deviceModel,
+        os: input.os,
+        appVersion: input.appVersion,
+        sessionId: input.sessionId,
+        screenAtFailure: input.currentScreen,
+        screensVisited: input.screensVisited,
+        testName: input.testName,
+        testExecutionId: input.testExecutionId,
+      },
+      capture: this.selectCapture(input.screenshotPath, input.videoPath),
+    };
+
+    try {
+      const occurrenceId = await this.repository.recordFailure(failureInput);
+      logger.debug(`[FailureRecorder] Recorded non-fatal: ${title} (${occurrenceId})`);
+
+      // Push notification to connected IDE plugins
+      this.pushFailureNotification(
+        occurrenceId,
+        signature,
+        "nonfatal",
+        severity,
+        title,
+        failureInput.message
+      );
+
+      return occurrenceId;
+    } catch (error) {
+      logger.error(`[FailureRecorder] Failed to record non-fatal: ${error}`);
+      throw error;
+    }
+  }
+
   // Private helper methods
+
+  /**
+   * Push a failure notification to connected IDE plugins
+   */
+  private pushFailureNotification(
+    occurrenceId: string,
+    groupId: string,
+    type: FailureType,
+    severity: FailureSeverity,
+    title: string,
+    message: string
+  ): void {
+    const server = getFailuresPushServer();
+    if (server) {
+      const notification: FailureNotificationPush = {
+        occurrenceId,
+        groupId,
+        type,
+        severity,
+        title,
+        message,
+        timestamp: Date.now(),
+      };
+      logger.debug(`[FailureRecorder] Pushing failure notification: ${type} - ${title}`);
+      server.pushFailure(notification);
+    } else {
+      logger.warn(`[FailureRecorder] Push server not available, cannot push failure notification: ${type} - ${title}`);
+    }
+  }
 
   private generateToolFailureSignature(toolName: string, errorCode: string): string {
     return `tool:${toolName}:${errorCode}`;
@@ -291,6 +436,16 @@ export class FailureRecorder implements FailureRecorderService {
     return `anr:${hash}`;
   }
 
+  private generateNonFatalSignature(exceptionType: string, stackTrace: StackTraceElement[]): string {
+    // Find the first app code frame for signature
+    const appFrame = stackTrace.find(frame => frame.isAppCode);
+    if (appFrame) {
+      return `nonfatal:${exceptionType}:${appFrame.className}.${appFrame.methodName}`;
+    }
+    // Fall back to just exception type
+    return `nonfatal:${exceptionType}`;
+  }
+
   private generateCrashTitle(exceptionType: string, stackTrace: StackTraceElement[]): string {
     const appFrame = stackTrace.find(frame => frame.isAppCode);
     if (appFrame) {
@@ -309,6 +464,16 @@ export class FailureRecorder implements FailureRecorderService {
     // Truncate reason for title
     const truncatedReason = reason.length > 50 ? reason.substring(0, 50) + "..." : reason;
     return `ANR: ${truncatedReason}`;
+  }
+
+  private generateNonFatalTitle(exceptionType: string, stackTrace: StackTraceElement[]): string {
+    const appFrame = stackTrace.find(frame => frame.isAppCode);
+    if (appFrame) {
+      const fileName = appFrame.fileName ?? appFrame.className.split(".").pop();
+      const line = appFrame.lineNumber ? `:${appFrame.lineNumber}` : "";
+      return `[Non-Fatal] ${exceptionType} in ${appFrame.methodName} (${fileName}${line})`;
+    }
+    return `[Non-Fatal] ${exceptionType}`;
   }
 
   private calculateToolFailureSeverity(errorCode?: string): FailureSeverity {
@@ -364,6 +529,21 @@ export class FailureRecorder implements FailureRecorderService {
     }
 
     return "medium";
+  }
+
+  private calculateNonFatalSeverity(exceptionType: string): FailureSeverity {
+    // Non-fatal errors are generally lower severity since they're handled
+    // Medium severity for potentially serious errors that were handled
+    if (
+      exceptionType.includes("SecurityException") ||
+      exceptionType.includes("IllegalState") ||
+      exceptionType.includes("NullPointer")
+    ) {
+      return "medium";
+    }
+
+    // Most non-fatal errors are low severity
+    return "low";
   }
 
   private extractParameterVariants(

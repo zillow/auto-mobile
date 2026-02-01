@@ -117,6 +117,53 @@ data class StorageChangedEvent(
   val data: String, // JSON string of preferences
 ) : WebSocketResponse()
 
+@Serializable
+@SerialName("crash_event")
+data class CrashEvent(
+  override val timestamp: Long,
+  val event: CrashData,
+) : WebSocketResponse()
+
+@Serializable
+data class CrashData(
+  val exceptionClass: String,
+  val message: String?,
+  val stackTrace: String,
+  val threadName: String,
+  val currentScreen: String? = null,
+  val packageName: String? = null,
+  val appVersion: String? = null,
+  val deviceInfo: DeviceInfo? = null,
+  val applicationId: String? = null,
+)
+
+@Serializable
+@SerialName("anr_event")
+data class AnrEvent(
+  override val timestamp: Long,
+  val event: AnrData,
+) : WebSocketResponse()
+
+@Serializable
+data class AnrData(
+  /** Process ID that experienced the ANR */
+  val pid: Int,
+  /** Process name */
+  val processName: String,
+  /** Process importance when ANR occurred (FOREGROUND, VISIBLE, etc.) */
+  val importance: String,
+  /** Full thread dump from ApplicationExitInfo.traceInputStream */
+  val trace: String?,
+  /** Human-readable reason description */
+  val reason: String,
+  /** Package name of the app */
+  val packageName: String? = null,
+  /** App version */
+  val appVersion: String? = null,
+  /** Device information */
+  val deviceInfo: DeviceInfo? = null,
+)
+
 // =============================================================================
 // Screenshot Results
 // =============================================================================

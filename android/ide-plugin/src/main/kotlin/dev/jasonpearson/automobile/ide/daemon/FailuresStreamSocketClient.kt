@@ -129,6 +129,7 @@ data class FailureTotals(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 )
 
 /**
@@ -148,6 +149,7 @@ data class TimelineDataPointDto(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 )
 
 @Serializable
@@ -155,6 +157,7 @@ data class PeriodTotalsDto(
     val crashes: Int,
     val anrs: Int,
     val toolFailures: Int,
+    val nonfatals: Int = 0,
 )
 
 /**
@@ -197,6 +200,7 @@ data class FailureGroupDto(
             "crash" -> FailureType.Crash
             "anr" -> FailureType.ANR
             "tool_failure" -> FailureType.ToolCallFailure
+            "nonfatal" -> FailureType.NonFatal
             else -> FailureType.Crash
         },
         signature = signature,
@@ -345,6 +349,7 @@ class FailuresStreamSocketClient(
     private val json: Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
+        encodeDefaults = true  // Required to include command field with default value
     },
 ) : FailuresStreamClient {
 

@@ -9,6 +9,7 @@ enum class FailureType(val label: String, val icon: String, val color: Color) {
     Crash("Crash", "💥", Color(0xFFE53935)),
     ANR("ANR", "🔄", Color(0xFFFF9800)),
     ToolCallFailure("Tool Failure", "🔧", Color(0xFF9C27B0)),
+    NonFatal("Non-Fatal", "⚠️", Color(0xFF2196F3)),
 }
 
 /**
