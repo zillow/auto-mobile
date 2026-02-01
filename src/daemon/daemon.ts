@@ -37,6 +37,7 @@ import { InstalledAppsRepository } from "../db/installedAppsRepository";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../utils/appearance/AppearanceSyncScheduler";
 import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
+import { defaultTimer } from "../utils/SystemTimer";
 
 const DEVICE_DISCONNECT_POLL_INTERVAL_MS = 5000;
 const DEVICE_DISCONNECT_MISS_THRESHOLD = 2;
@@ -200,7 +201,7 @@ export class Daemon {
       let resolved = false;
 
       // Timeout safety - prevent hanging forever
-      const timeout = setTimeout(() => {
+      const timeout = defaultTimer.setTimeout(() => {
         if (!resolved) {
           resolved = true;
           testServer.close(() => {
@@ -598,7 +599,7 @@ export class Daemon {
     const MAX_FAILED_CHECKS = 3; // Allow 3 consecutive failures before taking action
     let failedCheckCount = 0;
 
-    this.healthCheckTimer = setInterval(async () => {
+    this.healthCheckTimer = defaultTimer.setInterval(async () => {
       try {
         // Check if HTTP server is responsive
         if (!this.httpServer) {
@@ -642,7 +643,7 @@ export class Daemon {
     const HEARTBEAT_CHECK_INTERVAL_MS = 10000;
     const INITIAL_HEARTBEAT_GRACE_MS = 20_000;
 
-    this.heartbeatMonitorTimer = setInterval(async () => {
+    this.heartbeatMonitorTimer = defaultTimer.setInterval(async () => {
       const now = Date.now();
       const sessions = this.sessionManager.getAllSessions();
 
@@ -672,7 +673,7 @@ export class Daemon {
 
     const deviceManager = new MultiPlatformDeviceManager();
 
-    this.deviceDisconnectTimer = setInterval(async () => {
+    this.deviceDisconnectTimer = defaultTimer.setInterval(async () => {
       try {
         const bootedDevices = await deviceManager.getBootedDevices("either");
         const bootedDeviceIds = new Set(bootedDevices.map(device => device.deviceId));
@@ -773,13 +774,13 @@ export class Daemon {
    */
   private async initializeDevicePoolWithTimeout(timeoutMs: number): Promise<void> {
     const timeoutPromise = new Promise<void>(resolve => {
-      const timer = setTimeout(() => {
+      const timer = defaultTimer.setTimeout(() => {
         logger.warn(`Device pool initialization timed out after ${timeoutMs}ms`);
         resolve();
       }, timeoutMs);
       // Allow process to exit even if this timer is pending
-      if (typeof timer.unref === "function") {
-        timer.unref();
+      if (typeof (timer as { unref?: () => void }).unref === "function") {
+        (timer as { unref: () => void }).unref();
       }
     });
 
@@ -844,12 +845,12 @@ export class Daemon {
         logger.info(`[Daemon] Setting up XCTestService for iOS device ${device.id}`);
 
         const timeoutPromise = new Promise<never>((_, reject) => {
-          const timer = setTimeout(() => {
+          const timer = defaultTimer.setTimeout(() => {
             reject(new Error(`Timeout after ${PER_DEVICE_TIMEOUT_MS}ms`));
           }, PER_DEVICE_TIMEOUT_MS);
           // Allow process to exit even if this timer is pending
-          if (typeof timer.unref === "function") {
-            timer.unref();
+          if (typeof (timer as { unref?: () => void }).unref === "function") {
+            (timer as { unref: () => void }).unref();
           }
         });
 

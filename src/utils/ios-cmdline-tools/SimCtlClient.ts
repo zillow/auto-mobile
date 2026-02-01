@@ -5,6 +5,7 @@ import { createExecResult } from "../execResult";
 import { isRunningInDocker } from "../dockerEnv";
 import { isHostControlAvailable, runSimctlExec, shouldUseHostControl } from "../hostControlClient";
 import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
+import { defaultTimer } from "../SystemTimer";
 
 export interface AppleDevice {
   udid: string;
@@ -388,7 +389,7 @@ export class SimCtlClient implements SimCtl {
       let timeoutId: NodeJS.Timeout;
 
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = setTimeout(
+        timeoutId = defaultTimer.setTimeout(
           () => reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
           timeoutMs
         );
@@ -647,7 +648,7 @@ export class SimCtlClient implements SimCtl {
     await this.executeCommand(`boot ${udid}`);
 
     // Wait a moment for the simulator to register as booted
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await defaultTimer.sleep(1000);
 
     const bootedSimulators = await this.getBootedSimulators();
     const bootedSimulator = bootedSimulators.find(device => device.deviceId === udid);

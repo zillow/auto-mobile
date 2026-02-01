@@ -4,20 +4,26 @@ import { DeviceSessionManager } from "../DeviceSessionManager";
 import { applyAppearanceToDevice } from "../deviceAppearance";
 import { logger } from "../logger";
 import { getAppearanceConfig, resolveAppearanceMode } from "../../server/appearanceManager";
+import { Timer, defaultTimer } from "../SystemTimer";
 
 const DEFAULT_SYNC_INTERVAL_MS = 10000;
 
 class AppearanceSyncScheduler {
-  private timer: NodeJS.Timeout | null = null;
+  private intervalHandle: NodeJS.Timeout | null = null;
   private lastAppliedModes = new Map<string, AppearanceMode>();
   private pending: Promise<void> | null = null;
+  private readonly timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
 
   start(): void {
-    if (this.timer) {
+    if (this.intervalHandle) {
       return;
     }
 
-    this.timer = setInterval(() => {
+    this.intervalHandle = this.timer.setInterval(() => {
       void this.trigger();
     }, DEFAULT_SYNC_INTERVAL_MS);
 
@@ -25,9 +31,9 @@ class AppearanceSyncScheduler {
   }
 
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    if (this.intervalHandle) {
+      this.timer.clearInterval(this.intervalHandle);
+      this.intervalHandle = null;
     }
     this.pending = null;
     this.lastAppliedModes.clear();

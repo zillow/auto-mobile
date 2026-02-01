@@ -10,6 +10,7 @@ import {
   NavigationGraphHistoryProvider
 } from "../utils/interfaces/NavigationGraph";
 import { logger } from "../utils/logger";
+import { defaultTimer } from "../utils/SystemTimer";
 
 export const NAVIGATION_RESOURCE_URIS = {
   GRAPH: "automobile:navigation/graph",
@@ -44,7 +45,7 @@ function scheduleNavigationGraphUpdate(): void {
     return;
   }
 
-  updateTimeout = setTimeout(() => {
+  updateTimeout = defaultTimer.setTimeout(() => {
     updateTimeout = null;
     void ResourceRegistry.notifyResourcesUpdated([
       NAVIGATION_RESOURCE_URIS.GRAPH,

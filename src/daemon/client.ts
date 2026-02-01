@@ -8,6 +8,7 @@ import {
   SOCKET_PATH,
   CONNECTION_TIMEOUT_MS,
 } from "./constants";
+import { defaultTimer } from "../utils/SystemTimer";
 
 /**
  * Custom error thrown when daemon is unavailable
@@ -84,7 +85,7 @@ export class DaemonClient {
     }
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timeout = defaultTimer.setTimeout(() => {
         if (this.socket) {
           this.socket.destroy();
         }
@@ -207,7 +208,7 @@ export class DaemonClient {
 
     // Send request
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timeout = defaultTimer.setTimeout(() => {
         this.pendingRequests.delete(requestId);
         reject(
           new DaemonUnavailableError(
@@ -258,7 +259,7 @@ export class DaemonClient {
     };
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
+      const timeout = defaultTimer.setTimeout(() => {
         this.pendingRequests.delete(requestId);
         reject(
           new DaemonUnavailableError(
@@ -276,7 +277,7 @@ export class DaemonClient {
       });
 
       if (!this.socket) {
-        clearTimeout(timeout);
+        defaultTimer.clearTimeout(timeout);
         this.pendingRequests.delete(requestId);
         reject(
           new DaemonUnavailableError("Socket connection lost")

@@ -770,7 +770,7 @@ export class Explore extends BaseVisualChange {
       this.consecutiveBackCount++;
 
       // Wait briefly for navigation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await defaultTimer.sleep(1000);
     } catch (error) {
       logger.warn(`[Explore] Failed to navigate back: ${error}`);
     }
@@ -793,7 +793,7 @@ export class Explore extends BaseVisualChange {
       await this.adb.executeCommand("shell input keyevent KEYCODE_HOME");
 
       // Wait for home screen
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await defaultTimer.sleep(2000);
 
       // Reset consecutive back count
       this.consecutiveBackCount = 0;

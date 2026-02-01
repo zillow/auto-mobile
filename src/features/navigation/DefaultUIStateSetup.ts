@@ -7,6 +7,7 @@ import { ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGra
 import { UIStateExtractor } from "./UIStateExtractor";
 import { RealObserveScreen } from "../observe/ObserveScreen";
 import { UIStateSetup } from "./interfaces/UIStateSetup";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Default implementation of UIStateSetup that handles UI state alignment
@@ -456,6 +457,6 @@ export class DefaultUIStateSetup implements UIStateSetup {
    * Sleep for the specified duration.
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return defaultTimer.sleep(ms);
   }
 }

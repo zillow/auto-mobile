@@ -1,6 +1,7 @@
 import { logger } from "../../utils/logger";
 import { NavigationGraphManager } from "./NavigationGraphManager";
 import { ScreenTransitionWaiter } from "./interfaces/ScreenTransitionWaiter";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Default implementation of ScreenTransitionWaiter that polls the navigation graph
@@ -45,6 +46,6 @@ export class DefaultScreenTransitionWaiter implements ScreenTransitionWaiter {
    * Sleep for the specified duration.
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return defaultTimer.sleep(ms);
   }
 }

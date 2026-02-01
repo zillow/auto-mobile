@@ -3,6 +3,7 @@ import { existsSync } from "fs";
 import { join, resolve } from "path";
 import { ActionableError } from "../../models";
 import { logger } from "../logger";
+import { defaultTimer } from "../SystemTimer";
 import {
   detectAndroidCommandLineTools,
   getAndroidHomeWithSystemImages,
@@ -308,7 +309,7 @@ async function spawnCommand(command: string, args: string[], options: {
 
     // Set up timeout if specified
     if (options.timeout) {
-      timeoutId = setTimeout(() => {
+      timeoutId = defaultTimer.setTimeout(() => {
         child.kill("SIGTERM");
         reject(new Error(`Command timed out after ${options.timeout}ms: ${command} ${args.join(" ")}`));
       }, options.timeout);

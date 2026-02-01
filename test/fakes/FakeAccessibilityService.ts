@@ -14,6 +14,7 @@ import {
 import { HighlightOperationResult, HighlightShape, ViewHierarchyResult } from "../../src/models";
 import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
 import { PerformanceTracker } from "../../src/utils/PerformanceTracker";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
  * Fake implementation of AccessibilityService for testing
@@ -270,7 +271,7 @@ export class FakeAccessibilityService implements AccessibilityService {
   private async applyDelay(operation: string): Promise<void> {
     const delay = this.operationDelays.get(operation);
     if (delay && delay > 0) {
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await defaultTimer.sleep(delay);
     }
   }
 

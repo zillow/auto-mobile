@@ -5,6 +5,7 @@ import { logger } from "../logger";
 import { createExecResult } from "../execResult";
 import { isRunningInDocker } from "../dockerEnv";
 import { isHostControlAvailable, runXcodebuildExec, shouldUseHostControl } from "../hostControlClient";
+import { defaultTimer } from "../SystemTimer";
 
 export interface XcodebuildCommandOptions {
   timeoutMs?: number;
@@ -93,7 +94,7 @@ export class XcodebuildClient implements Xcodebuild {
     if (timeoutMs) {
       let timeoutId: NodeJS.Timeout;
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = setTimeout(
+        timeoutId = defaultTimer.setTimeout(
           () => reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
           timeoutMs
         );

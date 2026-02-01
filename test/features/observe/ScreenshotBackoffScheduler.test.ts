@@ -6,6 +6,7 @@ import {
   computeChecksum,
 } from "../../../src/features/observe/ScreenshotBackoffScheduler";
 import { FakeTimer } from "../../fakes/FakeTimer";
+import { defaultTimer } from "../../../src/utils/SystemTimer";
 
 describe("computeChecksum", () => {
   it("returns consistent checksum for same data", () => {
@@ -344,7 +345,7 @@ describe("DefaultScreenshotBackoffScheduler", () => {
         captureCount++;
         // Simulate slow capture that takes 150ms
         if (captureDelay > 0) {
-          await new Promise(resolve => setTimeout(resolve, captureDelay));
+          await defaultTimer.sleep(captureDelay);
         }
         return { success: true, data: `screenshot-${captureCount}` };
       };

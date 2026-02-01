@@ -3,6 +3,7 @@ import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/A
 import { logger } from "../../utils/logger";
 import { UiStabilityResult, TouchIdleResult, RotationCheckResult, BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 export class Idle {
   private adb: AdbExecutor;
@@ -159,7 +160,7 @@ export class Idle {
       );
 
       // Wait for measurement period to accumulate data
-      await new Promise(resolve => setTimeout(resolve, measurementDelayMs));
+      await defaultTimer.sleep(measurementDelayMs);
 
       // Take immediate measurement with no previous state
       return await this.getUiStability(

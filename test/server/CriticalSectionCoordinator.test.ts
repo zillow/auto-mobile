@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { CriticalSectionCoordinator } from "../../src/server/CriticalSectionCoordinator";
 import { FakeTimer } from "../fakes/FakeTimer";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 describe("CriticalSectionCoordinator", () => {
   let coordinator: CriticalSectionCoordinator;
@@ -36,7 +37,7 @@ describe("CriticalSectionCoordinator", () => {
   });
 
   const wait = async (ms: number): Promise<void> => {
-    const promise = new Promise<void>(resolve => setTimeout(resolve, ms));
+    const promise = defaultTimer.sleep(ms);
     fakeTimer.advanceTime(ms);
     await promise;
   };

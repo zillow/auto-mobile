@@ -20,6 +20,7 @@ import {
 } from "./debugTools";
 import { DaemonClient, type DaemonClientFactory, type DaemonClientLike } from "./client";
 import { DaemonState, type DaemonStateLike } from "./daemonState";
+import { defaultTimer } from "../utils/SystemTimer";
 
 /**
  * Daemon Manager
@@ -109,7 +110,7 @@ export class DaemonManager {
       }
 
       // Wait for processes to terminate
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await defaultTimer.sleep(1000);
     }
 
     // Enforce single daemon policy: stop any existing daemon before starting
@@ -121,7 +122,7 @@ export class DaemonManager {
       );
       await this.stop();
       // Wait briefly for cleanup
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await defaultTimer.sleep(500);
     }
 
     // Clean up stale socket and PID files from previous sessions
@@ -245,7 +246,7 @@ export class DaemonManager {
         process.kill(pid, "SIGKILL");
 
         // Wait a bit more
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await defaultTimer.sleep(1000);
       }
 
       // Clean up stale PID file if it exists
@@ -315,7 +316,7 @@ export class DaemonManager {
     console.log("Restarting daemon...");
     await this.stop();
     // Wait a bit before starting
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await defaultTimer.sleep(1000);
     await this.start(options);
   }
 
@@ -336,7 +337,7 @@ export class DaemonManager {
         }
       }
 
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      await defaultTimer.sleep(pollInterval);
     }
 
     return false;
@@ -353,7 +354,7 @@ export class DaemonManager {
       if (!this.isProcessRunning(pid)) {
         return true;
       }
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      await defaultTimer.sleep(pollInterval);
     }
 
     return false;

@@ -5,6 +5,7 @@ import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 export class InputText extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
@@ -163,7 +164,7 @@ export class InputText extends BaseVisualChange {
     const keyCode = imeKeyCodeMap[imeAction];
     if (keyCode) {
       // Small delay to ensure text input is processed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await defaultTimer.sleep(100);
 
       // Execute the key event(s)
       if (keyCode.includes(" ")) {

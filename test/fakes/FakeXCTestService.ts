@@ -17,6 +17,7 @@ import {
 import { ViewHierarchyResult } from "../../src/models";
 import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
 import { PerformanceTracker } from "../../src/utils/PerformanceTracker";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
  * Fake implementation of XCTestService for testing
@@ -300,7 +301,7 @@ export class FakeXCTestService implements XCTestService {
   private async applyDelay(operation: string): Promise<void> {
     const delay = this.operationDelays.get(operation);
     if (delay && delay > 0) {
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await defaultTimer.sleep(delay);
     }
   }
 

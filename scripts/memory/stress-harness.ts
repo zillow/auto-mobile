@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 import { RealObserveScreen } from "../../src/features/observe/ObserveScreen";
 import type { ObserveScreen } from "../../src/features/observe/interfaces/ObserveScreen";
 import { TapOnElement } from "../../src/features/action/TapOnElement";
@@ -408,7 +409,7 @@ export async function runStressOperations(
       const elapsed = performance.now() - opStart;
       const remaining = delayMs - elapsed;
       if (remaining > 0) {
-        await new Promise(resolve => setTimeout(resolve, remaining));
+        await defaultTimer.sleep(remaining);
       }
     }
   }

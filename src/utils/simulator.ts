@@ -2,6 +2,7 @@ import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "./logger";
 import { ExecResult } from "../models";
+import { defaultTimer } from "./SystemTimer";
 
 /**
  * Interface for iOS simulator utilities
@@ -330,7 +331,7 @@ export class SimCtlSimulatorManager implements AppleSimulatorManager {
         }
 
         // Wait before checking again
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await defaultTimer.sleep(2000);
       } catch (error) {
         logger.warn(`Error checking simulator boot status: ${error}`);
       }
