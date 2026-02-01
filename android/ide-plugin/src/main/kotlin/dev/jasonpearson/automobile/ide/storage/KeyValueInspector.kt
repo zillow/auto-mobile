@@ -2,6 +2,8 @@
 
 package dev.jasonpearson.automobile.ide.storage
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,15 +42,29 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.jasonpearson.automobile.ide.socket.StorageChangeListener
+import dev.jasonpearson.automobile.ide.socket.StorageSocketClient
+import kotlinx.coroutines.delay
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 
+/** Duration for the highlight animation when a key changes */
+private const val HIGHLIGHT_DURATION_MS = 2000L
+
+/** Color for highlighting recently changed entries */
+private val HIGHLIGHT_COLOR = Color(0xFF4CAF50).copy(alpha = 0.3f)
+
 /**
  * Key-Value storage inspector for SharedPreferences (Android) / UserDefaults (iOS).
+ *
+ * @param keyValueFiles List of key-value storage files to display
+ * @param storageSocketClient Optional socket client for real-time change updates
+ * @param modifier Modifier for the composable
  */
 @Composable
 fun KeyValueInspector(
     keyValueFiles: List<KeyValueFile>,
+    storageSocketClient: StorageSocketClient? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
@@ -57,6 +75,30 @@ fun KeyValueInspector(
     var selectedEntry by remember { mutableStateOf<KeyValueEntry?>(null) }
     var editingEntry by remember { mutableStateOf<KeyValueEntry?>(null) }
     var editValue by remember { mutableStateOf("") }
+
+    // Track recently changed keys for highlight animation
+    // Key format: "fileName:key" to uniquely identify entries across files
+    var recentlyChangedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    // Subscribe to storage changes
+    DisposableEffect(storageSocketClient) {
+        val listener = StorageChangeListener { event ->
+            val changeKey = "${event.fileName}:${event.key}"
+            recentlyChangedKeys = recentlyChangedKeys + changeKey
+        }
+        storageSocketClient?.subscribe(listener)
+        onDispose {
+            storageSocketClient?.unsubscribe(listener)
+        }
+    }
+
+    // Auto-clear highlighted keys after animation duration
+    LaunchedEffect(recentlyChangedKeys) {
+        if (recentlyChangedKeys.isNotEmpty()) {
+            delay(HIGHLIGHT_DURATION_MS)
+            recentlyChangedKeys = emptySet()
+        }
+    }
 
     // Filter entries by search query
     val filteredEntries = remember(selectedFile, searchQuery) {
@@ -253,6 +295,21 @@ fun KeyValueInspector(
                         val isSelected = entry == selectedEntry
                         val isEditing = entry == editingEntry
 
+                        // Check if this entry was recently changed
+                        val changeKey = "${selectedFile?.name}:${entry.key}"
+                        val isRecentlyChanged = changeKey in recentlyChangedKeys
+
+                        // Animate background color for recently changed entries
+                        val backgroundColor by animateColorAsState(
+                            targetValue = when {
+                                isRecentlyChanged -> HIGHLIGHT_COLOR
+                                isSelected -> Color(0xFF2196F3).copy(alpha = 0.1f)
+                                else -> Color.Transparent
+                            },
+                            animationSpec = tween(durationMillis = 300),
+                            label = "entryBackground"
+                        )
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -261,10 +318,7 @@ fun KeyValueInspector(
                                     editingEntry = null
                                 }
                                 .pointerHoverIcon(PointerIcon.Hand)
-                                .background(
-                                    if (isSelected) Color(0xFF2196F3).copy(alpha = 0.1f)
-                                    else Color.Transparent
-                                )
+                                .background(backgroundColor)
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

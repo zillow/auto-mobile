@@ -63,12 +63,20 @@ object DataSourceFactory {
 
     /**
      * Creates a storage data source based on the specified mode.
-     * Note: Storage data source does not yet have MCP support.
+     * @param mode The data source mode (Fake or Real)
+     * @param clientProvider Optional function to provide an AutoMobileClient for MCP access
+     * @param deviceId The device ID to fetch storage data for (required for Real mode)
+     * @param packageName The package name of the app to inspect (required for Real mode)
      */
-    fun createStorageDataSource(mode: DataSourceMode): StorageDataSource {
+    fun createStorageDataSource(
+        mode: DataSourceMode,
+        clientProvider: (() -> AutoMobileClient)? = null,
+        deviceId: String? = null,
+        packageName: String? = null,
+    ): StorageDataSource {
         return when (mode) {
             DataSourceMode.Fake -> FakeStorageDataSource()
-            DataSourceMode.Real -> RealStorageDataSource()
+            DataSourceMode.Real -> RealStorageDataSource(clientProvider, deviceId, packageName)
         }
     }
 

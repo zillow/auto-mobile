@@ -49,7 +49,7 @@ fun StorageDashboard(
 
     // Fetch storage data from data source
     var databases by remember { mutableStateOf<List<DatabaseInfo>>(emptyList()) }
-    var keyValueEntries by remember { mutableStateOf<List<KeyValueEntry>>(emptyList()) }
+    var keyValueFiles by remember { mutableStateOf<List<KeyValueFile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -73,10 +73,10 @@ fun StorageDashboard(
                     }
                 }
 
-                // Fetch key-value pairs
-                when (val result = dataSource.getKeyValuePairs()) {
+                // Fetch key-value files
+                when (val result = dataSource.getKeyValueFiles()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
-                        keyValueEntries = result.data
+                        keyValueFiles = result.data
                         isLoading = false
                     }
                     is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {
@@ -139,10 +139,7 @@ fun StorageDashboard(
                 modifier = Modifier.fillMaxSize()
             )
             StorageTab.KeyValue -> KeyValueInspector(
-                keyValueFiles = when (dataSourceMode) {
-                    DataSourceMode.Fake -> StorageMockData.keyValueFiles
-                    DataSourceMode.Real -> emptyList()
-                },
+                keyValueFiles = keyValueFiles,
                 modifier = Modifier.fillMaxSize()
             )
         }
