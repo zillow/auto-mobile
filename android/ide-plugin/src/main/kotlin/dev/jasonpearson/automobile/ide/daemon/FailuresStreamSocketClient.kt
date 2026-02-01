@@ -349,6 +349,7 @@ class FailuresStreamSocketClient(
     private val json: Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
+        encodeDefaults = true  // Required to include command field with default value
     },
 ) : FailuresStreamClient {
 
