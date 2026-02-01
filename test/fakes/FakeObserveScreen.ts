@@ -12,6 +12,8 @@ export class FakeObserveScreen implements ObserveScreen {
   private executeCallCount: number = 0;
   private getMostRecentCachedObserveResultCallCount: number = 0;
   private failures: Map<string, Error> = new Map();
+  private callCounter: number = 0;
+  private autoVaryHierarchy: boolean = false;
 
   /**
    * Set the observe result to be returned by execute and getMostRecentCachedObserveResult
@@ -30,16 +32,41 @@ export class FakeObserveScreen implements ObserveScreen {
   }
 
   /**
+   * Enable auto-varying hierarchy mode. When enabled, each call adds a unique
+   * counter to the viewHierarchy so that BaseVisualChange sees different hashes
+   * and doesn't trigger retry loops. Call this in tests where changeExpected=true.
+   */
+  enableAutoVaryHierarchy(): void {
+    this.autoVaryHierarchy = true;
+  }
+
+  /**
    * Get the next observe result (either from factory or static)
    */
   private getNextObserveResult(): ObserveResult {
+    this.callCounter++;
+
+    let result: ObserveResult;
     if (this.observeResultFactory) {
-      return this.observeResultFactory();
-    }
-    if (!this.configuredObserveResult) {
+      result = this.observeResultFactory();
+    } else if (!this.configuredObserveResult) {
       throw new Error("No observe result configured");
+    } else {
+      result = this.configuredObserveResult;
     }
-    return this.configuredObserveResult;
+
+    if (this.autoVaryHierarchy && result.viewHierarchy) {
+      // Add unique counter to make each observation have a different hash
+      result = {
+        ...result,
+        viewHierarchy: {
+          ...result.viewHierarchy,
+          _fakeCallId: this.callCounter
+        }
+      };
+    }
+
+    return result;
   }
 
   /**
@@ -90,6 +117,7 @@ export class FakeObserveScreen implements ObserveScreen {
     this.executedOperations = [];
     this.executeCallCount = 0;
     this.getMostRecentCachedObserveResultCallCount = 0;
+    this.callCounter = 0;
   }
 
   /**

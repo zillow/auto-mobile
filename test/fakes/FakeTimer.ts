@@ -365,7 +365,7 @@ export class FakeTimer implements Timer {
       await new Promise(resolve => setImmediate(resolve));
     }
 
-    if (error) throw error;
+    if (error) {throw error;}
     return result as T;
   }
 }

@@ -28,6 +28,7 @@ describe("ImeAction", () => {
     // Create fakes for testing
     fakeAdb = new FakeAdbExecutor();
     fakeObserveScreen = new FakeObserveScreen();
+    fakeObserveScreen.enableAutoVaryHierarchy();
     fakeWindow = new FakeWindow();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeA11yService = new FakeAccessibilityService();
