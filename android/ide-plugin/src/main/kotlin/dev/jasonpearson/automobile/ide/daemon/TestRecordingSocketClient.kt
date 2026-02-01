@@ -141,6 +141,64 @@ class FakeTestRecordingClient(
     stopIndex += 1
     return response
   }
+
+  companion object {
+    /** Creates a FakeTestRecordingClient with sample responses for UI development/testing. */
+    fun withSampleResponses(): FakeTestRecordingClient {
+      val sampleYaml =
+          """
+          |name: recorded-plan-2026-02-01T10-30-00
+          |description: Recorded test plan with 5 steps
+          |steps:
+          |  - tool: tapOn
+          |    params:
+          |      elementId: "com.example.app:id/login_button"
+          |      description: "Login button"
+          |  - tool: inputText
+          |    params:
+          |      text: "user@example.com"
+          |      elementId: "com.example.app:id/email_field"
+          |  - tool: inputText
+          |    params:
+          |      text: "password123"
+          |      elementId: "com.example.app:id/password_field"
+          |  - tool: tapOn
+          |    params:
+          |      elementId: "com.example.app:id/submit_button"
+          |      description: "Submit button"
+          |  - tool: observe
+          |    params:
+          |      waitForIdle: true
+          """
+              .trimMargin()
+
+      return FakeTestRecordingClient(
+          startResponses =
+              listOf(
+                  TestRecordingStartResult(
+                      recordingId = "rec-001",
+                      startedAt = "2026-02-01T10:30:00Z",
+                      deviceId = "emulator-5554",
+                      platform = "android",
+                  )
+              ),
+          stopResponses =
+              listOf(
+                  TestRecordingStopResult(
+                      recordingId = "rec-001",
+                      startedAt = "2026-02-01T10:30:00Z",
+                      stoppedAt = "2026-02-01T10:30:12Z",
+                      durationMs = 12345L,
+                      planName = "recorded-plan-2026-02-01T10-30-00",
+                      planContent = sampleYaml,
+                      stepCount = 5,
+                      deviceId = "emulator-5554",
+                      platform = "android",
+                  )
+              ),
+      )
+    }
+  }
 }
 
 object TestRecordingSocketPaths {
