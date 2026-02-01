@@ -214,6 +214,88 @@ export async function checkAccessibilityService(
 }
 
 /**
+ * Check work profile accessibility service status
+ * Warns if work profiles exist but accessibility service is not enabled for them
+ */
+export async function checkWorkProfileAccessibility(
+  adbFactory: AdbClientFactory = defaultAdbClientFactory
+): Promise<CheckResult> {
+  try {
+    const adb = adbFactory.create();
+    const devices = await adb.getBootedAndroidDevices();
+
+    if (devices.length === 0) {
+      return {
+        name: "Work Profile Accessibility",
+        status: "skip",
+        message: "No Android devices connected",
+      };
+    }
+
+    // Check first connected device
+    const device = devices[0];
+    const deviceAdb = adbFactory.create(device);
+    const users = await deviceAdb.listUsers();
+
+    // Filter to work profiles: userId > 0, running, and flags indicate managed profile (0x30 = 48)
+    // Work profiles have FLAG_MANAGED_PROFILE (0x20) in their flags
+    const workProfiles = users.filter(
+      user => user.userId > 0 && user.running && (user.flags & 0x20) !== 0
+    );
+
+    if (workProfiles.length === 0) {
+      return {
+        name: "Work Profile Accessibility",
+        status: "pass",
+        message: "No work profiles detected",
+      };
+    }
+
+    // Check accessibility service status for each work profile
+    const profilesWithoutService: { userId: number; name: string }[] = [];
+
+    for (const profile of workProfiles) {
+      const result = await deviceAdb.executeCommand(
+        `shell settings --user ${profile.userId} get secure enabled_accessibility_services`,
+        undefined,
+        undefined,
+        true
+      );
+      const isEnabled = result.stdout.includes(AndroidAccessibilityServiceManager.PACKAGE);
+      if (!isEnabled) {
+        profilesWithoutService.push({ userId: profile.userId, name: profile.name });
+      }
+    }
+
+    if (profilesWithoutService.length === 0) {
+      return {
+        name: "Work Profile Accessibility",
+        status: "pass",
+        message: `Accessibility service enabled for ${workProfiles.length} work profile(s)`,
+      };
+    }
+
+    const profileList = profilesWithoutService
+      .map(p => `${p.name} (user ${p.userId})`)
+      .join(", ");
+
+    return {
+      name: "Work Profile Accessibility",
+      status: "warn",
+      message: `Accessibility service not enabled for work profile(s): ${profileList}`,
+      recommendation: "The accessibility service needs to be enabled in each work profile for full app install tracking. Run auto-mobile doctor or enable manually in Settings > Accessibility.",
+    };
+  } catch (error) {
+    logger.debug(`Work profile accessibility check failed: ${error}`);
+    return {
+      name: "Work Profile Accessibility",
+      status: "skip",
+      message: `Could not check: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
  * Run all AutoMobile checks
  */
 export async function runAutoMobileChecks(): Promise<CheckResult[]> {
@@ -223,6 +305,7 @@ export async function runAutoMobileChecks(): Promise<CheckResult[]> {
   results.push(await checkDaemonStatus());
   results.push(await checkDaemonConnectivity());
   results.push(await checkAccessibilityService());
+  results.push(await checkWorkProfileAccessibility());
 
   return results;
 }

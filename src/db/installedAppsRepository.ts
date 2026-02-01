@@ -4,6 +4,7 @@ import type { Database, InstalledApp as DbInstalledApp, NewInstalledApp } from "
 
 export interface InstalledAppsStore {
   getLatestVerification(deviceId: string): Promise<number | null>;
+  getLatestVerificationForProfile(deviceId: string, userId: number): Promise<number | null>;
   listInstalledApps(deviceId: string): Promise<DbInstalledApp[]>;
   replaceInstalledApps(deviceId: string, apps: NewInstalledApp[]): Promise<void>;
   upsertInstalledApp(
@@ -20,6 +21,7 @@ export interface InstalledAppsStore {
   ): Promise<void>;
   removeInstalledAppForDevice(deviceId: string, packageName: string): Promise<void>;
   markDeviceStale(deviceId: string): Promise<void>;
+  markProfileStale(deviceId: string, userId: number): Promise<void>;
   touchDevice(deviceId: string, timestampMs: number): Promise<void>;
   clearDeviceSession(deviceId: string): Promise<void>;
   clearOldDaemonSessions(currentDaemonSessionId: string): Promise<void>;
@@ -47,6 +49,22 @@ export class InstalledAppsRepository implements InstalledAppsStore {
       .selectFrom("installed_apps")
       .select(db.fn.max<number>("last_verified_at").as("last_verified_at"))
       .where("device_id", "=", deviceId)
+      .executeTakeFirst();
+
+    if (!row || row.last_verified_at === null || row.last_verified_at === undefined) {
+      return null;
+    }
+
+    return Number(row.last_verified_at);
+  }
+
+  async getLatestVerificationForProfile(deviceId: string, userId: number): Promise<number | null> {
+    const db = await this.getDb();
+    const row = await db
+      .selectFrom("installed_apps")
+      .select(db.fn.max<number>("last_verified_at").as("last_verified_at"))
+      .where("device_id", "=", deviceId)
+      .where("user_id", "=", userId)
       .executeTakeFirst();
 
     if (!row || row.last_verified_at === null || row.last_verified_at === undefined) {
@@ -143,6 +161,16 @@ export class InstalledAppsRepository implements InstalledAppsStore {
       .updateTable("installed_apps")
       .set({ last_verified_at: 0 })
       .where("device_id", "=", deviceId)
+      .execute();
+  }
+
+  async markProfileStale(deviceId: string, userId: number): Promise<void> {
+    const db = await this.getDb();
+    await db
+      .updateTable("installed_apps")
+      .set({ last_verified_at: 0 })
+      .where("device_id", "=", deviceId)
+      .where("user_id", "=", userId)
       .execute();
   }
 

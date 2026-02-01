@@ -36,6 +36,7 @@ import { NavigationGraphManager, NavigationEvent } from "../../navigation/Naviga
 import { NavigationScreenshotManager } from "../../navigation/NavigationScreenshotManager";
 import { HierarchyNavigationDetector } from "../../navigation/HierarchyNavigationDetector";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../../db/installedAppsRepository";
+import { DefaultWorkProfileMonitor, WorkProfileMonitor } from "../../../utils/WorkProfileMonitor";
 import { PortManager } from "../../../utils/PortManager";
 import { getDeviceDataStreamServer } from "../../../daemon/deviceDataStreamSocketServer";
 import {
@@ -333,6 +334,9 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   private screenshotBackoffScheduler: ScreenshotBackoffScheduler | null = null;
   private cachedScreenDimensions: { width: number; height: number } | null = null;
 
+  // Work profile monitor for polling profiles without accessibility service
+  private workProfileMonitor: WorkProfileMonitor | null = null;
+
   // Logging tag for base class
   protected readonly logTag = "ACCESSIBILITY_SERVICE";
 
@@ -505,6 +509,9 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       this.hierarchyNavigationDetector.dispose();
       this.hierarchyNavigationDetector = null;
     }
+
+    // Stop work profile monitor when connection closes
+    this.stopWorkProfileMonitor();
   }
 
   protected async setupBeforeConnect(perf: PerformanceTracker): Promise<void> {
@@ -963,6 +970,9 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
   async close(): Promise<void> {
     try {
+      // Stop work profile monitor if running
+      this.stopWorkProfileMonitor();
+
       await super.close();
 
       if (this.portForwardingSetup) {
@@ -1497,6 +1507,37 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     return this.installedAppsRepository;
   }
 
+  /**
+   * Get or create the work profile monitor for polling profiles without accessibility service
+   */
+  getWorkProfileMonitor(): WorkProfileMonitor {
+    if (!this.workProfileMonitor) {
+      this.workProfileMonitor = new DefaultWorkProfileMonitor({
+        deviceId: this.device.deviceId,
+        adb: this.adb,
+        installedAppsStore: this.getInstalledAppsRepository(),
+        timer: this.timer
+      });
+    }
+    return this.workProfileMonitor;
+  }
+
+  /**
+   * Start the work profile monitor to poll profiles without accessibility service
+   */
+  startWorkProfileMonitor(): void {
+    this.getWorkProfileMonitor().start();
+  }
+
+  /**
+   * Stop the work profile monitor
+   */
+  stopWorkProfileMonitor(): void {
+    if (this.workProfileMonitor) {
+      this.workProfileMonitor.stop();
+    }
+  }
+
   private async handlePackageEvent(event: PackageEvent, timestamp?: number): Promise<void> {
     if (this.device.platform !== "android") {
       return;
@@ -1521,6 +1562,12 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       } else {
         const isSystem = event.isSystem === true;
         await repo.upsertInstalledApp(deviceId, event.userId, event.packageName, isSystem, eventTimestamp);
+      }
+
+      // Notify work profile monitor that this user has accessibility service
+      // (if we're receiving package events, the service is working for this user)
+      if (event.userId > 0 && this.workProfileMonitor) {
+        this.workProfileMonitor.setProfileHasAccessibilityService(event.userId, true);
       }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to apply package event: ${error}`);

@@ -17,6 +17,7 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   private shouldCleanupFail: boolean = false;
   private installedSha256: string | null = null;
   private versionCompatible: boolean = true;
+  private enabledForUsers: Map<number, boolean> = new Map();
 
   /**
    * Set whether the accessibility service is installed
@@ -107,6 +108,15 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   }
 
   /**
+   * Set whether the accessibility service is enabled for a specific user
+   * @param userId - The user ID
+   * @param enabled - Whether the service is enabled for this user
+   */
+  setEnabledForUser(userId: number, enabled: boolean): void {
+    this.enabledForUsers.set(userId, enabled);
+  }
+
+  /**
    * Get history of executed operations (for test assertions)
    * @returns Array of operation strings that were executed
    */
@@ -150,6 +160,11 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   async isEnabled(): Promise<boolean> {
     this.executedOperations.push("isEnabled");
     return this.enabledState;
+  }
+
+  async isEnabledForUser(userId: number): Promise<boolean> {
+    this.executedOperations.push(`isEnabledForUser:${userId}`);
+    return this.enabledForUsers.get(userId) ?? false;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -221,6 +236,16 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
     if (this.shouldEnableFail) {
       throw new Error("Failed to enable accessibility service");
     }
+  }
+
+  async enableForUser(userId: number): Promise<void> {
+    this.executedOperations.push(`enableForUser:${userId}`);
+
+    if (this.shouldEnableFail) {
+      throw new Error(`Failed to enable accessibility service for user ${userId}`);
+    }
+
+    this.enabledForUsers.set(userId, true);
   }
 
   async cleanupApk(apkPath: string): Promise<void> {

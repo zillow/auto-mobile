@@ -18,6 +18,20 @@ export class FakeInstalledAppsRepository implements InstalledAppsStore {
     return latest;
   }
 
+  async getLatestVerificationForProfile(deviceId: string, userId: number): Promise<number | null> {
+    let latest: number | null = null;
+    for (const row of this.rows) {
+      if (row.device_id !== deviceId || row.user_id !== userId) {
+        continue;
+      }
+      const value = Number(row.last_verified_at);
+      if (latest === null || value > latest) {
+        latest = value;
+      }
+    }
+    return latest;
+  }
+
   async listInstalledApps(deviceId: string): Promise<DbInstalledApp[]> {
     return this.rows.filter(row => row.device_id === deviceId).map(row => ({ ...row }));
   }
@@ -75,6 +89,14 @@ export class FakeInstalledAppsRepository implements InstalledAppsStore {
   async markDeviceStale(deviceId: string): Promise<void> {
     for (const row of this.rows) {
       if (row.device_id === deviceId) {
+        row.last_verified_at = 0;
+      }
+    }
+  }
+
+  async markProfileStale(deviceId: string, userId: number): Promise<void> {
+    for (const row of this.rows) {
+      if (row.device_id === deviceId && row.user_id === userId) {
         row.last_verified_at = 0;
       }
     }

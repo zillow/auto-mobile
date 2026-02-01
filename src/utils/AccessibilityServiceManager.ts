@@ -37,6 +37,7 @@ export interface AccessibilityServiceManager {
   setup(force?: boolean, perf?: PerformanceTracker): Promise<AccessibilitySetupResult>;
   isInstalled(): Promise<boolean>;
   isEnabled(): Promise<boolean>;
+  isEnabledForUser(userId: number): Promise<boolean>;
   isAvailable(): Promise<boolean>;
   getInstalledApkSha256(): Promise<string | null>;
   isVersionCompatible(): Promise<boolean>;
@@ -44,6 +45,7 @@ export interface AccessibilityServiceManager {
   downloadApk(): Promise<string>;
   install(apkPath: string): Promise<void>;
   enable(): Promise<void>;
+  enableForUser(userId: number): Promise<void>;
   cleanupApk(apkPath: string): Promise<void>;
 }
 
@@ -550,6 +552,23 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       return isEnabled;
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error checking enabled status: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Check if Accessibility Service is enabled for a specific user profile
+   * @param userId - The Android user ID to check (e.g., 10 for work profile)
+   */
+  async isEnabledForUser(userId: number): Promise<boolean> {
+    try {
+      logger.info(`[ACCESSIBILITY_SERVICE] Checking if accessibility service is enabled for user ${userId}`);
+      const result = await this.adb.executeCommand(`shell settings --user ${userId} get secure enabled_accessibility_services`);
+      const isEnabled = result.stdout.includes(AndroidAccessibilityServiceManager.PACKAGE);
+      logger.info(`[ACCESSIBILITY_SERVICE] Service enabled status for user ${userId}: ${isEnabled ? "enabled" : "disabled"}`);
+      return isEnabled;
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Error checking enabled status for user ${userId}: ${error}`);
       return false;
     }
   }
@@ -1102,6 +1121,73 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    */
   async enable(): Promise<void> {
     return this.enableViaSettings();
+  }
+
+  /**
+   * Enable Accessibility Service for a specific user profile via adb settings commands
+   * @param userId - The Android user ID to enable for (e.g., 10 for work profile)
+   */
+  async enableForUser(userId: number): Promise<void> {
+    // Check if settings toggle is supported
+    const capabilities = await this.getToggleCapabilities();
+    if (!capabilities.supportsSettingsToggle) {
+      const errorMsg = `Settings-based accessibility toggle is not supported on this device. ${capabilities.reason || ""}`;
+      logger.error("[ACCESSIBILITY_SERVICE] " + errorMsg, { capabilities });
+      throw new Error(errorMsg);
+    }
+
+    try {
+      logger.info(`[ACCESSIBILITY_SERVICE] Enabling Accessibility Service via settings commands for user ${userId}`);
+
+      // Get current enabled services for this user
+      const result = await this.adb.executeCommand(`shell settings --user ${userId} get secure enabled_accessibility_services`);
+      let currentServices = result.stdout.trim();
+
+      // Issue #384: preserve existing enabled services; settings may return "null" or empty.
+      if (currentServices === "null" || currentServices === "") {
+        currentServices = "";
+      }
+
+      // Build the service component name
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      // Check if service is already in the list
+      if (currentServices.includes(serviceComponent)) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Accessibility Service is already enabled for user ${userId}`);
+      } else {
+        // Issue #384: append to the colon-separated list instead of overwriting other services.
+        const updatedServices = currentServices
+          ? `${currentServices}:${serviceComponent}`
+          : serviceComponent;
+
+        // Set updated list
+        await this.adb.executeCommand(`shell settings --user ${userId} put secure enabled_accessibility_services "${updatedServices}"`);
+        logger.info(`[ACCESSIBILITY_SERVICE] Added AutoMobile service to enabled_accessibility_services for user ${userId}`);
+      }
+
+      // Enable accessibility globally for this user
+      await this.adb.executeCommand(`shell settings --user ${userId} put secure accessibility_enabled 1`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Accessibility Service enabled successfully via settings for user ${userId}`);
+
+      // Clear cache after enabling (main user cache - per-user caching not implemented)
+      this.clearAvailabilityCache();
+      // Also invalidate the accessibility detector cache so observe reports correct state
+      this.getAccessibilityDetector().invalidateCache(this.device.deviceId);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorLower = errorMsg.toLowerCase();
+
+      // Categorize error types for clearer feedback
+      if (errorLower.includes("permission denied") || errorLower.includes("not permitted")) {
+        throw new Error(`Permission denied while enabling Accessibility Service for user ${userId}. The device may require root access, device owner status, or special shell permissions. Original error: ${errorMsg}`);
+      } else if (errorLower.includes("device not found") || errorLower.includes("no devices") || errorLower.includes("offline")) {
+        throw new Error(`Device connection lost while enabling Accessibility Service for user ${userId}. Ensure the device is connected and adb is responsive. Original error: ${errorMsg}`);
+      } else if (errorLower.includes("timeout") || errorLower.includes("timed out")) {
+        throw new Error(`Timeout while enabling Accessibility Service for user ${userId}. The device may be unresponsive. Original error: ${errorMsg}`);
+      } else {
+        throw new Error(`Failed to enable Accessibility Service via settings for user ${userId}. This may indicate an ADB communication issue or device state problem. Original error: ${errorMsg}`);
+      }
+    }
   }
 
   /**
