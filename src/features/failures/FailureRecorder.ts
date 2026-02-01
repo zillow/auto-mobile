@@ -117,6 +117,20 @@ export class FailureRecorder implements FailureRecorderService {
   }
 
   /**
+   * Reset the singleton instance (for testing).
+   */
+  static resetInstance(): void {
+    FailureRecorder.instance = null;
+  }
+
+  /**
+   * Create a new instance for testing with injected dependencies.
+   */
+  static createForTesting(repository?: FailureAnalyticsRepository): FailureRecorder {
+    return new FailureRecorder(repository);
+  }
+
+  /**
    * Record a tool call failure
    */
   async recordToolFailure(input: RecordToolFailureInput): Promise<string> {
@@ -382,5 +396,11 @@ export class FailureRecorder implements FailureRecorderService {
   }
 }
 
-// Export singleton instance getter
-export const getFailureRecorder = (): FailureRecorder => FailureRecorder.getInstance();
+/**
+ * Default singleton instance of FailureRecorder.
+ * Use this for production code. For testing, use FailureRecorder.createForTesting().
+ */
+export const defaultFailureRecorder: FailureRecorderService = FailureRecorder.getInstance();
+
+// Export singleton instance getter (uses defaultFailureRecorder)
+export const getFailureRecorder = (): FailureRecorderService => defaultFailureRecorder;

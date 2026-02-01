@@ -1,6 +1,5 @@
-import { expect, describe, test, beforeEach, afterEach, spyOn } from "bun:test";
+import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { NavigateTo } from "../../../src/features/navigation/NavigateTo";
-import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { BootedDevice } from "../../../src/models";
 import { z } from "zod";
@@ -12,7 +11,6 @@ describe("NavigateTo", () => {
   let device: BootedDevice;
   let toolCallLog: Array<{ toolName: string; args: Record<string, any> }>;
   let fakeGraph: FakeNavigationGraphManager;
-  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let fakeAdbFactory: FakeAdbClientFactory;
 
   // Map of text -> screen to simulate navigation when tools are called
@@ -20,9 +18,6 @@ describe("NavigateTo", () => {
 
   beforeEach(async () => {
     fakeGraph = new FakeNavigationGraphManager();
-    getInstanceSpy = spyOn(NavigationGraphManager, "getInstance").mockReturnValue(
-      fakeGraph as unknown as NavigationGraphManager
-    );
     ToolRegistry.clearTools();
 
     // Create fake device
@@ -55,7 +50,7 @@ describe("NavigateTo", () => {
         // Simulate navigation by recording a navigation event
         const targetScreen = navigationMap.get(args.text);
         if (targetScreen) {
-          await NavigationGraphManager.getInstance().recordNavigationEvent({
+          await fakeGraph.recordNavigationEvent({
             destination: targetScreen,
             source: "TEST",
             arguments: {},
@@ -70,18 +65,17 @@ describe("NavigateTo", () => {
     );
 
     // Set up navigation graph with test data
-    const manager = NavigationGraphManager.getInstance();
-    await manager.setCurrentApp("com.test.app");
+    await fakeGraph.setCurrentApp("com.test.app");
   });
 
   afterEach(() => {
-    getInstanceSpy?.mockRestore();
     ToolRegistry.clearTools();
   });
 
   describe("execute", () => {
     test("should return error when no current screen", async () => {
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       const result = await navigateTo.execute({
         targetScreen: "TargetScreen",
@@ -94,8 +88,7 @@ describe("NavigateTo", () => {
     });
 
     test("should return success when already on target screen", async () => {
-      const manager = NavigationGraphManager.getInstance();
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -104,7 +97,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 0
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       const result = await navigateTo.execute({
         targetScreen: "HomeScreen",
@@ -117,8 +111,7 @@ describe("NavigateTo", () => {
     });
 
     test("should return error when no path exists", async () => {
-      const manager = NavigationGraphManager.getInstance();
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -127,7 +120,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 0
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       const result = await navigateTo.execute({
         targetScreen: "UnknownScreen",
@@ -141,17 +135,16 @@ describe("NavigateTo", () => {
     });
 
     test("should execute tool call when path exists", async () => {
-      const manager = NavigationGraphManager.getInstance();
       const now = Date.now();
 
       // Set up navigation map so fake tool triggers navigation
       navigationMap.set("Settings", "SettingsScreen");
 
       // Record tool call before navigation (to correlate)
-      manager.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
+      fakeGraph.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
 
       // Record navigation: Home -> Settings
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -159,7 +152,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "SettingsScreen",
         source: "TEST",
         arguments: {},
@@ -169,7 +162,7 @@ describe("NavigateTo", () => {
       });
 
       // Go back to Home to test navigation
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -178,7 +171,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 2
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       await navigateTo.execute({
         targetScreen: "SettingsScreen",
@@ -192,14 +186,13 @@ describe("NavigateTo", () => {
     });
 
     test("should include path in successful navigation result", async () => {
-      const manager = NavigationGraphManager.getInstance();
       const now = Date.now();
 
       // Set up navigation map so fake tool triggers navigation
       navigationMap.set("Profile", "ProfileScreen");
 
-      manager.recordToolCall("tapOn", { text: "Profile", action: "tap", platform: "android" });
-      await manager.recordNavigationEvent({
+      fakeGraph.recordToolCall("tapOn", { text: "Profile", action: "tap", platform: "android" });
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -207,7 +200,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "ProfileScreen",
         source: "TEST",
         arguments: {},
@@ -215,7 +208,7 @@ describe("NavigateTo", () => {
         timestamp: now + 100,
         sequenceNumber: 1
       });
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -224,7 +217,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 2
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       const result = await navigateTo.execute({
         targetScreen: "ProfileScreen",
@@ -237,15 +231,14 @@ describe("NavigateTo", () => {
     });
 
     test("should report progress during navigation", async () => {
-      const manager = NavigationGraphManager.getInstance();
       const now = Date.now();
       const progressUpdates: Array<{ current: number; total: number; message: string }> = [];
 
       // Set up navigation map so fake tool triggers navigation
       navigationMap.set("Step1", "Screen2");
 
-      manager.recordToolCall("tapOn", { text: "Step1", action: "tap", platform: "android" });
-      await manager.recordNavigationEvent({
+      fakeGraph.recordToolCall("tapOn", { text: "Step1", action: "tap", platform: "android" });
+      await fakeGraph.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
         arguments: {},
@@ -253,7 +246,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "Screen2",
         source: "TEST",
         arguments: {},
@@ -261,7 +254,7 @@ describe("NavigateTo", () => {
         timestamp: now + 100,
         sequenceNumber: 1
       });
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
         arguments: {},
@@ -270,7 +263,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 2
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       await navigateTo.execute(
         { targetScreen: "Screen2", platform: "android" },
@@ -286,8 +280,7 @@ describe("NavigateTo", () => {
     });
 
     test("should return duration in result", async () => {
-      const manager = NavigationGraphManager.getInstance();
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -296,7 +289,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 0
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       const result = await navigateTo.execute({
         targetScreen: "HomeScreen",
@@ -311,7 +305,6 @@ describe("NavigateTo", () => {
 
   describe("multi-hop navigation", () => {
     test("should find and execute multi-hop path", async () => {
-      const manager = NavigationGraphManager.getInstance();
       const now = Date.now();
 
       // Set up navigation map so fake tools trigger navigation
@@ -319,8 +312,8 @@ describe("NavigateTo", () => {
       navigationMap.set("Advanced", "AdvancedScreen");
 
       // Create path: Home -> Settings -> Advanced
-      manager.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
-      await manager.recordNavigationEvent({
+      fakeGraph.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -328,7 +321,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "SettingsScreen",
         source: "TEST",
         arguments: {},
@@ -337,8 +330,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 1
       });
 
-      manager.recordToolCall("tapOn", { text: "Advanced", action: "tap", platform: "android" });
-      await manager.recordNavigationEvent({
+      fakeGraph.recordToolCall("tapOn", { text: "Advanced", action: "tap", platform: "android" });
+      await fakeGraph.recordNavigationEvent({
         destination: "AdvancedScreen",
         source: "TEST",
         arguments: {},
@@ -348,7 +341,7 @@ describe("NavigateTo", () => {
       });
 
       // Go back to Home
-      await manager.recordNavigationEvent({
+      await fakeGraph.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -357,7 +350,8 @@ describe("NavigateTo", () => {
         sequenceNumber: 3
       });
 
-      navigateTo = new NavigateTo(device, fakeAdbFactory);
+      // Inject fakeGraph via constructor
+      navigateTo = new NavigateTo(device, fakeAdbFactory, null, null, fakeGraph);
 
       await navigateTo.execute({
         targetScreen: "AdvancedScreen",

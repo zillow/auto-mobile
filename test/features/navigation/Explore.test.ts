@@ -1,6 +1,5 @@
-import { expect, describe, test, beforeEach, afterEach, spyOn } from "bun:test";
+import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { Explore } from "../../../src/features/navigation/Explore";
-import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { BootedDevice, Element, ObserveResult } from "../../../src/models";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { FakeNavigationGraphManager } from "../../fakes/FakeNavigationGraphManager";
@@ -35,7 +34,6 @@ describe("Explore", () => {
   let mockObserveScreen: any;
   let fakeGraph: FakeNavigationGraphManager;
   let fakeTimer: FakeTimer;
-  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let elementParser: ElementParser;
 
   beforeEach(() => {
@@ -43,9 +41,6 @@ describe("Explore", () => {
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
     elementParser = new ElementParser();
-    getInstanceSpy = spyOn(NavigationGraphManager, "getInstance").mockReturnValue(
-      fakeGraph as unknown as NavigationGraphManager
-    );
 
     // Create fake device
     device = {
@@ -59,7 +54,7 @@ describe("Explore", () => {
       executeCommand: async (cmd: string) => {
         if (cmd.includes("KEYCODE_BACK")) {
           // Simulate navigation event when back is pressed
-          NavigationGraphManager.getInstance().recordNavigationEvent({
+          fakeGraph.recordNavigationEvent({
             destination: "PreviousScreen",
             source: "TEST",
             arguments: {},
@@ -84,7 +79,7 @@ describe("Explore", () => {
         observeCallCount++;
         // Alternate between screens to simulate navigation
         if (observeCallCount % 2 === 0) {
-          NavigationGraphManager.getInstance().recordNavigationEvent({
+          fakeGraph.recordNavigationEvent({
             destination: `Screen${observeCallCount}`,
             source: "TEST",
             arguments: {},
@@ -103,7 +98,7 @@ describe("Explore", () => {
   });
 
   afterEach(() => {
-    getInstanceSpy?.mockRestore();
+    // No cleanup needed since we're using injected fakes
   });
 
   function createMockViewHierarchyNode(overrides: any = {}): any {
@@ -311,7 +306,7 @@ describe("Explore", () => {
         }
       } as AdbClient;
 
-      explore = new Explore(device, adbWithTracking);
+      explore = new Explore(device, adbWithTracking, fakeTimer, fakeGraph);
       (explore as any).handleDeadEnd = async () => {
         backPresses.push("back");
       };
@@ -348,7 +343,7 @@ describe("Explore", () => {
         }
       } as AdbClient;
 
-      explore = new Explore(device, adbWithTracking);
+      explore = new Explore(device, adbWithTracking, fakeTimer, fakeGraph);
       (explore as any).handleDeadEnd = async () => {
         backPresses.push("back");
       };
@@ -395,10 +390,8 @@ describe("Explore", () => {
 
   describe("graph-based navigation (validate mode)", () => {
     test("should initialize graph traversal state in validate mode", async () => {
-      const navManager = NavigationGraphManager.getInstance();
-
       // Pre-populate the graph with some nodes and edges
-      navManager.recordNavigationEvent({
+      fakeGraph.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
         arguments: {},
@@ -408,7 +401,7 @@ describe("Explore", () => {
         applicationId: "com.test.app"
       });
 
-      await navManager.recordToolCall(
+      fakeGraph.recordToolCall(
         "tapOn",
         { text: "Button1" },
         {
@@ -416,7 +409,7 @@ describe("Explore", () => {
         }
       );
 
-      navManager.recordNavigationEvent({
+      fakeGraph.recordNavigationEvent({
         destination: "Screen2",
         source: "TEST",
         arguments: {},
@@ -426,8 +419,8 @@ describe("Explore", () => {
         applicationId: "com.test.app"
       });
 
-      // Initialize traversal using the extracted function
-      const state = await initializeGraphTraversal(navManager);
+      // Initialize traversal using the extracted function with fakeGraph
+      const state = await initializeGraphTraversal(fakeGraph);
 
       expect(state).toBeDefined();
       expect(state.totalNodesInGraph).toBeGreaterThan(0);
@@ -437,7 +430,7 @@ describe("Explore", () => {
     });
 
     test("should select next edge to traverse", async () => {
-      const state = await initializeGraphTraversal(fakeGraph as unknown as NavigationGraphManager);
+      const state = await initializeGraphTraversal(fakeGraph);
 
       // If there are any pending edges, selectNextEdgeToTraverse should return one
       if (state.pendingEdges.length > 0) {
@@ -453,7 +446,7 @@ describe("Explore", () => {
     });
 
     test("should mark nodes as visited", async () => {
-      const state = await initializeGraphTraversal(fakeGraph as unknown as NavigationGraphManager);
+      const state = await initializeGraphTraversal(fakeGraph);
 
       expect(state.visitedNodes.size).toBe(0);
 
@@ -466,7 +459,7 @@ describe("Explore", () => {
     });
 
     test("should mark edges as traversed with validation results", async () => {
-      const state = await initializeGraphTraversal(fakeGraph as unknown as NavigationGraphManager);
+      const state = await initializeGraphTraversal(fakeGraph);
 
       expect(state.traversedEdges.size).toBe(0);
 
@@ -500,7 +493,7 @@ describe("Explore", () => {
     });
 
     test("should record failed edge validation", async () => {
-      const state = await initializeGraphTraversal(fakeGraph as unknown as NavigationGraphManager);
+      const state = await initializeGraphTraversal(fakeGraph);
 
       // Create a mock edge with interaction
       const mockEdge = {
@@ -600,10 +593,8 @@ describe("Explore", () => {
     });
 
     test("should include graph traversal metrics in result", async () => {
-      const navManager = NavigationGraphManager.getInstance();
-
       // Create a simple graph
-      navManager.recordNavigationEvent({
+      fakeGraph.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
         arguments: {},
@@ -613,11 +604,12 @@ describe("Explore", () => {
         applicationId: "com.test.app"
       });
 
-      explore = new Explore(device, mockAdb, fakeTimer);
+      // Inject fakeGraph via constructor
+      explore = new Explore(device, mockAdb, fakeTimer, fakeGraph);
       (explore as any).observeScreen = mockObserveScreen;
 
       // Initialize traversal state on explore instance
-      (explore as any).graphTraversalState = await initializeGraphTraversal(navManager);
+      (explore as any).graphTraversalState = await initializeGraphTraversal(fakeGraph);
       const state = (explore as any).graphTraversalState;
 
       // Mark some edges as traversed
@@ -636,7 +628,7 @@ describe("Explore", () => {
       markNodeVisited(state, "Screen1");
       markNodeVisited(state, "Screen2");
 
-      const initialGraph = await navManager.exportGraph();
+      const initialGraph = await fakeGraph.exportGraph();
       const result = await (explore as any).generateReport(initialGraph, Date.now(), false);
 
       expect(result.graphTraversal).toBeDefined();

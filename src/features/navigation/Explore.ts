@@ -3,7 +3,7 @@ import { BaseVisualChange, ProgressCallback } from "../action/BaseVisualChange";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
-import { NavigationGraphManager, type NavigationEdge } from "./NavigationGraphManager";
+import { defaultNavigationGraphManager, type NavigationEdge, type NavigationGraphService } from "./NavigationGraphManager";
 import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
 import { SwipeOnElement } from "../action/SwipeOnElement";
@@ -71,7 +71,7 @@ import {
  * avoiding redundant interactions, and efficiently covering unexplored screens.
  */
 export class Explore extends BaseVisualChange {
-  private navigationManager: NavigationGraphManager;
+  private navigationManager: NavigationGraphService;
   private exploredElements: Map<string, TrackedElement>;
   private interactionCount: number = 0;
   private explorationPath: string[] = [];
@@ -100,10 +100,11 @@ export class Explore extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    navigationManager?: NavigationGraphService
   ) {
     super(device, adb, timer);
-    this.navigationManager = NavigationGraphManager.getInstance();
+    this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
     this.exploredElements = new Map();
     this.elementParser = new ElementParser();
   }
