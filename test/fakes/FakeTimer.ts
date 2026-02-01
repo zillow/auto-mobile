@@ -323,4 +323,36 @@ export class FakeTimer implements Timer {
   getPendingIntervalCount(): number {
     return this.pendingIntervals.length;
   }
+
+  /**
+   * Advance time until a promise resolves.
+   * Useful for tests where the code uses timer-based polling (setInterval).
+   * @param promise - The promise to wait for
+   * @param stepMs - Milliseconds to advance per iteration (default: 50)
+   * @returns The resolved value of the promise
+   */
+  async resolvePromise<T>(promise: Promise<T>, stepMs: number = 50): Promise<T> {
+    let settled = false;
+    let result: T | undefined;
+    let error: unknown;
+
+    promise
+      .then(value => {
+        settled = true;
+        result = value;
+      })
+      .catch(err => {
+        settled = true;
+        error = err;
+      });
+
+    // Advance time until promise settles
+    while (!settled) {
+      this.advanceTime(stepMs);
+      await new Promise(resolve => setImmediate(resolve));
+    }
+
+    if (error) throw error;
+    return result as T;
+  }
 }
