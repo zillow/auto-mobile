@@ -65,6 +65,7 @@ import dev.jasonpearson.automobile.ide.datasource.InstalledApp
 import dev.jasonpearson.automobile.ide.datasource.Result
 import dev.jasonpearson.automobile.ide.failures.FailureNotification
 import dev.jasonpearson.automobile.ide.failures.FailuresDashboard
+import dev.jasonpearson.automobile.ide.failures.StreamingFailuresDataSource
 import dev.jasonpearson.automobile.ide.mcp.McpProcess
 import dev.jasonpearson.automobile.ide.mcp.McpConnectionType
 import dev.jasonpearson.automobile.ide.mcp.FakeMcpProcessDetector
@@ -239,6 +240,12 @@ fun AutoMobileToolWindowContent() {
   // Observation stream client for real-time hierarchy/screenshot updates
   // Created once and shared across the app lifecycle
   val observationStreamClient = remember { ObservationStreamClient() }
+
+  // Streaming failures data source for real-time failure notifications
+  // Only created in Real mode since Fake mode creates its own FakeFailuresDataSource
+  val streamingFailuresDataSource = remember(dataSourceMode) {
+      if (dataSourceMode == DataSourceMode.Real) StreamingFailuresDataSource() else null
+  }
 
   // Connect/disconnect observation stream based on active device
   // Include client in keys to ensure reconnection after hot-reload creates a new instance
@@ -522,6 +529,7 @@ fun AutoMobileToolWindowContent() {
               },
               dataSourceMode = dataSourceMode,
               clientProvider = clientProvider,
+              streamingDataSource = streamingFailuresDataSource,
           )
         }
       }

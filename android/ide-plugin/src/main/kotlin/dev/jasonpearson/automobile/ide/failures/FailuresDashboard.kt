@@ -68,7 +68,10 @@ fun FailuresDashboard(
     var retryCounter by remember { mutableIntStateOf(0) }
 
     // For fake mode: track the FakeFailuresDataSource for trigger button
-    val fakeDataSource = remember { if (dataSourceMode == DataSourceMode.Fake) FakeFailuresDataSource() else null }
+    // Key by dataSourceMode so it's recreated when mode toggles
+    val fakeDataSource = remember(dataSourceMode) {
+        if (dataSourceMode == DataSourceMode.Fake) FakeFailuresDataSource() else null
+    }
 
     // Create data sources
     val mockDataSource = remember { MockFailuresDataSource() }
