@@ -33,8 +33,8 @@ describe("Shake", () => {
     fakeTimer.enableAutoAdvance();
 
     // Configure default responses
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
 
     // Set up default observe screen responses with valid viewHierarchy
     const defaultObserveResult = createObserveResult();

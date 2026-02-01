@@ -11,7 +11,7 @@ import {
   ObserveResult,
   ViewHierarchyResult
 } from "../models";
-import { ObserveScreen } from "../features/observe/ObserveScreen";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import type { ProgressCallback } from "./toolRegistry";
@@ -57,7 +57,7 @@ let systemTrayDependencies: SystemTrayDependencies | null = null;
 export const getSystemTrayDependencies = (): SystemTrayDependencies => {
   if (!systemTrayDependencies) {
     systemTrayDependencies = {
-      observeScreenFactory: device => new ObserveScreen(device),
+      observeScreenFactory: device => new RealObserveScreen(device),
       adbFactory: device => defaultAdbClientFactory.create(device),
       timer: defaultTimer
     };

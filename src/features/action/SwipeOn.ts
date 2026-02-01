@@ -22,7 +22,7 @@ import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClien
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 import { SwipeResult } from "../../models/SwipeResult";
-import { ObserveScreen } from "../observe/ObserveScreen";
+import type { ObserveScreen } from "../observe/interfaces/ObserveScreen";
 import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
@@ -39,20 +39,9 @@ export interface GestureExecutor {
   ): Promise<SwipeResult>;
 }
 
-export interface ObserveScreenLike {
-  execute(
-    queryOptions?: import("../../models").ViewHierarchyQueryOptions,
-    perf?: PerformanceTracker,
-    skipWaitForFresh?: boolean,
-    minTimestamp?: number,
-    signal?: AbortSignal
-  ): Promise<ObserveResult>;
-  getMostRecentCachedObserveResult(): Promise<ObserveResult>;
-}
-
 export interface SwipeOnDependencies {
   executeGesture?: GestureExecutor;
-  observeScreen?: ObserveScreenLike;
+  observeScreen?: ObserveScreen;
   elementUtils?: ElementUtils;
   accessibilityDetector?: AccessibilityDetector;
 }

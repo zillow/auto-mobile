@@ -5,8 +5,9 @@ import { Idle } from "./Idle";
 import { BootedDevice, GfxMetrics } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
+import type { AwaitIdle as AwaitIdleInterface, UiStabilityState } from "./interfaces/AwaitIdle";
 
-export class AwaitIdle {
+export class AwaitIdle implements AwaitIdleInterface {
   private adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
   private idle: Idle;
@@ -68,15 +69,7 @@ export class AwaitIdle {
    * @param timeoutMs - Maximum time to wait for stability
    * @returns Promise with initialized state
    */
-  public async initializeUiStabilityTracking(packageName: string, timeoutMs: number): Promise<{
-    startTime: number;
-    lastNonIdleTime: number;
-    prevMissedVsync: number | null;
-    prevSlowUiThread: number | null;
-    prevFrameDeadlineMissed: number | null;
-    prevTotalFrames: number | null;
-    firstGfxInfoLog: boolean;
-  }> {
+  public async initializeUiStabilityTracking(packageName: string, timeoutMs: number): Promise<UiStabilityState> {
     const startTime = Date.now();
     const lastNonIdleTime = startTime;
 

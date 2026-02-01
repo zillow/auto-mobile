@@ -3,11 +3,12 @@ import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/A
 import { BackStackInfo, ActivityInfo, TaskInfo, BootedDevice } from "../../models";
 import { logger } from "../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import type { BackStack } from "./interfaces/BackStack";
 
 /**
  * Extracts back stack information from Android device using dumpsys activity
  */
-export class GetBackStack {
+export class GetBackStack implements BackStack {
   private adb: AdbExecutor;
 
   constructor(adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, device?: BootedDevice) {

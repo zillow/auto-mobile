@@ -1,7 +1,8 @@
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { AwaitIdle } from "../observe/AwaitIdle";
-import { ObserveScreen } from "../observe/ObserveScreen";
+import { RealObserveScreen } from "../observe/ObserveScreen";
+import type { ObserveScreen } from "../observe/interfaces/ObserveScreen";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
@@ -72,7 +73,7 @@ export class BaseVisualChange {
       this.adb = this.adbFactory.create(device);
     }
     this.awaitIdle = new AwaitIdle(device, this.adbFactory);
-    this.observeScreen = new ObserveScreen(device, this.adbFactory);
+    this.observeScreen = new RealObserveScreen(device, this.adbFactory);
     this.window = new Window(device, this.adbFactory);
     this.predictionAnalyzer = new PredictionAnalyzer();
     this.timer = timer;

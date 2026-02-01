@@ -3,7 +3,7 @@ import { ToolRegistry } from "./toolRegistry";
 import { ResourceRegistry } from "./resourceRegistry";
 import { RESOURCE_URIS } from "./observationResources";
 import { ActionableError } from "../models/ActionableError";
-import { ObserveScreen } from "../features/observe/ObserveScreen";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { createJSONToolResponse, createStructuredToolResponse, throwIfAborted } from "../utils/toolUtils";
 import { BootedDevice, Element, ObserveResult, ViewHierarchyResult } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
@@ -212,7 +212,7 @@ export function registerObserveTools() {
   // Observe handler
   const observeHandler = async (device: BootedDevice, args: ObserveArgs, _progress?: unknown, signal?: AbortSignal) => {
     try {
-      const observeScreen = new ObserveScreen(device);
+      const observeScreen = new RealObserveScreen(device);
       const waitFor = args.waitFor;
       const waitOutcome = waitFor
         ? await waitForObservation(observeScreen, waitFor, signal)
@@ -279,7 +279,7 @@ export function registerObserveTools() {
     args: IdentifyInteractionsOptions
   ) => {
     try {
-      const observeScreen = new ObserveScreen(device);
+      const observeScreen = new RealObserveScreen(device);
       const cachedResult = await observeScreen.getMostRecentCachedObserveResult();
       const navigationGraph = NavigationGraphManager.getInstance();
       const currentScreen = navigationGraph.getCurrentScreen();

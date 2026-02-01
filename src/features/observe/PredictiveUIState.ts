@@ -10,6 +10,7 @@ import {
 import { NavigationEdge, NavigationGraphManager, UIState } from "../navigation/NavigationGraphManager";
 import { PredictionHistoryRepository } from "../../db/predictionHistoryRepository";
 import { normalizeToolArgs } from "../../utils/predictionUtils";
+import type { PredictiveUIState as PredictiveUIStateInterface } from "./interfaces/PredictiveUIState";
 
 interface InteractableElement {
   element: Element;
@@ -20,7 +21,7 @@ interface InteractableElement {
   scrollable: boolean;
 }
 
-export class PredictiveUIState {
+export class PredictiveUIState implements PredictiveUIStateInterface {
   private elementParser = new ElementParser();
   private historyRepository = new PredictionHistoryRepository();
   private readonly DEFAULT_CONFIDENCE = 0.5;

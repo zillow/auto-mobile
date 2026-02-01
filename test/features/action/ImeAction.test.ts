@@ -35,8 +35,8 @@ describe("ImeAction", () => {
     fakeTimer.enableAutoAdvance();
 
     // Set up default fake responses
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
 
     // Set up default observe screen responses with valid viewHierarchy
     // Use factory to generate new results on each call for change detection

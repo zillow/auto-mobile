@@ -47,8 +47,8 @@ describe("LaunchApp", () => {
     fakeWindow = new FakeWindow();
 
     fakeObserveScreen.setObserveResult(createObserveResult());
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: packageName, activityName: "MainActivity", layoutSeqSum: 1 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: packageName, activityName: "MainActivity", layoutSeqSum: 1 });
 
     launchApp = new LaunchApp(device, fakeAdb as unknown as any, null, fakeTimer);
     (launchApp as any).awaitIdle = fakeAwaitIdle;
@@ -221,7 +221,7 @@ describe("LaunchApp", () => {
     iosFakeObserveScreen.setObserveResult(iosObserveResult);
     const iosFakeAwaitIdle = new FakeAwaitIdle();
     const iosFakeWindow = new FakeWindow();
-    iosFakeWindow.setCachedActiveWindow({ appId: systemBundleId, activityName: "Main", layoutSeqSum: 1 });
+    iosFakeWindow.configureCachedActiveWindow({ appId: systemBundleId, activityName: "Main", layoutSeqSum: 1 });
 
     const installedAppsProvider = new FakeInstalledAppsProvider(fakeTimer, {
       installedApps: []

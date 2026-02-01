@@ -8,8 +8,9 @@ import * as path from "path";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
+import type { Window as WindowInterface } from "./interfaces/Window";
 
-export class Window {
+export class Window implements WindowInterface {
   private adb: AdbExecutor;
   private cachedActiveWindow: ActiveWindowInfo | null = null;
   private readonly device: BootedDevice;

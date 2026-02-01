@@ -12,6 +12,7 @@ import { FieldTypeDetector } from "./FieldTypeDetector";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
+import type { ObserveScreen } from "../observe/interfaces/ObserveScreen";
 
 /**
  * Interface for TapOnElement dependency
@@ -49,19 +50,6 @@ export interface SwipeOnLike {
 }
 
 /**
- * Interface for ObserveScreen dependency
- */
-export interface ObserveScreenLike {
-  execute(
-    queryOptions?: any,
-    perf?: any,
-    skipWaitForFresh?: boolean,
-    minTimestamp?: number,
-    signal?: AbortSignal
-  ): Promise<ObserveResult>;
-}
-
-/**
  * Dependencies that can be injected for testing
  */
 export interface SetUIStateDependencies {
@@ -69,7 +57,7 @@ export interface SetUIStateDependencies {
   inputText?: InputTextLike;
   clearText?: ClearTextLike;
   swipeOn?: SwipeOnLike;
-  observeScreen?: ObserveScreenLike;
+  observeScreen?: ObserveScreen;
   fieldTypeDetector?: FieldTypeDetector;
   timer?: Timer;
 }
@@ -602,7 +590,7 @@ export class SetUIState extends BaseVisualChange {
     return new SwipeOn(this.device, this.adb);
   }
 
-  private getObserveScreen(): ObserveScreenLike {
+  private getObserveScreen(): ObserveScreen {
     if (this.dependencies.observeScreen) {
       return this.dependencies.observeScreen;
     }

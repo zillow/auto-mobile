@@ -20,7 +20,7 @@ describe("PostNotification", () => {
 
     fakeAdb = new FakeAdbExecutor();
     fakeWindow = new FakeWindow();
-    fakeWindow.setCachedActiveWindow({
+    fakeWindow.configureCachedActiveWindow({
       appId: "com.example.app",
       activityName: "MainActivity",
       layoutSeqSum: 1

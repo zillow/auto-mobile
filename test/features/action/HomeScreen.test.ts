@@ -35,8 +35,8 @@ describe("HomeScreen", () => {
     fakeAwaitIdle = new FakeAwaitIdle();
 
     // Set up default fake responses
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
 
     // Set up default observe screen responses with valid viewHierarchy
     // We need to set different results to simulate screen change
@@ -144,8 +144,8 @@ describe("HomeScreen", () => {
       const fakeObserveScreen2 = new FakeObserveScreen();
       const fakeAwaitIdle2 = new FakeAwaitIdle();
 
-      fakeWindow2.setCachedActiveWindow(null);
-      fakeWindow2.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+      fakeWindow2.configureCachedActiveWindow(null);
+      fakeWindow2.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
       fakeObserveScreen2.setObserveResult(() => createObserveResult());
 
       (homeScreen2 as any).observeScreen = fakeObserveScreen2;

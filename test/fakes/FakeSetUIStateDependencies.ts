@@ -5,6 +5,7 @@ import { ClearTextResult } from "../../src/models/ClearTextResult";
 import { SwipeOnResult } from "../../src/models/SwipeOnResult";
 import { FieldType } from "../../src/models/SetUIStateResult";
 import { FieldTypeDetector } from "../../src/features/action/FieldTypeDetector";
+import type { ObserveScreen } from "../../src/features/observe/interfaces/ObserveScreen";
 
 /**
  * Interface for TapOnElement dependency
@@ -39,19 +40,6 @@ export interface SwipeOnLike {
     options: { direction: string; lookFor?: { text?: string; elementId?: string } },
     progress?: any
   ): Promise<SwipeOnResult>;
-}
-
-/**
- * Interface for ObserveScreen dependency
- */
-export interface ObserveScreenLike {
-  execute(
-    queryOptions?: any,
-    perf?: any,
-    skipWaitForFresh?: boolean,
-    minTimestamp?: number,
-    signal?: AbortSignal
-  ): Promise<ObserveResult>;
 }
 
 /**
@@ -251,7 +239,7 @@ export class FakeSwipeOn implements SwipeOnLike {
 /**
  * Fake ObserveScreen for testing SetUIState
  */
-export class FakeObserveScreenForSetUIState implements ObserveScreenLike {
+export class FakeObserveScreenForSetUIState implements ObserveScreen {
   private result: ObserveResult;
   private callCount: number = 0;
   private resultFactory: (() => ObserveResult) | null = null;
@@ -300,6 +288,13 @@ export class FakeObserveScreenForSetUIState implements ObserveScreenLike {
 
   getCallCount(): number {
     return this.callCount;
+  }
+
+  async getMostRecentCachedObserveResult(): Promise<ObserveResult> {
+    if (this.resultFactory) {
+      return this.resultFactory();
+    }
+    return this.result;
   }
 
   reset(): void {

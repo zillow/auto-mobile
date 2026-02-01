@@ -5,8 +5,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
+import type { DumpsysWindow } from "./interfaces/DumpsysWindow";
 
-export class GetDumpsysWindow {
+export class GetDumpsysWindow implements DumpsysWindow {
   private adb: AdbExecutor;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, { data: ExecResult; timestamp: number }>();

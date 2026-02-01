@@ -66,7 +66,7 @@ describe("SwipeOn autoTarget", () => {
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    fakeWindow.setCachedActiveWindow(null);
+    fakeWindow.configureCachedActiveWindow(null);
   });
 
   afterEach(() => {
@@ -193,7 +193,7 @@ describe("SwipeOn container overlays", () => {
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    fakeWindow.setCachedActiveWindow(null);
+    fakeWindow.configureCachedActiveWindow(null);
   });
 
   afterEach(() => {
@@ -590,7 +590,7 @@ describe("SwipeOn boomerang", () => {
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    fakeWindow.setCachedActiveWindow(null);
+    fakeWindow.configureCachedActiveWindow(null);
   });
 
   afterEach(() => {
@@ -656,7 +656,7 @@ describe("SwipeOn lookFor validation", () => {
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    fakeWindow.setCachedActiveWindow(null);
+    fakeWindow.configureCachedActiveWindow(null);
   });
 
   afterEach(() => {

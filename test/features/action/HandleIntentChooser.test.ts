@@ -55,8 +55,8 @@ describe("HandleIntentChooser", () => {
     fakeAwaitIdle = new FakeAwaitIdle();
 
     // Set up default fake responses
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
     fakeObserveScreen.setObserveResult(mockObserveResult);
 
     // Set default intent chooser to detected

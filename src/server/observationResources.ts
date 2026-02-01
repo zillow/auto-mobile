@@ -1,5 +1,5 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
-import { ObserveScreen } from "../features/observe/ObserveScreen";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { logger } from "../utils/logger";
 import { stringifyToolResponse } from "../utils/toolUtils";
 import { ScreenshotJobTracker } from "../utils/ScreenshotJobTracker";
@@ -14,7 +14,7 @@ export const RESOURCE_URIS = {
 // Helper to get the latest screenshot path from cache
 async function getLatestScreenshotPath(): Promise<string | undefined> {
   try {
-    const screenshotPath = ObserveScreen.getRecentCachedScreenshotPath();
+    const screenshotPath = RealObserveScreen.getRecentCachedScreenshotPath();
     if (!screenshotPath) {
       return undefined;
     }
@@ -34,7 +34,7 @@ async function getLatestScreenshotPath(): Promise<string | undefined> {
 // Handler for latest observation resource (text/json)
 async function getLatestObservation(): Promise<ResourceContent> {
   try {
-    const cachedResult = ObserveScreen.getRecentCachedResult();
+    const cachedResult = RealObserveScreen.getRecentCachedResult();
 
     if (!cachedResult) {
       return {
@@ -67,7 +67,7 @@ async function getLatestObservation(): Promise<ResourceContent> {
 // Handler for latest screenshot resource (image/png as blob)
 async function getLatestScreenshot(): Promise<ResourceContent> {
   try {
-    const cachedResult = ObserveScreen.getRecentCachedResult();
+    const cachedResult = RealObserveScreen.getRecentCachedResult();
     if (!cachedResult) {
       return {
         uri: RESOURCE_URIS.LATEST_SCREENSHOT,
@@ -89,7 +89,7 @@ async function getLatestScreenshot(): Promise<ResourceContent> {
     }
 
     if (!screenshotPath) {
-      const screenshotError = ObserveScreen.getRecentCachedScreenshotError();
+      const screenshotError = RealObserveScreen.getRecentCachedScreenshotError();
       const errorMessage = screenshotError
         ? `No screenshot available from the latest observation: ${screenshotError}`
         : "No screenshot available. Call the 'observe' tool again to capture a screenshot.";

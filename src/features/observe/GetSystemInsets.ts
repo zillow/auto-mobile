@@ -1,10 +1,11 @@
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
-import { BootedDevice, SystemInsets } from "../../models";
+import { BootedDevice, SystemInsets as SystemInsetsModel } from "../../models";
 import { ExecResult } from "../../models";
+import type { SystemInsets } from "./interfaces/SystemInsets";
 
-export class GetSystemInsets {
+export class GetSystemInsets implements SystemInsets {
   private adb: AdbExecutor;
 
   /**
@@ -81,7 +82,7 @@ export class GetSystemInsets {
    * @param dumpsysWindow - Pre-fetched dumpsys window output
    * @returns Promise with inset values
    */
-  async execute(dumpsysWindow: ExecResult): Promise<SystemInsets> {
+  async execute(dumpsysWindow: ExecResult): Promise<SystemInsetsModel> {
     try {
       // Use the full dumpsys output since we need to find status bar, nav bar, and gesture lines
       const fullOutput = dumpsysWindow.stdout;
@@ -113,7 +114,7 @@ export class GetSystemInsets {
    * Get fallback insets from alternative dumpsys output
    * @returns Promise with fallback system insets
    */
-  private async getFallbackInsets(dumpsysWindow: ExecResult): Promise<SystemInsets> {
+  private async getFallbackInsets(dumpsysWindow: ExecResult): Promise<SystemInsetsModel> {
     try {
       // Try to find status bar height
       const statusBarHeightMatch = dumpsysWindow.stdout.match(/mStatusBarHeight=(\d+)/);

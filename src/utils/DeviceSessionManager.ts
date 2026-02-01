@@ -11,7 +11,7 @@ import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../features/observe/XCTestServiceClient";
-import { ObserveScreen } from "../features/observe/ObserveScreen";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { createPerformanceTracker } from "./PerformanceTracker";
 import { storeSetupTiming } from "../server/ToolExecutionContext";
 import { applyAppearanceOnConnect } from "./appearance/applyAppearanceOnConnect";
@@ -793,7 +793,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
       xcTestClient.onPushUpdate(() => {
         logger.info(`[DeviceSessionManager] Received iOS UI change notification for ${deviceId}, clearing ObserveScreen cache`);
-        ObserveScreen.clearCache();
+        RealObserveScreen.clearCache();
       });
 
       DeviceSessionManager.pushUpdateListenersRegistered.add(deviceId);

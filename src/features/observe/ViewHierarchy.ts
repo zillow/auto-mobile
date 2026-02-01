@@ -20,6 +20,7 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
+import type { ViewHierarchy as ViewHierarchyInterface } from "./interfaces/ViewHierarchy";
 
 /**
  * Interface for element bounds
@@ -31,7 +32,7 @@ interface ElementBounds {
   bottom: number;
 }
 
-export class ViewHierarchy {
+export class ViewHierarchy implements ViewHierarchyInterface {
   private device: BootedDevice;
   private readonly adb: AdbExecutor;
   private adbFactory: AdbClientFactory;

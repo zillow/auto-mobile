@@ -2,14 +2,15 @@ import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-c
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { DeviceDetection } from "../../utils/DeviceDetection";
 import { logger } from "../../utils/logger";
-import { BootedDevice, ExecResult, ScreenSize } from "../../models";
+import { BootedDevice, ExecResult, ScreenSize as ScreenSizeModel } from "../../models";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { XCTestServiceClient } from "./XCTestServiceClient";
+import type { ScreenSize } from "./interfaces/ScreenSize";
 
-export class GetScreenSize {
+export class GetScreenSize implements ScreenSize {
   private adb: AdbExecutor;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
@@ -55,7 +56,7 @@ export class GetScreenSize {
    * @param cacheKey - Cache key for the device
    * @returns Screen size if found, null otherwise
    */
-  private loadFromDiskCache(cacheKey: string): ScreenSize | null {
+  private loadFromDiskCache(cacheKey: string): ScreenSizeModel | null {
     try {
       const cacheFile = this.getCacheFilePath(cacheKey);
       if (fs.existsSync(cacheFile)) {
@@ -75,7 +76,7 @@ export class GetScreenSize {
    * @param cacheKey - Cache key for the device
    * @param screenSize - Screen size to cache
    */
-  private saveToDiskCache(cacheKey: string, screenSize: ScreenSize): void {
+  private saveToDiskCache(cacheKey: string, screenSize: ScreenSizeModel): void {
     try {
       // Ensure cache directory exists
       if (!fs.existsSync(GetScreenSize.cacheDir)) {
@@ -128,7 +129,7 @@ export class GetScreenSize {
    * The root node (XCUIApplication) bounds represent the full screen dimensions.
    * Format: "[left,top][right,bottom]" e.g., "[0,0][402,874]"
    */
-  private extractScreenSizeFromHierarchy(viewHierarchy: { hierarchy?: { node?: { $?: { bounds?: string } } } }): ScreenSize | null {
+  private extractScreenSizeFromHierarchy(viewHierarchy: { hierarchy?: { node?: { $?: { bounds?: string } } } }): ScreenSizeModel | null {
     const rootNode = viewHierarchy?.hierarchy?.node;
     if (!rootNode?.$?.bounds) {
       return null;
@@ -162,7 +163,7 @@ export class GetScreenSize {
    * @param rotation - Device rotation (0-3)
    * @returns Adjusted screen size
    */
-  public adjustDimensionsForRotation(width: number, height: number, rotation: number): ScreenSize {
+  public adjustDimensionsForRotation(width: number, height: number, rotation: number): ScreenSizeModel {
     // Adjust dimensions based on rotation
     // 0 = portrait, 1 = landscape (90° clockwise), 2 = portrait upside down, 3 = landscape (270° clockwise)
     if (rotation === 1 || rotation === 3) {
@@ -189,7 +190,7 @@ export class GetScreenSize {
   private async getAndroidScreenSize(
     dumpsysResult?: ExecResult,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<ScreenSize> {
+  ): Promise<ScreenSizeModel> {
     // First get the physical screen size
     const { stdout } = await perf.track("adbWmSize", () =>
       this.adb.executeCommand("shell wm size")
@@ -228,7 +229,7 @@ export class GetScreenSize {
   async execute(
     dumpsysResult?: ExecResult,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<ScreenSize> {
+  ): Promise<ScreenSizeModel> {
     const cacheKey = this.generateCacheKey(this.device.deviceId);
 
     // Check memory cache first

@@ -1,11 +1,11 @@
 import { ObserveResult } from "../../src/models";
-import { ObserveScreenLike } from "../../src/features/action/SwipeOn";
+import type { ObserveScreen } from "../../src/features/observe/interfaces/ObserveScreen";
 
 /**
  * Fake implementation of ObserveScreen for testing
  * Allows configuring observation responses and asserting method calls
  */
-export class FakeObserveScreen implements ObserveScreenLike {
+export class FakeObserveScreen implements ObserveScreen {
   private executedOperations: string[] = [];
   private configuredObserveResult: ObserveResult | null = null;
   private observeResultFactory: (() => ObserveResult) | null = null;

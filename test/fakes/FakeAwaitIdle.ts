@@ -1,14 +1,31 @@
-import { ObserveResult } from "../../src/models";
+import type { AwaitIdle, UiStabilityState } from "../../src/features/observe/interfaces/AwaitIdle";
+import type { GfxMetrics } from "../../src/models";
 
 /**
  * Fake implementation of AwaitIdle for testing
  * Allows configuring idle tracking responses and asserting method calls
  */
-export class FakeAwaitIdle {
+export class FakeAwaitIdle implements AwaitIdle {
   private executedOperations: string[] = [];
   private initializeCallCount: number = 0;
   private waitForUiStabilityCallCount: number = 0;
   private waitForUiStabilityWithStateCallCount: number = 0;
+  private configuredGfxMetrics: GfxMetrics | null = null;
+  private configuredUiStabilityState: UiStabilityState | null = null;
+
+  /**
+   * Configure the GfxMetrics to be returned by waitForUiStability methods
+   */
+  configureGfxMetrics(metrics: GfxMetrics | null): void {
+    this.configuredGfxMetrics = metrics;
+  }
+
+  /**
+   * Configure the UiStabilityState to be returned by initializeUiStabilityTracking
+   */
+  configureUiStabilityState(state: UiStabilityState): void {
+    this.configuredUiStabilityState = state;
+  }
 
   /**
    * Get history of executed operations
@@ -64,19 +81,47 @@ export class FakeAwaitIdle {
 
   // Implementation of AwaitIdle interface
 
-  async initializeUiStabilityTracking(): Promise<void> {
-    this.executedOperations.push("initializeUiStabilityTracking");
+  async initializeUiStabilityTracking(packageName: string, timeoutMs: number): Promise<UiStabilityState> {
+    this.executedOperations.push(`initializeUiStabilityTracking(${packageName}, ${timeoutMs})`);
     this.initializeCallCount++;
+
+    if (this.configuredUiStabilityState) {
+      return this.configuredUiStabilityState;
+    }
+
+    const now = Date.now();
+    return {
+      startTime: now,
+      lastNonIdleTime: now,
+      prevMissedVsync: null,
+      prevSlowUiThread: null,
+      prevFrameDeadlineMissed: null,
+      prevTotalFrames: null,
+      firstGfxInfoLog: true
+    };
   }
 
-  async waitForUiStability(): Promise<void> {
-    this.executedOperations.push("waitForUiStability");
+  async waitForUiStability(
+    packageName: string,
+    timeoutMs: number,
+    _perf?: any,
+    _signal?: AbortSignal
+  ): Promise<GfxMetrics | null> {
+    this.executedOperations.push(`waitForUiStability(${packageName}, ${timeoutMs})`);
     this.waitForUiStabilityCallCount++;
+    return this.configuredGfxMetrics;
   }
 
-  async waitForUiStabilityWithState(state: ObserveResult): Promise<void> {
-    this.executedOperations.push("waitForUiStabilityWithState");
+  async waitForUiStabilityWithState(
+    packageName: string,
+    timeoutMs: number,
+    _initState: UiStabilityState,
+    _perf?: any,
+    _signal?: AbortSignal
+  ): Promise<GfxMetrics | null> {
+    this.executedOperations.push(`waitForUiStabilityWithState(${packageName}, ${timeoutMs})`);
     this.waitForUiStabilityWithStateCallCount++;
+    return this.configuredGfxMetrics;
   }
 
   async waitForRotation(targetRotation: number, timeoutMs?: number): Promise<void> {

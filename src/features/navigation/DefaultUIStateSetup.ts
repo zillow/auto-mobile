@@ -5,7 +5,7 @@ import { ToolRegistry } from "../../server/toolRegistry";
 import { NavigationEdge, UIState } from "./NavigationGraphManager";
 import { ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
 import { UIStateExtractor } from "./UIStateExtractor";
-import { ObserveScreen } from "../observe/ObserveScreen";
+import { RealObserveScreen } from "../observe/ObserveScreen";
 import { UIStateSetup } from "./interfaces/UIStateSetup";
 
 /**
@@ -162,7 +162,7 @@ export class DefaultUIStateSetup implements UIStateSetup {
    */
   private async getCurrentUIState(_platform: string): Promise<UIState | undefined> {
     try {
-      const observeScreen = new ObserveScreen(this.device, this.adb);
+      const observeScreen = new RealObserveScreen(this.device, this.adb);
       const result = await observeScreen.execute();
 
       if (!result.viewHierarchy) {

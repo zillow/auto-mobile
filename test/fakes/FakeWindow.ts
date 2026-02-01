@@ -1,28 +1,37 @@
 import { ActiveWindow } from "../../src/models";
+import type { Window } from "../../src/features/observe/interfaces/Window";
 
 /**
  * Fake implementation of Window for testing
  * Allows configuring window responses and asserting method calls
  */
-export class FakeWindow {
+export class FakeWindow implements Window {
   private executedOperations: string[] = [];
   private configuredCachedActiveWindow: ActiveWindow | null = null;
   private configuredActiveWindow: ActiveWindow | null = null;
   private cachedActiveWindowCallCount: number = 0;
   private getActiveCallCount: number = 0;
+  private configuredActiveHash: string = "fake-active-hash";
 
   /**
-   * Set the cached active window to be returned by getCachedActiveWindow
+   * Configure the cached active window to be returned by getCachedActiveWindow
    */
-  setCachedActiveWindow(window: ActiveWindow | null): void {
+  configureCachedActiveWindow(window: ActiveWindow | null): void {
     this.configuredCachedActiveWindow = window;
   }
 
   /**
-   * Set the active window to be returned by getActive
+   * Configure the active window to be returned by getActive
    */
-  setActiveWindow(window: ActiveWindow): void {
+  configureActiveWindow(window: ActiveWindow): void {
     this.configuredActiveWindow = window;
+  }
+
+  /**
+   * Configure the active hash to be returned by getActiveHash
+   */
+  configureActiveHash(hash: string): void {
+    this.configuredActiveHash = hash;
   }
 
   /**
@@ -84,5 +93,20 @@ export class FakeWindow {
       throw new Error("No active window configured");
     }
     return this.configuredActiveWindow;
+  }
+
+  async getActiveHash(): Promise<string> {
+    this.executedOperations.push("getActiveHash");
+    return this.configuredActiveHash;
+  }
+
+  async setCachedActiveWindow(activeWindow: ActiveWindow): Promise<void> {
+    this.executedOperations.push("setCachedActiveWindow");
+    this.configuredCachedActiveWindow = activeWindow;
+  }
+
+  async clearCache(): Promise<void> {
+    this.executedOperations.push("clearCache");
+    this.configuredCachedActiveWindow = null;
   }
 }

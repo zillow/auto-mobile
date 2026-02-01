@@ -41,8 +41,8 @@ describe("BiometricAuth", () => {
     } as BootedDevice;
 
     // Set up default fake responses
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
     fakeObserveScreen.setObserveResult(() => createObserveResult());
 
     // Set up emulator detection (device is an emulator)

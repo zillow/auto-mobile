@@ -4,7 +4,7 @@ import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { ActionableError, BootedDevice, SomePlatform } from "../models";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { UIStateExtractor } from "../features/navigation/UIStateExtractor";
-import { ObserveScreen } from "../features/observe/ObserveScreen";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { serverConfig } from "../utils/ServerConfig";
 import { MemoryAudit } from "../features/memory/MemoryAudit";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
@@ -221,7 +221,7 @@ class ToolRegistryClass {
         ];
         if (navigationRelevantTools.includes(name)) {
           // Extract UI state from the most recent cached observation
-          const cachedResult = ObserveScreen.getRecentCachedResult();
+          const cachedResult = RealObserveScreen.getRecentCachedResult();
           const uiState = UIStateExtractor.extractFromObservation(cachedResult);
           NavigationGraphManager.getInstance().recordToolCall(name, args, uiState);
         }

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
-import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import { RealObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { z } from "zod";
@@ -52,7 +52,7 @@ describe("MCP Resources Read", () => {
 
   beforeAll(async () => {
     // Clear both in-memory and disk caches from previous tests
-    ObserveScreen.clearCache();
+    RealObserveScreen.clearCache();
 
     const cacheDir = path.join("/tmp/auto-mobile", "observe_results");
     try {
@@ -69,7 +69,7 @@ describe("MCP Resources Read", () => {
   });
 
   afterEach(() => {
-    ObserveScreen.clearCache();
+    RealObserveScreen.clearCache();
     ScreenshotJobTracker.resetTimer();
   });
 
@@ -172,12 +172,12 @@ describe("MCP Resources Read", () => {
       name: "Test Device",
       platform: "android"
     };
-    const observeScreen = new ObserveScreen(mockDevice, new FakeAdbExecutor());
+    const observeScreen = new RealObserveScreen(mockDevice, new FakeAdbExecutor());
     await observeScreen.cacheObserveResult(observeScreen.createBaseResult());
 
-    (ObserveScreen as any).latestScreenshotPath = null;
-    (ObserveScreen as any).latestScreenshotError = null;
-    (ObserveScreen as any).latestScreenshotTimestamp = null;
+    (RealObserveScreen as any).latestScreenshotPath = null;
+    (RealObserveScreen as any).latestScreenshotError = null;
+    (RealObserveScreen as any).latestScreenshotTimestamp = null;
 
     const screenshotDir = path.join("/tmp/auto-mobile", "screenshots");
     await fs.mkdir(screenshotDir, { recursive: true });
@@ -187,9 +187,9 @@ describe("MCP Resources Read", () => {
     ScreenshotJobTracker.startJob(mockDevice.deviceId, async signal => {
       return new Promise(resolve => {
         const timeoutId = fakeTimer.setTimeout(() => {
-          (ObserveScreen as any).latestScreenshotPath = screenshotPath;
-          (ObserveScreen as any).latestScreenshotError = null;
-          (ObserveScreen as any).latestScreenshotTimestamp = Date.now();
+          (RealObserveScreen as any).latestScreenshotPath = screenshotPath;
+          (RealObserveScreen as any).latestScreenshotError = null;
+          (RealObserveScreen as any).latestScreenshotTimestamp = Date.now();
           resolve({ success: true, path: screenshotPath });
         }, 25);
 

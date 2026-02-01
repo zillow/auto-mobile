@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import { RealObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ObserveResult } from "../../../src/models/ObserveResult";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
@@ -7,19 +7,19 @@ import { logger } from "../../../src/utils/logger";
 
 describe("ObserveScreen", function() {
   describe("Unit Tests for Extracted Methods", function() {
-    let observeScreen: ObserveScreen;
+    let observeScreen: RealObserveScreen;
     let fakeAdb: FakeAdbExecutor;
     let mockDevice: BootedDevice;
 
     beforeAll(function() {
-      ObserveScreen.clearCache();
+      RealObserveScreen.clearCache();
       mockDevice = {
         deviceId: "test-device",
         name: "Test Device",
         platform: "android"
       };
       fakeAdb = new FakeAdbExecutor();
-      observeScreen = new ObserveScreen(mockDevice, fakeAdb);
+      observeScreen = new RealObserveScreen(mockDevice, fakeAdb);
     });
 
     test("should create base result with correct structure", function() {
@@ -118,7 +118,7 @@ describe("ObserveScreen", function() {
         platform: "android"
       };
       const fakeAdb = new FakeAdbExecutor();
-      const observeScreen = new ObserveScreen(mockDevice, fakeAdb);
+      const observeScreen = new RealObserveScreen(mockDevice, fakeAdb);
       viewHierarchy = (observeScreen as any).viewHierarchy;
     });
 
@@ -278,12 +278,12 @@ describe("ObserveScreen", function() {
 
   describe("Integration Tests", function() {
 
-    let observeScreen: ObserveScreen;
+    let observeScreen: RealObserveScreen;
     let mockDevice: BootedDevice;
 
     beforeEach(async function() {
       // Clear cache before each test to prevent interference between tests
-      ObserveScreen.clearCache();
+      RealObserveScreen.clearCache();
 
       // Skip integration tests by default - they require a real device
       // To run integration tests, set a real device ID
@@ -420,7 +420,7 @@ describe("ObserveScreen", function() {
         platform: "android"
       };
       // Pass fakeAdb to avoid creating real AdbClient
-      const invalidObserveScreen = new ObserveScreen(invalidDevice, fakeAdb as any);
+      const invalidObserveScreen = new RealObserveScreen(invalidDevice, fakeAdb as any);
 
       // Should still return a result object with error info
       const result = await invalidObserveScreen.execute();

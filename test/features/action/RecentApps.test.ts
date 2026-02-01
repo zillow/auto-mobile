@@ -25,8 +25,8 @@ describe("RecentApps", () => {
     fakeTimer.enableAutoAdvance();
 
     // Configure default responses
-    fakeWindow.setCachedActiveWindow(null);
-    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    fakeWindow.configureCachedActiveWindow(null);
+    fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
 
     // Set up default factory function for observe results to create new objects each time
     // This is needed because BaseVisualChange compares object identity to detect changes
