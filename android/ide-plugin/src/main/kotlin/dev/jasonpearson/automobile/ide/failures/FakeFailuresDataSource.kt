@@ -26,6 +26,7 @@ class FakeFailuresDataSource(
     private var triggeredCrashes = 0
     private var triggeredAnrs = 0
     private var triggeredToolFailures = 0
+    private var triggeredNonfatals = 0
 
     override suspend fun getFailureGroups(): DataSourceResult<List<FailureGroup>> {
         return mockDataSource.getFailureGroups()
@@ -66,6 +67,7 @@ class FakeFailuresDataSource(
             FailureType.Crash -> triggeredCrashes++
             FailureType.ANR -> triggeredAnrs++
             FailureType.ToolCallFailure -> triggeredToolFailures++
+            FailureType.NonFatal -> triggeredNonfatals++
         }
 
         val notification = FailureNotification(
@@ -111,6 +113,11 @@ class FakeFailuresDataSource(
                 "tapOn: Element not found - Submit button",
                 "inputText: Keyboard not visible",
                 "swipeOn: Gesture timeout exceeded",
+            ).random(random)
+            FailureType.NonFatal -> listOf(
+                "Handled NetworkException in ApiClient",
+                "Caught IllegalArgumentException in Parser",
+                "Recovered from IOException in FileManager",
             ).random(random)
         }
     }
