@@ -10,164 +10,59 @@ import { SwipeOnElement } from "../action/SwipeOnElement";
 import { ElementParser } from "../utility/ElementParser";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
-import { createHash } from "crypto";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
-/**
- * Exploration strategies for explore
- */
-export type ExplorationStrategy = "breadth-first" | "depth-first" | "weighted";
+// Re-export all types for backward compatibility
+export * from "./ExploreTypes";
 
-/**
- * Exploration modes for explore
- */
-export type ExplorationMode = "discover" | "validate" | "hybrid";
+// Import types
+import type {
+  ExplorationMode,
+  ExplorationStrategy,
+  ExploreOptions,
+  ExploreResult,
+  ExploreDryRunResult,
+  ExploreExecutionResult,
+  ElementSelectionStats,
+  TrackedElement,
+  GraphTraversalState
+} from "./ExploreTypes";
 
-/**
- * Options for Explore execution
- */
-export interface ExploreOptions {
-  /** Maximum number of interactions to perform */
-  maxInteractions?: number;
+// Import element extraction functions
+import {
+  extractNavigationElements,
+  extractScrollableContainers,
+  extractAllElements,
+  getElementKey,
+  filterUnexhaustedElements
+} from "./ExploreElementExtraction";
 
-  /** Maximum time in milliseconds */
-  timeoutMs?: number;
+// Import element scoring functions
+import {
+  selectBreadthFirst,
+  selectDepthFirst,
+  selectWeighted,
+  rankElementsForDryRun,
+  getElementTarget,
+  predictOutcomeForElement
+} from "./ExploreElementScoring";
 
-  /** Strategy for selecting next interaction */
-  strategy?: ExplorationStrategy;
+// Import blocker detection functions
+import {
+  detectAndHandleBlockers,
+  isPermissionDialog,
+  handlePermissionDialog
+} from "./ExploreBlockerDetection";
 
-  /** Whether to reset to home screen periodically */
-  resetToHome?: boolean;
-
-  /** How often to reset (every N interactions) */
-  resetInterval?: number;
-
-  /** Exploration mode */
-  mode?: ExplorationMode;
-
-  /** Package name to limit exploration to */
-  packageName?: string;
-
-  /** Dry run mode (no interactions performed) */
-  dryRun?: boolean;
-}
-
-/**
- * Statistics about element selection during exploration
- */
-export interface ElementSelectionStats {
-  text?: string;
-  resourceId?: string;
-  className?: string;
-  score: number;
-  novelty: number;
-  coverage: number;
-  finalScore: number;
-}
-
-/**
- * Result of Explore execution
- */
-export interface ExploreResult {
-  success: boolean;
-  error?: string;
-  cancelled?: boolean;
-  interactionsPerformed: number;
-  screensDiscovered: number;
-  edgesAdded: number;
-  navigationGraph: ExportedGraph;
-  explorationPath: string[];
-  coverage: {
-    totalScreens: number;
-    exploredScreens: number;
-    percentage: number;
-  };
-  elementSelections?: ElementSelectionStats[];
-  observation?: ObserveResult;
-  durationMs: number;
-  stopReason?: string;
-  graphTraversal?: {
-    nodesVisited: number;
-    totalNodes: number;
-    edgesTraversed: number;
-    totalEdges: number;
-    edgeValidationResults: EdgeValidationResult[];
-    coveragePercentage: number;
-  };
-}
-
-export interface PlannedInteraction {
-  order: number;
-  action: "tapOn" | "swipeOn";
-  target: {
-    type: "text" | "id" | "coordinates";
-    value: string;
-  };
-  reason: string;
-  predictedOutcome: {
-    screen: string;
-    confidence: number;
-  };
-  whitelistStatus: "allowed" | "blocked" | "unknown";
-}
-
-export interface ExploreDryRunResult {
-  success: true;
-  dryRun: true;
-  currentScreen: {
-    name: string;
-    interactableElements: number;
-  };
-  plannedInteractions: PlannedInteraction[];
-  estimatedCoverage: {
-    screensToVisit: string[];
-    newScreensExpected: number;
-    existingScreensToRevisit: number;
-  };
-  warnings: string[];
-  observation?: ObserveResult;
-  durationMs: number;
-}
-
-export type ExploreExecutionResult = ExploreResult | ExploreDryRunResult;
-
-/**
- * Tracked element interaction state
- */
-interface TrackedElement {
-  text?: string;
-  resourceId?: string;
-  contentDesc?: string;
-  className?: string;
-  interactionCount: number;
-  lastInteractionScreen: string;
-}
-
-/**
- * Edge validation result for tracking success/failure of known transitions
- */
-export interface EdgeValidationResult {
-  edgeKey: string;
-  fromScreen: string;
-  expectedTo: string;
-  actualTo: string | null;
-  success: boolean;
-  timestamp: number;
-  error?: string;
-  matchConfidence?: number;
-}
-
-/**
- * Graph traversal state for validate mode
- */
-export interface GraphTraversalState {
-  visitedNodes: Set<string>;
-  traversedEdges: Set<string>;
-  pendingEdges: NavigationEdge[];
-  edgeValidationResults: Map<string, EdgeValidationResult>;
-  totalNodesInGraph: number;
-  totalEdgesInGraph: number;
-}
+// Import validate mode functions
+import {
+  initializeGraphTraversal,
+  markNodeVisited,
+  markEdgeTraversed,
+  selectNextEdgeToTraverse,
+  findElementMatchingEdge,
+  validateNavigation
+} from "./ExploreValidateMode";
 
 /**
  * Explore implements intelligent app navigation exploration.
@@ -195,9 +90,9 @@ export class Explore extends BaseVisualChange {
 
   // Constants for safety limits
   private static readonly MAX_CONSECUTIVE_BACKS = 5;
-  private static readonly MAX_CONSECUTIVE_NO_CHANGE = 40; // Increased to allow more exploration
+  private static readonly MAX_CONSECUTIVE_NO_CHANGE = 40;
   private static readonly MAX_LOOP_ITERATIONS = 3;
-  private static readonly DEFAULT_MAX_INTERACTIONS = 200; // Increased to allow thorough exploration
+  private static readonly DEFAULT_MAX_INTERACTIONS = 200;
   private static readonly DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly DEFAULT_RESET_INTERVAL = 15;
   private static readonly MAX_OUT_OF_APP_ATTEMPTS = 5;
@@ -260,7 +155,7 @@ export class Explore extends BaseVisualChange {
 
       // Initialize graph traversal for validate mode
       if (mode === "validate") {
-        await this.initializeGraphTraversal();
+        this.graphTraversalState = await initializeGraphTraversal(this.navigationManager);
         logger.info(
           `[Explore] Validate mode: traversing ${this.graphTraversalState?.totalEdgesInGraph ?? 0} known edges`
         );
@@ -277,10 +172,10 @@ export class Explore extends BaseVisualChange {
 
         const viewHierarchy = observation.viewHierarchy;
         if (viewHierarchy && !viewHierarchy.hierarchy.error) {
-          const elements = this.extractAllElements(viewHierarchy);
-          if (this.isPermissionDialog(elements)) {
+          const elements = extractAllElements(viewHierarchy, this.elementParser);
+          if (isPermissionDialog(elements)) {
             logger.info("[Explore] Detected permission dialog, attempting to dismiss");
-            await this.handlePermissionDialog(elements, progress);
+            await handlePermissionDialog(elements, this.device, this.adb, progress);
             continue;
           }
         }
@@ -307,7 +202,14 @@ export class Explore extends BaseVisualChange {
         }
 
         // Check for blocker screens (auth, permissions, etc.) and handle them
-        const blockerHandled = await this.detectAndHandleBlockers(observation, progress);
+        const blockerHandled = await detectAndHandleBlockers(
+          observation,
+          this.device,
+          this.adb,
+          this.elementParser,
+          p => this.handleDeadEnd(p),
+          progress
+        );
         if (blockerHandled) {
           // Re-observe after handling blocker
           continue;
@@ -354,12 +256,14 @@ export class Explore extends BaseVisualChange {
           this.consecutiveNoChangeCount = 0;
 
           // Validate navigation in validate mode
-          if (mode === "validate" && this.currentTargetEdge) {
-            const preNavigationScreen = currentScreen ?? "unknown";
-            const validationSuccess = await this.validateNavigation(
+          if (mode === "validate" && this.currentTargetEdge && this.graphTraversalState) {
+            const validationSuccess = await validateNavigation(
               this.currentTargetEdge,
-              preNavigationScreen,
-              this.currentElementConfidence
+              this.graphTraversalState,
+              this.navigationManager,
+              this.timer,
+              this.currentElementConfidence,
+              reason => { this.stopReason = reason; }
             );
 
             if (!validationSuccess) {
@@ -500,18 +404,18 @@ export class Explore extends BaseVisualChange {
         ? await this.navigationManager.getEdgesFrom(currentScreen)
         : [];
 
-    const navigationElements = this.extractNavigationElements(viewHierarchy);
-    const scrollableContainers = this.extractScrollableContainers(viewHierarchy);
+    const navigationElements = extractNavigationElements(viewHierarchy, this.elementParser);
+    const scrollableContainers = extractScrollableContainers(viewHierarchy, this.elementParser);
     const allCandidates = [...navigationElements, ...scrollableContainers];
 
     if (allCandidates.length === 0) {
       warnings.push("No interactable elements were detected on the current screen.");
     }
 
-    const scored = this.rankElementsForDryRun(allCandidates, strategy, mode);
+    const scored = rankElementsForDryRun(allCandidates, strategy, mode, this.exploredElements);
     const plannedInteractions = scored.slice(0, maxInteractions).map((entry, index) => {
-      const target = this.getElementTarget(entry.element);
-      const predictedOutcome = this.predictOutcomeForElement(entry.element, edges);
+      const target = getElementTarget(entry.element);
+      const predictedOutcome = predictOutcomeForElement(entry.element, edges);
 
       return {
         order: index + 1,
@@ -632,8 +536,8 @@ export class Explore extends BaseVisualChange {
       }
 
       // Extract both navigation elements and scrollable containers
-      const navigationElements = this.extractNavigationElements(viewHierarchy);
-      const scrollableContainers = this.extractScrollableContainers(viewHierarchy);
+      const navigationElements = extractNavigationElements(viewHierarchy, this.elementParser);
+      const scrollableContainers = extractScrollableContainers(viewHierarchy, this.elementParser);
 
       // Combine all interaction candidates
       const allCandidates = [...navigationElements, ...scrollableContainers];
@@ -648,11 +552,11 @@ export class Explore extends BaseVisualChange {
 
         // Mark current node as visited
         if (currentScreen !== "unknown") {
-          this.markNodeVisited(currentScreen);
+          markNodeVisited(this.graphTraversalState, currentScreen);
         }
 
         // Select next edge to traverse
-        const targetEdge = this.selectNextEdgeToTraverse(currentScreen);
+        const targetEdge = selectNextEdgeToTraverse(this.graphTraversalState, currentScreen);
         if (!targetEdge) {
           logger.info("[Explore] No more edges to traverse in validate mode");
           this.stopReason = "All edges in navigation graph have been traversed";
@@ -660,7 +564,7 @@ export class Explore extends BaseVisualChange {
         }
 
         // Find element that matches the target edge
-        const match = this.findElementMatchingEdge(allCandidates, targetEdge);
+        const match = findElementMatchingEdge(allCandidates, targetEdge);
         if (!match) {
           const errorMsg =
             `Validate mode: Cannot find element matching edge ${targetEdge.from}->${targetEdge.to}. ` +
@@ -669,10 +573,12 @@ export class Explore extends BaseVisualChange {
           this.stopReason = errorMsg;
 
           // Mark edge as failed
-          this.markEdgeTraversed(
+          markEdgeTraversed(
+            this.graphTraversalState,
             targetEdge,
             null,
             false,
+            this.timer,
             "Element not found on screen"
           );
 
@@ -697,7 +603,12 @@ export class Explore extends BaseVisualChange {
       this.currentElementConfidence = 0;
 
       // Filter out exhausted elements
-      const unexhaustedElements = this.filterUnexhaustedElements(allCandidates);
+      const currentScreen = this.navigationManager.getCurrentScreen();
+      const unexhaustedElements = filterUnexhaustedElements(
+        allCandidates,
+        this.exploredElements,
+        currentScreen
+      );
 
       if (unexhaustedElements.length === 0) {
         return null;
@@ -706,12 +617,19 @@ export class Explore extends BaseVisualChange {
       // Select based on strategy
       switch (strategy) {
         case "breadth-first":
-          return this.selectBreadthFirst(unexhaustedElements);
+          return selectBreadthFirst(unexhaustedElements);
         case "depth-first":
-          return this.selectDepthFirst(unexhaustedElements);
+          return selectDepthFirst(unexhaustedElements, this.exploredElements);
         case "weighted":
-        default:
-          return this.selectWeighted(unexhaustedElements, mode);
+        default: {
+          const result = selectWeighted(unexhaustedElements, mode, this.exploredElements);
+          if (result) {
+            // Record selection stats
+            this.elementSelections.push(result.stats);
+            return result.element;
+          }
+          return null;
+        }
       }
     });
   }
@@ -761,508 +679,6 @@ export class Explore extends BaseVisualChange {
   }
 
   /**
-   * Extract elements likely to be navigation controls
-   */
-  private extractNavigationElements(viewHierarchy: any): Element[] {
-    const flatElements = this.elementParser.flattenViewHierarchy(viewHierarchy);
-    const navigationElements: Element[] = [];
-    const targetPackage = viewHierarchy.packageName;
-
-    for (const { element, depth } of flatElements) {
-      if (this.isNavigationCandidate(element)) {
-        // Filter by package name if available (keep only elements from target app)
-        if (targetPackage && element.package && element.package !== targetPackage) {
-          continue;
-        }
-
-        // Enrich element with properties from child nodes (for Compose UI)
-        const enrichedElement = this.enrichElementWithChildProperties(element);
-
-        // Store depth information for scoring
-        (enrichedElement as any).hierarchyDepth = depth;
-
-        navigationElements.push(enrichedElement);
-      }
-    }
-
-    return navigationElements;
-  }
-
-  /**
-   * Enrich element with properties from child nodes (for Compose UI elements)
-   */
-  private enrichElementWithChildProperties(element: Element): Element {
-    const enriched = { ...element };
-
-    // For Compose elements, text and className might be on child nodes
-    if ((element as any).node) {
-      const children = Array.isArray((element as any).node) ? (element as any).node : [(element as any).node];
-
-      for (const child of children) {
-        // Extract text from first child with text
-        if (!enriched.text && child.text) {
-          enriched.text = child.text;
-        }
-
-        // Extract className from first child with className
-        if (!enriched["class"] && child.className) {
-          enriched["class"] = child.className;
-        }
-
-        // Extract content-desc from first child with content-desc
-        if (!enriched["content-desc"] && child["content-desc"]) {
-          enriched["content-desc"] = child["content-desc"];
-        }
-      }
-    }
-
-    return enriched;
-  }
-
-  /**
-   * Extract scrollable containers for swiping
-   */
-  private extractScrollableContainers(viewHierarchy: any): Element[] {
-    const flatElements = this.elementParser.flattenViewHierarchy(viewHierarchy);
-    const scrollableContainers: Element[] = [];
-    const targetPackage = viewHierarchy.packageName;
-
-    for (const { element, depth } of flatElements) {
-      // Must be scrollable
-      const isScrollable = element.scrollable === true || (element.scrollable as any) === "true";
-      if (!isScrollable) {
-        continue;
-      }
-
-      // Filter by package name if available
-      if (targetPackage && element.package && element.package !== targetPackage) {
-        continue;
-      }
-
-      // Must have reasonable size for scrolling
-      if (element.bounds) {
-        const width = element.bounds.right - element.bounds.left;
-        const height = element.bounds.bottom - element.bounds.top;
-        if (width < 50 || height < 50) {
-          continue;
-        }
-      }
-
-      // Store depth information for scoring
-      (element as any).hierarchyDepth = depth;
-
-      scrollableContainers.push(element);
-    }
-
-    return scrollableContainers;
-  }
-
-  /**
-   * Check if element is a navigation candidate
-   */
-  private isNavigationCandidate(element: Element): boolean {
-    // Must be clickable (handle both boolean and string values from XML parsing)
-    const isClickable = element.clickable === true || (element.clickable as any) === "true";
-    if (!isClickable) {
-      return false;
-    }
-
-    // Must be enabled (handle both boolean and string values from XML parsing)
-    const isEnabled = element.enabled !== false && (element.enabled as any) !== "false";
-    if (!isEnabled) {
-      return false;
-    }
-
-    // Must have reasonable size
-    if (element.bounds) {
-      const width = element.bounds.right - element.bounds.left;
-      const height = element.bounds.bottom - element.bounds.top;
-      if (width < 10 || height < 10) {
-        return false;
-      }
-    }
-
-    // Check if it looks like a navigation element
-    const className = element["class"]?.toLowerCase() ?? "";
-
-    // Avoid input elements
-    if (className.includes("edittext") || className.includes("textfield")) {
-      return false;
-    }
-
-    // Avoid checkboxes and switches
-    if (className.includes("checkbox") || className.includes("switch")) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Calculate navigation score for an element
-   */
-  private calculateNavigationScore(element: Element): number {
-    let score = 0;
-
-    const clickable = element.clickable === true || (element.clickable as any) === "true";
-    const scrollable = element.scrollable === true || (element.scrollable as any) === "true";
-
-    // Clickable bonus - clickable elements are more likely to be interactive
-    if (clickable) {
-      score += 5;
-    }
-
-    // Scrollable bonus - scrollable containers can reveal new content
-    if (scrollable) {
-      score += 3;
-    }
-
-    // Hierarchy depth bonus - linear function where closer to root = higher score
-    // Formula: max(0, 25 - depth * 2)
-    // depth 0: +25, depth 3: +19, depth 6: +13, depth 10: +5, depth 12+: 0
-    const depth = (element as any).hierarchyDepth ?? 99;
-    const depthBonus = Math.max(0, 25 - depth * 2);
-    score += depthBonus;
-
-    return Math.max(0, score);
-  }
-
-  /**
-   * Calculate novelty score based on previous interactions
-   */
-  private calculateNoveltyScore(element: Element): number {
-    const elementKey = this.getElementKey(element);
-    const tracked = this.exploredElements.get(elementKey);
-
-    // High score for never-explored elements
-    if (!tracked) {
-      return 10;
-    }
-
-    // Reduce score based on interaction count
-    return Math.max(1, 10 - tracked.interactionCount);
-  }
-
-  /**
-   * Estimate coverage gain from interacting with element
-   */
-  private estimateCoverageGain(element: Element): number {
-    // For now, use a simple heuristic based on navigation score
-    // Future: could use ML or historical data
-    const navScore = this.calculateNavigationScore(element);
-    return Math.max(1, navScore / 10);
-  }
-
-  /**
-   * Filter out elements that have been exhausted
-   */
-  private filterUnexhaustedElements(elements: Element[]): Element[] {
-    const currentScreen = this.navigationManager.getCurrentScreen();
-
-    return elements.filter(element => {
-      const elementKey = this.getElementKey(element);
-      const tracked = this.exploredElements.get(elementKey);
-
-      // Allow if never tried
-      if (!tracked) {
-        return true;
-      }
-
-      // Allow if tried on different screen
-      if (tracked.lastInteractionScreen !== currentScreen) {
-        return true;
-      }
-
-      // Filter out if tried too many times from this screen
-      return tracked.interactionCount < 2;
-    });
-  }
-
-  /**
-   * Breadth-first selection: prefer unexplored elements on current screen
-   */
-  private selectBreadthFirst(elements: Element[]): Element | null {
-    if (elements.length === 0) {
-      return null;
-    }
-
-    // Sort by navigation score
-    const sorted = elements.sort((a, b) => {
-      return this.calculateNavigationScore(b) - this.calculateNavigationScore(a);
-    });
-
-    return sorted[0];
-  }
-
-  /**
-   * Depth-first selection: follow promising paths deeply
-   */
-  private selectDepthFirst(elements: Element[]): Element | null {
-    if (elements.length === 0) {
-      return null;
-    }
-
-    // Prefer elements we haven't tried yet, then by score
-    const sorted = elements.sort((a, b) => {
-      const aNever = !this.exploredElements.has(this.getElementKey(a));
-      const bNever = !this.exploredElements.has(this.getElementKey(b));
-
-      if (aNever && !bNever) {
-        return -1;
-      }
-      if (!aNever && bNever) {
-        return 1;
-      }
-
-      return this.calculateNavigationScore(b) - this.calculateNavigationScore(a);
-    });
-
-    return sorted[0];
-  }
-
-  /**
-   * Weighted selection: balance navigation score, novelty, and coverage
-   */
-  private selectWeighted(
-    elements: Element[],
-    mode: ExplorationMode
-  ): Element | null {
-    if (elements.length === 0) {
-      return null;
-    }
-
-    // Calculate scores for each element
-    const scored = elements.map(element => {
-      const navScore = this.calculateNavigationScore(element);
-      const novelty = this.calculateNoveltyScore(element);
-      const coverage = this.estimateCoverageGain(element);
-
-      // Adjust weights based on mode
-      let finalScore: number;
-      if (mode === "discover") {
-        // Heavily favor novelty and coverage
-        finalScore = navScore * 0.3 + novelty * 0.4 + coverage * 0.3;
-      } else if (mode === "validate") {
-        // Favor previously explored elements
-        finalScore = navScore * 0.5 + (10 - novelty) * 0.3 + coverage * 0.2;
-      } else {
-        // Hybrid: balanced approach
-        finalScore = navScore * 0.4 + novelty * 0.4 + coverage * 0.2;
-      }
-
-      return {
-        element,
-        navScore,
-        novelty,
-        coverage,
-        finalScore
-      };
-    });
-
-    // Sort by final score
-    scored.sort((a, b) => b.finalScore - a.finalScore);
-
-    // Record selection stats
-    const selected = scored[0];
-    this.elementSelections.push({
-      text: selected.element.text,
-      resourceId: selected.element["resource-id"],
-      className: selected.element["class"],
-      score: selected.navScore,
-      novelty: selected.novelty,
-      coverage: selected.coverage,
-      finalScore: selected.finalScore
-    });
-
-    return selected.element;
-  }
-
-  private rankElementsForDryRun(
-    elements: Element[],
-    strategy: ExplorationStrategy,
-    mode: ExplorationMode
-  ): Array<{
-    element: Element;
-    score: number;
-    reason: string;
-    action: "tapOn" | "swipeOn";
-    whitelistStatus: "allowed" | "blocked" | "unknown";
-  }> {
-    const scored = elements.map(element => {
-      const navScore = this.calculateNavigationScore(element);
-      const novelty = this.calculateNoveltyScore(element);
-      const coverage = this.estimateCoverageGain(element);
-      const isScrollable = element.scrollable === true || (element.scrollable as any) === "true";
-
-      let score = navScore;
-      let reason = `Navigation score ${navScore.toFixed(1)}`;
-
-      if (strategy === "weighted") {
-        if (mode === "discover") {
-          score = navScore * 0.3 + novelty * 0.4 + coverage * 0.3;
-        } else if (mode === "validate") {
-          score = navScore * 0.5 + (10 - novelty) * 0.3 + coverage * 0.2;
-        } else {
-          score = navScore * 0.4 + novelty * 0.4 + coverage * 0.2;
-        }
-        reason =
-          `Weighted score ${score.toFixed(2)} ` +
-          `(nav=${navScore.toFixed(1)}, novelty=${novelty.toFixed(1)}, coverage=${coverage.toFixed(1)})`;
-      } else if (strategy === "depth-first") {
-        reason = `Depth-first preference with score ${score.toFixed(1)}`;
-      } else {
-        reason = `Breadth-first priority with score ${score.toFixed(1)}`;
-      }
-
-      return {
-        element,
-        score,
-        reason,
-        action: isScrollable ? "swipeOn" : "tapOn",
-        whitelistStatus: "unknown"
-      };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    return scored;
-  }
-
-  private getElementTarget(element: Element): PlannedInteraction["target"] {
-    if (element.text) {
-      return { type: "text", value: element.text };
-    }
-    if (element["content-desc"]) {
-      return { type: "text", value: element["content-desc"] };
-    }
-    if (element["resource-id"]) {
-      return { type: "id", value: element["resource-id"] };
-    }
-    if (element.bounds) {
-      const x = Math.round((element.bounds.left + element.bounds.right) / 2);
-      const y = Math.round((element.bounds.top + element.bounds.bottom) / 2);
-      return { type: "coordinates", value: `${x},${y}` };
-    }
-    return { type: "coordinates", value: "0,0" };
-  }
-
-  private predictOutcomeForElement(
-    element: Element,
-    edges: NavigationEdge[]
-  ): PlannedInteraction["predictedOutcome"] {
-    if (edges.length === 0) {
-      return { screen: "unknown", confidence: 0 };
-    }
-
-    let bestScore = 0;
-    let bestScreen = "unknown";
-
-    for (const edge of edges) {
-      const score = this.scoreEdgeMatch(element, edge);
-      if (score > bestScore) {
-        bestScore = score;
-        bestScreen = edge.to;
-      }
-    }
-
-    if (bestScore <= 0) {
-      return { screen: "unknown", confidence: 0 };
-    }
-
-    return { screen: bestScreen, confidence: Math.round(bestScore * 100) / 100 };
-  }
-
-  private scoreEdgeMatch(element: Element, edge: NavigationEdge): number {
-    const uiState = edge.uiState || edge.interaction?.uiState;
-    if (!uiState) {
-      return 0;
-    }
-
-    let score = 0;
-    for (const selected of uiState.selectedElements ?? []) {
-      score = Math.max(score, this.scoreSelectedElementMatch(element, selected));
-    }
-
-    if (uiState.scrollPosition) {
-      score = Math.max(score, this.scoreScrollPositionMatch(element, uiState.scrollPosition));
-    }
-
-    return score;
-  }
-
-  private scoreSelectedElementMatch(
-    element: Element,
-    selected: { text?: string; resourceId?: string; contentDesc?: string }
-  ): number {
-    let score = 0;
-    score = Math.max(
-      score,
-      this.scoreIdentifierMatch(element["resource-id"], selected.resourceId, 0.95, 0.85)
-    );
-    score = Math.max(score, this.scoreIdentifierMatch(element.text, selected.text, 0.9, 0.7));
-    score = Math.max(
-      score,
-      this.scoreIdentifierMatch(element["content-desc"], selected.contentDesc, 0.85, 0.65)
-    );
-    return score;
-  }
-
-  private scoreScrollPositionMatch(
-    element: Element,
-    scrollPosition: {
-      container?: { text?: string; resourceId?: string; contentDesc?: string };
-      targetElement: { text?: string; resourceId?: string; contentDesc?: string };
-    }
-  ): number {
-    let score = 0;
-    if (scrollPosition.container) {
-      score = Math.max(
-        score,
-        this.scoreIdentifierMatch(element["resource-id"], scrollPosition.container.resourceId, 0.8, 0.7)
-      );
-      score = Math.max(score, this.scoreIdentifierMatch(element.text, scrollPosition.container.text, 0.75, 0.65));
-      score = Math.max(
-        score,
-        this.scoreIdentifierMatch(element["content-desc"], scrollPosition.container.contentDesc, 0.75, 0.65)
-      );
-    }
-
-    score = Math.max(
-      score,
-      this.scoreIdentifierMatch(element["resource-id"], scrollPosition.targetElement.resourceId, 0.8, 0.7)
-    );
-    score = Math.max(score, this.scoreIdentifierMatch(element.text, scrollPosition.targetElement.text, 0.75, 0.65));
-    score = Math.max(
-      score,
-      this.scoreIdentifierMatch(element["content-desc"], scrollPosition.targetElement.contentDesc, 0.75, 0.65)
-    );
-
-    return score;
-  }
-
-  private scoreIdentifierMatch(
-    value: string | undefined,
-    candidate: string | undefined,
-    fullMatchScore: number,
-    partialMatchScore: number
-  ): number {
-    if (!value || !candidate) {
-      return 0;
-    }
-    const normalizedValue = value.trim().toLowerCase();
-    const normalizedCandidate = candidate.trim().toLowerCase();
-    if (normalizedValue === normalizedCandidate) {
-      return fullMatchScore;
-    }
-    if (
-      normalizedValue.includes(normalizedCandidate) ||
-      normalizedCandidate.includes(normalizedValue)
-    ) {
-      return partialMatchScore;
-    }
-    return 0;
-  }
-
-  /**
    * Perform interaction with selected element
    */
   private async performInteraction(
@@ -1272,7 +688,7 @@ export class Explore extends BaseVisualChange {
     perf?: PerformanceTracker,
     signal?: AbortSignal
   ): Promise<boolean> {
-    const elementKey = this.getElementKey(element);
+    const elementKey = getElementKey(element);
     const currentScreen = this.navigationManager.getCurrentScreen() ?? "unknown";
 
     try {
@@ -1336,176 +752,6 @@ export class Explore extends BaseVisualChange {
   }
 
   /**
-   * Detect and handle blocker screens (login, permissions, dialogs)
-   */
-  private async detectAndHandleBlockers(
-    observation: ObserveResult,
-    progress?: ProgressCallback
-  ): Promise<boolean> {
-    const viewHierarchy = observation.viewHierarchy;
-    if (!viewHierarchy || viewHierarchy.hierarchy.error) {
-      return false;
-    }
-
-    // Look for common blocker patterns
-    const elements = this.extractAllElements(viewHierarchy);
-
-    // Check for permission dialogs
-    if (this.isPermissionDialog(elements)) {
-      logger.info("[Explore] Detected permission dialog, attempting to dismiss");
-      return await this.handlePermissionDialog(elements, progress);
-    }
-
-    // Check for login/signup screens
-    if (this.isLoginScreen(elements)) {
-      logger.info("[Explore] Detected login screen, skipping by going back");
-      await this.handleDeadEnd(progress);
-      return true;
-    }
-
-    // Check for app rating/review dialogs
-    if (this.isRatingDialog(elements)) {
-      logger.info("[Explore] Detected rating dialog, attempting to dismiss");
-      return await this.dismissDialog(elements, progress);
-    }
-
-    return false;
-  }
-
-  /**
-   * Extract all elements from hierarchy (including non-clickable)
-   */
-  private extractAllElements(viewHierarchy: any): Element[] {
-    const flatElements = this.elementParser.flattenViewHierarchy(viewHierarchy);
-    return flatElements.map(({ element }) => element);
-  }
-
-  /**
-   * Check if screen is a permission dialog
-   */
-  private isPermissionDialog(elements: Element[]): boolean {
-    const permissionKeywords = [
-      "allow",
-      "permission",
-      "access",
-      "deny",
-      "don't allow",
-      "while using",
-      "only this time"
-    ];
-
-    return elements.some(el => {
-      const text = (el.text?.toLowerCase() ?? "") + (el["content-desc"]?.toLowerCase() ?? "");
-      return permissionKeywords.some(keyword => text.includes(keyword));
-    });
-  }
-
-  /**
-   * Check if screen is a login/signup screen
-   */
-  private isLoginScreen(elements: Element[]): boolean {
-    const loginKeywords = ["login", "sign in", "sign up", "username", "password", "email"];
-    const hasEditText = elements.some(el => el["class"]?.toLowerCase().includes("edittext"));
-
-    const hasLoginText = elements.some(el => {
-      const text = (el.text?.toLowerCase() ?? "") + (el["content-desc"]?.toLowerCase() ?? "");
-      return loginKeywords.some(keyword => text.includes(keyword));
-    });
-
-    // Login screen typically has text fields and login-related text
-    return hasEditText && hasLoginText;
-  }
-
-  /**
-   * Check if screen is a rating/review dialog
-   */
-  private isRatingDialog(elements: Element[]): boolean {
-    const ratingKeywords = ["rate", "review", "feedback", "enjoy", "star"];
-
-    return elements.some(el => {
-      const text = (el.text?.toLowerCase() ?? "") + (el["content-desc"]?.toLowerCase() ?? "");
-      return ratingKeywords.some(keyword => text.includes(keyword));
-    });
-  }
-
-  /**
-   * Handle permission dialog by clicking "Allow" or similar
-   */
-  private async handlePermissionDialog(
-    elements: Element[],
-    progress?: ProgressCallback
-  ): Promise<boolean> {
-    // Look for "Allow" or "While using" buttons
-    const allowKeywords = ["allow", "while using", "only this time", "ok"];
-
-    for (const element of elements) {
-      if (!element.clickable) {
-        continue;
-      }
-
-      const text = (element.text?.toLowerCase() ?? "") + (element["content-desc"]?.toLowerCase() ?? "");
-
-      if (allowKeywords.some(keyword => text.includes(keyword))) {
-        try {
-          const tapOn = new TapOnElement(this.device, this.adb);
-          await tapOn.execute(
-            {
-              text: element.text,
-              elementId: element["resource-id"],
-              action: "tap"
-            },
-            progress
-          );
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return true;
-        } catch (error) {
-          logger.warn(`[Explore] Failed to handle permission dialog: ${error}`);
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Dismiss dialog by clicking dismiss/close/later buttons
-   */
-  private async dismissDialog(
-    elements: Element[],
-    progress?: ProgressCallback
-  ): Promise<boolean> {
-    const dismissKeywords = ["not now", "later", "no thanks", "dismiss", "close", "skip"];
-
-    for (const element of elements) {
-      if (!element.clickable) {
-        continue;
-      }
-
-      const text = (element.text?.toLowerCase() ?? "") + (element["content-desc"]?.toLowerCase() ?? "");
-
-      if (dismissKeywords.some(keyword => text.includes(keyword))) {
-        try {
-          const tapOn = new TapOnElement(this.device, this.adb);
-          await tapOn.execute(
-            {
-              text: element.text,
-              elementId: element["resource-id"],
-              action: "tap"
-            },
-            progress
-          );
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return true;
-        } catch (error) {
-          logger.warn(`[Explore] Failed to dismiss dialog: ${error}`);
-        }
-      }
-    }
-
-    return false;
-  }
-
-  /**
    * Handle dead-end situation by going back
    */
   private async handleDeadEnd(progress?: ProgressCallback): Promise<void> {
@@ -1553,261 +799,6 @@ export class Explore extends BaseVisualChange {
     } catch (error) {
       logger.warn(`[Explore] Failed to reset to home: ${error}`);
     }
-  }
-
-  /**
-   * Generate unique key for element tracking
-   */
-  private getElementKey(element: Element): string {
-    const parts: string[] = [];
-
-    if (element["resource-id"]) {
-      parts.push(`id:${element["resource-id"]}`);
-    }
-    if (element.text) {
-      parts.push(`text:${element.text}`);
-    }
-    if (element["content-desc"]) {
-      parts.push(`desc:${element["content-desc"]}`);
-    }
-    if (element["class"]) {
-      parts.push(`class:${element["class"]}`);
-    }
-
-    return parts.join("|") || "unknown";
-  }
-
-  /**
-   * Validate that navigation matched expected edge in validate mode
-   */
-  private async validateNavigation(
-    expectedEdge: NavigationEdge,
-    preNavigationScreen: string,
-    elementConfidence: number
-  ): Promise<boolean> {
-    // Wait a bit for navigation to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const actualScreen = this.navigationManager.getCurrentScreen() ?? "unknown";
-    const success = actualScreen === expectedEdge.to;
-
-    // Mark edge as traversed with result
-    this.markEdgeTraversed(
-      expectedEdge,
-      actualScreen,
-      success,
-      success ? undefined : `Expected ${expectedEdge.to}, got ${actualScreen}`,
-      elementConfidence
-    );
-
-    if (!success) {
-      const errorMsg =
-        `Validate mode: Navigation validation failed for edge ${expectedEdge.from}->${expectedEdge.to}. ` +
-        `Expected to reach "${expectedEdge.to}", but reached "${actualScreen}". ` +
-        `App has diverged from known graph.`;
-      logger.error(`[Explore] ${errorMsg}`);
-      this.stopReason = errorMsg;
-    }
-
-    return success;
-  }
-
-  /**
-   * Find element on screen that matches a target edge
-   */
-  private findElementMatchingEdge(
-    elements: Element[],
-    edge: NavigationEdge
-  ): { element: Element; confidence: number } | null {
-    const uiState = edge.uiState || edge.interaction?.uiState;
-    if (!uiState) {
-      logger.warn(`[Explore] Edge ${edge.from}->${edge.to} has no UI state, cannot match`);
-      return null;
-    }
-
-    let bestMatch: { element: Element; confidence: number } | null = null;
-    let bestScore = 0;
-
-    for (const element of elements) {
-      // Try to match against selected elements in the edge's UI state
-      if (uiState.selectedElements && uiState.selectedElements.length > 0) {
-        for (const selected of uiState.selectedElements) {
-          const score = this.scoreSelectedElementMatch(element, selected);
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = { element, confidence: score };
-          }
-        }
-      }
-
-      // Try to match against scroll position if present
-      if (uiState.scrollPosition) {
-        const score = this.scoreScrollPositionMatch(element, uiState.scrollPosition);
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = { element, confidence: score };
-        }
-      }
-    }
-
-    // Require minimum confidence threshold
-    const MIN_CONFIDENCE = 0.6;
-    if (bestMatch && bestMatch.confidence >= MIN_CONFIDENCE) {
-      logger.debug(
-        `[Explore] Matched element for edge ${edge.from}->${edge.to} with confidence ${bestMatch.confidence.toFixed(2)}`
-      );
-      return bestMatch;
-    }
-
-    logger.warn(
-      `[Explore] No confident match for edge ${edge.from}->${edge.to} ` +
-        `(best score: ${bestScore.toFixed(2)}, threshold: ${MIN_CONFIDENCE})`
-    );
-    return null;
-  }
-
-  /**
-   * Initialize graph traversal state for validate mode
-   */
-  private async initializeGraphTraversal(): Promise<void> {
-    const graph = await this.navigationManager.exportGraph();
-    const allEdges: NavigationEdge[] = [];
-
-    // Collect all edges from the graph
-    for (const edge of graph.edges) {
-      allEdges.push(edge);
-    }
-
-    this.graphTraversalState = {
-      visitedNodes: new Set<string>(),
-      traversedEdges: new Set<string>(),
-      pendingEdges: [...allEdges],
-      edgeValidationResults: new Map<string, EdgeValidationResult>(),
-      totalNodesInGraph: graph.nodes.length,
-      totalEdgesInGraph: allEdges.length
-    };
-
-    logger.info(
-      `[Explore] Initialized graph traversal: ${graph.nodes.length} nodes, ${allEdges.length} edges`
-    );
-  }
-
-  /**
-   * Generate edge key for tracking
-   * Uses hash of the action/interaction to ensure uniqueness for multiple edges between same screens
-   * Format: {from}->{action_hash}->{to}
-   */
-  private getEdgeKey(edge: NavigationEdge): string {
-    const actionHash = this.hashEdgeAction(edge);
-    return `${edge.from}->${actionHash}->${edge.to}`;
-  }
-
-  /**
-   * Create a deterministic hash of the edge's action/interaction
-   * This ensures the same interaction always produces the same hash
-   */
-  private hashEdgeAction(edge: NavigationEdge): string {
-    // For edges without interactions (back button, unknown), use edge type
-    if (!edge.interaction) {
-      return createHash("sha256")
-        .update(`${edge.edgeType}`)
-        .digest("hex")
-        .substring(0, 8);
-    }
-
-    // Create a stable representation of the interaction, excluding timestamps
-    const stableData = {
-      toolName: edge.interaction.toolName,
-      // Sort args keys for stability, exclude any timestamp-like fields
-      args: Object.keys(edge.interaction.args)
-        .filter(k => !k.toLowerCase().includes("timestamp"))
-        .sort()
-        .reduce((acc, key) => {
-          acc[key] = edge.interaction!.args[key];
-          return acc;
-        }, {} as Record<string, any>),
-      // Include edge type for additional uniqueness
-      edgeType: edge.edgeType
-    };
-
-    return createHash("sha256")
-      .update(JSON.stringify(stableData))
-      .digest("hex")
-      .substring(0, 8); // Use first 8 chars for readability
-  }
-
-  /**
-   * Mark current node as visited
-   */
-  private markNodeVisited(screenName: string): void {
-    if (!this.graphTraversalState) {
-      return;
-    }
-    this.graphTraversalState.visitedNodes.add(screenName);
-  }
-
-  /**
-   * Mark edge as traversed with validation result
-   */
-  private markEdgeTraversed(
-    edge: NavigationEdge,
-    actualTo: string | null,
-    success: boolean,
-    error?: string,
-    matchConfidence?: number
-  ): void {
-    if (!this.graphTraversalState) {
-      return;
-    }
-
-    const edgeKey = this.getEdgeKey(edge);
-    this.graphTraversalState.traversedEdges.add(edgeKey);
-
-    const validationResult: EdgeValidationResult = {
-      edgeKey,
-      fromScreen: edge.from,
-      expectedTo: edge.to,
-      actualTo,
-      success,
-      timestamp: this.timer.now(),
-      error,
-      matchConfidence
-    };
-
-    this.graphTraversalState.edgeValidationResults.set(edgeKey, validationResult);
-
-    // Remove from pending edges
-    this.graphTraversalState.pendingEdges = this.graphTraversalState.pendingEdges.filter(
-      e => this.getEdgeKey(e) !== edgeKey
-    );
-
-    logger.info(
-      `[Explore] Edge ${edgeKey} validation: ${success ? "SUCCESS" : "FAILED"}` +
-        (actualTo && actualTo !== edge.to ? ` (went to ${actualTo})` : "")
-    );
-  }
-
-  /**
-   * Select next edge to traverse in validate mode
-   * Only selects edges from the current screen to avoid false divergence
-   */
-  private selectNextEdgeToTraverse(currentScreen: string): NavigationEdge | null {
-    if (!this.graphTraversalState) {
-      return null;
-    }
-
-    // Only select untraversed edges from current screen
-    // Do not attempt to navigate to other screens, as this causes false divergence
-    const untraversedFromCurrent = this.graphTraversalState.pendingEdges.filter(
-      edge => edge.from === currentScreen
-    );
-
-    if (untraversedFromCurrent.length > 0) {
-      return untraversedFromCurrent[0];
-    }
-
-    // No edges from current screen - exploration is complete or stuck
-    return null;
   }
 
   /**
