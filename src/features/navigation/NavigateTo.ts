@@ -14,6 +14,7 @@ import { UIStateSetup } from "./interfaces/UIStateSetup";
 import { DefaultUIStateSetup } from "./DefaultUIStateSetup";
 import { ScreenTransitionWaiter } from "./interfaces/ScreenTransitionWaiter";
 import { DefaultScreenTransitionWaiter } from "./DefaultScreenTransitionWaiter";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Options for the navigateTo tool.
@@ -132,7 +133,7 @@ export class NavigateTo {
             executedPath.push("pressButton(back)");
 
             // Small delay between presses to allow screen transitions
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await defaultTimer.sleep(300);
           }
 
           // Wait for target screen
@@ -321,6 +322,6 @@ export class NavigateTo {
    * Sleep for the specified duration.
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return defaultTimer.sleep(ms);
   }
 }

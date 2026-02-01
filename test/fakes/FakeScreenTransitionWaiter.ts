@@ -1,4 +1,5 @@
 import { ScreenTransitionWaiter } from "../../src/features/navigation/interfaces/ScreenTransitionWaiter";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
  * Fake implementation of ScreenTransitionWaiter for testing.
@@ -103,7 +104,7 @@ export class FakeScreenTransitionWaiter implements ScreenTransitionWaiter {
 
     // Simulate delay if configured
     if (this.waitDelay > 0) {
-      await new Promise(resolve => setTimeout(resolve, this.waitDelay));
+      await defaultTimer.sleep(this.waitDelay);
     }
 
     // Return configured result for this screen, or default

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { WriteStream } from "node:fs";
 import fs from "fs-extra";
 import { ActionableError, BootedDevice } from "../../models";
+import { defaultTimer } from "../../utils/SystemTimer";
 import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
@@ -103,7 +104,7 @@ async function waitForExit(
 
   let timeoutId: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<void>(resolve => {
-    timeoutId = setTimeout(() => {
+    timeoutId = defaultTimer.setTimeout(() => {
       if (process.exitCode === null) {
         process.kill("SIGKILL");
       }
@@ -169,7 +170,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       const gracefulExitTimeout = 10000;
       let timeoutId: NodeJS.Timeout | undefined;
       const timeoutPromise = new Promise<void>(resolve => {
-        timeoutId = setTimeout(() => {
+        timeoutId = defaultTimer.setTimeout(() => {
           if (backendHandle.process.exitCode === null) {
             logger.warn(`[VideoCapture] screenrecord did not exit gracefully, sending SIGKILL`);
             backendHandle.process.kill("SIGKILL");
@@ -189,7 +190,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       // Give screenrecord extra time to finalize the file on device
       // Even though the process has exited, file writes may still be in progress
       logger.info(`[VideoCapture] Waiting 1 second for file to finalize on device`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await defaultTimer.sleep(1000);
     } else {
       await waitForExit(backendHandle.process, backendHandle.exitPromise);
       logger.info(

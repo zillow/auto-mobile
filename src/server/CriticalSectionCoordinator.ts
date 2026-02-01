@@ -1,5 +1,6 @@
 import { Mutex } from "async-mutex";
 import { logger } from "../utils/logger";
+import { defaultTimer } from "../utils/SystemTimer";
 
 /**
  * Coordinates critical sections across multiple devices using global locks.
@@ -165,7 +166,7 @@ export class CriticalSectionCoordinator {
       this.barrierResolvers.set(lock, resolvers);
 
       // Set timeout
-      const timer = setTimeout(() => {
+      const timer = defaultTimer.setTimeout(() => {
         // Remove this resolver
         const currentResolvers = this.barrierResolvers.get(lock) || [];
         const index = currentResolvers.indexOf(resolve);
@@ -210,7 +211,7 @@ export class CriticalSectionCoordinator {
     }
 
     // Schedule new cleanup
-    const timer = setTimeout(() => {
+    const timer = defaultTimer.setTimeout(() => {
       logger.debug(`Cleaning up lock resources for "${lock}"`);
       this.locks.delete(lock);
       this.barrierCounts.delete(lock);

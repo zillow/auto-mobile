@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { WriteStream } from "node:fs";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
  * Fake WriteStream for testing file output without real filesystem I/O
@@ -160,7 +161,7 @@ export class FakeWriteStream extends EventEmitter implements Partial<WriteStream
       return;
     }
 
-    setTimeout(() => {
+    defaultTimer.setTimeout(() => {
       this.closed = true;
       this.emit("close");
       if (callback) {

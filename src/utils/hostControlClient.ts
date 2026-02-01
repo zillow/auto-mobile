@@ -8,6 +8,7 @@
 import { createConnection } from "node:net";
 import { logger } from "./logger";
 import { createExecResult } from "./execResult";
+import { defaultTimer } from "./SystemTimer";
 
 // Configuration from environment
 const HOST_CONTROL_HOST = process.env.AUTOMOBILE_HOST_CONTROL_HOST || "host.docker.internal";
@@ -121,7 +122,7 @@ async function sendCommand<T>(method: string, params?: Record<string, unknown>):
       }
     };
 
-    const timeout = setTimeout(() => {
+    const timeout = defaultTimer.setTimeout(() => {
       cleanup();
       resolve({ success: false, error: "Command timed out" });
     }, COMMAND_TIMEOUT_MS);

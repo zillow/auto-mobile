@@ -5,6 +5,7 @@ import type { ElementParser } from "../utility/ElementParser";
 import { TapOnElement } from "../action/TapOnElement";
 import { logger } from "../../utils/logger";
 import { extractAllElements } from "./ExploreElementExtraction";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Check if screen is a permission dialog
@@ -98,7 +99,7 @@ export async function handlePermissionDialog(
           },
           progress
         );
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await defaultTimer.sleep(1000);
         return true;
       } catch (error) {
         logger.warn(`[Explore] Failed to handle permission dialog: ${error}`);
@@ -147,7 +148,7 @@ export async function dismissDialog(
           },
           progress
         );
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await defaultTimer.sleep(1000);
         return true;
       } catch (error) {
         logger.warn(`[Explore] Failed to dismiss dialog: ${error}`);

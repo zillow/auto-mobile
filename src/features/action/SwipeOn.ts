@@ -27,6 +27,7 @@ import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
 import { serverConfig } from "../../utils/ServerConfig";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 export interface GestureExecutor {
   swipe(
@@ -1533,7 +1534,7 @@ export class SwipeOn extends BaseVisualChange {
     // Retry logic similar to TapOnElement
     if (!element && attempt < SwipeOn.MAX_ATTEMPTS) {
       const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
-      await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
+      await defaultTimer.sleep(delayNextAttempt);
 
       let latestViewHierarchy: ViewHierarchyResult | null = null;
 

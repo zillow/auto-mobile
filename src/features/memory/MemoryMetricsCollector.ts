@@ -5,6 +5,7 @@ import { logger } from "../../utils/logger";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import type { MemoryMetricsProvider } from "./interfaces/MemoryMetricsProvider";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Memory snapshot from dumpsys meminfo
@@ -160,7 +161,7 @@ export class MemoryMetricsCollector implements MemoryMetricsProvider {
       );
 
       // Wait for GC to complete (small delay)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await defaultTimer.sleep(500);
 
       logger.info(`[MemoryMetricsCollector] GC triggered for ${packageName}`);
     } catch (error) {

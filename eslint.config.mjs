@@ -160,6 +160,14 @@ export const baseRules = {
 			selector: "ImportDeclaration[source.value=/^\\..*\\.ts$/]",
 			message: "Do not use .ts extension in relative imports. Use extensionless imports instead (e.g., './foo' not './foo.ts').",
 		},
+		{
+			selector: "CallExpression[callee.name='setTimeout']",
+			message: "Use Timer.setTimeout() instead. Import { Timer, defaultTimer } from 'utils/SystemTimer'.",
+		},
+		{
+			selector: "CallExpression[callee.name='setInterval']",
+			message: "Use Timer.setInterval() instead. Import { Timer, defaultTimer } from 'utils/SystemTimer'.",
+		},
 	],
 
 	// file whitespace
@@ -213,6 +221,27 @@ export default [
 		rules: {
 			...baseRules,
 			"no-mixed-spaces-and-tabs": "off",
+		},
+	},
+	{
+		// SystemTimer.ts is the implementation that wraps raw setTimeout/setInterval
+		files: ["**/SystemTimer.ts"],
+		plugins,
+		languageOptions,
+		rules: {
+			...baseRules,
+			"no-restricted-syntax": [
+				2,
+				{
+					selector: "ImportDeclaration[source.value=/^\\..*\\.js$/]",
+					message: "Do not use .js extension in relative imports. Use extensionless imports instead (e.g., './foo' not './foo.js'). This causes MODULE_NOT_FOUND errors in tests.",
+				},
+				{
+					selector: "ImportDeclaration[source.value=/^\\..*\\.ts$/]",
+					message: "Do not use .ts extension in relative imports. Use extensionless imports instead (e.g., './foo' not './foo.ts').",
+				},
+				// setTimeout/setInterval rules intentionally omitted - this file wraps them
+			],
 		},
 	},
 ];

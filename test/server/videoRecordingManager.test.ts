@@ -17,6 +17,7 @@ import {
   startVideoRecording,
   stopVideoRecording,
 } from "../../src/server/videoRecordingManager";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 describe("videoRecordingManager", () => {
   let fakeTimer: FakeTimer;
@@ -74,7 +75,7 @@ describe("videoRecordingManager", () => {
       }
       // Use setTimeout instead of setImmediate for more reliable cross-platform timing
       // The auto-stop callback fires async work that needs multiple event loop cycles
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await defaultTimer.sleep(1);
     }
     throw new Error(`Timed out waiting for ${expected} recordings`);
   };

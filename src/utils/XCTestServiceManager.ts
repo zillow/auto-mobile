@@ -687,7 +687,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     this.stopProcessMonitoring();
 
     // Check every 30 seconds
-    this.processMonitorInterval = setInterval(async () => {
+    this.processMonitorInterval = defaultTimer.setInterval(async () => {
       try {
         const isHealthy = await this.checkHealthEndpoint();
         this.lastHealthCheckSuccess = isHealthy;

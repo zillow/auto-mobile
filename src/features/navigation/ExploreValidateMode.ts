@@ -226,7 +226,7 @@ export async function validateNavigation(
   setStopReason: (reason: string) => void
 ): Promise<boolean> {
   // Wait a bit for navigation to complete
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await timer.sleep(500);
 
   const actualScreen = navigationManager.getCurrentScreen() ?? "unknown";
   const success = actualScreen === expectedEdge.to;

@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
+import { defaultTimer } from "../../utils/SystemTimer";
 import {
   BootedDevice,
   BugReportHighlightEntry,
@@ -507,7 +508,7 @@ export class BugReport {
     if (HIGHLIGHT_RENDER_DELAY_MS <= 0) {
       return;
     }
-    await new Promise(resolve => setTimeout(resolve, HIGHLIGHT_RENDER_DELAY_MS));
+    await defaultTimer.sleep(HIGHLIGHT_RENDER_DELAY_MS);
   }
 
   private buildHighlightEntries(

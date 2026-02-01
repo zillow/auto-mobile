@@ -6,6 +6,7 @@ import { BootedDevice, GfxMetrics } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import type { AwaitIdle as AwaitIdleInterface, UiStabilityState } from "./interfaces/AwaitIdle";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 export class AwaitIdle implements AwaitIdleInterface {
   private adb: AdbExecutor;
@@ -59,7 +60,7 @@ export class AwaitIdle implements AwaitIdleInterface {
       }
 
       // Wait a short interval before checking again
-      await new Promise(resolve => setTimeout(resolve, this.pollIntervalMs));
+      await defaultTimer.sleep(this.pollIntervalMs);
     }
   }
 
@@ -246,7 +247,7 @@ export class AwaitIdle implements AwaitIdleInterface {
         }
 
         // Wait before checking again
-        await new Promise(resolve => setTimeout(resolve, this.pollIntervalMs));
+        await defaultTimer.sleep(this.pollIntervalMs);
       }
     } catch {
       logger.error("[AwaitIdle] Encountered an error while waiting for UI stability");

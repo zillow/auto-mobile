@@ -384,9 +384,9 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       let timeoutId: NodeJS.Timeout;
 
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = setTimeout(() =>
+        timeoutId = defaultTimer.setTimeout(() =>
           reject(new ActionableError(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
-                               timeoutMs
+                                            timeoutMs
         );
       });
 
@@ -743,7 +743,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       };
 
       // Set a timeout for startup validation (5 seconds should be enough to detect PANIC)
-      const startupTimeout = setTimeout(() => {
+      const startupTimeout = defaultTimer.setTimeout(() => {
         if (!startupValidationComplete) {
           startupValidationComplete = true;
           // If no PANIC detected and no clear success indicators, assume success

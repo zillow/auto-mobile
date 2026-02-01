@@ -3,6 +3,7 @@ import { platform } from "node:os";
 import path from "node:path";
 import fs from "fs-extra";
 import { ActionableError, type BootedDevice } from "../../models";
+import { defaultTimer } from "../../utils/SystemTimer";
 import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
@@ -110,7 +111,7 @@ async function waitForExit(
 
   let timeoutId: NodeJS.Timeout | undefined;
   const timeoutPromise = new Promise<void>(resolve => {
-    timeoutId = setTimeout(() => {
+    timeoutId = defaultTimer.setTimeout(() => {
       if (process.exitCode === null) {
         process.kill("SIGKILL");
       }

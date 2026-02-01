@@ -16,6 +16,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "./logger";
 import { isRunningInDocker } from "./dockerEnv";
+import { defaultTimer } from "./SystemTimer";
 
 const execFileAsync = promisify(execFile);
 
@@ -77,7 +78,7 @@ async function execAdb(args: string[], timeoutMs: number = CONNECT_TIMEOUT_MS): 
     const result = await Promise.race([
       execFileAsync(adb, fullArgs),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`ADB command timed out after ${timeoutMs}ms`)), timeoutMs)
+        defaultTimer.setTimeout(() => reject(new Error(`ADB command timed out after ${timeoutMs}ms`)), timeoutMs)
       )
     ]);
 
@@ -203,7 +204,7 @@ async function scanAndConnect(): Promise<void> {
     // Wait for all connection attempts with a global timeout
     await Promise.race([
       Promise.allSettled(connectPromises),
-      new Promise<void>(resolve => setTimeout(resolve, 30000)) // 30s max scan time
+      new Promise<void>(resolve => defaultTimer.setTimeout(resolve, 30000)) // 30s max scan time
     ]);
 
   } catch (error) {
@@ -259,7 +260,7 @@ export async function startHostEmulatorAutoConnect(): Promise<void> {
   await scanAndConnect();
 
   // Start periodic scanning
-  scanInterval = setInterval(() => {
+  scanInterval = defaultTimer.setInterval(() => {
     scanAndConnect().catch(error => {
       logger.debug(`Periodic scan failed: ${error}`);
     });

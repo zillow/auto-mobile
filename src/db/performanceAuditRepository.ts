@@ -1,6 +1,7 @@
 import { getDatabase } from "./database";
 import type { NewPerformanceAuditResult } from "./types";
 import { logger } from "../utils/logger";
+import { defaultTimer } from "../utils/SystemTimer";
 
 const RETENTION_MAX_ROWS = 10_000;
 const RETENTION_MAX_AGE_HOURS = 24;
@@ -356,7 +357,7 @@ export class PerformanceAuditRepository {
       return;
     }
 
-    pruningTimer = setInterval(() => {
+    pruningTimer = defaultTimer.setInterval(() => {
       this.pruneOldRecords().catch(error => {
         logger.warn(`[PerformanceAuditRepository] Periodic pruning error: ${error}`);
       });
@@ -373,7 +374,7 @@ export class PerformanceAuditRepository {
    */
   stopPeriodicPruning(): void {
     if (pruningTimer) {
-      clearInterval(pruningTimer);
+      defaultTimer.clearInterval(pruningTimer);
       pruningTimer = null;
       logger.info("[PerformanceAuditRepository] Stopped periodic pruning");
     }

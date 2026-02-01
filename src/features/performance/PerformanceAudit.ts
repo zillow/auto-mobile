@@ -8,6 +8,7 @@ import { DeviceCapabilitiesDetector, DeviceCapabilities } from "../../utils/Devi
 import { TouchLatencyTracker } from "./TouchLatencyTracker";
 import { serverConfig } from "../../utils/ServerConfig";
 import { PerformanceAuditRepository } from "../../db/performanceAuditRepository";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Performance metrics collected during audit
@@ -477,7 +478,7 @@ export class PerformanceAudit {
         );
 
         // Wait for check interval
-        await new Promise(resolve => setTimeout(resolve, stabilityCheckIntervalMs));
+        await defaultTimer.sleep(stabilityCheckIntervalMs);
         elapsedMs += stabilityCheckIntervalMs;
 
         // Get metrics after interval

@@ -7,6 +7,7 @@ import { AdbExecutor } from "./interfaces/AdbExecutor";
 import { getAbortSignal } from "../AbortContext";
 import { OPERATION_CANCELLED_MESSAGE } from "../constants";
 import { RetryExecutor, defaultRetryExecutor } from "../retry/RetryExecutor";
+import { defaultTimer } from "../SystemTimer";
 
 type ExecFileAsync = (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
 
@@ -497,7 +498,7 @@ export class AdbClient implements AdbExecutor {
 
       let timeoutId: NodeJS.Timeout | undefined;
       if (timeoutMs) {
-        timeoutId = setTimeout(() => {
+        timeoutId = defaultTimer.setTimeout(() => {
           if (settled) {
             return;
           }

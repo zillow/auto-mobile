@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { Readable, Writable } from "node:stream";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
  * Fake ChildProcess for testing without spawning real processes
@@ -82,7 +83,7 @@ export class FakeChildProcess extends EventEmitter implements Partial<ChildProce
    * Simulate the spawn lifecycle
    */
   simulateSpawn(): void {
-    setTimeout(() => {
+    defaultTimer.setTimeout(() => {
       if (this.shouldError) {
         this.emit("error", new Error(this.errorMessage));
         return;
@@ -104,7 +105,7 @@ export class FakeChildProcess extends EventEmitter implements Partial<ChildProce
    * Simulate process exit
    */
   simulateExit(code: number = 0, signal: NodeJS.Signals | null = null): void {
-    setTimeout(() => {
+    defaultTimer.setTimeout(() => {
       this.exitCode = code;
       this.signalCode = signal;
       this.stdout.push(null); // End stdout stream
