@@ -129,7 +129,7 @@ public class AutoMobileTestObserver: NSObject, XCTestObservation {
     }
 }
 
-// Make TimingData Encodable for JSON export
+/// Make TimingData Encodable for JSON export
 extension AutoMobileTestObserver.TimingData: Encodable {
     enum CodingKeys: String, CodingKey {
         case testName, duration, startTime, endTime, passed

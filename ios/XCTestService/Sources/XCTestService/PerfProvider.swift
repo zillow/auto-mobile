@@ -112,14 +112,14 @@ public class FakeTimer: Timer, @unchecked Sendable {
         return currentTime
     }
 
-    // Helper to update time in a thread-safe manner (called from non-async contexts)
+    /// Helper to update time in a thread-safe manner (called from non-async contexts)
     private func incrementTime(by milliseconds: Int64) {
         lock.lock()
         currentTime += milliseconds
         lock.unlock()
     }
 
-    // Helper to add a waiter (called from withCheckedContinuation)
+    /// Helper to add a waiter (called from withCheckedContinuation)
     private func addWaiter(_ continuation: CheckedContinuation<Void, Never>) {
         lock.lock()
         pendingWaiters.append(continuation)
@@ -294,13 +294,13 @@ public class PerfProvider {
     private let timeProvider: TimeProvider
     private let lock = NSLock()
 
-    // Stack of active timing entries (for nested operations)
+    /// Stack of active timing entries (for nested operations)
     private var entryStack: [MutablePerfEntry] = []
 
-    // Root entries that have been completed
+    /// Root entries that have been completed
     private var completedEntries: [MutablePerfEntry] = []
 
-    // Current active root entry
+    /// Current active root entry
     private var currentRoot: MutablePerfEntry?
 
     // Debounce tracking

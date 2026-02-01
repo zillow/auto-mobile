@@ -95,7 +95,7 @@ public class NoOpPerformanceMetricsProvider: PerformanceMetricsProvider {
         return nil
     }
 
-    public func startMonitoring(callback: @escaping @Sendable (PerformanceSnapshot) -> Void) {
+    public func startMonitoring(callback _: @escaping @Sendable (PerformanceSnapshot) -> Void) {
         lock.lock()
         defer { lock.unlock() }
         // No-op: Set flag but don't actually monitor
@@ -175,7 +175,9 @@ public class FakePerformanceMetricsProvider: PerformanceMetricsProvider {
     }
 
     /// Helper to get monitoring state synchronously.
-    private func getMonitoringState() -> (isMonitoring: Bool, callback: (@Sendable (PerformanceSnapshot) -> Void)?, intervalMs: Int64) {
+    private func getMonitoringState()
+        -> (isMonitoring: Bool, callback: (@Sendable (PerformanceSnapshot) -> Void)?, intervalMs: Int64)
+    {
         lock.lock()
         let monitoring = _isMonitoring
         let cb = monitoringCallback

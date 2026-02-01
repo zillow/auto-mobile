@@ -55,7 +55,7 @@ final class ModelsTests: XCTestCase {
         }
         """
 
-        let request = try JSONDecoder().decode(WebSocketRequest.self, from: json.data(using: .utf8)!)
+        let request = try JSONDecoder().decode(WebSocketRequest.self, from: XCTUnwrap(json.data(using: .utf8)))
 
         XCTAssertEqual(request.type, "request_tap_coordinates")
         XCTAssertEqual(request.requestId, "req-123")
@@ -76,7 +76,7 @@ final class ModelsTests: XCTestCase {
         }
         """
 
-        let request = try JSONDecoder().decode(WebSocketRequest.self, from: json.data(using: .utf8)!)
+        let request = try JSONDecoder().decode(WebSocketRequest.self, from: XCTUnwrap(json.data(using: .utf8)))
 
         XCTAssertEqual(request.type, "request_swipe")
         XCTAssertEqual(request.x1, 100)
@@ -100,7 +100,7 @@ final class ModelsTests: XCTestCase {
         }
         """
 
-        let request = try JSONDecoder().decode(WebSocketRequest.self, from: json.data(using: .utf8)!)
+        let request = try JSONDecoder().decode(WebSocketRequest.self, from: XCTUnwrap(json.data(using: .utf8)))
 
         XCTAssertEqual(request.type, "request_drag")
         XCTAssertEqual(request.pressDurationMs, 600)
@@ -110,7 +110,7 @@ final class ModelsTests: XCTestCase {
 
     // MARK: - WebSocketResponse Tests
 
-    func testWebSocketResponseSuccess() throws {
+    func testWebSocketResponseSuccess() {
         let response = WebSocketResponse.success(
             type: "tap_coordinates_result",
             requestId: "req-123",
@@ -124,7 +124,7 @@ final class ModelsTests: XCTestCase {
         XCTAssertNil(response.error)
     }
 
-    func testWebSocketResponseError() throws {
+    func testWebSocketResponseError() {
         let response = WebSocketResponse.error(
             type: "tap_coordinates_result",
             requestId: "req-123",
@@ -226,7 +226,7 @@ final class ModelsTests: XCTestCase {
         }
         """
 
-        let element = try JSONDecoder().decode(UIElementInfo.self, from: json.data(using: .utf8)!)
+        let element = try JSONDecoder().decode(UIElementInfo.self, from: XCTUnwrap(json.data(using: .utf8)))
 
         XCTAssertEqual(element.text, "Label")
         XCTAssertEqual(element.contentDesc, "Description")

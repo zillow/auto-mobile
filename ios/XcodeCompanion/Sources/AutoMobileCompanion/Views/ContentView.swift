@@ -27,7 +27,9 @@ enum SidebarTab: String, CaseIterable, Identifiable {
     case performance = "Performance"
     case flags = "Feature Flags"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var icon: String {
         switch self {

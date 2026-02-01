@@ -366,7 +366,7 @@ public class GesturePerformer: GesturePerforming {
         }
 
     #else
-        // Non-iOS stub implementation
+        /// Non-iOS stub implementation
         private let elementLocator: ElementLocating
 
         public init(elementLocator: ElementLocating) {

@@ -829,7 +829,7 @@ public class ElementLocator: ElementLocating {
         }
 
     #else
-        // Non-iOS stub implementation
+        /// Non-iOS stub implementation
         public init() {}
 
         public func getViewHierarchy(disableAllFiltering _: Bool = false) throws -> ViewHierarchy {

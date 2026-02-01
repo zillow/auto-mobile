@@ -40,11 +40,17 @@ public class FakeElementLocator: ElementLocating {
 
     // MARK: - Assertions
 
-    public var hierarchyRequestCount: Int { getHierarchyCallCount }
+    public var hierarchyRequestCount: Int {
+        getHierarchyCallCount
+    }
 
-    public func getFindByIdHistory() -> [String] { findByIdHistory }
+    public func getFindByIdHistory() -> [String] {
+        findByIdHistory
+    }
 
-    public func getFindByTextHistory() -> [String] { findByTextHistory }
+    public func getFindByTextHistory() -> [String] {
+        findByTextHistory
+    }
 
     public func clearHistory() {
         getHierarchyCallCount = 0
@@ -167,18 +173,53 @@ public class FakeGesturePerformer: GesturePerforming {
 
     // MARK: - Assertions
 
-    public func getTapHistory() -> [TapCall] { tapHistory }
-    public func getSwipeHistory() -> [SwipeCall] { swipeHistory }
-    public func getDragHistory() -> [DragCall] { dragHistory }
-    public func getPinchHistory() -> [PinchCall] { pinchHistory }
-    public func getTypeTextHistory() -> [String] { typeTextHistory }
-    public func getSetTextHistory() -> [TextCall] { setTextHistory }
-    public func getImeActionHistory() -> [String] { imeActionHistory }
-    public func getActionHistory() -> [(action: String, resourceId: String?)] { actionHistory }
-    public func getScreenshotCallCount() -> Int { screenshotCallCount }
-    public func getPressHomeCallCount() -> Int { pressHomeCallCount }
-    public func getAppLaunchHistory() -> [String] { appLaunchHistory }
-    public func getAppTerminateHistory() -> [String] { appTerminateHistory }
+    public func getTapHistory() -> [TapCall] {
+        tapHistory
+    }
+
+    public func getSwipeHistory() -> [SwipeCall] {
+        swipeHistory
+    }
+
+    public func getDragHistory() -> [DragCall] {
+        dragHistory
+    }
+
+    public func getPinchHistory() -> [PinchCall] {
+        pinchHistory
+    }
+
+    public func getTypeTextHistory() -> [String] {
+        typeTextHistory
+    }
+
+    public func getSetTextHistory() -> [TextCall] {
+        setTextHistory
+    }
+
+    public func getImeActionHistory() -> [String] {
+        imeActionHistory
+    }
+
+    public func getActionHistory() -> [(action: String, resourceId: String?)] {
+        actionHistory
+    }
+
+    public func getScreenshotCallCount() -> Int {
+        screenshotCallCount
+    }
+
+    public func getPressHomeCallCount() -> Int {
+        pressHomeCallCount
+    }
+
+    public func getAppLaunchHistory() -> [String] {
+        appLaunchHistory
+    }
+
+    public func getAppTerminateHistory() -> [String] {
+        appTerminateHistory
+    }
 
     public func clearHistory() {
         tapHistory.removeAll()
@@ -347,9 +388,17 @@ public class FakeWebSocketServer: WebSocketServing {
 
     // MARK: - Assertions
 
-    public func getBroadcastHistory() -> [Data] { broadcastHistory }
-    public func getStartCallCount() -> Int { startCallCount }
-    public func getStopCallCount() -> Int { stopCallCount }
+    public func getBroadcastHistory() -> [Data] {
+        broadcastHistory
+    }
+
+    public func getStartCallCount() -> Int {
+        startCallCount
+    }
+
+    public func getStopCallCount() -> Int {
+        stopCallCount
+    }
 
     public func clearHistory() {
         broadcastHistory.removeAll()
@@ -359,7 +408,9 @@ public class FakeWebSocketServer: WebSocketServing {
 
     // MARK: - WebSocketServing
 
-    public var isRunning: Bool { running }
+    public var isRunning: Bool {
+        running
+    }
 
     public func start() throws {
         startCallCount += 1
@@ -414,11 +465,25 @@ public class FakePerfProvider {
 
     // MARK: - Assertions
 
-    public func getSerialHistory() -> [String] { serialHistory }
-    public func getParallelHistory() -> [String] { parallelHistory }
-    public func getOperationHistory() -> [(name: String, type: String)] { operationHistory }
-    public func getEndCallCount() -> Int { endCallCount }
-    public func getFlushCallCount() -> Int { flushCallCount }
+    public func getSerialHistory() -> [String] {
+        serialHistory
+    }
+
+    public func getParallelHistory() -> [String] {
+        parallelHistory
+    }
+
+    public func getOperationHistory() -> [(name: String, type: String)] {
+        operationHistory
+    }
+
+    public func getEndCallCount() -> Int {
+        endCallCount
+    }
+
+    public func getFlushCallCount() -> Int {
+        flushCallCount
+    }
 
     public func clearHistory() {
         serialHistory.removeAll()

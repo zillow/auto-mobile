@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import XCTest
 
-// Module load logging - this runs when the test module is first loaded
+/// Module load logging - this runs when the test module is first loaded
 private let _moduleLoadLog: Void = {
     let line = "[XCTestRunner] Module loaded at \(Date())\n"
     fputs(line, stderr)

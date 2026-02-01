@@ -388,10 +388,21 @@ public struct ElementBounds: Codable {
         self.bottom = bottom
     }
 
-    public var width: Int { right - left }
-    public var height: Int { bottom - top }
-    public var centerX: Int { left + width / 2 }
-    public var centerY: Int { top + height / 2 }
+    public var width: Int {
+        right - left
+    }
+
+    public var height: Int {
+        bottom - top
+    }
+
+    public var centerX: Int {
+        left + width / 2
+    }
+
+    public var centerY: Int {
+        top + height / 2
+    }
 }
 
 // MARK: - Screenshot Response
@@ -533,7 +544,7 @@ public enum RequestType: String {
     case requestAction = "request_action"
     case requestLaunchApp = "request_launch_app"
 
-    // Clipboard
+    /// Clipboard
     case requestClipboard = "request_clipboard"
 
     // Accessibility features

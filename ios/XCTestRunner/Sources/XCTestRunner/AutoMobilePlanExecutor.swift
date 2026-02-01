@@ -812,8 +812,7 @@ public final class AutoMobilePlanExecutor {
                 if attempt > 0 {
                     logger.info("Retry attempt \(attempt + 1) of \(configuration.retryCount + 1)")
                 }
-                let result = try executeOnce(testMetadata: testMetadata)
-                return result
+                return try executeOnce(testMetadata: testMetadata)
             } catch {
                 lastError = error
                 let shouldRetry = shouldRetry(error: error, attempt: attempt)

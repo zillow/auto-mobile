@@ -10,8 +10,8 @@ final class XCTestRunnerTests: XCTestCase {
 
         mcpClient.queueResponse(success: true, executedSteps: 1, totalSteps: 1)
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "test-plan.yaml",
             retryCount: 0,
             timeoutSeconds: 5,
@@ -70,8 +70,8 @@ final class XCTestRunnerTests: XCTestCase {
         mcpClient.queueError(NSError(domain: "MCP", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timeout"]))
         mcpClient.queueResponse(success: true, executedSteps: 1, totalSteps: 1)
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "retry-plan.yaml",
             retryCount: 1,
             timeoutSeconds: 5,
@@ -96,7 +96,7 @@ final class XCTestRunnerTests: XCTestCase {
         XCTAssertEqual(timer.sleeps, [1])
     }
 
-    func testExecutePlanStopsAfterRetries() {
+    func testExecutePlanStopsAfterRetries() throws {
         let planLoader = FakePlanLoader(content: "name: Fail Plan\nsteps:\n  - tool: observe")
         let mcpClient = FakeMCPClient()
         let timer = FakeTimer()
@@ -104,8 +104,8 @@ final class XCTestRunnerTests: XCTestCase {
         mcpClient.queueError(NSError(domain: "MCP", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timeout"]))
         mcpClient.queueError(NSError(domain: "MCP", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timeout"]))
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "fail-plan.yaml",
             retryCount: 1,
             timeoutSeconds: 5,
@@ -135,8 +135,8 @@ final class XCTestRunnerTests: XCTestCase {
 
         mcpClient.queueResponse(success: true, executedSteps: 1, totalSteps: 1)
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "sub-plan.yaml",
             retryCount: 0,
             timeoutSeconds: 5,
@@ -175,8 +175,8 @@ final class XCTestRunnerTests: XCTestCase {
 
         mcpClient.queueResponse(success: true, executedSteps: 1, totalSteps: 1)
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "platform-plan.yaml",
             retryCount: 0,
             timeoutSeconds: 5,
@@ -216,8 +216,8 @@ final class XCTestRunnerTests: XCTestCase {
 
         mcpClient.queueResponse(success: true, executedSteps: 1, totalSteps: 1)
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "multi-device.yaml",
             retryCount: 0,
             timeoutSeconds: 5,
@@ -248,7 +248,7 @@ final class XCTestRunnerTests: XCTestCase {
         XCTAssertNotNil(observer)
     }
 
-    func testExecutePlanFailureIncludesFailedStepInfo() {
+    func testExecutePlanFailureIncludesFailedStepInfo() throws {
         let planContent = "name: Fail Plan\nsteps:\n  - tool: tapOn\n    element: Submit Button"
         let planLoader = FakePlanLoader(content: planContent)
         let mcpClient = FakeMCPClient()
@@ -267,8 +267,8 @@ final class XCTestRunnerTests: XCTestCase {
             error: "Plan execution failed"
         )
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "fail-plan.yaml",
             retryCount: 0,
             timeoutSeconds: 5,
@@ -300,7 +300,7 @@ final class XCTestRunnerTests: XCTestCase {
         }
     }
 
-    func testExecutePlanFailureFallsBackToErrorWhenNoFailedStep() {
+    func testExecutePlanFailureFallsBackToErrorWhenNoFailedStep() throws {
         let planContent = "name: Fail Plan\nsteps:\n  - tool: observe"
         let planLoader = FakePlanLoader(content: planContent)
         let mcpClient = FakeMCPClient()
@@ -314,8 +314,8 @@ final class XCTestRunnerTests: XCTestCase {
             error: "Connection timeout"
         )
 
-        let config = AutoMobilePlanExecutor.Configuration(
-            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+        let config = try AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: XCTUnwrap(URL(string: "http://localhost:9000/auto-mobile/streamable"))),
             planPath: "fail-plan.yaml",
             retryCount: 0,
             timeoutSeconds: 5,
