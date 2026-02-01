@@ -86,24 +86,41 @@ fun TestDashboard(
     var refineError by remember { mutableStateOf<String?>(null) }
     var refineOutputFile by remember { mutableStateOf<java.io.File?>(null) }
 
-    // File watcher for CLI output
+    // File watcher for CLI output - waits for file size to stabilize before reading
     LaunchedEffect(isRefining, refineOutputFile) {
         if (!isRefining || refineOutputFile == null) return@LaunchedEffect
         val outputFile = refineOutputFile!!
         val deadline = System.currentTimeMillis() + 120_000 // 2 min timeout
+        var lastFileSize = -1L
+        var stableCount = 0
+        val requiredStableChecks = 3 // Require 3 consecutive checks with same size (1.5s stability)
+
         while (System.currentTimeMillis() < deadline) {
-            if (outputFile.exists() && outputFile.length() > 0) {
-                try {
-                    val refinedContent = outputFile.readText()
-                    if (refinedContent.isNotBlank()) {
-                        planContent = refinedContent
-                        isRefining = false
-                        refineError = null
-                        LOG.info("Received refined YAML from CLI")
-                        return@LaunchedEffect
+            if (outputFile.exists()) {
+                val currentSize = outputFile.length()
+                if (currentSize > 0) {
+                    if (currentSize == lastFileSize) {
+                        stableCount++
+                        if (stableCount >= requiredStableChecks) {
+                            // File size has been stable, safe to read
+                            try {
+                                val refinedContent = outputFile.readText()
+                                if (refinedContent.isNotBlank()) {
+                                    planContent = refinedContent
+                                    isRefining = false
+                                    refineError = null
+                                    LOG.info("Received refined YAML from CLI (${currentSize} bytes)")
+                                    return@LaunchedEffect
+                                }
+                            } catch (e: Exception) {
+                                LOG.warn("Error reading refined output: ${e.message}")
+                            }
+                        }
+                    } else {
+                        // File size changed, reset stability counter
+                        stableCount = 0
                     }
-                } catch (e: Exception) {
-                    LOG.warn("Error reading refined output: ${e.message}")
+                    lastFileSize = currentSize
                 }
             }
             kotlinx.coroutines.delay(500)
