@@ -47,6 +47,7 @@ describe("Rotate", () => {
     fakeAdb = new FakeAdbExecutor();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeObserveScreen = new FakeObserveScreen();
+    fakeObserveScreen.enableAutoVaryHierarchy();
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();

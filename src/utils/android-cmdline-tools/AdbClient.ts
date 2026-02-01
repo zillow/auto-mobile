@@ -7,9 +7,52 @@ import { AdbExecutor } from "./interfaces/AdbExecutor";
 import { getAbortSignal } from "../AbortContext";
 import { OPERATION_CANCELLED_MESSAGE } from "../constants";
 import { RetryExecutor, defaultRetryExecutor } from "../retry/RetryExecutor";
-import { defaultTimer } from "../SystemTimer";
+import { TTLCache } from "../cache/Cache";
+import { Timer, defaultTimer } from "../SystemTimer";
 
 type ExecFileAsync = (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
+
+// Module-level cache configuration and instances
+let moduleTimer: Timer = defaultTimer;
+let deviceListCache: TTLCache<string, BootedDevice[]> | null = null;
+let adbPathCache: TTLCache<string, string> | null = null;
+
+const DEVICE_LIST_CACHE_TTL_MS = 5000; // 5 seconds
+const ADB_PATH_CACHE_TTL_MS = 60000; // 1 minute - ADB path rarely changes
+
+function getDeviceListCache(): TTLCache<string, BootedDevice[]> {
+  if (!deviceListCache) {
+    deviceListCache = new TTLCache(moduleTimer, { ttlMs: DEVICE_LIST_CACHE_TTL_MS });
+  }
+  return deviceListCache;
+}
+
+function getAdbPathCache(): TTLCache<string, string> {
+  if (!adbPathCache) {
+    adbPathCache = new TTLCache(moduleTimer, { ttlMs: ADB_PATH_CACHE_TTL_MS });
+  }
+  return adbPathCache;
+}
+
+/**
+ * Reset all AdbClient module-level caches.
+ * Useful for testing and cleanup.
+ */
+export function resetAdbClientCaches(): void {
+  deviceListCache?.clear();
+  adbPathCache?.clear();
+}
+
+/**
+ * Set the timer used by AdbClient module-level caches.
+ * This resets existing caches to use the new timer.
+ * Primarily for testing with FakeTimer.
+ */
+export function setAdbClientTimer(timer: Timer): void {
+  deviceListCache = null;
+  adbPathCache = null;
+  moduleTimer = timer;
+}
 
 // Enhance the standard execFileAsync result to implement the ExecResult interface
 const execFileAsync: ExecFileAsync = async (
@@ -44,18 +87,16 @@ export class AdbClient implements AdbExecutor {
   private adbPath: string;
   private isTestMode: boolean;
   private activeProcesses: Set<ChildProcess> = new Set();
+  /**
+   * Cached API level for the current device. Intentionally never expires during
+   * a device session because API level is constant. Reset on setDevice().
+   * NOT using TTLCache: session-scoped without time-based expiration.
+   */
   private apiLevelCache: number | null | undefined;
   private readonly retryExecutor: RetryExecutor;
 
-  // Static cache for device list
-  private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
-  private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
   private static readonly DEVICE_LIST_TIMEOUT_MS = 5000;
   private static readonly MAX_ADB_RETRIES = 3;
-
-  // Static cache for ADB path detection (shared across instances)
-  private static adbPathCache: { path: string, timestamp: number } | null = null;
-  private static readonly ADB_PATH_CACHE_TTL = 60000; // 1 minute - ADB path rarely changes
 
   /**
    * Create an AdbClient instance
@@ -193,21 +234,17 @@ export class AdbClient implements AdbExecutor {
       return this.adbPath;
     }
 
-    // Check static cache first
-    if (AdbClient.adbPathCache) {
-      const cacheAge = Date.now() - AdbClient.adbPathCache.timestamp;
-      if (cacheAge < AdbClient.ADB_PATH_CACHE_TTL) {
-        this.adbPath = AdbClient.adbPathCache.path;
-        return this.adbPath;
-      }
+    // Check cache first - TTLCache handles expiration automatically
+    const cache = getAdbPathCache();
+    const cachedPath = cache.get("adbPath");
+    if (cachedPath) {
+      this.adbPath = cachedPath;
+      return this.adbPath;
     }
 
     // Detect and cache the path
     const detectedPath = await this.getAdbPath();
-    AdbClient.adbPathCache = {
-      path: detectedPath,
-      timestamp: Date.now()
-    };
+    cache.set("adbPath", detectedPath);
     this.adbPath = detectedPath;
     return this.adbPath;
   }
@@ -582,13 +619,12 @@ export class AdbClient implements AdbExecutor {
    * @returns Promise with an array of device IDs
    */
   async getBootedAndroidDevices(): Promise<BootedDevice[]> {
-    // Check cache first
-    if (AdbClient.deviceListCache) {
-      const cacheAge = Date.now() - AdbClient.deviceListCache.timestamp;
-      if (cacheAge < AdbClient.DEVICE_LIST_CACHE_TTL) {
-        logger.info(`Getting list of connected devices (cached, age: ${cacheAge}ms)`);
-        return AdbClient.deviceListCache.devices;
-      }
+    // Check cache first - TTLCache handles expiration automatically
+    const cache = getDeviceListCache();
+    const cachedDevices = cache.get("devices");
+    if (cachedDevices) {
+      logger.info(`Getting list of connected devices (cached)`);
+      return cachedDevices;
     }
 
     logger.info("Getting list of connected devices");
@@ -608,10 +644,7 @@ export class AdbClient implements AdbExecutor {
       });
 
     // Cache the result
-    AdbClient.deviceListCache = {
-      devices,
-      timestamp: Date.now()
-    };
+    cache.set("devices", devices);
 
     return devices;
   }

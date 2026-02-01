@@ -53,6 +53,8 @@ export class FakeTimer implements Timer {
   private nextTimeoutId: number = 1;
   private nextIntervalId: number = 1000000;
   private autoAdvance: boolean = false;
+  // Track cancelled timeout IDs for autoAdvance mode (where callbacks are scheduled via setImmediate)
+  private cancelledTimeoutIds: Set<number> = new Set();
 
   /**
    * Enable auto-advance mode where sleeps and timeouts resolve immediately.
@@ -228,6 +230,7 @@ export class FakeTimer implements Timer {
     this.pendingIntervals = [];
     this.nextTimeoutId = 1;
     this.nextIntervalId = 1000000;
+    this.cancelledTimeoutIds.clear();
   }
 
   /**
@@ -240,14 +243,22 @@ export class FakeTimer implements Timer {
   /**
    * Schedule a callback to be executed after a specified delay.
    * In normal mode: fires when advanceTime() moves past the delay.
-   * In auto-advance mode: fires immediately via setImmediate.
+   * In auto-advance mode: fires immediately via setImmediate (but can be cancelled).
    */
   setTimeout(callback: () => void, ms: number): NodeJS.Timeout {
     const id = this.nextTimeoutId as unknown as NodeJS.Timeout;
+    const numericId = this.nextTimeoutId;
     this.nextTimeoutId++;
     if (this.autoAdvance) {
       this.currentTime += ms;
-      setImmediate(callback);
+      // Wrap callback to check if it was cancelled before executing
+      setImmediate(() => {
+        if (!this.cancelledTimeoutIds.has(numericId)) {
+          callback();
+        }
+        // Clean up the cancelled ID after the callback would have run
+        this.cancelledTimeoutIds.delete(numericId);
+      });
       return id;
     }
     this.pendingTimeouts.push({
@@ -264,6 +275,8 @@ export class FakeTimer implements Timer {
    */
   clearTimeout(handle: NodeJS.Timeout): void {
     this.pendingTimeouts = this.pendingTimeouts.filter(t => t.id !== handle);
+    // Also mark as cancelled for autoAdvance mode where callback is already scheduled
+    this.cancelledTimeoutIds.add(handle as unknown as number);
   }
 
   /**
@@ -322,5 +335,37 @@ export class FakeTimer implements Timer {
    */
   getPendingIntervalCount(): number {
     return this.pendingIntervals.length;
+  }
+
+  /**
+   * Advance time until a promise resolves.
+   * Useful for tests where the code uses timer-based polling (setInterval).
+   * @param promise - The promise to wait for
+   * @param stepMs - Milliseconds to advance per iteration (default: 50)
+   * @returns The resolved value of the promise
+   */
+  async resolvePromise<T>(promise: Promise<T>, stepMs: number = 50): Promise<T> {
+    let settled = false;
+    let result: T | undefined;
+    let error: unknown;
+
+    promise
+      .then(value => {
+        settled = true;
+        result = value;
+      })
+      .catch(err => {
+        settled = true;
+        error = err;
+      });
+
+    // Advance time until promise settles
+    while (!settled) {
+      this.advanceTime(stepMs);
+      await new Promise(resolve => setImmediate(resolve));
+    }
+
+    if (error) {throw error;}
+    return result as T;
   }
 }

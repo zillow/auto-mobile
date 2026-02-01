@@ -11,7 +11,6 @@ import {
   createSuccessWebSocketFactory,
   WebSocketState
 } from "../../fakes/FakeWebSocket";
-import { defaultTimer } from "../../../src/utils/SystemTimer";
 import { FakeInstalledAppsRepository } from "../../fakes/FakeInstalledAppsRepository";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
@@ -19,13 +18,14 @@ describe("AccessibilityServiceClient", function() {
   let accessibilityServiceClient: AccessibilityServiceClient;
   let fakeAdb: FakeAdbExecutor;
   let testDevice: BootedDevice;
-  let fakeTimer = defaultTimer;
+  let fakeTimer: FakeTimer;
   let fakeAdbFactory: FakeAdbClientFactory;
   const serverPort: number = 8765;
 
   beforeEach(async function() {
-    // Create fake timer
-    fakeTimer = defaultTimer;
+    // Create fake timer with auto-advance for async event flushing
+    fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Create fake ADB instance
     fakeAdb = new FakeAdbExecutor();
@@ -152,8 +152,9 @@ describe("AccessibilityServiceClient", function() {
         }
       };
 
-      // Use delayed mode with 1ms for fast execution while avoiding manual mode deadlock
-      const testTimer = defaultTimer;
+      // Use FakeTimer for fast, deterministic test execution
+      const testTimer = new FakeTimer();
+      testTimer.enableAutoAdvance();
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
@@ -171,7 +172,7 @@ describe("AccessibilityServiceClient", function() {
 
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
-          timestamp: Date.now(),
+          timestamp: testTimer.now(),
           data: mockHierarchyData
         }));
 
@@ -191,7 +192,7 @@ describe("AccessibilityServiceClient", function() {
 
     test("should return cached data when not waiting for fresh data", async function() {
       const mockHierarchyData = {
-        updatedAt: 1750934583218,
+        updatedAt: 100, // Use timer-relative timestamp
         packageName: "com.google.android.deskclock",
         hierarchy: {
           text: "Cached Data",
@@ -199,30 +200,40 @@ describe("AccessibilityServiceClient", function() {
         }
       };
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testTimer = new FakeTimer();
+      // Don't use autoAdvance - we need to control time for polling
+      const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         fakeAdb,
-        factory
+        factory,
+        testTimer
       );
 
       try {
-        // First call to populate cache
+        // First call to populate cache - use resolveWithFakeTimer for polling
         const firstResultPromise = testClient.getLatestHierarchy(true, 2000);
+
+        // Wait for socket and send message (this happens in parallel with the promise)
         const socket = await waitForSocket(getSocket);
         expect(socket).not.toBeNull();
         await waitForSocketOpen(socket);
+
+        // Simulate message - this sets cachedHierarchy
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
-          timestamp: Date.now(),
+          timestamp: testTimer.now(),
           data: mockHierarchyData
         }));
-        await firstResultPromise;
 
-        // Second call should return cached data immediately
-        const startTime = Date.now();
+        // Now advance time so the polling interval finds the fresh data
+        await testTimer.resolvePromise(firstResultPromise);
+
+        // Second call should return cached data immediately (no polling needed)
+        testTimer.enableAutoAdvance(); // Now autoAdvance is fine
+        const startTime = testTimer.now();
         const result = await testClient.getLatestHierarchy(false, 0);
-        const duration = Date.now() - startTime;
+        const duration = testTimer.now() - startTime;
 
         expect(result).not.toBeNull();
         expect(result.hierarchy).not.toBeNull();
@@ -282,12 +293,14 @@ describe("AccessibilityServiceClient", function() {
       NavigationGraphManager.resetInstance();
       const navManager = NavigationGraphManager.getInstance();
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testTimer = new FakeTimer();
+      testTimer.enableAutoAdvance();
+      const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         fakeAdb,
         factory,
-        fakeTimer
+        testTimer
       );
 
       try {
@@ -298,9 +311,9 @@ describe("AccessibilityServiceClient", function() {
 
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
-          timestamp: Date.now(),
+          timestamp: testTimer.now(),
           data: {
-            updatedAt: Date.now(),
+            updatedAt: testTimer.now(),
             packageName: "com.google.android.deskclock",
             hierarchy: {
               "text": "6:43 AM",
@@ -313,7 +326,7 @@ describe("AccessibilityServiceClient", function() {
         await resultPromise;
         // Allow async event handlers to process (navigation graph update is async)
         for (let i = 0; i < 10; i++) {
-          await new Promise(resolve => setImmediate(resolve));
+          await testTimer.advanceTimersByTimeAsync(1);
         }
 
         // With named-nodes-only feature, hierarchy updates alone don't create screens
@@ -333,12 +346,14 @@ describe("AccessibilityServiceClient", function() {
       NavigationGraphManager.resetInstance();
       const navManager = NavigationGraphManager.getInstance();
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testTimer = new FakeTimer();
+      testTimer.enableAutoAdvance();
+      const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         fakeAdb,
         factory,
-        fakeTimer
+        testTimer
       );
 
       try {
@@ -354,7 +369,7 @@ describe("AccessibilityServiceClient", function() {
             source: "SdkStart",
             arguments: {},
             metadata: {},
-            timestamp: Date.now(),
+            timestamp: testTimer.now(),
             sequenceNumber: 1,
             applicationId: "com.example.sdk",
           }
@@ -362,9 +377,9 @@ describe("AccessibilityServiceClient", function() {
 
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
-          timestamp: Date.now(),
+          timestamp: testTimer.now(),
           data: {
-            updatedAt: Date.now(),
+            updatedAt: testTimer.now(),
             packageName: "com.example.sdk",
             hierarchy: {
               "text": "SDK Home",
@@ -374,7 +389,7 @@ describe("AccessibilityServiceClient", function() {
         }));
 
         await resultPromise;
-        await new Promise(resolve => setImmediate(resolve));
+        await testTimer.advanceTimersByTimeAsync(1);
 
         expect(navManager.getCurrentScreen()).toBe("SdkHome");
       } finally {
@@ -526,8 +541,9 @@ describe("AccessibilityServiceClient", function() {
   describe("package events", function() {
     test("should upsert package on added event", async function() {
       const repo = new FakeInstalledAppsRepository();
-      const timer = defaultTimer;
-      const timestamp = Date.now();
+      const timer = new FakeTimer();
+      timer.enableAutoAdvance();
+      const timestamp = timer.now();
 
       const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
@@ -570,8 +586,9 @@ describe("AccessibilityServiceClient", function() {
 
     test("should remove package for a single user on removed event", async function() {
       const repo = new FakeInstalledAppsRepository();
-      const timer = defaultTimer;
-      const baseTime = Date.now();
+      const timer = new FakeTimer();
+      timer.enableAutoAdvance();
+      const baseTime = timer.now();
 
       await repo.replaceInstalledApps(testDevice.deviceId, [
         {
@@ -629,8 +646,9 @@ describe("AccessibilityServiceClient", function() {
 
     test("should remove package for all users when removedForAllUsers is true", async function() {
       const repo = new FakeInstalledAppsRepository();
-      const timer = defaultTimer;
-      const baseTime = Date.now();
+      const timer = new FakeTimer();
+      timer.enableAutoAdvance();
+      const baseTime = timer.now();
 
       await repo.replaceInstalledApps(testDevice.deviceId, [
         {
@@ -689,7 +707,8 @@ describe("AccessibilityServiceClient", function() {
 
   describe("highlight requests", function() {
     test("requestAddHighlight sends payload and resolves highlight response", async function() {
-      const highlightTimer = defaultTimer;
+      const highlightTimer = new FakeTimer();
+      // Don't use autoAdvance - we need to control time for the request timeout
 
       const { factory, getSocket } = createCapturingWebSocketFactory(highlightTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
@@ -714,18 +733,23 @@ describe("AccessibilityServiceClient", function() {
       };
 
       try {
+        // Start the request (don't await yet)
         const requestPromise = testClient.requestAddHighlight("highlight-1", shape, 2000);
+
+        // Wait for socket to be created and open
         const socket = await waitForSocket(getSocket);
         expect(socket).not.toBeNull();
         await waitForSocketOpen(socket);
         await waitForSentMessages(socket);
 
+        // Verify the request payload was sent
         expect(socket!.sentMessages.length).toBeGreaterThan(0);
         const payload = JSON.parse(socket!.sentMessages[0]);
         expect(payload.type).toBe("add_highlight");
         expect(payload.id).toBe("highlight-1");
         expect(payload.shape.bounds.width).toBe(100);
 
+        // Simulate the response from the server
         socket!.simulateMessage(JSON.stringify({
           type: "highlight_response",
           requestId: payload.requestId,
@@ -733,7 +757,8 @@ describe("AccessibilityServiceClient", function() {
           error: null
         }));
 
-        const result = await requestPromise;
+        // Advance time to process the response
+        const result = await highlightTimer.resolvePromise(requestPromise);
         expect(result.success).toBe(true);
       } finally {
         await testClient.close();
