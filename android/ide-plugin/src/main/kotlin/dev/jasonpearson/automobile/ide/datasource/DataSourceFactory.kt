@@ -1,6 +1,12 @@
 package dev.jasonpearson.automobile.ide.datasource
 
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
+import dev.jasonpearson.automobile.ide.daemon.FailuresStreamClient
+import dev.jasonpearson.automobile.ide.failures.CompositeFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.FailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.FakeFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.McpFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.StreamingFailuresDataSource
 
 /**
  * Factory for creating data source implementations based on the current mode.
@@ -95,6 +101,26 @@ object DataSourceFactory {
         return when (mode) {
             DataSourceMode.Fake -> FakeAppListDataSource()
             DataSourceMode.Real -> RealAppListDataSource(clientProvider, deviceId)
+        }
+    }
+
+    /**
+     * Creates a failures data source based on the specified mode.
+     * @param mode The data source mode (Fake or Real)
+     * @param clientProvider Optional function to provide an AutoMobileClient for MCP access
+     * @param streamClientProvider Optional function to provide a FailuresStreamClient for streaming
+     */
+    fun createFailuresDataSource(
+        mode: DataSourceMode,
+        clientProvider: (() -> AutoMobileClient)? = null,
+        streamClientProvider: (() -> FailuresStreamClient)? = null,
+    ): FailuresDataSource {
+        return when (mode) {
+            DataSourceMode.Fake -> FakeFailuresDataSource()
+            DataSourceMode.Real -> CompositeFailuresDataSource(
+                mcpDataSource = clientProvider?.let { McpFailuresDataSource(it) },
+                streamingDataSource = streamClientProvider?.let { StreamingFailuresDataSource(it()) },
+            )
         }
     }
 }

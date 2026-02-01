@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.flow
  */
 class StreamingFailuresDataSource(
     private val socketClient: FailuresStreamClient = FailuresStreamSocketClient(),
-) : FailuresDataSource {
+) : FailuresDataSource, StreamingFailuresDataSourceInterface {
 
     // Cursor state for polling
     private var lastNotificationTimestamp: Long? = null
@@ -150,9 +150,16 @@ class StreamingFailuresDataSource(
     }
 
     /**
-     * Create a flow that polls for new notifications at regular intervals
+     * Create a flow that polls for new notifications at regular intervals.
+     * Implements [StreamingFailuresDataSourceInterface.notificationsFlow].
      */
-    fun notificationsFlow(
+    override fun notificationsFlow(): Flow<DataSourceResult<List<FailureNotification>>> =
+        notificationsFlowWithParams()
+
+    /**
+     * Create a flow that polls for new notifications at regular intervals with custom parameters.
+     */
+    fun notificationsFlowWithParams(
         pollIntervalMs: Long = 2000,
         type: FailureType? = null,
     ): Flow<DataSourceResult<List<FailureNotification>>> = flow {
@@ -164,9 +171,16 @@ class StreamingFailuresDataSource(
     }
 
     /**
-     * Create a flow that polls for updated failure groups at regular intervals
+     * Create a flow that polls for updated failure groups at regular intervals.
+     * Implements [StreamingFailuresDataSourceInterface.failureGroupsFlow].
      */
-    fun failureGroupsFlow(
+    override fun failureGroupsFlow(): Flow<DataSourceResult<FailureGroupsWithTotals>> =
+        failureGroupsFlowWithParams()
+
+    /**
+     * Create a flow that polls for updated failure groups at regular intervals with custom parameters.
+     */
+    fun failureGroupsFlowWithParams(
         pollIntervalMs: Long = 5000,
         dateRange: DateRange? = null,
         type: FailureType? = null,

@@ -63,6 +63,7 @@ import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
 import dev.jasonpearson.automobile.ide.datasource.InstalledApp
 import dev.jasonpearson.automobile.ide.datasource.Result
+import dev.jasonpearson.automobile.ide.failures.FailureNotification
 import dev.jasonpearson.automobile.ide.failures.FailuresDashboard
 import dev.jasonpearson.automobile.ide.mcp.McpProcess
 import dev.jasonpearson.automobile.ide.mcp.McpConnectionType
@@ -506,6 +507,18 @@ fun AutoMobileToolWindowContent() {
               onNavigateToSource = { fileName, lineNumber ->
                   // TODO: Use OpenFileDescriptor to navigate to source
                   // FileEditorManager.getInstance(project).openFile(virtualFile, true)
+              },
+              onNewFailureNotification = { notification ->
+                  val typeLabel = when (notification.type) {
+                      dev.jasonpearson.automobile.ide.failures.FailureType.Crash -> "Crash"
+                      dev.jasonpearson.automobile.ide.failures.FailureType.ANR -> "ANR"
+                      dev.jasonpearson.automobile.ide.failures.FailureType.ToolCallFailure -> "Tool Failure"
+                  }
+                  showNotification(
+                      "New $typeLabel Detected",
+                      notification.title,
+                      NotificationType.WARNING,
+                  )
               },
               dataSourceMode = dataSourceMode,
               clientProvider = clientProvider,
