@@ -17,12 +17,9 @@ const createTapOnElement = (): TapOnElement => {
       id: "emulator-5554",
     } as any,
     new FakeAdbClient() as any,
-    null,
-    null,
-    undefined,
-    undefined,
-    undefined,
-    new FakeTimer()
+    {
+      timer: new FakeTimer()
+    }
   );
 };
 

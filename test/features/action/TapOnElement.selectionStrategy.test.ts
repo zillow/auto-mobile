@@ -16,11 +16,10 @@ describe("TapOnElement selectionStrategy", () => {
         id: "emulator-5554",
       } as any,
       new FakeAdbClient() as any,
-      undefined,       // visionConfig
-      undefined,       // selectionStateTracker
-      undefined,       // accessibilityDetector
-      new FakeTimer(),
-      fakeSelector
+      {
+        timer: new FakeTimer(),
+        elementSelector: fakeSelector
+      }
     );
 
     const result = (tapOnElement as any).findElementInHierarchy(
