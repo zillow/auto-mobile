@@ -1,14 +1,7 @@
 import { NavigationRepository } from "../../db/NavigationRepository";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
-
-/**
- * Cache entry for navigation node lookup
- */
-interface NodeCacheEntry {
-  nodeId: number | null;
-  timestamp: number;
-}
+import { TTLCache } from "../../utils/cache/Cache";
 
 /**
  * Utility for looking up navigation node IDs from app/screen name pairs.
@@ -16,9 +9,7 @@ interface NodeCacheEntry {
  */
 export class NavigationNodeLookup {
   private repository: NavigationRepository;
-  private cache: Map<string, NodeCacheEntry> = new Map();
-  private readonly cacheMaxAgeMs: number;
-  private readonly timer: Timer;
+  private readonly cache: TTLCache<string, number | null>;
 
   constructor(
     repository?: NavigationRepository,
@@ -26,8 +17,7 @@ export class NavigationNodeLookup {
     timer: Timer = defaultTimer
   ) {
     this.repository = repository ?? new NavigationRepository();
-    this.cacheMaxAgeMs = cacheMaxAgeMs;
-    this.timer = timer;
+    this.cache = new TTLCache(timer, { ttlMs: cacheMaxAgeMs });
   }
 
   /**
@@ -40,12 +30,10 @@ export class NavigationNodeLookup {
     }
 
     const cacheKey = `${appId}:${screenName}`;
-    const now = this.timer.now();
 
-    // Check cache
-    const cached = this.cache.get(cacheKey);
-    if (cached && (now - cached.timestamp) < this.cacheMaxAgeMs) {
-      return cached.nodeId;
+    // Check cache - TTLCache handles expiration automatically
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey) ?? null;
     }
 
     // Query database
@@ -54,10 +42,7 @@ export class NavigationNodeLookup {
       const nodeId = node?.id ?? null;
 
       // Update cache
-      this.cache.set(cacheKey, {
-        nodeId,
-        timestamp: now,
-      });
+      this.cache.set(cacheKey, nodeId);
 
       return nodeId;
     } catch (error) {
@@ -74,22 +59,10 @@ export class NavigationNodeLookup {
   }
 
   /**
-   * Remove stale entries from the cache.
-   */
-  pruneCache(): void {
-    const now = this.timer.now();
-    for (const [key, entry] of this.cache) {
-      if (now - entry.timestamp >= this.cacheMaxAgeMs) {
-        this.cache.delete(key);
-      }
-    }
-  }
-
-  /**
    * Get the current cache size (for testing/debugging).
    */
   getCacheSize(): number {
-    return this.cache.size;
+    return this.cache.size();
   }
 }
 

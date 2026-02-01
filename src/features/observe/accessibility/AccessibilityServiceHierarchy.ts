@@ -28,6 +28,9 @@ const WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000;
 
 /**
  * Delegate class for handling hierarchy retrieval and caching.
+ *
+ * NOT using TTLCache: Uses push updates from Android accessibility service,
+ * minTimestamp validation, and "fresh" boolean state rather than simple TTL.
  */
 export class AccessibilityServiceHierarchy {
   private readonly context: HierarchyDelegateContext;
@@ -77,7 +80,7 @@ export class AccessibilityServiceHierarchy {
     minTimestamp: number = 0,
     signal?: AbortSignal
   ): Promise<AccessibilityHierarchyResponse> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const cachedHierarchy = this.context.getCachedHierarchy();
 
     logger.debug(`[ACCESSIBILITY_SERVICE] getLatestHierarchy: cache=${cachedHierarchy ? "exists" : "null"}, waitForFresh=${waitForFresh}, skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp}`);
@@ -108,7 +111,7 @@ export class AccessibilityServiceHierarchy {
             // Fall through to wait for fresh data or sync
           } else {
             const isFresh = cacheAge < 1000;
-            const duration = Date.now() - startTime;
+            const duration = this.context.timer.now() - startTime;
             logger.debug(
               `[ACCESSIBILITY_SERVICE] Cache accepted in ${duration}ms: ` +
               `receivedAt=${cachedHierarchy.receivedAt}, ` +
@@ -125,7 +128,7 @@ export class AccessibilityServiceHierarchy {
         } else {
           // No minTimestamp check, return cache
           const isFresh = cacheAge < 1000;
-          const duration = Date.now() - startTime;
+          const duration = this.context.timer.now() - startTime;
           logger.debug(`[ACCESSIBILITY_SERVICE] Cache hit: ${duration}ms (age: ${cacheAge}ms, fresh: ${isFresh}, updatedAt: ${updatedAt})`);
 
           return {
@@ -150,7 +153,7 @@ export class AccessibilityServiceHierarchy {
         const freshData = await perf.track("waitForFresh", () =>
           this.waitForFreshData(timeout, waitMinTimestamp, useDeviceTimestamp, signal)
         );
-        const duration = Date.now() - startTime;
+        const duration = this.context.timer.now() - startTime;
 
         if (freshData) {
           logger.info(`[ACCESSIBILITY_SERVICE] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
@@ -162,7 +165,7 @@ export class AccessibilityServiceHierarchy {
           };
         } else {
           // Record timeout so we skip WebSocket wait for a while
-          this.context.setLastWebSocketTimeout(Date.now());
+          this.context.setLastWebSocketTimeout(this.context.timer.now());
           logger.warn(`[ACCESSIBILITY_SERVICE] Timeout waiting for fresh data after ${duration}ms, will skip WebSocket wait for ${WEBSOCKET_TIMEOUT_COOLDOWN_MS}ms`);
 
           // Return cached data if available
@@ -189,7 +192,7 @@ export class AccessibilityServiceHierarchy {
         fresh: false
       };
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get hierarchy after ${duration}ms: ${error}`);
       return {
         hierarchy: null,
@@ -210,7 +213,7 @@ export class AccessibilityServiceHierarchy {
     disableAllFiltering: boolean = false,
     signal?: AbortSignal
   ): Promise<ViewHierarchyResult | null> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const cachedHierarchy = this.context.getCachedHierarchy();
 
     perf.serial("a11yService");
@@ -277,13 +280,13 @@ export class AccessibilityServiceHierarchy {
 
       perf.end();
 
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved and converted hierarchy in ${duration}ms (fresh: ${isFresh}, updatedAt: ${hierarchyData!.updatedAt})`);
 
       return convertedHierarchy;
     } catch (error) {
       perf.end();
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] getAccessibilityHierarchy failed after ${duration}ms: ${error}`);
       return null;
     }
@@ -300,7 +303,7 @@ export class AccessibilityServiceHierarchy {
     signal?: AbortSignal,
     timeoutMs: number = 10000
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const effectiveTimeoutMs = Math.max(0, timeoutMs);
 
     try {
@@ -317,7 +320,7 @@ export class AccessibilityServiceHierarchy {
       // Fall back to ADB broadcast if WebSocket failed
       if (!sentViaWebSocket) {
         logger.info("[ACCESSIBILITY_SERVICE] Falling back to ADB broadcast");
-        const uuid = `sync_${Date.now()}_${generateSecureId()}`;
+        const uuid = `sync_${this.context.timer.now()}_${generateSecureId()}`;
         await perf.track("sendBroadcast", async () => {
           await this.context.adb.executeCommand(
             `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid} --ez disableAllFiltering ${disableAllFiltering}"`,
@@ -335,7 +338,7 @@ export class AccessibilityServiceHierarchy {
       );
 
       if (freshData) {
-        const duration = Date.now() - startTime;
+        const duration = this.context.timer.now() - startTime;
         logger.debug(`[ACCESSIBILITY_SERVICE] Sync complete: ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
         return {
           hierarchy: freshData.hierarchy,
@@ -346,7 +349,7 @@ export class AccessibilityServiceHierarchy {
       logger.warn("[ACCESSIBILITY_SERVICE] Timeout waiting for WebSocket push after request");
       return null;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Sync hierarchy request failed after ${duration}ms: ${error}`);
       return null;
     }
@@ -356,7 +359,7 @@ export class AccessibilityServiceHierarchy {
    * Convert accessibility service hierarchy format to ViewHierarchyResult format.
    */
   convertToViewHierarchyResult(accessibilityHierarchy: AccessibilityHierarchy): ViewHierarchyResult {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Converting accessibility service format to ViewHierarchyResult format");
@@ -398,12 +401,12 @@ export class AccessibilityServiceHierarchy {
         "sources": ["accessibility-service"]
       };
 
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.info(`[ACCESSIBILITY_SERVICE] Format conversion completed in ${duration}ms`);
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Format conversion failed after ${duration}ms: ${error}`);
 
       return {
@@ -447,7 +450,7 @@ export class AccessibilityServiceHierarchy {
     if (lastTimeout === 0) {
       return false;
     }
-    const timeSinceTimeout = Date.now() - lastTimeout;
+    const timeSinceTimeout = this.context.timer.now() - lastTimeout;
     return timeSinceTimeout < WEBSOCKET_TIMEOUT_COOLDOWN_MS;
   }
 
@@ -567,7 +570,7 @@ export class AccessibilityServiceHierarchy {
     }
 
     try {
-      const requestId = `req_${Date.now()}_${generateSecureId()}`;
+      const requestId = `req_${this.context.timer.now()}_${generateSecureId()}`;
       const message = JSON.stringify({
         type: "request_hierarchy",
         requestId,
@@ -593,7 +596,7 @@ export class AccessibilityServiceHierarchy {
     }
 
     try {
-      const requestId = `stale_${Date.now()}_${generateSecureId()}`;
+      const requestId = `stale_${this.context.timer.now()}_${generateSecureId()}`;
       const message = JSON.stringify({
         type: "request_hierarchy_if_stale",
         requestId,
@@ -619,7 +622,7 @@ export class AccessibilityServiceHierarchy {
     }
 
     try {
-      const requestId = `recomp_${Date.now()}_${generateSecureId()}`;
+      const requestId = `recomp_${this.context.timer.now()}_${generateSecureId()}`;
       const message = JSON.stringify({ type: "set_recomposition_tracking", requestId, enabled });
       ws.send(message);
       return true;

@@ -185,7 +185,11 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
   // Default port matches XCTestService on iOS
   public static readonly DEFAULT_PORT = 8765;
 
-  // Hierarchy caching
+  /**
+   * NOT using TTLCache: "fresh" state managed by push updates + minTimestamp
+   * validation, not simple TTL expiration. The cache is invalidated based on
+   * WebSocket push events and explicit invalidateCache() calls after actions.
+   */
   private cachedHierarchy: CachedHierarchy | null = null;
   private static readonly CACHE_FRESH_TTL_MS = 500;
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;

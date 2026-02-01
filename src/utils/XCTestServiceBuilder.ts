@@ -75,8 +75,20 @@ export class XCTestServiceBuilder {
 
   private readonly config: XCTestServiceBuildConfig;
   private readonly downloader: XCTestServiceBundleDownloader;
+  /**
+   * NOT using TTLCache: file-existence validation via fs.access(), not time-based.
+   * Cache is invalidated when files are re-extracted, not after a TTL.
+   */
   private cachedBuildProductsPath: Map<XCTestServicePlatform, string | null> = new Map();
+  /**
+   * NOT using TTLCache: file-existence validation via fs.access(), not time-based.
+   * Cache is invalidated when files are re-extracted, not after a TTL.
+   */
   private cachedXctestrunPath: Map<string, string | null> = new Map();
+  /**
+   * NOT using TTLCache: file-existence validation via fs.access(), not time-based.
+   * Hash is computed once per build and cached until next build/extraction.
+   */
   private cachedAppBundleHash: Map<XCTestServicePlatform, string | null> = new Map();
 
   private constructor(

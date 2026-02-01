@@ -3,17 +3,16 @@ import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService"
 import type { AccessibilityDetector as IAccessibilityDetector, AccessibilityService } from "./interfaces/AccessibilityDetector";
 import { SystemTimer, type Timer } from "./SystemTimer";
 import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
+import { TTLCache } from "./cache/Cache";
 
 export type { AccessibilityService };
 
 /**
- * Interface for cached accessibility state
+ * Cached accessibility state value
  */
-interface AccessibilityCache {
+interface AccessibilityCacheValue {
   enabled: boolean;
   service: AccessibilityService;
-  lastChecked: number;
-  ttl: number; // Time-to-live in milliseconds
 }
 
 /**
@@ -27,12 +26,13 @@ interface AccessibilityCache {
  * - Accepts Timer dependency for testability
  */
 export class DefaultAccessibilityDetector implements IAccessibilityDetector {
-  private cache: Map<string, AccessibilityCache> = new Map();
   private readonly DEFAULT_TTL_MS = 60000; // 60 seconds as per design doc
-  private timer: Timer;
+  private readonly cache: TTLCache<string, AccessibilityCacheValue>;
+  private readonly timer: Timer;
 
   constructor(timer: Timer = new SystemTimer()) {
     this.timer = timer;
+    this.cache = new TTLCache(timer, { ttlMs: this.DEFAULT_TTL_MS });
   }
 
   /**
@@ -64,9 +64,8 @@ export class DefaultAccessibilityDetector implements IAccessibilityDetector {
 
     // Check cache
     const cached = this.cache.get(deviceId);
-    const now = this.timer.now();
 
-    if (cached && now - cached.lastChecked < cached.ttl) {
+    if (cached) {
       logger.debug(
         `[AccessibilityDetector] Using cached result for device ${deviceId}: enabled=${cached.enabled}, service=${cached.service}`
       );
@@ -88,12 +87,7 @@ export class DefaultAccessibilityDetector implements IAccessibilityDetector {
     }
 
     // Update cache
-    this.cache.set(deviceId, {
-      enabled,
-      service,
-      lastChecked: now,
-      ttl: this.DEFAULT_TTL_MS,
-    });
+    this.cache.set(deviceId, { enabled, service });
 
     return enabled;
   }
@@ -125,14 +119,15 @@ export class DefaultAccessibilityDetector implements IAccessibilityDetector {
 
     // Check cache
     const cached = this.cache.get(deviceId);
-    const now = this.timer.now();
 
-    if (cached && now - cached.lastChecked < cached.ttl) {
+    if (cached) {
       return cached.service;
     }
 
     // Detect current state
-    const { service } = await this.detectAccessibilityState(deviceId, adb);
+    const { enabled, service } = await this.detectAccessibilityState(deviceId, adb);
+    // Update cache
+    this.cache.set(deviceId, { enabled, service });
     return service;
   }
 
