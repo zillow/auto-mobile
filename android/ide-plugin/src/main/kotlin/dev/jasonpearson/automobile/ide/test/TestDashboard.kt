@@ -61,6 +61,7 @@ private val LOG = Logger.getInstance("TestDashboard")
 enum class TestScreen {
     Dashboard,
     RecordingTest,
+    ReviewingYaml,
     ModuleSelection,
     TestRunDetail,
 }
@@ -76,6 +77,40 @@ fun TestDashboard(
     var currentScreen by remember { mutableStateOf(TestScreen.Dashboard) }
     var selectedTestRun by remember { mutableStateOf<TestRun?>(null) }
     var recordedActions by remember { mutableStateOf<List<RecordedAction>>(emptyList()) }
+
+    // ReviewingYaml screen state
+    var planContent by remember { mutableStateOf("") }
+    var planName by remember { mutableStateOf("") }
+    var testDescription by remember { mutableStateOf("") }
+    var isRefining by remember { mutableStateOf(false) }
+    var refineError by remember { mutableStateOf<String?>(null) }
+    var refineOutputFile by remember { mutableStateOf<java.io.File?>(null) }
+
+    // File watcher for CLI output
+    LaunchedEffect(isRefining, refineOutputFile) {
+        if (!isRefining || refineOutputFile == null) return@LaunchedEffect
+        val outputFile = refineOutputFile!!
+        val deadline = System.currentTimeMillis() + 120_000 // 2 min timeout
+        while (System.currentTimeMillis() < deadline) {
+            if (outputFile.exists() && outputFile.length() > 0) {
+                try {
+                    val refinedContent = outputFile.readText()
+                    if (refinedContent.isNotBlank()) {
+                        planContent = refinedContent
+                        isRefining = false
+                        refineError = null
+                        LOG.info("Received refined YAML from CLI")
+                        return@LaunchedEffect
+                    }
+                } catch (e: Exception) {
+                    LOG.warn("Error reading refined output: ${e.message}")
+                }
+            }
+            kotlinx.coroutines.delay(500)
+        }
+        refineError = "Timeout waiting for refined output. The CLI may still be running."
+        isRefining = false
+    }
 
     // Fetch test runs from data source
     var testRuns by remember { mutableStateOf<List<TestRun>>(emptyList()) }
@@ -177,7 +212,12 @@ fun TestDashboard(
         TestScreen.RecordingTest -> RecordingTestScreen(
             recordedActions = recordedActions,
             onActionRecorded = { recordedActions = recordedActions + it },
-            onFinishRecording = { currentScreen = TestScreen.ModuleSelection },
+            onFinishRecording = { prompt ->
+                testDescription = prompt
+                planContent = recordedActionsToYaml(recordedActions)
+                planName = "recorded_test"
+                currentScreen = TestScreen.ReviewingYaml
+            },
             onBack = {
                 recordedActions = emptyList()
                 currentScreen = TestScreen.Dashboard
@@ -185,6 +225,43 @@ fun TestDashboard(
             screenshotUpdate = currentScreenshotUpdate,
             hierarchyUpdate = currentHierarchyUpdate,
             navigationUpdate = currentNavigationUpdate,
+        )
+        TestScreen.ReviewingYaml -> ReviewingYamlScreen(
+            planContent = planContent,
+            planName = planName,
+            description = testDescription,
+            onDescriptionChanged = { testDescription = it },
+            onRefine = {
+                refineError = null
+                val result = launchRefineWithCli(planContent, testDescription)
+                if (result.error != null) {
+                    refineError = result.error
+                } else {
+                    refineOutputFile = result.outputFile
+                    isRefining = true
+                }
+            },
+            isRefining = isRefining,
+            refineError = refineError,
+            onSave = { currentScreen = TestScreen.ModuleSelection },
+            onCopy = {
+                try {
+                    val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                    val selection = java.awt.datatransfer.StringSelection(planContent)
+                    clipboard.setContents(selection, selection)
+                } catch (e: Exception) {
+                    LOG.warn("Failed to copy to clipboard: ${e.message}")
+                }
+            },
+            onDismiss = {
+                planContent = ""
+                recordedActions = emptyList()
+                isRefining = false
+                refineError = null
+                refineOutputFile = null
+                currentScreen = TestScreen.Dashboard
+            },
+            onBack = { currentScreen = TestScreen.RecordingTest },
         )
         TestScreen.ModuleSelection -> ModuleSelectionScreen(
             recordedActions = recordedActions,
@@ -486,7 +563,7 @@ private fun SuggestedPromptChip(
 private fun RecordingTestScreen(
     recordedActions: List<RecordedAction>,
     onActionRecorded: (RecordedAction) -> Unit,
-    onFinishRecording: () -> Unit,
+    onFinishRecording: (prompt: String) -> Unit,
     onBack: () -> Unit,
     screenshotUpdate: ScreenshotStreamUpdate? = null,
     hierarchyUpdate: HierarchyStreamUpdate? = null,
@@ -737,7 +814,7 @@ private fun RecordingTestScreen(
                     Text("Recording", fontSize = 12.sp, color = Color(0xFFFF4444))
                 }
 
-                DefaultButton(onClick = onFinishRecording) {
+                DefaultButton(onClick = { onFinishRecording(promptState.text.toString()) }) {
                     Text("Finish Recording")
                 }
             }
@@ -1058,6 +1135,210 @@ private fun ModuleSelectionScreen(
                         color = colors.text.normal.copy(alpha = 0.3f),
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewingYamlScreen(
+    planContent: String,
+    planName: String,
+    description: String,
+    onDescriptionChanged: (String) -> Unit,
+    onRefine: () -> Unit,
+    isRefining: Boolean,
+    refineError: String?,
+    onSave: () -> Unit,
+    onCopy: () -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val colors = JewelTheme.globalColors
+    val scrollState = rememberScrollState()
+    val descriptionState = remember(description) { TextFieldState(description) }
+
+    // Sync description state changes back to parent
+    LaunchedEffect(descriptionState.text.toString()) {
+        val newText = descriptionState.text.toString()
+        if (newText != description) {
+            onDescriptionChanged(newText)
+        }
+    }
+
+    // Count steps in the YAML
+    val stepCount = remember(planContent) {
+        planContent.lines().count { it.trim().startsWith("- ") }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
+    ) {
+        Link("← Back to Recording", onClick = onBack)
+        Spacer(Modifier.height(12.dp))
+
+        Text("Recorded Test Plan", fontSize = 18.sp)
+        Text(
+            "$stepCount steps recorded",
+            color = colors.text.normal.copy(alpha = 0.6f),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        // YAML display with monospace font
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                .border(1.dp, colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .padding(12.dp),
+        ) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                planContent.lines().forEach { line ->
+                    val textColor = when {
+                        line.trim().startsWith("#") -> Color(0xFF6A9955)  // Comments in green
+                        line.trim().startsWith("- ") -> Color(0xFF4EC9B0)  // Steps in cyan
+                        line.contains(":") -> Color(0xFF9CDCFE)  // Keys in light blue
+                        else -> Color(0xFFD4D4D4)  // Default light gray
+                    }
+                    Text(
+                        line,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = textColor,
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Description field
+        Text("Description (optional):", fontSize = 13.sp, color = colors.text.normal.copy(alpha = 0.8f))
+        Spacer(Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                .padding(8.dp),
+        ) {
+            val isEmpty = descriptionState.text.isEmpty()
+            if (isEmpty) {
+                Text(
+                    "Describe what this test is verifying...",
+                    fontSize = 12.sp,
+                    color = colors.text.normal.copy(alpha = 0.4f),
+                )
+            }
+            androidx.compose.foundation.text.BasicTextField(
+                state = descriptionState,
+                modifier = Modifier.fillMaxSize(),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 12.sp,
+                    color = colors.text.normal,
+                ),
+                lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
+                    minHeightInLines = 2,
+                    maxHeightInLines = 3,
+                ),
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Refine with AI section
+        Text(
+            "Use AI to refine this plan and remove unnecessary steps",
+            fontSize = 12.sp,
+            color = colors.text.normal.copy(alpha = 0.6f),
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // Error display
+        refineError?.let { error ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFF5722).copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                    .padding(12.dp),
+            ) {
+                Column {
+                    Text(error, fontSize = 12.sp, color = Color(0xFFFF5722))
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = onRefine) {
+                        Text("Retry")
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // Loading state
+        if (isRefining) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF2196F3).copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                    .padding(12.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    var dotCount by remember { mutableStateOf(0) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            kotlinx.coroutines.delay(300)
+                            dotCount = (dotCount + 1) % 4
+                        }
+                    }
+                    val dots = ".".repeat(dotCount)
+                    Text(
+                        "Refining with AI$dots",
+                        fontSize = 12.sp,
+                        color = Color(0xFF2196F3),
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Waiting for CLI to complete. A terminal window should be open.",
+                fontSize = 11.sp,
+                color = colors.text.normal.copy(alpha = 0.5f),
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // Action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            DefaultButton(
+                onClick = onRefine,
+                enabled = !isRefining,
+            ) {
+                Text("Refine with AI")
+            }
+
+            OutlinedButton(onClick = onCopy) {
+                Text("Copy")
+            }
+
+            OutlinedButton(onClick = onSave) {
+                Text("Save")
+            }
+
+            OutlinedButton(onClick = onDismiss) {
+                Text("Dismiss")
             }
         }
     }
@@ -2083,5 +2364,103 @@ private fun extractVideoFrame(videoPath: String, timeMs: Long): org.jetbrains.sk
         Logger.getInstance("VideoPlayer").debug("Failed to extract video frame: ${e.message}")
         frameCache[cacheKey] = null
         null
+    }
+}
+
+/**
+ * Convert recorded actions to YAML format for test plan.
+ */
+private fun recordedActionsToYaml(actions: List<RecordedAction>): String {
+    if (actions.isEmpty()) {
+        return "# No actions recorded\nsteps: []"
+    }
+
+    val sb = StringBuilder()
+    sb.appendLine("# AutoMobile Test Plan")
+    sb.appendLine("# Generated from recorded actions")
+    sb.appendLine()
+    sb.appendLine("steps:")
+
+    actions.forEach { action ->
+        sb.appendLine("  - ${action.toolName}:")
+        action.parameters.forEach { (key, value) ->
+            val escapedValue = value.replace("\"", "\\\"")
+            sb.appendLine("      $key: \"$escapedValue\"")
+        }
+    }
+
+    return sb.toString()
+}
+
+/**
+ * Result of launching the CLI for refinement.
+ */
+private data class RefineCliResult(
+    val inputFile: java.io.File,
+    val outputFile: java.io.File,
+    val error: String? = null,
+)
+
+/**
+ * Launch Claude CLI in a new Terminal window to refine the test plan YAML.
+ * Returns the input and output files for tracking, or an error message.
+ */
+private fun launchRefineWithCli(yaml: String, description: String): RefineCliResult {
+    val inputFile = java.io.File.createTempFile("automobile_refine_input_", ".yaml")
+    val outputFile = java.io.File.createTempFile("automobile_refine_output_", ".yaml")
+
+    // Clear output file to ensure we detect fresh output
+    outputFile.writeText("")
+
+    return try {
+        // Write YAML to input file
+        inputFile.writeText(yaml)
+        LOG.info("Wrote YAML to ${inputFile.absolutePath}")
+
+        // Escape description for shell
+        val escapedDescription = description
+            .replace("\\", "\\\\")
+            .replace("'", "'\"'\"'")
+            .replace("\n", " ")
+
+        // Build the Claude CLI command
+        val prompt = buildString {
+            append("Refine this mobile test plan YAML. ")
+            append("Remove duplicate actions, unnecessary navigation steps, and redundant observe calls. ")
+            append("Preserve essential interactions and assertions. ")
+            append("Output ONLY the refined YAML with no explanation or markdown formatting.")
+            if (escapedDescription.isNotBlank()) {
+                append(" User description: $escapedDescription")
+            }
+        }
+
+        // Use osascript to open Terminal and run Claude
+        val script = """
+            tell application "Terminal"
+                do script "claude --print '$prompt' < '${inputFile.absolutePath}' > '${outputFile.absolutePath}'"
+                activate
+            end tell
+        """.trimIndent()
+
+        val processBuilder = ProcessBuilder("osascript", "-e", script)
+        val process = processBuilder.start()
+        val exitCode = process.waitFor()
+
+        if (exitCode != 0) {
+            val stderr = process.errorStream.bufferedReader().readText()
+            LOG.warn("osascript returned non-zero exit code: $exitCode, stderr: $stderr")
+            RefineCliResult(inputFile, outputFile, "Failed to launch Terminal: $stderr")
+        } else {
+            LOG.info("Launched Claude CLI in Terminal, output will be at ${outputFile.absolutePath}")
+            RefineCliResult(inputFile, outputFile)
+        }
+    } catch (e: Exception) {
+        LOG.warn("Failed to launch refine CLI: ${e.message}")
+        val errorMessage = when {
+            e.message?.contains("osascript") == true -> "Failed to launch Terminal. Make sure Terminal.app is available."
+            e.message?.contains("claude") == true -> "Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-cli"
+            else -> "Failed to launch CLI: ${e.message}"
+        }
+        RefineCliResult(inputFile, outputFile, errorMessage)
     }
 }
