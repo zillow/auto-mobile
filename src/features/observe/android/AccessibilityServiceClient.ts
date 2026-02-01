@@ -179,6 +179,26 @@ interface CrashEvent {
 }
 
 /**
+ * Interface for ANR event from SDK
+ */
+interface AnrEvent {
+  timestamp: number;
+  pid: number;
+  processName: string;
+  importance: string;
+  trace?: string;
+  reason: string;
+  packageName?: string;
+  appVersion?: string;
+  deviceInfo: {
+    model: string;
+    manufacturer: string;
+    osVersion: string;
+    sdkInt: number;
+  };
+}
+
+/**
  * Interface for WebSocket message from accessibility service
  */
 interface WebSocketMessage {
@@ -1336,6 +1356,14 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         }
       }
 
+      if (message.type === "anr_event") {
+        const anrMessage = message as any;
+        const event = anrMessage.event as AnrEvent | undefined;
+        if (event) {
+          await this.handleAnrEvent(event);
+        }
+      }
+
       // Handle storage_changed push event
       if (message.type === "storage_changed") {
         const storageMessage = message as any;
@@ -1681,6 +1709,44 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       logger.info(`[ACCESSIBILITY_SERVICE] Recorded crash: ${occurrenceId}`);
     } catch (error) {
       logger.error(`[ACCESSIBILITY_SERVICE] Failed to record crash: ${error}`);
+    }
+  }
+
+  private async handleAnrEvent(event: AnrEvent): Promise<void> {
+    logger.info(`[ACCESSIBILITY_SERVICE] Received ANR: pid=${event.pid}, process=${event.processName}, importance=${event.importance}`);
+
+    try {
+      const failureRecorder = getFailureRecorder();
+      const packageName = event.packageName ?? event.processName;
+
+      // Parse stack trace if available
+      const stackTraceElements = event.trace
+        ? this.parseStackTrace(event.trace, packageName)
+        : [];
+
+      let currentScreen: string | undefined;
+      try {
+        const navManager = NavigationGraphManager.getInstance();
+        currentScreen = navManager.getCurrentScreen() ?? undefined;
+      } catch {
+        // Continue without screen
+      }
+
+      const anrInput = {
+        reason: event.reason,
+        stackTrace: stackTraceElements.length > 0 ? stackTraceElements : undefined,
+        deviceId: this.device.deviceId,
+        deviceModel: event.deviceInfo.model,
+        os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
+        appVersion: event.appVersion ?? "unknown",
+        sessionId: `anr-${packageName}-${Date.now()}`,
+        currentScreen,
+      };
+
+      const occurrenceId = await failureRecorder.recordAnr(anrInput);
+      logger.info(`[ACCESSIBILITY_SERVICE] Recorded ANR: ${occurrenceId}`);
+    } catch (error) {
+      logger.error(`[ACCESSIBILITY_SERVICE] Failed to record ANR: ${error}`);
     }
   }
 

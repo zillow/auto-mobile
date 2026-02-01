@@ -137,6 +137,33 @@ data class CrashData(
   val applicationId: String? = null,
 )
 
+@Serializable
+@SerialName("anr_event")
+data class AnrEvent(
+  override val timestamp: Long,
+  val event: AnrData,
+) : WebSocketResponse()
+
+@Serializable
+data class AnrData(
+  /** Process ID that experienced the ANR */
+  val pid: Int,
+  /** Process name */
+  val processName: String,
+  /** Process importance when ANR occurred (FOREGROUND, VISIBLE, etc.) */
+  val importance: String,
+  /** Full thread dump from ApplicationExitInfo.traceInputStream */
+  val trace: String?,
+  /** Human-readable reason description */
+  val reason: String,
+  /** Package name of the app */
+  val packageName: String? = null,
+  /** App version */
+  val appVersion: String? = null,
+  /** Device information */
+  val deviceInfo: DeviceInfo? = null,
+)
+
 // =============================================================================
 // Screenshot Results
 // =============================================================================

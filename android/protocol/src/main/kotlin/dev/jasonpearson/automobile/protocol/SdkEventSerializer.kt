@@ -53,6 +53,7 @@ object SdkEventSerializer {
     const val NOTIFICATION_ACTION = "notification_action"
     const val RECOMPOSITION_SNAPSHOT = "recomposition_snapshot"
     const val CRASH = "crash"
+    const val ANR = "anr"
   }
 
   /**
@@ -112,6 +113,7 @@ object SdkEventSerializer {
       is SdkNotificationActionEvent -> EventTypes.NOTIFICATION_ACTION
       is SdkRecompositionSnapshotEvent -> EventTypes.RECOMPOSITION_SNAPSHOT
       is SdkCrashEvent -> EventTypes.CRASH
+      is SdkAnrEvent -> EventTypes.ANR
     }
   }
 
@@ -167,5 +169,15 @@ object SdkEventSerializer {
    */
   fun crashEventFromJson(jsonString: String): SdkCrashEvent? {
     return fromJson(jsonString) as? SdkCrashEvent
+  }
+
+  /**
+   * Deserialize a SdkAnrEvent from JSON string.
+   *
+   * @param jsonString The JSON string to deserialize
+   * @return The ANR event, or null if parsing fails or not an ANR event
+   */
+  fun anrEventFromJson(jsonString: String): SdkAnrEvent? {
+    return fromJson(jsonString) as? SdkAnrEvent
   }
 }

@@ -35,6 +35,8 @@ import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.TimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.storage.StorageSubscriptionManager
+import dev.jasonpearson.automobile.protocol.AnrData
+import dev.jasonpearson.automobile.protocol.AnrEvent
 import dev.jasonpearson.automobile.protocol.CrashData
 import dev.jasonpearson.automobile.protocol.CrashEvent
 import dev.jasonpearson.automobile.protocol.DeviceInfo
@@ -42,11 +44,13 @@ import dev.jasonpearson.automobile.protocol.HandledExceptionData
 import dev.jasonpearson.automobile.protocol.HandledExceptionEvent
 import dev.jasonpearson.automobile.protocol.NavigationEventData
 import dev.jasonpearson.automobile.protocol.NavigationEventResponse
+import dev.jasonpearson.automobile.protocol.SdkAnrEvent
 import dev.jasonpearson.automobile.protocol.SdkCrashEvent
 import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkHandledExceptionEvent
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
+import dev.jasonpearson.automobile.sdk.anr.AutoMobileAnr
 import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import java.io.ByteArrayOutputStream
@@ -435,6 +439,44 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
       }
 
+  private val anrReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          if (intent == null || intent.action != AutoMobileAnr.ACTION_ANR) {
+            return
+          }
+
+          try {
+            val eventJson = intent.getStringExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON)
+            if (eventJson != null) {
+              val event = SdkEventSerializer.anrEventFromJson(eventJson)
+              if (event != null) {
+                Log.d(TAG, "Received ANR: pid=${event.pid} from ${event.applicationId}")
+
+                serviceScope.launch {
+                  broadcastAnrEvent(
+                      timestamp = event.timestamp,
+                      pid = event.pid,
+                      processName = event.processName,
+                      importance = event.importance,
+                      trace = event.trace,
+                      reason = event.reason,
+                      packageName = event.applicationId ?: "unknown",
+                      appVersion = event.appVersion,
+                      deviceModel = event.deviceInfo?.model ?: "unknown",
+                      deviceManufacturer = event.deviceInfo?.manufacturer ?: "unknown",
+                      osVersion = event.deviceInfo?.osVersion ?: "unknown",
+                      sdkInt = event.deviceInfo?.sdkInt ?: 0,
+                  )
+                }
+              }
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Error handling ANR broadcast", e)
+          }
+        }
+      }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
@@ -519,6 +561,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         registerReceiver(crashReceiver, crashFilter)
       }
       Log.d(TAG, "Crash receiver registered")
+
+      // Register broadcast receiver for ANRs from SDK
+      val anrFilter =
+          IntentFilter().apply { addAction(AutoMobileAnr.ACTION_ANR) }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(anrReceiver, anrFilter, RECEIVER_EXPORTED)
+      } else {
+        @SuppressLint("UnspecifiedRegisterReceiverFlag")
+        registerReceiver(anrReceiver, anrFilter)
+      }
+      Log.d(TAG, "ANR receiver registered")
 
       // Initialize the navigation event accumulator
       navigationEventAccumulator.initialize()
@@ -739,6 +793,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       unregisterReceiver(crashReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering crash receiver", e)
+    }
+
+    try {
+      unregisterReceiver(anrReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering ANR receiver", e)
     }
 
     if (::overlayDrawer.isInitialized) {
@@ -3686,6 +3746,56 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting crash event", e)
+    }
+  }
+
+  /** Broadcast ANR event to WebSocket clients using typed protocol */
+  private suspend fun broadcastAnrEvent(
+      timestamp: Long,
+      pid: Int,
+      processName: String,
+      importance: String,
+      trace: String?,
+      reason: String,
+      packageName: String,
+      appVersion: String?,
+      deviceModel: String,
+      deviceManufacturer: String,
+      osVersion: String,
+      sdkInt: Int,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping ANR broadcast")
+      return
+    }
+
+    try {
+      val response = AnrEvent(
+        timestamp = timestamp,
+        event = AnrData(
+          pid = pid,
+          processName = processName,
+          importance = importance,
+          trace = trace,
+          reason = reason,
+          packageName = packageName,
+          appVersion = appVersion,
+          deviceInfo = DeviceInfo(
+            model = deviceModel,
+            manufacturer = deviceManufacturer,
+            osVersion = osVersion,
+            sdkInt = sdkInt,
+          ),
+        ),
+      )
+
+      webSocketServer.broadcast(response)
+      Log.i(
+          TAG,
+          "Broadcasted ANR to ${webSocketServer.getConnectionCount()} clients: pid=$pid process=$processName",
+      )
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting ANR event", e)
     }
   }
 

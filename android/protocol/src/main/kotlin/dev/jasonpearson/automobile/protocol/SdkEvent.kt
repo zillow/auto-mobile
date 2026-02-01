@@ -159,3 +159,33 @@ data class SdkCrashEvent(
   /** Device information */
   val deviceInfo: SdkDeviceInfo? = null,
 ) : SdkEvent()
+
+// =============================================================================
+// ANR Events
+// =============================================================================
+
+/**
+ * Represents an ANR (Application Not Responding) detected via ApplicationExitInfo API.
+ * This is captured on app restart after an ANR occurred in a previous session.
+ * Requires Android 11+ (API 30).
+ */
+@Serializable
+@SerialName("anr")
+data class SdkAnrEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Process ID that experienced the ANR */
+  val pid: Int,
+  /** Process name */
+  val processName: String,
+  /** Process importance when ANR occurred (FOREGROUND, VISIBLE, CACHED, etc.) */
+  val importance: String,
+  /** Full thread dump from ApplicationExitInfo.traceInputStream */
+  val trace: String?,
+  /** Human-readable reason description */
+  val reason: String,
+  /** Application version name, if available */
+  val appVersion: String? = null,
+  /** Device information */
+  val deviceInfo: SdkDeviceInfo? = null,
+) : SdkEvent()
