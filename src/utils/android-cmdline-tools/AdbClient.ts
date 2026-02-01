@@ -6,6 +6,7 @@ import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./de
 import { AdbExecutor } from "./interfaces/AdbExecutor";
 import { getAbortSignal } from "../AbortContext";
 import { OPERATION_CANCELLED_MESSAGE } from "../constants";
+import { RetryExecutor, defaultRetryExecutor } from "../retry/RetryExecutor";
 
 type ExecFileAsync = (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
 
@@ -43,6 +44,7 @@ export class AdbClient implements AdbExecutor {
   private isTestMode: boolean;
   private activeProcesses: Set<ChildProcess> = new Set();
   private apiLevelCache: number | null | undefined;
+  private readonly retryExecutor: RetryExecutor;
 
   // Static cache for device list
   private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
@@ -59,11 +61,13 @@ export class AdbClient implements AdbExecutor {
    * @param device - Optional device
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
+   * @param retryExecutor - retry executor for command retries (for testing)
    */
   constructor(
     device: BootedDevice | null = null,
     execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | ExecFileAsync | null = null,
-    spawnFn: typeof spawn | null = null
+    spawnFn: typeof spawn | null = null,
+    retryExecutor: RetryExecutor = defaultRetryExecutor
   ) {
     this.device = device;
     // Test mode if: custom execAsync provided OR global test mode flag is set
@@ -87,6 +91,7 @@ export class AdbClient implements AdbExecutor {
         : execFileAsync;
     }
     this.spawnFn = spawnFn || spawn;
+    this.retryExecutor = retryExecutor;
     // Initialize with fallback, will be updated lazily
     this.adbPath = this.getFallbackAdbPath();
 
@@ -335,11 +340,31 @@ export class AdbClient implements AdbExecutor {
   }
 
   /**
+   * Determine if an error is non-retryable (auth, syntax, or device errors).
+   * Returns true if the error should NOT be retried.
+   */
+  private isNonRetryableError(error: Error): boolean {
+    const message = error.message.toLowerCase();
+    const nonRetryablePatterns = [
+      "operation cancelled",
+      "unauthorized",
+      "authentication failed",
+      "permission denied",
+      "unknown command",
+      "invalid argument",
+      "syntax error",
+      "device not found",
+      "no devices",
+      "offline",
+    ];
+    return nonRetryablePatterns.some(pattern => message.includes(pattern));
+  }
+
+  /**
    * Internal implementation of command execution
    * @param command - The ADB command to execute
    * @param timeoutMs - Optional timeout in milliseconds
    * @param maxBuffer - Optional maximum buffer size for command output
-   * @param attempt - Current attempt number at executing this command
    * @param noRetry - Optional flag to disable retry logic for commands expected to fail
    * @returns Promise with command output
    */
@@ -347,7 +372,7 @@ export class AdbClient implements AdbExecutor {
     command: string,
     timeoutMs?: number,
     maxBuffer?: number,
-    attempt: number = 0,
+    _attempt: number = 0,
     noRetry?: boolean,
     signal?: AbortSignal
   ): Promise<ExecResult> {
@@ -361,22 +386,49 @@ export class AdbClient implements AdbExecutor {
     const deviceInfo = this.device ? `[DEVICE:${this.device.deviceId}]` : "[NO-DEVICE]";
     logger.info(`[ADB] ${deviceInfo} Executing: ${command.length > 80 ? command.substring(0, 80) + "..." : command}`);
 
-    try {
-      const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
-      const duration = Date.now() - startTime;
-      logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
-      return result;
-    } catch (error) {
-      if (resolvedSignal?.aborted) {
-        throw new Error(OPERATION_CANCELLED_MESSAGE);
+    if (noRetry) {
+      // No retry - just execute once
+      try {
+        const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
+        const duration = Date.now() - startTime;
+        logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
+        return result;
+      } catch (error) {
+        if (resolvedSignal?.aborted) {
+          throw new Error(OPERATION_CANCELLED_MESSAGE);
+        }
+        const duration = Date.now() - startTime;
+        logger.warn(`[ADB] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
+        throw error;
       }
-      if (!noRetry && attempt < AdbClient.MAX_ADB_RETRIES) {
-        return this.executeCommandImpl(command, timeoutMs, maxBuffer, attempt + 1, noRetry, resolvedSignal);
-      }
-      const duration = Date.now() - startTime;
-      logger.warn(`[ADB] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
-      throw error;
     }
+
+    // Use retry executor for retryable commands
+    return this.retryExecutor.executeOrThrow(
+      async () => {
+        if (resolvedSignal?.aborted) {
+          throw new Error(OPERATION_CANCELLED_MESSAGE);
+        }
+        const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
+        const duration = Date.now() - startTime;
+        logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
+        return result;
+      },
+      {
+        maxAttempts: AdbClient.MAX_ADB_RETRIES + 1,
+        delays: 0, // Immediate retry (no delay)
+        signal: resolvedSignal,
+        shouldRetry: error => {
+          if (resolvedSignal?.aborted) {
+            return false;
+          }
+          return !this.isNonRetryableError(error);
+        },
+        onRetry: (error, attempt) => {
+          logger.debug(`[ADB] Retrying command (attempt ${attempt + 1}): ${command} - ${error.message}`);
+        },
+      }
+    );
   }
 
   private async execWithSignal(

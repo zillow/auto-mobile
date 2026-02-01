@@ -21,6 +21,7 @@ import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import type { Timer } from "../../utils/SystemTimer";
 import { defaultTimer } from "../../utils/SystemTimer";
 import { RequestManager } from "../../utils/RequestManager";
+import { RetryExecutor, defaultRetryExecutor } from "../../utils/retry/RetryExecutor";
 
 /**
  * Factory function type for creating WebSocket instances.
@@ -85,6 +86,7 @@ export abstract class DeviceServiceClient {
   protected readonly requestManager: RequestManager;
   protected readonly webSocketFactory: WebSocketFactory;
   protected readonly config: ConnectionConfig;
+  protected readonly retryExecutor: RetryExecutor;
 
   // Logging tag for subclass identification
   protected abstract readonly logTag: string;
@@ -95,12 +97,14 @@ export abstract class DeviceServiceClient {
   protected constructor(
     timer: Timer = defaultTimer,
     webSocketFactory: WebSocketFactory = defaultWebSocketFactory,
-    config: Partial<ConnectionConfig> = {}
+    config: Partial<ConnectionConfig> = {},
+    retryExecutor: RetryExecutor = defaultRetryExecutor
   ) {
     this.timer = timer;
     this.webSocketFactory = webSocketFactory;
     this.config = { ...DEFAULT_CONNECTION_CONFIG, ...config };
     this.requestManager = new RequestManager(timer);
+    this.retryExecutor = retryExecutor;
   }
 
   // ===========================================================================
@@ -170,24 +174,34 @@ export abstract class DeviceServiceClient {
     maxAttempts: number = 10,
     delayMs: number = 300
   ): Promise<boolean> {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      // Reset connection attempts counter to allow fresh connection attempts
-      this.connectionAttempts = 0;
+    const result = await this.retryExecutor.execute(
+      async attempt => {
+        // Reset connection attempts counter to allow fresh connection attempts
+        this.connectionAttempts = 0;
 
-      const connected = await this.ensureConnected();
-      if (connected) {
-        logger.info(`[${this.logTag}] WebSocket connected after ${attempt} attempt(s) (${(attempt - 1) * delayMs}ms)`);
-        return true;
-      }
+        const connected = await this.ensureConnected();
+        if (connected) {
+          logger.info(`[${this.logTag}] WebSocket connected after ${attempt} attempt(s) (${(attempt - 1) * delayMs}ms)`);
+          return true;
+        }
 
-      if (attempt < maxAttempts) {
-        logger.debug(`[${this.logTag}] Connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms`);
-        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
+        throw new Error(`Connection attempt ${attempt} failed`);
+      },
+      {
+        maxAttempts,
+        delays: delayMs,
+        onRetry: (_error, attempt) => {
+          logger.debug(`[${this.logTag}] Connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms`);
+        },
       }
+    );
+
+    if (!result.success) {
+      logger.warn(`[${this.logTag}] WebSocket not ready after ${maxAttempts} attempts (${maxAttempts * delayMs}ms)`);
+      return false;
     }
 
-    logger.warn(`[${this.logTag}] WebSocket not ready after ${maxAttempts} attempts (${maxAttempts * delayMs}ms)`);
-    return false;
+    return result.value ?? false;
   }
 
   /**

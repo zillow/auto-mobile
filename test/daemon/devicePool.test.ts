@@ -5,6 +5,7 @@ import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
 import { FakeDeviceManager } from "../fakes/FakeDeviceManager";
 import { BootedDevice, DeviceInfo, Platform } from "../../src/models";
+import { DefaultRetryExecutor } from "../../src/utils/retry/RetryExecutor";
 
 describe("DevicePool", () => {
   let devicePool: DevicePool;
@@ -29,7 +30,9 @@ describe("DevicePool", () => {
     sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
     fakeDeviceManager = new FakeDeviceManager();
-    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager);
+    // Create a RetryExecutor that uses the fakeTimer so time advancement works correctly
+    const retryExecutor = new DefaultRetryExecutor(fakeTimer);
+    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager, retryExecutor);
   });
 
   afterEach(() => {
@@ -159,7 +162,8 @@ describe("DevicePool", () => {
         { name: "iPhone 15", platform: "ios", isRunning: false, deviceId: "sim-2" },
       ];
       const fakeDeviceManager = new FakeDeviceManager(images);
-      devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager);
+      const retryExecutor = new DefaultRetryExecutor(fakeTimer);
+      devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager, retryExecutor);
 
       await expect(
         devicePool.assignMultipleDevices(["session-a", "session-b"], 1000, "ios")

@@ -6,6 +6,20 @@ import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/devi
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
+import { RetryExecutor, defaultRetryExecutor } from "../utils/retry/RetryExecutor";
+
+/**
+ * Error class for device pool operations with retryability flag.
+ */
+export class DevicePoolError extends Error {
+  constructor(
+    message: string,
+    public readonly isRetryable: boolean
+  ) {
+    super(message);
+    this.name = "DevicePoolError";
+  }
+}
 
 /**
  * Pooled Device Status
@@ -63,6 +77,7 @@ export class DevicePool {
   private daemonSessionId: string;
   private installedAppsRepository: InstalledAppsStore;
   private deviceManager: PlatformDeviceManager;
+  private readonly retryExecutor: RetryExecutor;
 
   // Max consecutive errors before marking device as failed
   private readonly MAX_DEVICE_ERRORS = 5;
@@ -76,7 +91,8 @@ export class DevicePool {
     daemonSessionId: string,
     timer: Timer = defaultTimer,
     installedAppsRepository?: InstalledAppsStore,
-    deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager()
+    deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager(),
+    retryExecutor: RetryExecutor = defaultRetryExecutor
   ) {
     this.instanceId = ++DevicePool.instanceCounter;
     logger.info(`[DEVICE-POOL-DEBUG] Creating DevicePool instance #${this.instanceId}`);
@@ -85,6 +101,7 @@ export class DevicePool {
     this.timer = timer;
     this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
     this.deviceManager = deviceManager;
+    this.retryExecutor = retryExecutor;
   }
 
   /**
@@ -280,86 +297,104 @@ export class DevicePool {
       );
     }
 
-    // Try to assign devices with shared timeout
-    let attemptCount = 0;
+    // Try to assign devices with shared timeout using retry executor
+    const maxAttempts = Math.ceil(timeoutMs / this.DEVICE_WAIT_INTERVAL_MS);
     const assigned = new Set<string>();
+    let firstWaitLogged = false;
 
-    while (assigned.size < requiredCount) {
-      attemptCount++;
+    const result = await this.retryExecutor.execute(
+      async () => {
+        // Try to assign all remaining sessions
+        while (assigned.size < requiredCount) {
+          const sessionIndex = assigned.size;
+          const sessionId = sessionIds[sessionIndex];
+
+          const assignResult = await this.tryAssignDevice(sessionId, platform);
+
+          if (assignResult.success) {
+            assigned.add(sessionId);
+            assignments.set(sessionId, assignResult.deviceId!);
+            logger.info(
+              `[DevicePool] Allocated device ${assignResult.deviceId} to session ${sessionId} ` +
+              `(${assigned.size}/${requiredCount})`
+            );
+          } else if (!assignResult.shouldWait) {
+            // No devices at all - non-retryable error
+            const currentStats = this.getStatsForPlatform(platform);
+            throw new DevicePoolError(
+              `Failed to allocate devices: no devices available.\n` +
+              `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
+              `Device pool status:\n` +
+              `  Total devices: ${currentStats.total}\n` +
+              `  Idle: ${currentStats.idle}\n` +
+              `  Assigned: ${currentStats.assigned}\n` +
+              `  Error: ${currentStats.error}\n\n` +
+              `Suggestions:\n` +
+              `  - Start an emulator or simulator\n` +
+              `  - Check device pool status: auto-mobile --cli listDevices\n` +
+              `  - Verify device tooling is working for the selected platform`,
+              false
+            );
+          } else {
+            // Devices busy - throw retryable error to wait
+            if (!firstWaitLogged) {
+              firstWaitLogged = true;
+              logger.info(
+                `[DevicePool] Waiting for ${requiredCount - assigned.size} more device(s) ` +
+                `(${assignResult.totalDevices} total, all currently busy)...`
+              );
+            }
+            throw new DevicePoolError("All devices busy", true);
+          }
+        }
+
+        // All devices assigned successfully
+        return assignments;
+      },
+      {
+        maxAttempts,
+        delays: this.DEVICE_WAIT_INTERVAL_MS,
+        shouldRetry: error => error instanceof DevicePoolError && error.isRetryable,
+      }
+    );
+
+    if (!result.success) {
+      // Release any devices we've assigned so far
+      for (const deviceId of assignments.values()) {
+        await this.releaseDevice(deviceId);
+      }
+
+      // Check if it was a non-retryable error
+      if (result.error instanceof DevicePoolError && !result.error.isRetryable) {
+        throw new ActionableError(result.error.message);
+      }
+
+      // Timeout case
       const elapsed = this.timer.now() - startTime;
-
-      // Check timeout
-      if (elapsed > timeoutMs) {
-        // Release any devices we've assigned so far
-        for (const deviceId of assignments.values()) {
-          await this.releaseDevice(deviceId);
-        }
-        const currentStats = this.getStatsForPlatform(platform);
-        throw new ActionableError(
-          `Timed out allocating devices after ${Math.round(elapsed / 1000)}s (${attemptCount} attempts).\n` +
-          `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
-          `Device pool status:\n` +
-          `  Total devices: ${currentStats.total}\n` +
-          `  Idle: ${currentStats.idle}\n` +
-          `  Assigned: ${currentStats.assigned}\n` +
-          `  Error: ${currentStats.error}\n\n` +
-          `Suggestions:\n` +
-          `  - Reduce parallel test count to match available devices\n` +
-          `  - Start additional emulators or connect more physical devices\n` +
-          `  - Increase device allocation timeout\n` +
-          `  - Check if tests are properly releasing devices after completion`
-        );
-      }
-
-      // Try to assign next session
-      const sessionIndex = assigned.size;
-      const sessionId = sessionIds[sessionIndex];
-
-      const result = await this.tryAssignDevice(sessionId, platform);
-
-      if (result.success) {
-        assigned.add(sessionId);
-        assignments.set(sessionId, result.deviceId!);
-        logger.info(
-          `[DevicePool] Allocated device ${result.deviceId} to session ${sessionId} ` +
-          `(${assigned.size}/${requiredCount})`
-        );
-      } else if (!result.shouldWait) {
-        // No devices at all - this shouldn't happen as we checked earlier
-        // but handle it gracefully
-        const currentStats = this.getStatsForPlatform(platform);
-        throw new ActionableError(
-          `Failed to allocate devices: no devices available.\n` +
-          `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
-          `Device pool status:\n` +
-          `  Total devices: ${currentStats.total}\n` +
-          `  Idle: ${currentStats.idle}\n` +
-          `  Assigned: ${currentStats.assigned}\n` +
-          `  Error: ${currentStats.error}\n\n` +
-          `Suggestions:\n` +
-          `  - Start an emulator or simulator\n` +
-          `  - Check device pool status: auto-mobile --cli listDevices\n` +
-          `  - Verify device tooling is working for the selected platform`
-        );
-      } else {
-        // Devices busy - wait and retry
-        if (attemptCount === 1) {
-          logger.info(
-            `[DevicePool] Waiting for ${requiredCount - assigned.size} more device(s) ` +
-            `(${result.totalDevices} total, all currently busy)...`
-          );
-        }
-        await this.timer.sleep(this.DEVICE_WAIT_INTERVAL_MS);
-      }
+      const currentStats = this.getStatsForPlatform(platform);
+      throw new ActionableError(
+        `Timed out allocating devices after ${Math.round(elapsed / 1000)}s (${result.attempts} attempts).\n` +
+        `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
+        `Device pool status:\n` +
+        `  Total devices: ${currentStats.total}\n` +
+        `  Idle: ${currentStats.idle}\n` +
+        `  Assigned: ${currentStats.assigned}\n` +
+        `  Error: ${currentStats.error}\n\n` +
+        `Suggestions:\n` +
+        `  - Reduce parallel test count to match available devices\n` +
+        `  - Start additional emulators or connect more physical devices\n` +
+        `  - Increase device allocation timeout\n` +
+        `  - Check if tests are properly releasing devices after completion`
+      );
     }
 
     const totalElapsed = this.timer.now() - startTime;
     logger.info(
       `[DevicePool] Successfully allocated ${requiredCount} devices ` +
-      `in ${totalElapsed}ms (${attemptCount} attempts)`
+      `in ${totalElapsed}ms (${result.attempts} attempts)`
     );
 
-    return assignments;
+    return result.value!;
   }
 
   /**
@@ -586,71 +621,84 @@ export class DevicePool {
     logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: assignDeviceToSession called for session ${sessionId}`);
     logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Current devices.size: ${this.devices.size}`);
     logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Device IDs: ${Array.from(this.devices.keys()).join(", ")}`);
-    const startTime = this.timer.now();
-    let attemptCount = 0;
 
-    while (true) {
-      attemptCount++;
-      const elapsed = this.timer.now() - startTime;
+    const maxAttempts = Math.ceil(this.DEVICE_WAIT_TIMEOUT_MS / this.DEVICE_WAIT_INTERVAL_MS);
+    let firstAttemptLogged = false;
 
-      // Check timeout
-      if (elapsed > this.DEVICE_WAIT_TIMEOUT_MS) {
-        const stats = this.getStatsForPlatform(platform);
-        throw new ActionableError(
-          `Timed out waiting for device after ${Math.round(elapsed / 1000)}s (${attemptCount} attempts).\n` +
-          `Session: ${sessionId}\n` +
-          `Device pool status:\n` +
-          `  Total devices: ${stats.total}\n` +
-          `  Idle: ${stats.idle}\n` +
-          `  Assigned: ${stats.assigned}\n` +
-          `  Error: ${stats.error}\n\n` +
-          `Suggestions:\n` +
-          `  - Reduce parallel test count to match available devices\n` +
-          `  - Start additional emulators or connect more physical devices\n` +
-          `  - Check if tests are properly releasing devices after completion`
-        );
-      }
+    const result = await this.retryExecutor.execute(
+      async attempt => {
+        // Try to assign device (mutex ensures atomic assignment)
+        const assignResult = await this.tryAssignDevice(sessionId, platform);
 
-      // Try to assign device (mutex ensures atomic assignment)
-      const result = await this.tryAssignDevice(sessionId, platform);
+        if (assignResult.success) {
+          if (attempt > 1) {
+            logger.info(
+              `Device ${assignResult.deviceId} assigned to session ${sessionId} ` +
+              `after ${attempt} attempts`
+            );
+          }
+          return assignResult.deviceId!;
+        }
 
-      if (result.success) {
-        if (attemptCount > 1) {
-          logger.info(
-            `Device ${result.deviceId} assigned to session ${sessionId} ` +
-            `after ${attemptCount} attempts (${elapsed}ms wait)`
+        // No device available - check if we should wait or fail
+        if (assignResult.shouldWait) {
+          // Devices exist but are busy - throw retryable error
+          if (!firstAttemptLogged) {
+            firstAttemptLogged = true;
+            logger.info(
+              `All ${assignResult.totalDevices} devices busy, ` +
+              `session ${sessionId} waiting for availability (timeout: ${this.DEVICE_WAIT_TIMEOUT_MS / 1000}s)...`
+            );
+          }
+          throw new DevicePoolError("All devices busy", true);
+        } else {
+          // No devices at all - fail immediately with non-retryable error
+          const stats = this.getStatsForPlatform(platform);
+          throw new DevicePoolError(
+            `No devices in pool to assign to session ${sessionId}.\n` +
+            `Device pool status:\n` +
+            `  Total devices: ${stats.total}\n` +
+            `  Idle: ${stats.idle}\n` +
+            `  Assigned: ${stats.assigned}\n` +
+            `  Error: ${stats.error}\n\n` +
+            `Suggestions:\n` +
+            `  - Start an emulator or connect a physical device\n` +
+            `  - Check device pool status: auto-mobile --cli listDevices\n` +
+            `  - Verify device tooling is working for the selected platform`,
+            false
           );
         }
-        return result.deviceId!;
+      },
+      {
+        maxAttempts,
+        delays: this.DEVICE_WAIT_INTERVAL_MS,
+        shouldRetry: error => error instanceof DevicePoolError && error.isRetryable,
       }
+    );
 
-      // No device available - check if we should wait or fail
-      if (result.shouldWait) {
-        // Devices exist but are busy - wait and retry
-        if (attemptCount === 1) {
-          logger.info(
-            `All ${result.totalDevices} devices busy, ` +
-            `session ${sessionId} waiting for availability (timeout: ${this.DEVICE_WAIT_TIMEOUT_MS / 1000}s)...`
-          );
-        }
-        await this.timer.sleep(this.DEVICE_WAIT_INTERVAL_MS);
-      } else {
-        // No devices at all - fail immediately
-        const stats = this.getStatsForPlatform(platform);
-        throw new ActionableError(
-          `No devices in pool to assign to session ${sessionId}.\n` +
-          `Device pool status:\n` +
-          `  Total devices: ${stats.total}\n` +
-          `  Idle: ${stats.idle}\n` +
-          `  Assigned: ${stats.assigned}\n` +
-          `  Error: ${stats.error}\n\n` +
-          `Suggestions:\n` +
-          `  - Start an emulator or connect a physical device\n` +
-          `  - Check device pool status: auto-mobile --cli listDevices\n` +
-          `  - Verify device tooling is working for the selected platform`
-        );
+    if (!result.success) {
+      // Check if it was a non-retryable error (no devices)
+      if (result.error instanceof DevicePoolError && !result.error.isRetryable) {
+        throw new ActionableError(result.error.message);
       }
+      // Timeout case - all attempts exhausted
+      const stats = this.getStatsForPlatform(platform);
+      throw new ActionableError(
+        `Timed out waiting for device after ${Math.round(this.DEVICE_WAIT_TIMEOUT_MS / 1000)}s (${result.attempts} attempts).\n` +
+        `Session: ${sessionId}\n` +
+        `Device pool status:\n` +
+        `  Total devices: ${stats.total}\n` +
+        `  Idle: ${stats.idle}\n` +
+        `  Assigned: ${stats.assigned}\n` +
+        `  Error: ${stats.error}\n\n` +
+        `Suggestions:\n` +
+        `  - Reduce parallel test count to match available devices\n` +
+        `  - Start additional emulators or connect more physical devices\n` +
+        `  - Check if tests are properly releasing devices after completion`
+      );
     }
+
+    return result.value!;
   }
 
   /**

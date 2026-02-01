@@ -4,6 +4,7 @@ import { DevicePool } from "../../../src/daemon/devicePool";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../../fakes/FakeInstalledAppsRepository";
 import { BootedDevice } from "../../../src/models";
+import { DefaultRetryExecutor } from "../../../src/utils/retry/RetryExecutor";
 
 describe("Parallel Execution Across Multiple Devices", function() {
   let sessionManager: SessionManager;
@@ -20,7 +21,9 @@ describe("Parallel Execution Across Multiple Devices", function() {
     fakeTimer = new FakeTimer();
     sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
-    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
+    // Create a RetryExecutor that uses the fakeTimer so time advancement works correctly
+    const retryExecutor = new DefaultRetryExecutor(fakeTimer);
+    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, undefined, retryExecutor);
     await devicePool.initializeWithDevices([
       createBootedDevice("device-1"),
       createBootedDevice("device-2"),

@@ -57,6 +57,7 @@ import {
   WebSocketFactory,
   defaultWebSocketFactory,
 } from "../DeviceServiceClient";
+import { RetryExecutor, defaultRetryExecutor } from "../../../utils/retry/RetryExecutor";
 
 // Import delegates
 import { AccessibilityServiceGestures } from "./AccessibilityServiceGestures";
@@ -343,9 +344,10 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     adb: AdbExecutor,
     webSocketFactory?: WebSocketFactory,
     timer?: Timer,
-    installedAppsRepository?: InstalledAppsStore
+    installedAppsRepository?: InstalledAppsStore,
+    retryExecutor?: RetryExecutor
   ) {
-    super(timer ?? defaultTimer, webSocketFactory ?? defaultWebSocketFactory);
+    super(timer ?? defaultTimer, webSocketFactory ?? defaultWebSocketFactory, {}, retryExecutor ?? defaultRetryExecutor);
     this.device = device;
     this.adb = adb;
     this.installedAppsRepository = installedAppsRepository ?? null;
@@ -388,9 +390,10 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     adb: AdbClient,
     webSocketFactory: (url: string) => WebSocket,
     timer?: Timer,
-    installedAppsRepository?: InstalledAppsStore
+    installedAppsRepository?: InstalledAppsStore,
+    retryExecutor?: RetryExecutor
   ): AccessibilityServiceClient {
-    return new AccessibilityServiceClient(device, adb, webSocketFactory, timer, installedAppsRepository);
+    return new AccessibilityServiceClient(device, adb, webSocketFactory, timer, installedAppsRepository, retryExecutor);
   }
 
   // ===========================================================================
@@ -865,30 +868,35 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   }
 
   async verifyServiceReady(maxAttempts: number = 5, delayMs: number = 500, timeoutMs: number = 3000): Promise<boolean> {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
+    const result = await this.retryExecutor.execute(
+      async attempt => {
         logger.info(`[ACCESSIBILITY_SERVICE] Verifying service ready (attempt ${attempt}/${maxAttempts})`);
 
-        const result = await this.requestHierarchySync(new NoOpPerformanceTracker(), false, undefined, timeoutMs);
+        const hierarchyResult = await this.requestHierarchySync(new NoOpPerformanceTracker(), false, undefined, timeoutMs);
 
-        if (result && result.hierarchy) {
+        if (hierarchyResult && hierarchyResult.hierarchy) {
           logger.info(`[ACCESSIBILITY_SERVICE] Service verified ready after ${attempt} attempt(s)`);
           return true;
         }
 
-        logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} returned no hierarchy`);
-      } catch (error) {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Verification attempt ${attempt} returned no hierarchy`);
+      },
+      {
+        maxAttempts,
+        delays: delayMs,
+        onRetry: (error, attempt) => {
+          logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} failed: ${error.message}`);
+          logger.debug(`[ACCESSIBILITY_SERVICE] Waiting ${delayMs}ms before next verification attempt`);
+        },
       }
+    );
 
-      if (attempt < maxAttempts) {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting ${delayMs}ms before next verification attempt`);
-        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
-      }
+    if (!result.success) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Service not ready after ${maxAttempts} verification attempts`);
+      return false;
     }
 
-    logger.warn(`[ACCESSIBILITY_SERVICE] Service not ready after ${maxAttempts} verification attempts`);
-    return false;
+    return result.value ?? false;
   }
 
   // ===========================================================================
