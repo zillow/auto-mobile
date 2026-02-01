@@ -7,17 +7,18 @@ import {
   createSuccessWebSocketFactory,
   WebSocketState
 } from "../../fakes/FakeWebSocket";
-import { defaultTimer } from "../../../src/utils/SystemTimer";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("XCTestServiceClient", function() {
   let xcTestServiceClient: XCTestServiceClient;
   let testDevice: BootedDevice;
-  let fakeTimer = defaultTimer;
+  let fakeTimer: FakeTimer;
   const serverPort: number = 8765;
 
   beforeEach(function() {
-    // Create fake timer
-    fakeTimer = defaultTimer;
+    // Create fake timer with auto-advance for fast tests
+    fakeTimer = new FakeTimer();
+    fakeTimer.enableAutoAdvance();
 
     // Create test device (iOS simulator format)
     testDevice = {
@@ -53,7 +54,7 @@ describe("XCTestServiceClient", function() {
     }
   }
 
-  const createCapturingWebSocketFactory = (timer?: FakeTimer): {
+  const createCapturingWebSocketFactory = (timer?: FakeTimer | undefined): {
     factory: (url: string) => CapturingWebSocket;
     getSocket: () => CapturingWebSocket | null;
   } => {
@@ -130,7 +131,7 @@ describe("XCTestServiceClient", function() {
       };
 
       // Use delayed mode with 1ms for fast execution
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -174,7 +175,7 @@ describe("XCTestServiceClient", function() {
     });
 
     test("should return null hierarchy when not connected", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const testClient = XCTestServiceClient.createForTesting(
         testDevice,
@@ -196,7 +197,7 @@ describe("XCTestServiceClient", function() {
 
   describe("requestSwipe", function() {
     test("should send swipe request and return result", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -239,7 +240,7 @@ describe("XCTestServiceClient", function() {
     });
 
     test("should return error when not connected", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const testClient = XCTestServiceClient.createForTesting(
         testDevice,
@@ -261,7 +262,7 @@ describe("XCTestServiceClient", function() {
 
   describe("requestTapCoordinates", function() {
     test("should send tap request and return result", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -301,7 +302,7 @@ describe("XCTestServiceClient", function() {
 
   describe("requestSetText", function() {
     test("should send setText request and return result", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -340,7 +341,7 @@ describe("XCTestServiceClient", function() {
 
   describe("requestScreenshot", function() {
     test("should send screenshot request and return base64 data", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -381,7 +382,7 @@ describe("XCTestServiceClient", function() {
 
   describe("requestImeAction", function() {
     test("should send imeAction request and return result", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -421,7 +422,7 @@ describe("XCTestServiceClient", function() {
 
   describe("requestLaunchApp", function() {
     test("should send launch app request and return result", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -460,7 +461,7 @@ describe("XCTestServiceClient", function() {
 
   describe("connection management", function() {
     test("isConnected should return true when WebSocket is open", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -485,7 +486,7 @@ describe("XCTestServiceClient", function() {
     });
 
     test("isConnected should return false after close", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -508,7 +509,7 @@ describe("XCTestServiceClient", function() {
 
   describe("caching", function() {
     test("hasCachedHierarchy should return true after receiving hierarchy", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -544,7 +545,7 @@ describe("XCTestServiceClient", function() {
     });
 
     test("invalidateCache should mark cache as not fresh", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
 
       const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = XCTestServiceClient.createForTesting(
@@ -587,7 +588,7 @@ describe("XCTestServiceClient", function() {
 
   describe("convertToViewHierarchyResult", function() {
     test("should convert XCTestHierarchy to ViewHierarchyResult format", async function() {
-      const testTimer = defaultTimer;
+      const testTimer = fakeTimer;
       const testClient = XCTestServiceClient.createForTesting(
         testDevice,
         serverPort,

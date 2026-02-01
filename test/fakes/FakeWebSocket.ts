@@ -28,10 +28,20 @@ export class FakeWebSocket extends EventEmitter {
     this.connectTimeoutMs = connectTimeoutMs;
     this.timer = timer;
 
-    // Schedule connection attempt immediately (use setImmediate for 0-delay to work with FakeTimer)
-    setImmediate(() => {
-      this.handleConnection();
-    });
+    // For success mode with no delay, emit open synchronously after constructor returns
+    // This ensures the "open" event fires before any FakeTimer.setTimeout with autoAdvance
+    // can schedule its timeout callback via setImmediate
+    if (this.failureMode === "none" && this.connectTimeoutMs === 0) {
+      // Use queueMicrotask to emit after constructor returns but before setImmediate callbacks
+      queueMicrotask(() => {
+        this.handleConnection();
+      });
+    } else {
+      // For failure modes or delayed connections, use setImmediate
+      setImmediate(() => {
+        this.handleConnection();
+      });
+    }
   }
 
   private handleConnection(): void {
