@@ -11,7 +11,7 @@ import { ViewHierarchyResult } from "../../models";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
-import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
+import { screenshotUtilsAdapter } from "../../utils/ScreenshotUtilsAdapter";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ViewHierarchyQueryOptions, HierarchySource } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
@@ -144,13 +144,13 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     // Try to find a cached screenshot that matches with fuzzy comparison
     logger.debug(`Performing fuzzy matching against ${ViewHierarchy.viewHierarchyCache.size} cached entries (tolerance: ${DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT}%)`);
 
-    const screenshotFiles = await ScreenshotUtils.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
+    const screenshotFiles = await screenshotUtilsAdapter.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
     if (screenshotFiles.length === 0) {
       logger.debug("No screenshot files found for fuzzy comparison");
       return null;
     }
 
-    const similarResult = await ScreenshotUtils.findSimilarScreenshots(
+    const similarResult = await screenshotUtilsAdapter.findSimilarScreenshots(
       targetBuffer,
       ViewHierarchy.screenshotCacheDir,
       DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
@@ -159,7 +159,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
     if (similarResult.matchFound) {
       // Extract hash from the similar screenshot filename
-      const hash = ScreenshotUtils.extractHashFromFilename(similarResult.filePath);
+      const hash = screenshotUtilsAdapter.extractHashFromFilename(similarResult.filePath);
       if (hash) {
         const cachedEntry = ViewHierarchy.viewHierarchyCache.get(hash);
         if (cachedEntry) {
@@ -189,7 +189,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
     const cacheTtl = ViewHierarchy.CACHE_TTL_MS;
 
-    const similarResult = await ScreenshotUtils.findSimilarScreenshots(
+    const similarResult = await screenshotUtilsAdapter.findSimilarScreenshots(
       targetBuffer,
       ViewHierarchy.screenshotCacheDir,
       DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
@@ -202,7 +202,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     }
 
     // Extract hash from the matched screenshot
-    const hash = ScreenshotUtils.extractHashFromFilename(similarResult.filePath);
+    const hash = screenshotUtilsAdapter.extractHashFromFilename(similarResult.filePath);
     if (!hash) {
       logger.warn(`Could not extract hash from matched file: ${similarResult.filePath}`);
       return null;
@@ -895,7 +895,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
     try {
       // Get list of recent screenshots (up to limit, sorted by modification time)
-      const screenshotFiles = await ScreenshotUtils.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
+      const screenshotFiles = await screenshotUtilsAdapter.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
       if (screenshotFiles.length === 0) {
         logger.debug("No recent screenshots found for fuzzy comparison");
         return null;
@@ -915,7 +915,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
       // Pre-filter: Find files that have cached view hierarchy data (parallel check)
       const filesWithCachePromises = recentFiles.map(async ({ filePath }) => {
-        const hash = ScreenshotUtils.extractHashFromFilename(filePath);
+        const hash = screenshotUtilsAdapter.extractHashFromFilename(filePath);
         if (!hash) {return null;}
 
         const cachedResult = await this.checkCacheHierarchy(hash);
@@ -934,7 +934,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
       // Use optimized batch comparison for even better performance
       const filePaths = filesWithCache.map(item => item.filePath);
-      const batchComparisonResults = await ScreenshotUtils.optimizedBatchCompareScreenshots(
+      const batchComparisonResults = await screenshotUtilsAdapter.optimizedBatchCompareScreenshots(
         targetBuffer,
         filePaths,
         DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
