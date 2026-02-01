@@ -20,11 +20,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,8 +42,11 @@ import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.time.Clock
 import dev.jasonpearson.automobile.ide.time.SystemClock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
+import kotlin.math.min
 
 /**
  * Main Failures dashboard showing crashes, ANRs, and tool call failures
@@ -51,13 +56,22 @@ fun FailuresDashboard(
     onNavigateToScreen: (String) -> Unit = {},
     onNavigateToTest: (String) -> Unit = {},
     onNavigateToSource: (fileName: String, lineNumber: Int) -> Unit = { _, _ -> },
+    onNewFailureNotification: ((FailureNotification) -> Unit)? = null,
     clientProvider: (() -> AutoMobileClient)? = null,
+    streamingDataSource: StreamingFailuresDataSourceInterface? = null,
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
 
     // Retry counter - incrementing triggers LaunchedEffect to reload
     var retryCounter by remember { mutableIntStateOf(0) }
+
+    // For fake mode: track the FakeFailuresDataSource for trigger button
+    // Key by dataSourceMode so it's recreated when mode toggles
+    val fakeDataSource = remember(dataSourceMode) {
+        if (dataSourceMode == DataSourceMode.Fake) FakeFailuresDataSource() else null
+    }
 
     // Create data sources
     val mockDataSource = remember { MockFailuresDataSource() }
@@ -67,9 +81,15 @@ fun FailuresDashboard(
     val emptyDataSource = remember { EmptyFailuresDataSource() }
 
     val currentDataSource: FailuresDataSource = when {
-        dataSourceMode == DataSourceMode.Fake -> mockDataSource
+        dataSourceMode == DataSourceMode.Fake -> fakeDataSource ?: mockDataSource
         mcpDataSource != null -> mcpDataSource
         else -> emptyDataSource  // Show empty data in Real mode when MCP not available
+    }
+
+    // Determine streaming source (fake or provided)
+    val activeStreamingSource: StreamingFailuresDataSourceInterface? = when {
+        dataSourceMode == DataSourceMode.Fake -> fakeDataSource
+        else -> streamingDataSource
     }
 
     // Data state
@@ -79,6 +99,10 @@ fun FailuresDashboard(
 
     var selectedFailure by remember { mutableStateOf<FailureGroup?>(null) }
     var filterType by remember { mutableStateOf<FailureType?>(null) }
+
+    // Streaming state
+    var streamingError by remember { mutableStateOf<String?>(null) }
+    var reconnectAttempt by remember { mutableIntStateOf(0) }
 
     // Load data when data source changes or retry is triggered
     LaunchedEffect(currentDataSource, dataSourceMode, retryCounter) {
@@ -92,6 +116,54 @@ fun FailuresDashboard(
             is DataSourceResult.Error -> {
                 errorMessage = result.message
                 isLoading = false
+            }
+        }
+    }
+
+    // Real-time notifications via streaming (with automatic reconnection)
+    LaunchedEffect(activeStreamingSource, reconnectAttempt) {
+        if (activeStreamingSource == null) return@LaunchedEffect
+
+        try {
+            streamingError = null
+            activeStreamingSource.notificationsFlow().collect { result ->
+                when (result) {
+                    is DataSourceResult.Success -> {
+                        // Reset reconnect attempt on success
+                        reconnectAttempt = 0
+                        streamingError = null
+
+                        // Process each new notification
+                        result.data.forEach { notification ->
+                            onNewFailureNotification?.invoke(notification)
+                        }
+                    }
+                    is DataSourceResult.Error -> {
+                        streamingError = result.message
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            streamingError = e.message
+            // Exponential backoff for reconnection
+            val backoffMs = min(1000L * (1 shl reconnectAttempt), 30000L)
+            delay(backoffMs)
+            reconnectAttempt++
+        }
+    }
+
+    // Real-time failure groups updates via streaming
+    LaunchedEffect(activeStreamingSource) {
+        if (activeStreamingSource == null) return@LaunchedEffect
+
+        activeStreamingSource.failureGroupsFlow().collect { result ->
+            when (result) {
+                is DataSourceResult.Success -> {
+                    failureGroups = result.data.groups
+                }
+                is DataSourceResult.Error -> {
+                    // Don't override main error, streaming updates are supplementary
+                }
             }
         }
     }
@@ -113,9 +185,16 @@ fun FailuresDashboard(
                 onFailureSelected = { selectedFailure = it },
                 isLoading = isLoading,
                 errorMessage = errorMessage,
+                streamingError = streamingError,
                 onRetry = { retryCounter++ },
                 dataSource = currentDataSource,
                 dataSourceMode = dataSourceMode,
+                fakeDataSource = fakeDataSource,
+                onTriggerFakeFailure = {
+                    scope.launch {
+                        fakeDataSource?.triggerNewFailure()
+                    }
+                },
             )
         }
     }
@@ -167,9 +246,12 @@ private fun FailureListView(
     onFailureSelected: (FailureGroup) -> Unit,
     isLoading: Boolean,
     errorMessage: String?,
+    streamingError: String?,
     onRetry: () -> Unit,
     dataSource: FailuresDataSource,
     dataSourceMode: DataSourceMode,
+    fakeDataSource: FakeFailuresDataSource?,
+    onTriggerFakeFailure: () -> Unit,
 ) {
     val colors = JewelTheme.globalColors
     val filteredFailures = if (filterType != null) {
@@ -288,6 +370,84 @@ private fun FailureListView(
         }
 
         Spacer(Modifier.height(16.dp))
+
+        // Fake mode: Trigger failure button
+        if (dataSourceMode == DataSourceMode.Fake && fakeDataSource != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF4CAF50).copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
+                    Text(
+                        "Fake Mode",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF4CAF50),
+                    )
+                    Text(
+                        "Trigger test failures to see real-time notifications",
+                        fontSize = 10.sp,
+                        color = colors.text.normal.copy(alpha = 0.6f),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF4CAF50), RoundedCornerShape(6.dp))
+                        .clickable(onClick = onTriggerFakeFailure)
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        "Trigger Failure",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Streaming error banner (non-fatal, shown as warning)
+        if (streamingError != null && errorMessage == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFF9800).copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Streaming updates unavailable",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFF9800),
+                        )
+                        Text(
+                            streamingError,
+                            fontSize = 10.sp,
+                            color = colors.text.normal.copy(alpha = 0.6f),
+                        )
+                    }
+                    Text(
+                        "Reconnecting...",
+                        fontSize = 11.sp,
+                        color = Color(0xFFFF9800).copy(alpha = 0.7f),
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
 
         // Error banner
         if (errorMessage != null) {

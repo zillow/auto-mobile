@@ -63,7 +63,9 @@ import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
 import dev.jasonpearson.automobile.ide.datasource.InstalledApp
 import dev.jasonpearson.automobile.ide.datasource.Result
+import dev.jasonpearson.automobile.ide.failures.FailureNotification
 import dev.jasonpearson.automobile.ide.failures.FailuresDashboard
+import dev.jasonpearson.automobile.ide.failures.StreamingFailuresDataSource
 import dev.jasonpearson.automobile.ide.mcp.McpProcess
 import dev.jasonpearson.automobile.ide.mcp.McpConnectionType
 import dev.jasonpearson.automobile.ide.mcp.FakeMcpProcessDetector
@@ -238,6 +240,12 @@ fun AutoMobileToolWindowContent() {
   // Observation stream client for real-time hierarchy/screenshot updates
   // Created once and shared across the app lifecycle
   val observationStreamClient = remember { ObservationStreamClient() }
+
+  // Streaming failures data source for real-time failure notifications
+  // Only created in Real mode since Fake mode creates its own FakeFailuresDataSource
+  val streamingFailuresDataSource = remember(dataSourceMode) {
+      if (dataSourceMode == DataSourceMode.Real) StreamingFailuresDataSource() else null
+  }
 
   // Connect/disconnect observation stream based on active device
   // Include client in keys to ensure reconnection after hot-reload creates a new instance
@@ -507,8 +515,21 @@ fun AutoMobileToolWindowContent() {
                   // TODO: Use OpenFileDescriptor to navigate to source
                   // FileEditorManager.getInstance(project).openFile(virtualFile, true)
               },
+              onNewFailureNotification = { notification ->
+                  val typeLabel = when (notification.type) {
+                      dev.jasonpearson.automobile.ide.failures.FailureType.Crash -> "Crash"
+                      dev.jasonpearson.automobile.ide.failures.FailureType.ANR -> "ANR"
+                      dev.jasonpearson.automobile.ide.failures.FailureType.ToolCallFailure -> "Tool Failure"
+                  }
+                  showNotification(
+                      "New $typeLabel Detected",
+                      notification.title,
+                      NotificationType.WARNING,
+                  )
+              },
               dataSourceMode = dataSourceMode,
               clientProvider = clientProvider,
+              streamingDataSource = streamingFailuresDataSource,
           )
         }
       }
