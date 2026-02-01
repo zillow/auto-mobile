@@ -30,6 +30,7 @@ import { startPerformanceStreamSocketServer, stopPerformanceStreamSocketServer }
 import { startPerformancePushSocketServer, stopPerformancePushSocketServer } from "./performancePushSocketServer";
 import { startDeviceDataStreamSocketServer, stopDeviceDataStreamSocketServer, getDeviceDataStreamServer } from "./deviceDataStreamSocketServer";
 import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
+import { startFailuresPushSocketServer, stopFailuresPushSocketServer } from "./failuresPushSocketServer";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
@@ -137,6 +138,7 @@ export class Daemon {
     await startPerformancePushSocketServer();
     await startDeviceDataStreamSocketServer();
     await startFailuresStreamSocketServer();
+    await startFailuresPushSocketServer();
 
     // Wire up callback to establish WebSocket connections when IDE plugins subscribe
     this.setupDeviceDataStreamCallback();
@@ -926,6 +928,7 @@ export class Daemon {
     await stopPerformancePushSocketServer();
     await stopDeviceDataStreamSocketServer();
     await stopFailuresStreamSocketServer();
+    await stopFailuresPushSocketServer();
     stopAppearanceSyncScheduler();
 
     // Close all active HTTP sessions

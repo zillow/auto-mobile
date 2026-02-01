@@ -11,7 +11,7 @@ const failureAnalyticsRepository = new FailureAnalyticsRepository();
 
 // Type definitions matching IDE plugin models
 
-export type FailureType = "crash" | "anr" | "tool_failure";
+export type FailureType = "crash" | "anr" | "tool_failure" | "nonfatal";
 export type FailureSeverity = "critical" | "high" | "medium" | "low";
 export type CaptureType = "screenshot" | "video";
 
@@ -112,12 +112,14 @@ export interface TimelineDataPoint {
   crashes: number;
   anrs: number;
   toolFailures: number;
+  nonfatals: number;
 }
 
 export interface PeriodTotals {
   crashes: number;
   anrs: number;
   toolFailures: number;
+  nonfatals: number;
 }
 
 export interface TimelineResponse {

@@ -52,6 +52,7 @@ object SdkEventSerializer {
     const val HANDLED_EXCEPTION = "handled_exception"
     const val NOTIFICATION_ACTION = "notification_action"
     const val RECOMPOSITION_SNAPSHOT = "recomposition_snapshot"
+    const val CRASH = "crash"
   }
 
   /**
@@ -110,6 +111,7 @@ object SdkEventSerializer {
       is SdkHandledExceptionEvent -> EventTypes.HANDLED_EXCEPTION
       is SdkNotificationActionEvent -> EventTypes.NOTIFICATION_ACTION
       is SdkRecompositionSnapshotEvent -> EventTypes.RECOMPOSITION_SNAPSHOT
+      is SdkCrashEvent -> EventTypes.CRASH
     }
   }
 
@@ -155,5 +157,15 @@ object SdkEventSerializer {
    */
   fun recompositionSnapshotEventFromJson(jsonString: String): SdkRecompositionSnapshotEvent? {
     return fromJson(jsonString) as? SdkRecompositionSnapshotEvent
+  }
+
+  /**
+   * Deserialize a SdkCrashEvent from JSON string.
+   *
+   * @param jsonString The JSON string to deserialize
+   * @return The crash event, or null if parsing fails or not a crash event
+   */
+  fun crashEventFromJson(jsonString: String): SdkCrashEvent? {
+    return fromJson(jsonString) as? SdkCrashEvent
   }
 }

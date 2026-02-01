@@ -130,3 +130,32 @@ data class SdkRecompositionSnapshotEvent(
   /** JSON string containing the recomposition tracking data */
   val snapshotJson: String,
 ) : SdkEvent()
+
+// =============================================================================
+// Crash Events
+// =============================================================================
+
+/**
+ * Represents an unhandled crash detected by the SDK's UncaughtExceptionHandler.
+ * This is a fatal crash that will terminate the app.
+ */
+@Serializable
+@SerialName("crash")
+data class SdkCrashEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Fully qualified class name of the exception (e.g., "java.lang.NullPointerException") */
+  val exceptionClass: String,
+  /** Exception message, if any */
+  val exceptionMessage: String?,
+  /** Full stack trace as a string */
+  val stackTrace: String,
+  /** Thread name where the crash occurred */
+  val threadName: String,
+  /** Current screen/destination at the time of the crash */
+  val currentScreen: String? = null,
+  /** Application version name, if available */
+  val appVersion: String? = null,
+  /** Device information */
+  val deviceInfo: SdkDeviceInfo? = null,
+) : SdkEvent()

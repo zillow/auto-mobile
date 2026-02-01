@@ -35,15 +35,19 @@ import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.TimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.storage.StorageSubscriptionManager
+import dev.jasonpearson.automobile.protocol.CrashData
+import dev.jasonpearson.automobile.protocol.CrashEvent
 import dev.jasonpearson.automobile.protocol.DeviceInfo
 import dev.jasonpearson.automobile.protocol.HandledExceptionData
 import dev.jasonpearson.automobile.protocol.HandledExceptionEvent
 import dev.jasonpearson.automobile.protocol.NavigationEventData
 import dev.jasonpearson.automobile.protocol.NavigationEventResponse
+import dev.jasonpearson.automobile.protocol.SdkCrashEvent
 import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkHandledExceptionEvent
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
+import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -350,6 +354,87 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
       }
 
+  private val crashReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          if (intent == null || intent.action != AutoMobileCrashes.ACTION_CRASH) {
+            return
+          }
+
+          try {
+            // Try type-safe deserialization first (new protocol)
+            val eventJson = intent.getStringExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON)
+            if (eventJson != null) {
+              val event = SdkEventSerializer.crashEventFromJson(eventJson)
+              if (event != null) {
+                Log.d(TAG, "Received crash (protocol): ${event.exceptionClass} from ${event.applicationId}")
+
+                serviceScope.launch {
+                  broadcastCrashEvent(
+                      timestamp = event.timestamp,
+                      exceptionClass = event.exceptionClass,
+                      exceptionMessage = event.exceptionMessage,
+                      stackTrace = event.stackTrace,
+                      threadName = event.threadName,
+                      currentScreen = event.currentScreen,
+                      packageName = event.applicationId ?: "unknown",
+                      appVersion = event.appVersion,
+                      deviceModel = event.deviceInfo?.model ?: "unknown",
+                      deviceManufacturer = event.deviceInfo?.manufacturer ?: "unknown",
+                      osVersion = event.deviceInfo?.osVersion ?: "unknown",
+                      sdkInt = event.deviceInfo?.sdkInt ?: 0,
+                  )
+                }
+                return
+              }
+            }
+
+            // Fallback to legacy extras for backward compatibility
+            val timestamp = intent.getLongExtra(AutoMobileCrashes.EXTRA_TIMESTAMP, 0L)
+            val exceptionClass =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_EXCEPTION_CLASS) ?: return
+            val exceptionMessage =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_EXCEPTION_MESSAGE)
+            val stackTrace =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_STACK_TRACE) ?: return
+            val threadName =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_THREAD_NAME) ?: "unknown"
+            val currentScreen = intent.getStringExtra(AutoMobileCrashes.EXTRA_CURRENT_SCREEN)
+            val packageName =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_PACKAGE_NAME) ?: return
+            val appVersion = intent.getStringExtra(AutoMobileCrashes.EXTRA_APP_VERSION)
+            val deviceModel =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_DEVICE_MODEL) ?: "unknown"
+            val deviceManufacturer =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_DEVICE_MANUFACTURER) ?: "unknown"
+            val osVersion =
+                intent.getStringExtra(AutoMobileCrashes.EXTRA_OS_VERSION) ?: "unknown"
+            val sdkInt = intent.getIntExtra(AutoMobileCrashes.EXTRA_SDK_INT, 0)
+
+            Log.d(TAG, "Received crash (legacy): $exceptionClass from $packageName")
+
+            serviceScope.launch {
+              broadcastCrashEvent(
+                  timestamp = timestamp,
+                  exceptionClass = exceptionClass,
+                  exceptionMessage = exceptionMessage,
+                  stackTrace = stackTrace,
+                  threadName = threadName,
+                  currentScreen = currentScreen,
+                  packageName = packageName,
+                  appVersion = appVersion,
+                  deviceModel = deviceModel,
+                  deviceManufacturer = deviceManufacturer,
+                  osVersion = osVersion,
+                  sdkInt = sdkInt,
+              )
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Error handling crash broadcast", e)
+          }
+        }
+      }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
@@ -422,6 +507,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         registerReceiver(handledExceptionReceiver, handledExceptionFilter)
       }
       Log.d(TAG, "Handled exception receiver registered")
+
+      // Register broadcast receiver for crashes from SDK
+      val crashFilter =
+          IntentFilter().apply { addAction(AutoMobileCrashes.ACTION_CRASH) }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(crashReceiver, crashFilter, RECEIVER_EXPORTED)
+      } else {
+        @SuppressLint("UnspecifiedRegisterReceiverFlag")
+        registerReceiver(crashReceiver, crashFilter)
+      }
+      Log.d(TAG, "Crash receiver registered")
 
       // Initialize the navigation event accumulator
       navigationEventAccumulator.initialize()
@@ -636,6 +733,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       unregisterReceiver(handledExceptionReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering handled exception receiver", e)
+    }
+
+    try {
+      unregisterReceiver(crashReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering crash receiver", e)
     }
 
     if (::overlayDrawer.isInitialized) {
@@ -3533,6 +3636,56 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting handled exception event", e)
+    }
+  }
+
+  /** Broadcast crash event to WebSocket clients using typed protocol */
+  private suspend fun broadcastCrashEvent(
+      timestamp: Long,
+      exceptionClass: String,
+      exceptionMessage: String?,
+      stackTrace: String,
+      threadName: String,
+      currentScreen: String?,
+      packageName: String,
+      appVersion: String?,
+      deviceModel: String,
+      deviceManufacturer: String,
+      osVersion: String,
+      sdkInt: Int,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping crash broadcast")
+      return
+    }
+
+    try {
+      val response = CrashEvent(
+        timestamp = System.currentTimeMillis(),
+        event = CrashData(
+          exceptionClass = exceptionClass,
+          message = exceptionMessage,
+          stackTrace = stackTrace,
+          threadName = threadName,
+          currentScreen = currentScreen,
+          packageName = packageName,
+          appVersion = appVersion,
+          deviceInfo = DeviceInfo(
+            model = deviceModel,
+            manufacturer = deviceManufacturer,
+            osVersion = osVersion,
+            sdkInt = sdkInt,
+          ),
+        ),
+      )
+
+      webSocketServer.broadcast(response)
+      Log.i(
+          TAG,
+          "Broadcasted crash to ${webSocketServer.getConnectionCount()} clients: $exceptionClass on thread $threadName",
+      )
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting crash event", e)
     }
   }
 

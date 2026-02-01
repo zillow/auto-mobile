@@ -117,6 +117,26 @@ data class StorageChangedEvent(
   val data: String, // JSON string of preferences
 ) : WebSocketResponse()
 
+@Serializable
+@SerialName("crash_event")
+data class CrashEvent(
+  override val timestamp: Long,
+  val event: CrashData,
+) : WebSocketResponse()
+
+@Serializable
+data class CrashData(
+  val exceptionClass: String,
+  val message: String?,
+  val stackTrace: String,
+  val threadName: String,
+  val currentScreen: String? = null,
+  val packageName: String? = null,
+  val appVersion: String? = null,
+  val deviceInfo: DeviceInfo? = null,
+  val applicationId: String? = null,
+)
+
 // =============================================================================
 // Screenshot Results
 // =============================================================================

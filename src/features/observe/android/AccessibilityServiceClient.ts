@@ -159,6 +159,26 @@ interface HandledExceptionEvent {
 }
 
 /**
+ * Interface for crash event from SDK
+ */
+interface CrashEvent {
+  timestamp: number;
+  exceptionClass: string;
+  message?: string;
+  stackTrace: string;
+  threadName: string;
+  currentScreen?: string;
+  packageName: string;
+  appVersion?: string;
+  deviceInfo: {
+    model: string;
+    manufacturer: string;
+    osVersion: string;
+    sdkInt: number;
+  };
+}
+
+/**
  * Interface for WebSocket message from accessibility service
  */
 interface WebSocketMessage {
@@ -336,6 +356,9 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
   // Work profile monitor for polling profiles without accessibility service
   private workProfileMonitor: WorkProfileMonitor | null = null;
+
+  // Track foreground package for crash monitoring
+  private lastForegroundPackage: string | null = null;
 
   // Logging tag for base class
   protected readonly logTag = "ACCESSIBILITY_SERVICE";
@@ -1305,6 +1328,14 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         }
       }
 
+      if (message.type === "crash_event") {
+        const crashMessage = message as any;
+        const event = crashMessage.event as CrashEvent | undefined;
+        if (event) {
+          await this.handleCrashEvent(event);
+        }
+      }
+
       // Handle storage_changed push event
       if (message.type === "storage_changed") {
         const storageMessage = message as any;
@@ -1353,6 +1384,11 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
     // Start screenshot backoff
     this.startScreenshotBackoff();
+
+    // Track foreground package for context
+    if (data.packageName && data.packageName !== this.lastForegroundPackage) {
+      this.lastForegroundPackage = data.packageName;
+    }
 
     // Notify hierarchy navigation detector
     if (!data.hierarchy) {
@@ -1591,10 +1627,11 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         }
       }
 
-      const crashInput = {
+      const nonFatalInput = {
         exceptionType: event.exceptionClass,
-        exceptionMessage: event.exceptionMessage ?? event.customMessage ?? "Handled exception",
+        exceptionMessage: event.exceptionMessage ?? "Handled exception",
         stackTrace: stackTraceElements,
+        customMessage: event.customMessage,
         deviceId: this.device.deviceId,
         deviceModel: event.deviceInfo.model,
         os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
@@ -1603,10 +1640,47 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         currentScreen,
       };
 
-      const occurrenceId = await failureRecorder.recordCrash(crashInput);
-      logger.info(`[ACCESSIBILITY_SERVICE] Recorded handled exception as crash: ${occurrenceId}`);
+      const occurrenceId = await failureRecorder.recordNonFatal(nonFatalInput);
+      logger.info(`[ACCESSIBILITY_SERVICE] Recorded non-fatal exception: ${occurrenceId}`);
     } catch (error) {
       logger.error(`[ACCESSIBILITY_SERVICE] Failed to record handled exception: ${error}`);
+    }
+  }
+
+  private async handleCrashEvent(event: CrashEvent): Promise<void> {
+    logger.info(`[ACCESSIBILITY_SERVICE] Received crash: ${event.exceptionClass} on thread ${event.threadName} from ${event.packageName}`);
+
+    try {
+      const failureRecorder = getFailureRecorder();
+      const stackTraceElements = this.parseStackTrace(event.stackTrace, event.packageName);
+
+      let currentScreen = event.currentScreen;
+      if (!currentScreen) {
+        try {
+          const navManager = NavigationGraphManager.getInstance();
+          currentScreen = navManager.getCurrentScreen() ?? undefined;
+        } catch {
+          // Continue without screen
+        }
+      }
+
+      const crashInput = {
+        exceptionType: event.exceptionClass,
+        exceptionMessage: event.message ?? "Application crashed",
+        stackTrace: stackTraceElements,
+        threadName: event.threadName,
+        deviceId: this.device.deviceId,
+        deviceModel: event.deviceInfo.model,
+        os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
+        appVersion: event.appVersion ?? "unknown",
+        sessionId: `crash-${event.packageName}-${Date.now()}`,
+        currentScreen,
+      };
+
+      const occurrenceId = await failureRecorder.recordCrash(crashInput);
+      logger.info(`[ACCESSIBILITY_SERVICE] Recorded crash: ${occurrenceId}`);
+    } catch (error) {
+      logger.error(`[ACCESSIBILITY_SERVICE] Failed to record crash: ${error}`);
     }
   }
 

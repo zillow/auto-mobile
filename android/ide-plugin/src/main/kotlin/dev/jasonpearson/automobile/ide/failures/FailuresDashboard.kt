@@ -39,10 +39,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
+import dev.jasonpearson.automobile.ide.daemon.FailuresPushSocketClient
+import dev.jasonpearson.automobile.ide.daemon.FailuresPushConnectionState
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.time.Clock
 import dev.jasonpearson.automobile.ide.time.SystemClock
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
@@ -103,6 +106,9 @@ fun FailuresDashboard(
     // Streaming state
     var streamingError by remember { mutableStateOf<String?>(null) }
     var reconnectAttempt by remember { mutableIntStateOf(0) }
+
+    // Push socket client for real-time updates
+    val pushClient = remember { FailuresPushSocketClient() }
 
     // Load data when data source changes or retry is triggered
     LaunchedEffect(currentDataSource, dataSourceMode, retryCounter) {
@@ -168,6 +174,39 @@ fun FailuresDashboard(
         }
     }
 
+    // Connect to push socket for real-time updates in real mode
+    LaunchedEffect(dataSourceMode) {
+        if (dataSourceMode == DataSourceMode.Real) {
+            pushClient.connect()
+        } else {
+            pushClient.disconnect()
+        }
+    }
+
+    // Listen for push notifications and refresh data
+    LaunchedEffect(pushClient, currentDataSource, dataSourceMode) {
+        if (dataSourceMode == DataSourceMode.Real) {
+            pushClient.failureNotifications.collectLatest {
+                // Refresh failure groups when we receive a push notification
+                when (val result = currentDataSource.getFailureGroups()) {
+                    is DataSourceResult.Success -> {
+                        failureGroups = result.data
+                    }
+                    is DataSourceResult.Error -> {
+                        // Don't overwrite error message on refresh failures
+                    }
+                }
+            }
+        }
+    }
+
+    // Cleanup on unmount
+    DisposableEffect(Unit) {
+        onDispose {
+            pushClient.disconnect()
+        }
+    }
+
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         if (selectedFailure != null) {
             FailureDetailView(
@@ -195,6 +234,7 @@ fun FailuresDashboard(
                         fakeDataSource?.triggerNewFailure()
                     }
                 },
+                pushClient = pushClient,
             )
         }
     }
@@ -252,6 +292,7 @@ private fun FailureListView(
     dataSourceMode: DataSourceMode,
     fakeDataSource: FakeFailuresDataSource?,
     onTriggerFakeFailure: () -> Unit,
+    pushClient: FailuresPushSocketClient? = null,
 ) {
     val colors = JewelTheme.globalColors
     val filteredFailures = if (filterType != null) {
@@ -287,6 +328,23 @@ private fun FailureListView(
             is DataSourceResult.Error -> {
                 timelineData = null
                 timelineLoading = false
+            }
+        }
+    }
+
+    // Refresh timeline when push notifications arrive (real mode only)
+    LaunchedEffect(pushClient, dataSource, dateRange, timeAggregation, dataSourceMode) {
+        if (dataSourceMode == DataSourceMode.Real && pushClient != null) {
+            pushClient.failureNotifications.collectLatest {
+                // Refresh timeline when we receive a push notification
+                when (val result = dataSource.getTimelineData(dateRange, timeAggregation)) {
+                    is DataSourceResult.Success -> {
+                        timelineData = result.data
+                    }
+                    is DataSourceResult.Error -> {
+                        // Don't clear timeline on refresh failures
+                    }
+                }
             }
         }
     }
@@ -670,6 +728,7 @@ private fun EventTrendsSection(
     val totalCrashes = data.dataPoints.sumOf { it.crashes }
     val totalAnrs = data.dataPoints.sumOf { it.anrs }
     val totalToolFailures = data.dataPoints.sumOf { it.toolFailures }
+    val totalNonfatals = data.dataPoints.sumOf { it.nonfatals }
 
     // Use previous period totals from data source
     val previousPeriodTotals = data.previousPeriodTotals
@@ -706,8 +765,13 @@ private fun EventTrendsSection(
                 color = FailureType.ToolCallFailure.color,
             )
             StatBox(
+                label = "Non-Fatal",
+                value = formatNumber(totalNonfatals),
+                color = FailureType.NonFatal.color,
+            )
+            StatBox(
                 label = "Total",
-                value = formatNumber(totalCrashes + totalAnrs + totalToolFailures),
+                value = formatNumber(totalCrashes + totalAnrs + totalToolFailures + totalNonfatals),
                 color = colors.text.normal,
             )
         }
@@ -752,21 +816,30 @@ private fun FailureBarChart(
                         ),
                     verticalArrangement = Arrangement.Bottom,
                 ) {
-                    // Stacked bar: crashes (red) + ANRs (orange) + tool failures (purple)
+                    // Stacked bar: crashes (red) + ANRs (orange) + tool failures (purple) + nonfatals (blue)
                     if (point.total > 0) {
                         val crashHeight = point.crashes.toFloat() / point.total * barHeight
                         val anrHeight = point.anrs.toFloat() / point.total * barHeight
                         val toolHeight = point.toolFailures.toFloat() / point.total * barHeight
+                        val nonfatalHeight = point.nonfatals.toFloat() / point.total * barHeight
 
+                        if (point.nonfatals > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height((chartHeight.value * nonfatalHeight).dp)
+                                    .background(
+                                        FailureType.NonFatal.color.copy(alpha = 0.8f),
+                                        RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp),
+                                    ),
+                            )
+                        }
                         if (point.toolFailures > 0) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height((chartHeight.value * toolHeight).dp)
-                                    .background(
-                                        FailureType.ToolCallFailure.color.copy(alpha = 0.8f),
-                                        RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp),
-                                    ),
+                                    .background(FailureType.ToolCallFailure.color.copy(alpha = 0.8f)),
                             )
                         }
                         if (point.anrs > 0) {

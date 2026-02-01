@@ -350,11 +350,11 @@ export class FailureAnalyticsRepository {
       .execute();
 
     // Create buckets
-    const buckets = new Map<number, { crashes: number; anrs: number; toolFailures: number }>();
+    const buckets = new Map<number, { crashes: number; anrs: number; toolFailures: number; nonfatals: number }>();
 
     for (const occ of occurrences) {
       const bucketStart = Math.floor(occ.timestamp / bucketMs) * bucketMs;
-      const bucket = buckets.get(bucketStart) ?? { crashes: 0, anrs: 0, toolFailures: 0 };
+      const bucket = buckets.get(bucketStart) ?? { crashes: 0, anrs: 0, toolFailures: 0, nonfatals: 0 };
 
       switch (occ.type) {
         case "crash":
@@ -365,6 +365,9 @@ export class FailureAnalyticsRepository {
           break;
         case "tool_failure":
           bucket.toolFailures++;
+          break;
+        case "nonfatal":
+          bucket.nonfatals++;
           break;
       }
 
@@ -381,6 +384,7 @@ export class FailureAnalyticsRepository {
         crashes: counts.crashes,
         anrs: counts.anrs,
         toolFailures: counts.toolFailures,
+        nonfatals: counts.nonfatals,
       });
     }
 
@@ -400,6 +404,7 @@ export class FailureAnalyticsRepository {
       crashes: previousOccurrences.filter(o => o.type === "crash").length,
       anrs: previousOccurrences.filter(o => o.type === "anr").length,
       toolFailures: previousOccurrences.filter(o => o.type === "tool_failure").length,
+      nonfatals: previousOccurrences.filter(o => o.type === "nonfatal").length,
     };
 
     return { dataPoints, previousPeriodTotals };
@@ -486,7 +491,7 @@ export class FailureAnalyticsRepository {
    */
   async getAggregatedGroups(query: FailuresStreamQuery): Promise<{
     groups: FailureGroup[];
-    totals: { crashes: number; anrs: number; toolFailures: number };
+    totals: { crashes: number; anrs: number; toolFailures: number; nonfatals: number };
   }> {
     const groups = await this.getFailureGroups({
       startTime: query.startTime,
@@ -499,6 +504,7 @@ export class FailureAnalyticsRepository {
       crashes: groups.filter(g => g.type === "crash").reduce((sum, g) => sum + g.totalCount, 0),
       anrs: groups.filter(g => g.type === "anr").reduce((sum, g) => sum + g.totalCount, 0),
       toolFailures: groups.filter(g => g.type === "tool_failure").reduce((sum, g) => sum + g.totalCount, 0),
+      nonfatals: groups.filter(g => g.type === "nonfatal").reduce((sum, g) => sum + g.totalCount, 0),
     };
 
     return { groups, totals };

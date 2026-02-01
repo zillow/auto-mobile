@@ -5,6 +5,7 @@ import android.content.Intent
 import dev.jasonpearson.automobile.protocol.NavigationSourceType
 import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
+import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
@@ -66,6 +67,7 @@ object AutoMobileSDK {
     DatabaseInspector.initialize(this.context!!)
     SharedPreferencesInspector.initialize(this.context!!)
     AutoMobileFailures.initialize(this.context!!)
+    AutoMobileCrashes.initialize(this.context!!)
   }
 
   /**

@@ -2,6 +2,7 @@ import type {
   RecordToolFailureInput,
   RecordCrashInput,
   RecordAnrInput,
+  RecordNonFatalInput,
 } from "../FailureRecorder";
 
 /**
@@ -30,4 +31,11 @@ export interface FailureRecorderService {
    * @returns The occurrence ID for the recorded failure
    */
   recordAnr(input: RecordAnrInput): Promise<string>;
+
+  /**
+   * Record a non-fatal (handled) exception.
+   * @param input - Details of the non-fatal error
+   * @returns The occurrence ID for the recorded failure
+   */
+  recordNonFatal(input: RecordNonFatalInput): Promise<string>;
 }
