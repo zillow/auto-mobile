@@ -11,6 +11,7 @@ import { ViewHierarchy } from "../../src/features/observe/ViewHierarchy";
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
 import { SharpImageUtils } from "../../src/utils/image-utils";
 import type { BootedDevice } from "../../src/models";
+import type { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbExecutor } from "../../test/fakes/FakeAdbExecutor";
 import { FakeAccessibilityDetector } from "../../test/fakes/FakeAccessibilityDetector";
 
@@ -34,7 +35,6 @@ export interface StressHarnessResources {
   viewHierarchy: ViewHierarchy;
   observeScreen: ObserveScreen;
   fixtureImagePaths: string[];
-  xmlSamples: string[];
 }
 
 export interface StressHarness {
@@ -42,13 +42,6 @@ export interface StressHarness {
   cleanup: () => Promise<void>;
   resources: StressHarnessResources;
 }
-
-const DEFAULT_XML_SAMPLE = [
-  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-  "<hierarchy>",
-  "  <node text=\"Sample\" resource-id=\"com.example:id/button\" clickable=\"true\" bounds=\"[0,0][100,100]\" />",
-  "</hierarchy>"
-].join("\n");
 
 const DUMPSYS_WINDOW_OUTPUT = [
   "mRotation=0",
@@ -253,7 +246,6 @@ function createFakeAdb(screenshotBase64: string): FakeAdbExecutor {
   fakeAdb.setCommandResponse("dumpsys window windows", { stdout: DUMPSYS_WINDOW_WINDOWS_OUTPUT, stderr: "" });
   fakeAdb.setCommandResponse("dumpsys window", { stdout: DUMPSYS_WINDOW_OUTPUT, stderr: "" });
   fakeAdb.setCommandResponse("dumpsys activity activities", { stdout: DUMPSYS_ACTIVITY_OUTPUT, stderr: "" });
-  fakeAdb.setCommandResponse("uiautomator dump", { stdout: DEFAULT_XML_SAMPLE, stderr: "" });
   fakeAdb.setCommandResponse("screencap -p", { stdout: screenshotBase64, stderr: "" });
   return fakeAdb;
 }
@@ -280,17 +272,9 @@ export async function createStressHarness(): Promise<StressHarness> {
   const originalGetInstance = AccessibilityServiceClient.getInstance;
   (AccessibilityServiceClient as unknown as { getInstance: () => unknown }).getInstance = () => fakeA11yClient;
 
-  const mockTakeScreenshot = {
-    async execute() {
-      return { success: true, path: fallbackImage };
-    }
-  };
-
   const viewHierarchy = new ViewHierarchy(
     device,
     fakeAdbFactory,
-    null,
-    mockTakeScreenshot as unknown as any,
     fakeA11yClient as unknown as any
   );
 
@@ -320,19 +304,13 @@ export async function createStressHarness(): Promise<StressHarness> {
 
   const inputText = new InputText(device, fakeAdb as unknown as any);
   const imageUtils = new SharpImageUtils();
-  const xmlSamples = [DEFAULT_XML_SAMPLE];
 
   let imageIndex = 0;
-  let xmlIndex = 0;
 
   const operations: Record<StressOperation, () => Promise<void>> = {
     observe: async () => {
       await observeScreen.execute();
-      const xml = xmlSamples[xmlIndex++ % xmlSamples.length];
-      await viewHierarchy.processXmlData(xml);
-      const screenshotPath = fixtureImages[imageIndex++ % fixtureImages.length] ?? fallbackImage;
-      await viewHierarchy.getOrCreateScreenshotBuffer(screenshotPath);
-      const buffer = imageBuffers[imageIndex % imageBuffers.length];
+      const buffer = imageBuffers[imageIndex++ % imageBuffers.length];
       await imageUtils.resize(buffer, 120);
     },
     tapOn: async () => {
@@ -376,8 +354,7 @@ export async function createStressHarness(): Promise<StressHarness> {
       device,
       viewHierarchy,
       observeScreen,
-      fixtureImagePaths: fixtureImages.length > 0 ? fixtureImages : [fallbackImage],
-      xmlSamples
+      fixtureImagePaths: fixtureImages.length > 0 ? fixtureImages : [fallbackImage]
     }
   };
 }

@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
-import { AdbClientFactory } from "../../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
-import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import fs from "fs-extra";
@@ -28,7 +26,6 @@ describe("ViewHierarchy", function() {
   describe("Unit Tests for Public Methods", function() {
     let viewHierarchy: ViewHierarchy;
     let fakeAdbFactory: FakeAdbClientFactory;
-    let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
 
@@ -41,10 +38,6 @@ describe("ViewHierarchy", function() {
       // Create fakes for testing
       fakeAdbFactory = new FakeAdbClientFactory();
 
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
       mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
         convertToViewHierarchyResult: () => ({ hierarchy: {} }),
@@ -52,7 +45,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdbFactory, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdbFactory, mockAccessibilityServiceClient);
       setupReadFileMock();
     });
 
@@ -93,39 +86,6 @@ describe("ViewHierarchy", function() {
       expect(viewHierarchy.meetsFilterCriteria(propsWithText)).toBe(true);
       expect(viewHierarchy.meetsFilterCriteria(propsClickable)).toBe(true);
       expect(viewHierarchy.meetsFilterCriteria(propsEmpty)).toBe(false);
-    });
-
-    test("should calculate screenshot hash correctly", function() {
-      const testBuffer = Buffer.from("test screenshot data");
-
-      const hash = viewHierarchy.calculateScreenshotHash(testBuffer);
-
-      expect(typeof hash).toBe("string");
-      expect(hash).toHaveLength(32); // MD5 hash length
-      expect(hash).toMatch(/^[a-f0-9]+$/); // Hex string
-    });
-
-    test("should validate XML data correctly", function() {
-      const validXml = '<?xml version="1.0"?><hierarchy><node text="test"/></hierarchy>';
-      const invalidXml = "";
-      const xmlWithoutHierarchy = '<?xml version="1.0"?><root><node text="test"/></root>';
-
-      expect(viewHierarchy.validateXmlData(validXml)).toBe(true);
-      expect(viewHierarchy.validateXmlData(invalidXml)).toBe(false);
-      expect(viewHierarchy.validateXmlData(xmlWithoutHierarchy)).toBe(false);
-    });
-
-    test("should extract XML from ADB output correctly", function() {
-      const tempFile = "/sdcard/window_dump.xml";
-      const xmlContent = '<?xml version="1.0"?><hierarchy><node text="test"/></hierarchy>';
-      const stdout = `UI hierchary dumped to:${tempFile}\n${xmlContent}`;
-
-      const result = viewHierarchy.extractXmlFromAdbOutput(stdout, tempFile);
-      expect(result).toBe(xmlContent);
-
-      // Should return original if no UI hierarchy message
-      const result2 = viewHierarchy.extractXmlFromAdbOutput(xmlContent, tempFile);
-      expect(result2).toBe(xmlContent);
     });
 
     test("should process node children correctly", function() {
@@ -207,287 +167,12 @@ describe("ViewHierarchy", function() {
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(2);
     });
-
-    test("should calculate filtering stats", function() {
-      const original = { large: "data".repeat(1000) };
-      const filtered = { small: "data" };
-
-      // Should not throw error
-      expect(() => {
-        viewHierarchy.calculateFilteringStats(original, filtered);
-      }).not.toThrow();
-    });
   });
 
-
-  describe("Cache Management Tests", function() {
-    let viewHierarchy: ViewHierarchy;
-    let fakeAdb: FakeAdbExecutor;
-    let fakeAdbFactory: AdbClientFactory;
-    let mockTakeScreenshot: TakeScreenshot;
-    let mockAccessibilityServiceClient: AccessibilityServiceClient;
-    let mockDevice: BootedDevice;
-
-    beforeEach(function() {
-      mockDevice = {
-        deviceId: "test-device",
-        name: "Test Device",
-        platform: "android"
-      };
-      // Create fakes for testing
-      fakeAdb = new FakeAdbExecutor();
-      fakeAdbFactory = { create: () => fakeAdb };
-
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
-      mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdbFactory, mockTakeScreenshot, mockAccessibilityServiceClient);
-    });
-
-    test("should return null from checkInMemoryCache when no cache exists", async function() {
-      const mockBuffer = Buffer.from("mock screenshot data");
-      const result = await viewHierarchy.checkInMemoryCache(mockBuffer);
-      expect(result).toBeNull();
-    });
-
-    test("should return null from checkInMemoryCache when cache is expired", async function() {
-      const hash = "test-hash";
-      const mockBuffer = Buffer.from("mock screenshot data");
-      const oldTimestamp = Date.now() - 120000; // 2 minutes ago (older than 60s TTL)
-
-      // Access the static cache to add expired entry
-      (ViewHierarchy as any).viewHierarchyCache.set(hash, {
-        timestamp: oldTimestamp,
-        activityHash: hash,
-        viewHierarchy: { hierarchy: { test: "data" } }
-      });
-
-      const result = await viewHierarchy.checkInMemoryCache(mockBuffer);
-      expect(result).toBeNull();
-    });
-
-    test("should return cached result from checkInMemoryCache when cache is valid", async function() {
-      const hash = "test-hash";
-      const mockBuffer = Buffer.from("mock screenshot data");
-      const recentTimestamp = Date.now() - 30000; // 30 seconds ago (within 60s TTL)
-      const testHierarchy = { hierarchy: { test: "data" } } as any;
-
-      // Access the static cache to add valid entry
-      (ViewHierarchy as any).viewHierarchyCache.set(hash, {
-        timestamp: recentTimestamp,
-        activityHash: hash,
-        viewHierarchy: testHierarchy
-      });
-
-      // For this test to pass with fuzzy matching, we'd need actual screenshot files
-      // For now, just test that it returns null since no fuzzy match is found
-      const result = await viewHierarchy.checkInMemoryCache(mockBuffer);
-      expect(result).toBeNull(); // Will be null since no screenshot files exist to match against
-    });
-
-    test("should cache view hierarchy correctly", async function() {
-      const timestamp = Date.now();
-      const testHierarchy = { hierarchy: { test: "data" } } as any;
-
-      await viewHierarchy.cacheViewHierarchy(timestamp, testHierarchy);
-
-      // Check that it was cached using legacy hash-based method
-      const cached = await viewHierarchy.checkCacheHierarchy(timestamp.toString());
-      expect(cached).toEqual(testHierarchy);
-    });
-
-    test("should return empty cache result when cache is empty", async function() {
-      // Clear any existing cache
-      (ViewHierarchy as any).viewHierarchyCache.clear();
-
-      const result = await viewHierarchy.getMostRecentCachedViewHierarchy();
-
-      expect(result).toBeDefined();
-      expect(result.hierarchy).toHaveProperty("error", "No cached view hierarchy available");
-    });
-
-    test("should return most recent cached view hierarchy", async function() {
-      const hash1 = "hash1";
-      const hash2 = "hash2";
-      const oldHierarchy = { hierarchy: { data: "old" } } as any;
-      const newHierarchy = { hierarchy: { data: "new" } } as any;
-
-      // Add old entry
-      (ViewHierarchy as any).viewHierarchyCache.set(hash1, {
-        timestamp: Date.now() - 50000,
-        activityHash: hash1,
-        viewHierarchy: oldHierarchy
-      });
-
-      // Add newer entry
-      (ViewHierarchy as any).viewHierarchyCache.set(hash2, {
-        timestamp: Date.now() - 10000,
-        activityHash: hash2,
-        viewHierarchy: newHierarchy
-      });
-
-      const result = await viewHierarchy.getMostRecentCachedViewHierarchy();
-      expect(result).toEqual(newHierarchy);
-    });
-
-    test("should check cache hierarchy correctly", async function() {
-      const hash = "test-hash";
-      const testHierarchy = { hierarchy: { test: "data" } } as any;
-
-      // Set up in-memory cache
-      (ViewHierarchy as any).viewHierarchyCache.set(hash, {
-        timestamp: Date.now() - 30000,
-        activityHash: hash,
-        viewHierarchy: testHierarchy
-      });
-
-      // Use legacy hash-based method for this test
-      const result = await viewHierarchy.checkCacheHierarchy(hash);
-      expect(result).toEqual(testHierarchy);
-    });
-
-    test("should return null from checkCacheHierarchy when no cache exists for nonexistent hash", async function() {
-      const result = await viewHierarchy.checkCacheHierarchy("nonexistent-hash");
-      expect(result).toBeNull();
-    });
-
-    test("should return null from checkCacheHierarchyWithFuzzyMatching when no cache exists", async function() {
-      const mockBuffer = Buffer.from("mock screenshot data");
-      const result = await viewHierarchy.checkCacheHierarchyWithFuzzyMatching(mockBuffer);
-      expect(result).toBeNull();
-    });
-
-    test("should return null from checkDiskCache when file doesn't exist", async function() {
-      const mockBuffer = Buffer.from("mock screenshot data");
-      const result = await viewHierarchy.checkDiskCache(mockBuffer);
-      expect(result).toBeNull();
-    });
-
-
-  });
-
-  describe("XML Processing Tests", function() {
-    let viewHierarchy: ViewHierarchy;
-    let fakeAdb: FakeAdbExecutor;
-    let mockTakeScreenshot: TakeScreenshot;
-    let mockAccessibilityServiceClient: AccessibilityServiceClient;
-    let mockDevice: BootedDevice;
-
-    beforeEach(function() {
-      mockDevice = {
-        deviceId: "test-device",
-        name: "Test Device",
-        platform: "android"
-      };
-      fakeAdb = new FakeAdbExecutor();
-
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
-      mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-    });
-
-    test("should process valid XML data correctly", async function() {
-      const validXml = '<?xml version="1.0"?><hierarchy><node text="test" clickable="true"/></hierarchy>';
-
-      const result = await viewHierarchy.processXmlData(validXml);
-
-      expect(result).toBeDefined();
-      expect(result.hierarchy).toBeDefined();
-    });
-
-    test("should handle invalid XML data", async function() {
-      const invalidXml = "";
-
-      const result = await viewHierarchy.processXmlData(invalidXml);
-
-      expect(result).toBeDefined();
-      expect(result.hierarchy).toHaveProperty("error");
-    });
-
-    test("should parse XML to view hierarchy", async function() {
-      const xmlData = '<?xml version="1.0"?><hierarchy><node text="test" clickable="true"/></hierarchy>';
-
-      const result = await viewHierarchy.parseXmlToViewHierarchy(xmlData);
-
-      expect(result).toBeDefined();
-      expect(result.hierarchy).toBeDefined();
-    });
-
-    test("should execute uiautomator dump command", async function() {
-      const xmlContent = '<?xml version="1.0"?><hierarchy><node text="test"/></hierarchy>';
-      const fakeAdbWithOutput = new FakeAdbExecutor();
-      fakeAdbWithOutput.setCommandResponse("uiautomator dump", { stdout: xmlContent, stderr: "" });
-
-      const mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, fakeAdbWithOutput, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-
-      const result = await viewHierarchyWithMock.executeUiAutomatorDump();
-      expect(result).toBe(xmlContent);
-    });
-  });
-
-  describe("Screenshot Buffer Management Tests", function() {
-    test("should throw error when screenshot fails", async function() {
-      const mockDevice: BootedDevice = {
-        deviceId: "test-device",
-        name: "Test Device",
-        platform: "android"
-      };
-
-      const fakeAdb = new FakeAdbExecutor();
-
-      const mockTakeScreenshotFail = {
-        execute: async () => ({ success: false, error: "Screenshot failed" })
-      } as unknown as TakeScreenshot;
-
-      const mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshotFail, mockAccessibilityServiceClient);
-
-      try {
-        await viewHierarchyWithMock.getOrCreateScreenshotBuffer(null);
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        expect(error instanceof Error).toBe(true);
-        // Error message may vary - check for common patterns
-        const message = (error as Error).message.toLowerCase();
-        expect(message.includes("screenshot") || message.includes("failed")).toBe(true);
-      }
-    });
-  });
 
   describe("Error Handling Tests", function() {
     let viewHierarchy: ViewHierarchy;
     let fakeAdb: FakeAdbExecutor;
-    let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
 
@@ -499,10 +184,6 @@ describe("ViewHierarchy", function() {
       };
       fakeAdb = new FakeAdbExecutor();
 
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
       mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
         convertToViewHierarchyResult: () => ({ hierarchy: {} }),
@@ -510,7 +191,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, mockAccessibilityServiceClient);
       setupReadFileMock();
     });
 
@@ -525,139 +206,27 @@ describe("ViewHierarchy", function() {
       expect(result.hierarchy).toBeDefined();
     });
 
-    test("should handle screenshot errors in getViewHierarchy", async function() {
-      const mockTakeScreenshotError = {
-        execute: async () => ({ success: false, error: "screenshot error" })
-      } as unknown as TakeScreenshot;
-
-      const mockAccessibilityServiceClient = {
+    test("should handle accessibility service errors in getViewHierarchy", async function() {
+      const mockAccessibilityServiceClientError = {
         getLatestHierarchy: async () => null,
         convertToViewHierarchyResult: () => ({ hierarchy: {} }),
         convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
+        getAccessibilityHierarchy: async () => { throw new Error("Accessibility service error"); }
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMocks = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshotError, mockAccessibilityServiceClient);
+      const viewHierarchyWithMocks = new ViewHierarchy(mockDevice, fakeAdb, mockAccessibilityServiceClientError);
 
       const result = await viewHierarchyWithMocks.getAndroidViewHierarchy();
 
       expect(result).toBeDefined();
       expect(result.hierarchy).toBeDefined();
-    });
-
-    test("should handle ADB errors in executeUiAutomatorDump", async function() {
-      const fakeAdbError = new FakeAdbExecutor();
-      fakeAdbError.setDefaultResponse({
-        stdout: "",
-        stderr: "null root node returned by UiTestAutomationBridge",
-        toString() { return this.stderr; },
-        trim() { return this.stderr.trim(); },
-        includes(searchString: string) { return this.stderr.includes(searchString); }
-      });
-
-      const mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-
-      try {
-        await viewHierarchyWithError.executeUiAutomatorDump();
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        expect(error instanceof Error).toBe(true);
-      }
-    });
-
-    test("should handle device locked/screen off error in _getViewHierarchyWithoutCache", async function() {
-      const fakeAdbLockedError = new FakeAdbExecutor();
-      fakeAdbLockedError.setDefaultResponse({
-        stdout: "",
-        stderr: "null root node returned by UiTestAutomationBridge",
-        toString() { return this.stderr; },
-        trim() { return this.stderr.trim(); },
-        includes(searchString: string) { return this.stderr.includes(searchString); }
-      });
-
-      const mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbLockedError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-
-      // Call _getViewHierarchyWithoutCache directly to test its error handling
-      const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
-
-      expect(result).toBeDefined();
       expect(result.hierarchy).toHaveProperty("error");
-      expect(result.hierarchy.error).toContain("screen appears to be off or device is locked");
-    });
-
-    test("should handle cat file not found error in _getViewHierarchyWithoutCache", async function() {
-      const fakeAdbCatError = new FakeAdbExecutor();
-      fakeAdbCatError.setDefaultResponse({
-        stdout: "",
-        stderr: "cat: /sdcard/window_dump.xml: No such file or directory",
-        toString() { return this.stderr; },
-        trim() { return this.stderr.trim(); },
-        includes(searchString: string) { return this.stderr.includes(searchString); }
-      });
-
-      const mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbCatError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-
-      // Call _getViewHierarchyWithoutCache directly to test its error handling
-      const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
-
-      expect(result).toBeDefined();
-      expect(result.hierarchy).toHaveProperty("error");
-      expect(result.hierarchy.error).toContain("screen appears to be off or device is locked");
-    });
-
-    test("should handle generic error in _getViewHierarchyWithoutCache", async function() {
-      const fakeAdbGenericError = new FakeAdbExecutor();
-      fakeAdbGenericError.setDefaultResponse({
-        stdout: "",
-        stderr: "Some other generic error",
-        toString() { return this.stderr; },
-        trim() { return this.stderr.trim(); },
-        includes(searchString: string) { return this.stderr.includes(searchString); }
-      });
-
-      const mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbGenericError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-
-      // Call _getViewHierarchyWithoutCache directly to test its error handling
-      const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
-
-      expect(result).toBeDefined();
-      expect(result.hierarchy).toHaveProperty("error");
-      expect(result.hierarchy.error).toContain("Failed to retrieve view hierarchy data");
     });
   });
 
   describe("FilterViewHierarchy Tests", function() {
     let viewHierarchy: ViewHierarchy;
     let fakeAdb: FakeAdbExecutor;
-    let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
 
@@ -669,10 +238,6 @@ describe("ViewHierarchy", function() {
       };
       fakeAdb = new FakeAdbExecutor();
 
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
       mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
         convertToViewHierarchyResult: () => ({ hierarchy: {} }),
@@ -680,7 +245,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, mockAccessibilityServiceClient);
     });
 
     test("should handle empty hierarchy", function() {
@@ -723,7 +288,6 @@ describe("ViewHierarchy", function() {
   describe("Edge Cases and Additional Coverage", function() {
     let viewHierarchy: ViewHierarchy;
     let fakeAdb: FakeAdbExecutor;
-    let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
 
@@ -735,10 +299,6 @@ describe("ViewHierarchy", function() {
       };
       fakeAdb = new FakeAdbExecutor();
 
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
       mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
         convertToViewHierarchyResult: () => ({ hierarchy: {} }),
@@ -746,7 +306,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, mockAccessibilityServiceClient);
     });
 
     test("should handle node with empty children array", function() {
@@ -897,7 +457,7 @@ describe("findFocusedElement", function() {
       platform: "android"
     };
 
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any, null, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any, null);
   });
 
   test("should find focused element in simple hierarchy", function() {
@@ -1385,632 +945,5 @@ describe("Offscreen Node Filtering", function() {
       expect(result?.text).toBe("Popup Button");
       expect(result?.["accessibility-focused"]).toBe(true);
     });
-  });
-});
-
-describe("Node Hash Generation", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should generate consistent hash for same node properties", function() {
-    const node1 = {
-      "bounds": "[0,0][100,50]",
-      "resource-id": "com.app:id/button",
-      "text": "Click me",
-      "content-desc": "Button",
-      "class": "android.widget.Button",
-      "clickable": "true",
-      "scrollable": "false"
-    };
-
-    const node2 = { ...node1 };
-
-    const hash1 = viewHierarchy.generateNodeHash(node1);
-    const hash2 = viewHierarchy.generateNodeHash(node2);
-
-    expect(hash1).toBe(hash2);
-    expect(hash1.length).toBeGreaterThan(0);
-  });
-
-  test("should generate different hash for different bounds", function() {
-    const node1 = {
-      "bounds": "[0,0][100,50]",
-      "resource-id": "com.app:id/button",
-      "text": "Click me"
-    };
-
-    const node2 = {
-      "bounds": "[0,100][100,150]",
-      "resource-id": "com.app:id/button",
-      "text": "Click me"
-    };
-
-    const hash1 = viewHierarchy.generateNodeHash(node1);
-    const hash2 = viewHierarchy.generateNodeHash(node2);
-
-    expect(hash1).not.toBe(hash2);
-  });
-
-  test("should handle $ property format", function() {
-    const nodeWithDollar = {
-      $: {
-        "bounds": "[0,0][100,50]",
-        "resource-id": "com.app:id/button",
-        "text": "Click me"
-      }
-    };
-
-    const nodeWithoutDollar = {
-      "bounds": "[0,0][100,50]",
-      "resource-id": "com.app:id/button",
-      "text": "Click me"
-    };
-
-    const hash1 = viewHierarchy.generateNodeHash(nodeWithDollar);
-    const hash2 = viewHierarchy.generateNodeHash(nodeWithoutDollar);
-
-    expect(hash1).toBe(hash2);
-  });
-
-  test("should return empty string for null node", function() {
-    const hash = viewHierarchy.generateNodeHash(null);
-    expect(hash).toBe("");
-  });
-
-  test("should NOT include interaction properties in hash (for deduplication)", function() {
-    // Interaction properties are intentionally excluded from hash
-    // so the same element with different capability metadata is treated as duplicate
-    const clickableNode = {
-      bounds: "[0,0][100,50]",
-      clickable: "true"
-    };
-
-    const scrollableNode = {
-      bounds: "[0,0][100,50]",
-      scrollable: "true"
-    };
-
-    const hash1 = viewHierarchy.generateNodeHash(clickableNode);
-    const hash2 = viewHierarchy.generateNodeHash(scrollableNode);
-
-    // Same bounds, no other identifying properties = same hash
-    expect(hash1).toBe(hash2);
-  });
-});
-
-describe("Zero Bounds Detection", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should detect zero width bounds", function() {
-    const node = { bounds: "[100,0][100,50]" };
-    expect(viewHierarchy.hasZeroBounds(node)).toBe(true);
-  });
-
-  test("should detect zero height bounds", function() {
-    const node = { bounds: "[0,100][100,100]" };
-    expect(viewHierarchy.hasZeroBounds(node)).toBe(true);
-  });
-
-  test("should not flag valid bounds", function() {
-    const node = { bounds: "[0,0][100,50]" };
-    expect(viewHierarchy.hasZeroBounds(node)).toBe(false);
-  });
-
-  test("should handle object format bounds", function() {
-    const zeroWidthNode = { bounds: { left: 100, top: 0, right: 100, bottom: 50 } };
-    const zeroHeightNode = { bounds: { left: 0, top: 100, right: 100, bottom: 100 } };
-    const validNode = { bounds: { left: 0, top: 0, right: 100, bottom: 50 } };
-
-    expect(viewHierarchy.hasZeroBounds(zeroWidthNode)).toBe(true);
-    expect(viewHierarchy.hasZeroBounds(zeroHeightNode)).toBe(true);
-    expect(viewHierarchy.hasZeroBounds(validNode)).toBe(false);
-  });
-
-  test("should handle $ property format", function() {
-    const node = { $: { bounds: "[100,0][100,50]" } };
-    expect(viewHierarchy.hasZeroBounds(node)).toBe(true);
-  });
-
-  test("should return true for null node", function() {
-    expect(viewHierarchy.hasZeroBounds(null)).toBe(true);
-  });
-
-  test("should not filter nodes without bounds info", function() {
-    const node = { text: "No bounds" };
-    expect(viewHierarchy.hasZeroBounds(node)).toBe(false);
-  });
-
-  test("should handle negative coordinates", function() {
-    const validNode = { bounds: "[-50,-50][50,50]" };
-    const zeroNode = { bounds: "[-50,0][-50,50]" };
-
-    expect(viewHierarchy.hasZeroBounds(validNode)).toBe(false);
-    expect(viewHierarchy.hasZeroBounds(zeroNode)).toBe(true);
-  });
-});
-
-describe("Invisible Node Detection", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should detect invisible node with string false", function() {
-    const node = { visible: "false" };
-    expect(viewHierarchy.isInvisible(node)).toBe(true);
-  });
-
-  test("should detect invisible node with boolean false", function() {
-    const node = { visible: false };
-    expect(viewHierarchy.isInvisible(node)).toBe(true);
-  });
-
-  test("should not flag visible node", function() {
-    const node = { visible: "true" };
-    expect(viewHierarchy.isInvisible(node)).toBe(false);
-  });
-
-  test("should not filter nodes without visible property", function() {
-    const node = { text: "No visible property" };
-    expect(viewHierarchy.isInvisible(node)).toBe(false);
-  });
-
-  test("should handle $ property format", function() {
-    const node = { $: { visible: "false" } };
-    expect(viewHierarchy.isInvisible(node)).toBe(true);
-  });
-
-  test("should return true for null node", function() {
-    expect(viewHierarchy.isInvisible(null)).toBe(true);
-  });
-});
-
-describe("Interactable Node Detection", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should detect clickable node", function() {
-    const node = { clickable: "true" };
-    expect(viewHierarchy.isInteractable(node)).toBe(true);
-  });
-
-  test("should detect scrollable node", function() {
-    const node = { scrollable: "true" };
-    expect(viewHierarchy.isInteractable(node)).toBe(true);
-  });
-
-  test("should detect long-clickable node", function() {
-    const node = { "long-clickable": "true" };
-    expect(viewHierarchy.isInteractable(node)).toBe(true);
-  });
-
-  test("should detect focusable node", function() {
-    const node = { focusable: "true" };
-    expect(viewHierarchy.isInteractable(node)).toBe(true);
-  });
-
-  test("should detect checkable node", function() {
-    const node = { checkable: "true" };
-    expect(viewHierarchy.isInteractable(node)).toBe(true);
-  });
-
-  test("should not flag non-interactable node", function() {
-    const node = { text: "Static text", enabled: "true" };
-    expect(viewHierarchy.isInteractable(node)).toBe(false);
-  });
-
-  test("should return false for null node", function() {
-    expect(viewHierarchy.isInteractable(null)).toBe(false);
-  });
-
-  test("should handle $ property format", function() {
-    const node = { $: { clickable: "true" } };
-    expect(viewHierarchy.isInteractable(node)).toBe(true);
-  });
-});
-
-describe("Node Deduplication", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should remove duplicate nodes with same hash", function() {
-    const nodes = [
-      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
-      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
-      { "bounds": "[0,100][100,150]", "resource-id": "button2", "text": "Submit" }
-    ];
-
-    const result = viewHierarchy.deduplicateNodes(nodes);
-
-    expect(result).toHaveLength(2);
-  });
-
-  test("should prefer interactable nodes over non-interactable", function() {
-    const nodes = [
-      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
-      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click", "clickable": "true" }
-    ];
-
-    const result = viewHierarchy.deduplicateNodes(nodes);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].clickable).toBe("true");
-  });
-
-  test("should filter out zero-bounds nodes", function() {
-    const nodes = [
-      { bounds: "[0,0][100,50]", text: "Visible" },
-      { bounds: "[100,0][100,50]", text: "Zero width" },
-      { bounds: "[0,100][100,100]", text: "Zero height" }
-    ];
-
-    const result = viewHierarchy.deduplicateNodes(nodes);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Visible");
-  });
-
-  test("should filter out invisible nodes", function() {
-    const nodes = [
-      { bounds: "[0,0][100,50]", text: "Visible" },
-      { bounds: "[0,100][100,150]", text: "Hidden", visible: "false" }
-    ];
-
-    const result = viewHierarchy.deduplicateNodes(nodes);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].text).toBe("Visible");
-  });
-
-  test("should handle empty array", function() {
-    const result = viewHierarchy.deduplicateNodes([]);
-    expect(result).toHaveLength(0);
-  });
-});
-
-describe("Hierarchy Tree Deduplication", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should recursively deduplicate children", function() {
-    const hierarchy = {
-      bounds: "[0,0][1080,2400]",
-      text: "Root",
-      node: [
-        { bounds: "[0,0][100,50]", text: "Child 1" },
-        { bounds: "[0,0][100,50]", text: "Child 1" },
-        { bounds: "[0,100][100,150]", text: "Child 2" }
-      ]
-    };
-
-    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
-
-    expect(result).toBeDefined();
-    const children = Array.isArray(result.node) ? result.node : [result.node];
-    expect(children).toHaveLength(2);
-  });
-
-  test("should filter zero-bounds nodes from tree", function() {
-    const hierarchy = {
-      bounds: "[0,0][1080,2400]",
-      text: "Root",
-      node: [
-        { bounds: "[0,0][100,50]", text: "Visible" },
-        { bounds: "[100,0][100,50]", text: "Zero width" }
-      ]
-    };
-
-    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
-
-    expect(result).toBeDefined();
-    expect(result.node.text).toBe("Visible");
-  });
-
-  test("should return null for zero-bounds root", function() {
-    const hierarchy = {
-      bounds: "[0,0][0,0]",
-      text: "Zero root"
-    };
-
-    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
-
-    expect(result).toBeNull();
-  });
-
-  test("should handle single child", function() {
-    const hierarchy = {
-      bounds: "[0,0][1080,2400]",
-      text: "Root",
-      node: { bounds: "[0,0][100,50]", text: "Only child" }
-    };
-
-    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
-
-    expect(result).toBeDefined();
-    expect(result.node.text).toBe("Only child");
-  });
-
-  test("should remove node property when all children filtered", function() {
-    const hierarchy = {
-      bounds: "[0,0][1080,2400]",
-      text: "Root",
-      node: [
-        { bounds: "[100,0][100,50]", text: "Zero 1" },
-        { bounds: "[0,100][100,100]", text: "Zero 2" }
-      ]
-    };
-
-    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
-
-    expect(result).toBeDefined();
-    expect(result.node).toBeUndefined();
-  });
-});
-
-describe("Overlay Window Filtering", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should filter accessibility_overlay windows", function() {
-    const windows = [
-      { windowType: "application", id: 1 },
-      { windowType: "accessibility_overlay", id: 2 },
-      { windowType: "system", id: 3 }
-    ];
-
-    const result = viewHierarchy.filterOverlayWindows(windows);
-
-    expect(result).toHaveLength(2);
-    expect(result?.find(w => w.windowType === "accessibility_overlay")).toBeUndefined();
-  });
-
-  test("should filter magnification_overlay windows", function() {
-    const windows = [
-      { windowType: "application", id: 1 },
-      { windowType: "magnification_overlay", id: 2 }
-    ];
-
-    const result = viewHierarchy.filterOverlayWindows(windows);
-
-    expect(result).toHaveLength(1);
-    expect(result?.[0].windowType).toBe("application");
-  });
-
-  test("should handle numeric window types", function() {
-    const windows = [
-      { type: 1, id: 1 }, // application
-      { type: 4, id: 2 }, // accessibility_overlay
-      { type: 5, id: 3 }, // magnification_overlay
-      { type: 2, id: 4 }  // input_method
-    ];
-
-    const result = viewHierarchy.filterOverlayWindows(windows);
-
-    expect(result).toHaveLength(2);
-    expect(result?.find(w => w.type === 4)).toBeUndefined();
-    expect(result?.find(w => w.type === 5)).toBeUndefined();
-  });
-
-  test("should return undefined for undefined input", function() {
-    const result = viewHierarchy.filterOverlayWindows(undefined);
-    expect(result).toBeUndefined();
-  });
-
-  test("should keep all non-overlay windows", function() {
-    const windows = [
-      { windowType: "application", id: 1 },
-      { windowType: "system", id: 2 },
-      { windowType: "input_method", id: 3 },
-      { windowType: "split_screen_divider", id: 4 }
-    ];
-
-    const result = viewHierarchy.filterOverlayWindows(windows);
-
-    expect(result).toHaveLength(4);
-  });
-
-  test("should handle windows without type property", function() {
-    const windows = [
-      { id: 1, packageName: "com.app" },
-      { windowType: "accessibility_overlay", id: 2 }
-    ];
-
-    const result = viewHierarchy.filterOverlayWindows(windows);
-
-    expect(result).toHaveLength(1);
-    expect(result?.[0].id).toBe(1);
-  });
-});
-
-describe("Merge Hierarchies with Deduplication", function() {
-  let viewHierarchy: ViewHierarchy;
-  let mockDevice: BootedDevice;
-
-  beforeEach(function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
-  });
-
-  test("should deduplicate nodes when merging a11y and uiautomator", function() {
-    const a11yHierarchy = {
-      hierarchy: {
-        node: {
-          "bounds": "[0,0][1080,2400]",
-          "resource-id": "root",
-          "node": [
-            { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" }
-          ]
-        }
-      },
-      packageName: "com.test"
-    };
-
-    const uiautomatorHierarchy = {
-      hierarchy: {
-        node: {
-          "bounds": "[0,0][1080,2400]",
-          "resource-id": "root",
-          "node": [
-            { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
-            { "bounds": "[0,100][100,150]", "resource-id": "button2", "text": "Submit" }
-          ]
-        }
-      }
-    };
-
-    const result = viewHierarchy.mergeHierarchies(
-      a11yHierarchy as any,
-      uiautomatorHierarchy as any
-    );
-
-    expect(result.accessibilityServiceIncomplete).toBe(true);
-    expect(result.sources).toContain("accessibility-service");
-    expect(result.sources).toContain("uiautomator");
-  });
-
-  test("should return a11y hierarchy when uiautomator is missing", function() {
-    const a11yHierarchy = {
-      hierarchy: {
-        node: { bounds: "[0,0][100,50]", text: "A11y only" }
-      },
-      packageName: "com.test"
-    };
-
-    const uiautomatorHierarchy = {
-      hierarchy: {}
-    };
-
-    const result = viewHierarchy.mergeHierarchies(
-      a11yHierarchy as any,
-      uiautomatorHierarchy as any
-    );
-
-    expect(result.hierarchy.node.text).toBe("A11y only");
-  });
-
-  test("should return uiautomator hierarchy when a11y is missing", function() {
-    const a11yHierarchy = {
-      hierarchy: {},
-      packageName: "com.test",
-      windows: [{ id: 1 }]
-    };
-
-    const uiautomatorHierarchy = {
-      hierarchy: {
-        node: { bounds: "[0,0][100,50]", text: "UI only" }
-      }
-    };
-
-    const result = viewHierarchy.mergeHierarchies(
-      a11yHierarchy as any,
-      uiautomatorHierarchy as any
-    );
-
-    expect(result.hierarchy.node.text).toBe("UI only");
-    expect(result.packageName).toBe("com.test");
-  });
-
-  test("should return error when both hierarchies are empty", function() {
-    const a11yHierarchy = { hierarchy: {} };
-    const uiautomatorHierarchy = { hierarchy: {} };
-
-    const result = viewHierarchy.mergeHierarchies(
-      a11yHierarchy as any,
-      uiautomatorHierarchy as any
-    );
-
-    expect(result.hierarchy.error).toBeDefined();
-  });
-
-  test("should filter overlay windows from merged result", function() {
-    const a11yHierarchy = {
-      hierarchy: {
-        node: { bounds: "[0,0][100,50]", text: "Test" }
-      },
-      windows: [
-        { windowType: "application", id: 1 },
-        { windowType: "accessibility_overlay", id: 2 }
-      ]
-    };
-
-    const uiautomatorHierarchy = {
-      hierarchy: {
-        node: { bounds: "[0,100][100,150]", text: "UI" }
-      }
-    };
-
-    const result = viewHierarchy.mergeHierarchies(
-      a11yHierarchy as any,
-      uiautomatorHierarchy as any
-    );
-
-    expect(result.windows).toHaveLength(1);
-    expect(result.windows?.[0].windowType).toBe("application");
   });
 });
