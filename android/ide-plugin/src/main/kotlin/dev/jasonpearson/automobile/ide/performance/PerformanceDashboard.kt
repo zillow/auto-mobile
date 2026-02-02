@@ -354,9 +354,33 @@ private fun PerformanceOverviewScreen(
         Text("Metrics", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
         Spacer(Modifier.height(8.dp))
 
+        if (run.metrics.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Waiting for performance data...",
+                        fontSize = 13.sp,
+                        color = colors.text.normal.copy(alpha = 0.6f),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Interact with your app to see metrics",
+                        fontSize = 11.sp,
+                        color = colors.text.normal.copy(alpha = 0.4f),
+                    )
+                }
+            }
+        }
+
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val isWide = maxWidth >= 400.dp
-            if (isWide) {
+            if (isWide && run.metrics.isNotEmpty()) {
                 // 2 columns
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     run.metrics.chunked(2).forEach { row ->
@@ -377,7 +401,7 @@ private fun PerformanceOverviewScreen(
                         }
                     }
                 }
-            } else {
+            } else if (run.metrics.isNotEmpty()) {
                 // Single column
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     run.metrics.forEach { metric ->
