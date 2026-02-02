@@ -972,6 +972,10 @@ export class RealObserveScreen implements ObserveScreen {
         } else {
           logger.info("[PerformanceAudit] Performance audit PASSED");
         }
+
+        // Start continuous performance monitoring for this device/package
+        const { getPerformanceMonitor } = await import("../performance/PerformanceMonitor");
+        getPerformanceMonitor().startMonitoring(this.device.deviceId, result.activeWindow!.appId);
       });
     } catch (error) {
       logger.error(`[PerformanceAudit] Failed to run performance audit: ${error}`);

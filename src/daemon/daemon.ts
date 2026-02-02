@@ -37,6 +37,7 @@ import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../utils/appearance/AppearanceSyncScheduler";
+import { startPerformanceMonitor, stopPerformanceMonitor, getPerformanceMonitor } from "../features/performance/PerformanceMonitor";
 import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
 import { defaultTimer } from "../utils/SystemTimer";
 
@@ -144,6 +145,7 @@ export class Daemon {
     this.setupDeviceDataStreamCallback();
 
     startAppearanceSyncScheduler();
+    startPerformanceMonitor();
     this.startDeviceDisconnectMonitor();
 
     // Write PID file
@@ -702,6 +704,9 @@ export class Daemon {
         }
 
         for (const [deviceId, recordingIds] of missingByDevice.entries()) {
+          // Stop performance monitoring for this device
+          getPerformanceMonitor().stopMonitoring(deviceId);
+
           for (const recordingId of recordingIds) {
             if (this.stoppingRecordings.has(recordingId)) {
               continue;
@@ -930,6 +935,7 @@ export class Daemon {
     await stopFailuresStreamSocketServer();
     await stopFailuresPushSocketServer();
     stopAppearanceSyncScheduler();
+    stopPerformanceMonitor();
 
     // Close all active HTTP sessions
     for (const [sessionId, streamableTransport] of this.transports) {
