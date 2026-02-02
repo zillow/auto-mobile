@@ -33,6 +33,14 @@ export interface ViewHierarchyResult {
    * When both sources are present, the hierarchy was merged from accessibility service + uiautomator.
    */
   sources?: HierarchySource[];
+  /** Screen width from accessibility service (eliminates need for dumpsys) */
+  screenWidth?: number;
+  /** Screen height from accessibility service (eliminates need for dumpsys) */
+  screenHeight?: number;
+  /** Display rotation: 0=portrait, 1=landscape90, 2=reverse, 3=landscape270 */
+  rotation?: number;
+  /** System insets (status bar, nav bar, gesture insets) */
+  systemInsets?: { top: number; bottom: number; left: number; right: number };
 }
 
 export interface Hierarchy {

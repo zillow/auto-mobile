@@ -447,27 +447,32 @@ export class RealObserveScreen implements ObserveScreen {
   ): Promise<void> {
     switch (this.device.platform) {
       case "android":
-        // Phase 1: Get dumpsys window data for screen info
-        // Note: We no longer call collectActiveWindow here - packageName comes from accessibility service
-        perf.serial("phase1_initial");
+        // Phase 1: Get view hierarchy first (includes screen info from accessibility service)
+        perf.serial("phase1_hierarchy");
 
-        const dumpsysWindow = await perf.track("dumpsysWindow", () => this.dumpsysWindow.execute(perf, signal));
-        perf.end();
-
-        // Phase 2: Parallel - quick operations using shared dumpsys data
-        perf.parallel("phase2_collect");
-
+        // Run view hierarchy and non-dumpsys operations in parallel
         await Promise.all([
-          perf.track("screenSize", () => this.collectScreenSize(dumpsysWindow, result)),
-          perf.track("systemInsets", () => this.collectSystemInsets(dumpsysWindow, result)),
-          perf.track("rotation", () => this.collectRotationInfo(dumpsysWindow, result)),
+          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal),
           perf.track("wakefulness", () => this.collectWakefulness(result, signal)),
           perf.track("backStack", () => this.collectBackStack(result, perf, signal)),
         ]);
 
-        // Run view hierarchy separately to avoid perf tracker race condition
-        // (it creates nested serial blocks that conflict with parallel tracking)
-        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
+        perf.end();
+
+        // Use screen info from accessibility service (no dumpsys fallback)
+        const hierarchy = result.viewHierarchy;
+        if (hierarchy?.screenWidth && hierarchy?.screenHeight) {
+          result.screenSize = { width: hierarchy.screenWidth, height: hierarchy.screenHeight };
+          if (hierarchy.rotation !== undefined) {
+            result.rotation = hierarchy.rotation;
+          }
+          if (hierarchy.systemInsets) {
+            result.systemInsets = hierarchy.systemInsets;
+          }
+          logger.debug("[OBSERVE] Using screen info from accessibility service");
+        } else {
+          logger.warn("[OBSERVE] No screen info from accessibility service - check if APK is updated");
+        }
 
         // Note: Offscreen filtering is now done in the Android accessibility service (Kotlin)
         // for better performance (avoids serializing/transferring filtered data)
@@ -490,7 +495,6 @@ export class RealObserveScreen implements ObserveScreen {
           result.activeWindow.type = "notification_permission_dialog";
         }
 
-        perf.end();
         break;
 
       case "ios":

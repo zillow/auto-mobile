@@ -1,13 +1,13 @@
 {
   "version": "1.2.0",
   "metadata": {
-    "generatedAt": "2026-01-09",
+    "generatedAt": "2026-02-02",
     "description": "MCP tool call throughput thresholds with 20% regression tolerance",
     "baseline": {
       "description": "Baseline measurements from actual tool handler execution (MCP overhead without device I/O)",
       "sampleSize": 50,
       "generatedBy": "benchmark-mcp-tools.ts",
-      "note": "Measures tool registry lookup, schema validation, device resolution, and handler wrapper overhead"
+      "note": "Measures tool registry lookup, schema validation, device resolution, and handler wrapper overhead. Updated after ViewHierarchy caching removal (commit 724ae74d)."
     },
     "regressionTolerance": "20%"
   },
@@ -28,9 +28,9 @@
       "mean": 225.0
     },
     "observe": {
-      "p50": 60.0,
-      "p95": 65.0,
-      "mean": 60.0
+      "p50": 150.0,
+      "p95": 250.0,
+      "mean": 180.0
     },
     "tapOn": {
       "p50": 0.5,
@@ -38,9 +38,9 @@
       "mean": 0.5
     },
     "inputText": {
-      "p50": 230.0,
-      "p95": 330.0,
-      "mean": 240.0
+      "p50": 350.0,
+      "p95": 400.0,
+      "mean": 360.0
     },
     "swipe": {
       "p50": 0.5,

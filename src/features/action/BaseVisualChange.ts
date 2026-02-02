@@ -241,6 +241,12 @@ export class BaseVisualChange {
     perf.end();
 
     const shouldRetry = (observation: ObserveResult): boolean => {
+      // Don't retry if the observation has an error (service unavailable, connection failed, etc.)
+      // Retrying won't help in these cases and just adds latency
+      if (observation.viewHierarchy?.hierarchy?.error) {
+        return false;
+      }
+
       const isFresh = observation.freshness?.isFresh ?? true;
       if (minTimestamp > 0 && !isFresh) {
         return true;

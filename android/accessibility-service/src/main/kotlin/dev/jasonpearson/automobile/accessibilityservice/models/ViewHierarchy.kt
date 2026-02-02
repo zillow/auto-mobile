@@ -20,4 +20,8 @@ data class ViewHierarchy(
     val accessibilityFocusedElement: UIElementInfo? = null, // Element with TalkBack cursor
     val accessibilityServiceIncomplete: Boolean? = null,
     val error: String? = null, // For error cases like locked screen
+    val screenWidth: Int? = null,
+    val screenHeight: Int? = null,
+    val rotation: Int? = null, // 0=portrait, 1=landscape90, 2=reverse, 3=landscape270
+    val systemInsets: SystemInsetsInfo? = null,
 )

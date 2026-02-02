@@ -29,6 +29,7 @@ import dev.jasonpearson.automobile.accessibilityservice.models.InteractionElemen
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionEvent
 import dev.jasonpearson.automobile.accessibilityservice.models.RecompositionSnapshot
 import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
+import dev.jasonpearson.automobile.accessibilityservice.models.SystemInsetsInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
@@ -92,8 +93,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
   private val recompositionStore = RecompositionStore()
   private val viewHierarchyExtractor = ViewHierarchyExtractor(recompositionStore)
-  private val json = Json { prettyPrint = true }
-  private val jsonCompact = Json { prettyPrint = false }
+  private val json = Json { prettyPrint = true; encodeDefaults = true }
+  private val jsonCompact = Json { prettyPrint = false; encodeDefaults = true }
   private val jsonLenient = Json { ignoreUnknownKeys = true }
   private val perfProvider = PerfProvider.instance
   private val timeProvider: TimeProvider = SystemTimeProvider()
@@ -1069,6 +1070,55 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
+  /** Get current display rotation. Returns 0=portrait, 1=landscape90, 2=reverse, 3=landscape270. */
+  @Suppress("DEPRECATION")
+  private fun getRotation(): Int {
+    return try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        // Use DisplayManager for AccessibilityService context (can't use context.display)
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
+        displayManager?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.rotation ?: 0
+      } else {
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+        windowManager?.defaultDisplay?.rotation ?: 0
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get rotation", e)
+      0
+    }
+  }
+
+  /** Get all system insets (status bar, nav bar, gesture insets). */
+  @Suppress("DEPRECATION")
+  private fun getSystemInsets(): SystemInsetsInfo {
+    return try {
+      val windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+      if (windowManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val metrics = windowManager.currentWindowMetrics
+        val insets =
+            metrics.windowInsets.getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.systemBars()
+            )
+        SystemInsetsInfo(
+            top = insets.top,
+            bottom = insets.bottom,
+            left = insets.left,
+            right = insets.right,
+        )
+      } else {
+        // Fallback for older Android versions
+        val statusBarId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        val navBarId = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        val statusBarHeight = if (statusBarId > 0) resources.getDimensionPixelSize(statusBarId) else 0
+        val navBarHeight = if (navBarId > 0) resources.getDimensionPixelSize(navBarId) else 0
+        SystemInsetsInfo(top = statusBarHeight, bottom = navBarHeight, left = 0, right = 0)
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get system insets", e)
+      SystemInsetsInfo()
+    }
+  }
+
   /**
    * Direct hierarchy extraction without debouncing. Used by the HierarchyDebouncer. Extracts from
    * all visible windows to capture popups, toolbars, etc.
@@ -1078,6 +1128,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     val allWindows = windows
     val rootNode = rootInActiveWindow
     val screenDimensions = getScreenDimensions()
+    val rotation = getRotation()
+    val systemInsets = getSystemInsets()
 
     if (allWindows.isNullOrEmpty() && rootNode == null) {
       Log.w(TAG, "No windows or root node available for extraction")
@@ -1085,7 +1137,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
 
     // Use multi-window extraction if windows are available, otherwise fall back to single window
-    return if (!allWindows.isNullOrEmpty()) {
+    val hierarchy = if (!allWindows.isNullOrEmpty()) {
       Log.d(
           TAG,
           "Extracting from ${allWindows.size} windows (disableAllFiltering: $disableAllFiltering)",
@@ -1107,6 +1159,14 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           disableAllFiltering,
       )
     }
+
+    // Add screen info to the hierarchy (eliminates need for dumpsys window call on client)
+    return hierarchy?.copy(
+        screenWidth = screenDimensions?.width,
+        screenHeight = screenDimensions?.height,
+        rotation = rotation,
+        systemInsets = systemInsets,
+    )
   }
 
   /**

@@ -398,7 +398,11 @@ export class AccessibilityServiceHierarchy {
         "notificationPermissionDetected": accessibilityHierarchy.notificationPermissionDetected,
         "accessibility-focused-element": accessibilityFocusedElement,
         "accessibilityServiceIncomplete": accessibilityHierarchy.accessibilityServiceIncomplete,
-        "sources": ["accessibility-service"]
+        "sources": ["accessibility-service"],
+        "screenWidth": accessibilityHierarchy.screenWidth,
+        "screenHeight": accessibilityHierarchy.screenHeight,
+        "rotation": accessibilityHierarchy.rotation,
+        "systemInsets": accessibilityHierarchy.systemInsets
       };
 
       const duration = this.context.timer.now() - startTime;
