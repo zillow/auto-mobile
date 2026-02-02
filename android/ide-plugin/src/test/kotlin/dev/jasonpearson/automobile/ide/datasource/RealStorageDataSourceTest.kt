@@ -16,13 +16,13 @@ import org.junit.Test
 class RealStorageDataSourceTest {
 
     @Test
-    fun `getKeyValueFiles returns empty list when no clientProvider`() = runBlocking {
+    fun `getKeyValueFiles returns error when no clientProvider`() = runBlocking {
         val dataSource = RealStorageDataSource()
 
         val result = dataSource.getKeyValueFiles()
 
-        assertTrue(result is Result.Success)
-        assertEquals(emptyList<Any>(), (result as Result.Success).data)
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Not connected"))
     }
 
     @Test

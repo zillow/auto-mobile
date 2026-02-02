@@ -112,10 +112,10 @@ class RealStorageDataSource(
             LOG.info("getKeyValueFiles: Returning ${keyValueFiles.size} files")
             Result.Success(keyValueFiles)
         } catch (e: McpConnectionException) {
-            LOG.error("getKeyValueFiles: MCP connection error", e)
+            LOG.warn("getKeyValueFiles: MCP connection error: ${e.message}")
             Result.Error("MCP server not available: ${e.message}")
         } catch (e: Exception) {
-            LOG.error("getKeyValueFiles: Exception during fetch", e)
+            LOG.warn("getKeyValueFiles: Exception during fetch: ${e.message}")
             Result.Error("Failed to load storage data: ${e.message}")
         }
     }
