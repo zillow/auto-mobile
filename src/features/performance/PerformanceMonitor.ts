@@ -33,6 +33,10 @@ interface MonitoredDevice {
   lastSlowTick: number;
   cachedCpu: number | null;
   cachedMemory: number | null;
+  /** Cached FPS from last interval with actual frames */
+  cachedFps: number | null;
+  /** Cached frame time from last interval with actual frames */
+  cachedFrameTime: number | null;
   /** Previous jank counters for computing deltas */
   prevJankCounters: RawJankCounters | null;
 }
@@ -121,6 +125,8 @@ export class PerformanceMonitor {
         // Reset cached metrics for the new package
         existing.cachedCpu = null;
         existing.cachedMemory = null;
+        existing.cachedFps = null;
+        existing.cachedFrameTime = null;
         existing.lastMediumTick = 0;
         existing.lastSlowTick = 0;
         existing.prevJankCounters = null;
@@ -137,6 +143,8 @@ export class PerformanceMonitor {
       lastSlowTick: 0,
       cachedCpu: null,
       cachedMemory: null,
+      cachedFps: null,
+      cachedFrameTime: null,
       prevJankCounters: null,
     });
     logger.info(`[PerformanceMonitor] Started monitoring ${packageName} on ${deviceId}`);
@@ -243,6 +251,22 @@ export class PerformanceMonitor {
 
       device.lastFastTick = now;
 
+      // Update cached FPS/frame time when we have valid data from actual frames
+      // When app is idle (no frames rendered), use cached values instead of showing 0
+      let fps: number | null;
+      let frameTimeMs: number | null;
+      if (gfx.fps !== null && gfx.frameTimeMs !== null) {
+        // Got valid data from rendered frames - update cache
+        device.cachedFps = gfx.fps;
+        device.cachedFrameTime = gfx.frameTimeMs;
+        fps = gfx.fps;
+        frameTimeMs = gfx.frameTimeMs;
+      } else {
+        // No frames rendered this interval - use cached values
+        fps = device.cachedFps;
+        frameTimeMs = device.cachedFrameTime;
+      }
+
       // Jank counters are now per-interval (since we reset gfxinfo after each read)
       let jankFrames: number | null = null;
       if (gfx.rawJankCounters) {
@@ -252,8 +276,8 @@ export class PerformanceMonitor {
       }
 
       const metrics = {
-        fps: gfx.fps,
-        frameTimeMs: gfx.frameTimeMs,
+        fps,
+        frameTimeMs,
         jankFrames,
         touchLatencyMs: null,
         ttffMs: null,
