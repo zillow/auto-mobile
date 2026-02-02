@@ -313,9 +313,16 @@ export class PerformanceMonitor {
       // The 'reset' flag clears stats after reading, so next read reflects only new frames
       const { stdout } = await adb.executeCommand(`shell dumpsys gfxinfo ${device.packageName} reset`);
 
-      // Parse 50th percentile frame time (now reflects only frames since last reset)
-      const p50Match = stdout.match(/50th percentile:\s+(\d+(?:\.\d+)?)ms/);
-      const frameTimeMs = p50Match ? parseFloat(p50Match[1]) : null;
+      // Check if any frames were actually rendered in this interval
+      const totalFramesMatch = stdout.match(/Total frames rendered:\s+(\d+)/);
+      const totalFrames = totalFramesMatch ? parseInt(totalFramesMatch[1], 10) : 0;
+
+      // Only parse P50 frame time if frames were rendered (otherwise it's a garbage default value)
+      let frameTimeMs: number | null = null;
+      if (totalFrames > 0) {
+        const p50Match = stdout.match(/50th percentile:\s+(\d+(?:\.\d+)?)ms/);
+        frameTimeMs = p50Match ? parseFloat(p50Match[1]) : null;
+      }
 
       // Parse jank counters (now reflects only jank since last reset)
       const missedVsync = parseInt(stdout.match(/Missed Vsync:\s+(\d+)/)?.[1] || "0", 10);

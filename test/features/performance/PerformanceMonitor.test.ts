@@ -79,6 +79,7 @@ describe("PerformanceMonitor", () => {
     adb.setCommandResult(
       "shell dumpsys gfxinfo com.example.app reset",
       `
+        Total frames rendered: 100
         50th percentile: 8.5ms
         90th percentile: 12.3ms
         95th percentile: 15.7ms
@@ -376,6 +377,7 @@ describe("PerformanceMonitor", () => {
       fakeAdbClient.setCommandResult(
         "shell dumpsys gfxinfo com.example.app reset",
         `
+          Total frames rendered: 50
           50th percentile: 8.5ms
           Missed Vsync: 3
           Slow UI thread: 1
@@ -414,6 +416,31 @@ describe("PerformanceMonitor", () => {
       expect(data!.metrics.fps).toBeNull();
       expect(data!.metrics.frameTimeMs).toBeNull();
       expect(data!.metrics.jankFrames).toBe(0); // Jank counters default to 0 when not found
+    });
+
+    it("should return null frame time when no frames were rendered", async () => {
+      // When app is idle, gfxinfo shows "Total frames rendered: 0" with garbage P50 values
+      fakeAdbClient.setCommandResult(
+        "shell dumpsys gfxinfo com.example.app reset",
+        `
+          Total frames rendered: 0
+          50th percentile: 4950ms
+          Missed Vsync: 0
+          Slow UI thread: 0
+          Frame deadline missed: 0
+        `
+      );
+
+      monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
+      monitor.start();
+      monitor.startMonitoring("device-1", "com.example.app");
+
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+      const data = fakePusher.getLastPushedData();
+      expect(data!.metrics.fps).toBeNull(); // No frames = no FPS
+      expect(data!.metrics.frameTimeMs).toBeNull(); // Ignore garbage P50 when no frames
+      expect(data!.metrics.jankFrames).toBe(0);
     });
 
     it("should handle missing PID gracefully", async () => {
@@ -478,11 +505,11 @@ describe("PerformanceMonitor", () => {
     it("should push data for each monitored device", async () => {
       fakeAdbClient.setCommandResult(
         "shell dumpsys gfxinfo com.app1 reset",
-        "50th percentile: 10ms"
+        "Total frames rendered: 10\n50th percentile: 10ms"
       );
       fakeAdbClient.setCommandResult(
         "shell dumpsys gfxinfo com.app2 reset",
-        "50th percentile: 12ms"
+        "Total frames rendered: 10\n50th percentile: 12ms"
       );
       fakeAdbClient.setCommandResult("shell pidof com.app1", "111");
       fakeAdbClient.setCommandResult("shell pidof com.app2", "222");
