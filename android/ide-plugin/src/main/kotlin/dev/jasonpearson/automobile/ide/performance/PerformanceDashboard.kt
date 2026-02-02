@@ -110,8 +110,59 @@ fun PerformanceDashboard(
             realtimeMetricsHistory = (realtimeMetricsHistory + newPoint).takeLast(120)
 
             // Update the current run with real-time data
-            currentRun?.let { run ->
-                val updatedMetrics = run.metrics.map { metric ->
+            val run = currentRun ?: PerformanceRun(
+                id = "live-run-${System.currentTimeMillis()}",
+                name = "Live Performance Data",
+                timestamp = System.currentTimeMillis(),
+                durationMs = 0,
+                deviceName = update.deviceId ?: "Unknown",
+                overallHealth = HealthStatus.Healthy,
+                metrics = emptyList(),
+                anomalies = emptyList(),
+                screensAnalyzed = emptyList(),
+            )
+
+            // Create metrics from streaming data if they don't exist, otherwise update
+            val updatedMetrics = if (run.metrics.isEmpty()) {
+                // Create new metrics from live data
+                listOf(
+                    PerformanceMetric(
+                        id = "fps",
+                        type = MetricType.FPS,
+                        name = "Frame Rate",
+                        currentValue = update.fps,
+                        unit = "fps",
+                        thresholdWarning = 55f,
+                        thresholdCritical = 45f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(newPoint),
+                    ),
+                    PerformanceMetric(
+                        id = "frame_time",
+                        type = MetricType.FrameTime,
+                        name = "Frame Time",
+                        currentValue = update.frameTimeMs,
+                        unit = "ms",
+                        thresholdWarning = 18f,
+                        thresholdCritical = 33f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(MetricDataPoint(update.timestamp, update.frameTimeMs, update.screenName)),
+                    ),
+                    PerformanceMetric(
+                        id = "jank",
+                        type = MetricType.Jank,
+                        name = "Jank (Missed Frames)",
+                        currentValue = update.jankFrames.toFloat(),
+                        unit = "frames",
+                        thresholdWarning = 5f,
+                        thresholdCritical = 10f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(MetricDataPoint(update.timestamp, update.jankFrames.toFloat(), update.screenName)),
+                    ),
+                )
+            } else {
+                // Update existing metrics
+                run.metrics.map { metric ->
                     when (metric.type) {
                         MetricType.FPS -> metric.copy(
                             currentValue = update.fps,
@@ -140,16 +191,16 @@ fun PerformanceDashboard(
                         else -> metric
                     }
                 }
-
-                // Detect anomalies from real-time data
-                val newAnomalies = detectAnomalies(update, updatedMetrics)
-
-                currentRun = run.copy(
-                    metrics = updatedMetrics,
-                    anomalies = (run.anomalies + newAnomalies).distinctBy { it.id }.takeLast(50),
-                    overallHealth = calculateOverallHealth(updatedMetrics),
-                )
             }
+
+            // Detect anomalies from real-time data
+            val newAnomalies = detectAnomalies(update, updatedMetrics)
+
+            currentRun = run.copy(
+                metrics = updatedMetrics,
+                anomalies = (run.anomalies + newAnomalies).distinctBy { it.id }.takeLast(50),
+                overallHealth = calculateOverallHealth(updatedMetrics),
+            )
         }
     }
 
