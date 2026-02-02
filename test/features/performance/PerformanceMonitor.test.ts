@@ -360,16 +360,33 @@ describe("PerformanceMonitor", () => {
       expect(data!.metrics.frameTimeMs).toBe(8.5);
     });
 
-    it("should calculate jank frames sum", async () => {
-      // Missed Vsync: 2, Slow UI thread: 1, Frame deadline missed: 3 = 6 total
+    it("should calculate jank frames as delta between samples", async () => {
+      // First sample establishes baseline, returns 0 jank
+      // Second sample returns the delta
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
       monitor.startMonitoring("device-1", "com.example.app");
 
+      // First tick - baseline, jank should be 0
       await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+      const data1 = fakePusher.getLastPushedData();
+      expect(data1!.metrics.jankFrames).toBe(0); // First sample = baseline
 
-      const data = fakePusher.getLastPushedData();
-      expect(data!.metrics.jankFrames).toBe(6);
+      // Update counters to simulate new jank (increase by 5)
+      fakeAdbClient.setCommandResult(
+        "shell dumpsys gfxinfo com.example.app",
+        `
+          50th percentile: 8.5ms
+          Missed Vsync: 5
+          Slow UI thread: 2
+          Frame deadline missed: 4
+        `
+      );
+
+      // Second tick - should report delta: (5-2) + (2-1) + (4-3) = 3 + 1 + 1 = 5
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+      const data2 = fakePusher.getLastPushedData();
+      expect(data2!.metrics.jankFrames).toBe(5);
     });
 
     it("should parse memory in MB", async () => {
@@ -396,7 +413,7 @@ describe("PerformanceMonitor", () => {
       const data = fakePusher.getLastPushedData();
       expect(data!.metrics.fps).toBeNull();
       expect(data!.metrics.frameTimeMs).toBeNull();
-      expect(data!.metrics.jankFrames).toBe(0); // Sum of zero matches
+      expect(data!.metrics.jankFrames).toBe(0); // First sample = baseline, returns 0
     });
 
     it("should handle missing PID gracefully", async () => {

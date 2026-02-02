@@ -14,6 +14,16 @@ interface GfxMetrics {
   jankFrames: number | null;
 }
 
+/**
+ * Raw cumulative jank counters from dumpsys gfxinfo.
+ * These are cumulative since last reset, so we need to track deltas.
+ */
+interface RawJankCounters {
+  missedVsync: number;
+  slowUi: number;
+  deadlineMissed: number;
+}
+
 interface MonitoredDevice {
   deviceId: string;
   packageName: string;
@@ -22,6 +32,8 @@ interface MonitoredDevice {
   lastSlowTick: number;
   cachedCpu: number | null;
   cachedMemory: number | null;
+  /** Previous jank counters for computing deltas */
+  prevJankCounters: RawJankCounters | null;
 }
 
 /**
@@ -110,6 +122,7 @@ export class PerformanceMonitor {
         existing.cachedMemory = null;
         existing.lastMediumTick = 0;
         existing.lastSlowTick = 0;
+        existing.prevJankCounters = null;
         logger.info(`[PerformanceMonitor] Updated monitoring to ${packageName} on ${deviceId}`);
       }
       return;
@@ -123,6 +136,7 @@ export class PerformanceMonitor {
       lastSlowTick: 0,
       cachedCpu: null,
       cachedMemory: null,
+      prevJankCounters: null,
     });
     logger.info(`[PerformanceMonitor] Started monitoring ${packageName} on ${deviceId}`);
   }
@@ -228,10 +242,29 @@ export class PerformanceMonitor {
 
       device.lastFastTick = now;
 
+      // Calculate jank delta from cumulative counters
+      let jankFrames: number | null = null;
+      if (gfx.rawJankCounters) {
+        const curr = gfx.rawJankCounters;
+        const prev = device.prevJankCounters;
+        if (prev) {
+          // Compute delta (new jank since last sample)
+          const deltaMissedVsync = Math.max(0, curr.missedVsync - prev.missedVsync);
+          const deltaSlowUi = Math.max(0, curr.slowUi - prev.slowUi);
+          const deltaDeadlineMissed = Math.max(0, curr.deadlineMissed - prev.deadlineMissed);
+          jankFrames = deltaMissedVsync + deltaSlowUi + deltaDeadlineMissed;
+        } else {
+          // First sample - report 0 jank (we don't know what happened before)
+          jankFrames = 0;
+        }
+        // Update previous counters for next delta calculation
+        device.prevJankCounters = curr;
+      }
+
       const metrics = {
         fps: gfx.fps,
         frameTimeMs: gfx.frameTimeMs,
-        jankFrames: gfx.jankFrames,
+        jankFrames,
         touchLatencyMs: null,
         ttffMs: null,
         ttiMs: null,
@@ -258,9 +291,10 @@ export class PerformanceMonitor {
 
   /**
    * Collect graphics metrics from dumpsys gfxinfo.
-   * Parses FPS, frame time percentiles, and jank indicators.
+   * Parses FPS, frame time percentiles, and raw jank counters (cumulative).
+   * Jank delta calculation happens in sampleDevice.
    */
-  private async collectGfxMetrics(device: MonitoredDevice): Promise<GfxMetrics> {
+  private async collectGfxMetrics(device: MonitoredDevice): Promise<GfxMetrics & { rawJankCounters: RawJankCounters | null }> {
     try {
       const adb = this.adbClientFactory.create({
         deviceId: device.deviceId,
@@ -274,19 +308,23 @@ export class PerformanceMonitor {
       const p50Match = stdout.match(/50th percentile:\s+(\d+(?:\.\d+)?)ms/);
       const frameTimeMs = p50Match ? parseFloat(p50Match[1]) : null;
 
-      // Parse jank indicators
+      // Parse cumulative jank counters
       const missedVsync = parseInt(stdout.match(/Missed Vsync:\s+(\d+)/)?.[1] || "0", 10);
       const slowUi = parseInt(stdout.match(/Slow UI thread:\s+(\d+)/)?.[1] || "0", 10);
       const deadlineMissed = parseInt(stdout.match(/Frame deadline missed:\s+(\d+)/)?.[1] || "0", 10);
-      const jankFrames = missedVsync + slowUi + deadlineMissed;
 
       // Calculate FPS from frame time
       const fps = frameTimeMs && frameTimeMs > 0 ? Math.min(1000 / frameTimeMs, 60) : null;
 
-      return { fps, frameTimeMs, jankFrames };
+      return {
+        fps,
+        frameTimeMs,
+        jankFrames: null, // Computed as delta in sampleDevice
+        rawJankCounters: { missedVsync, slowUi, deadlineMissed },
+      };
     } catch (error) {
       logger.debug(`[PerformanceMonitor] gfxinfo failed for ${device.deviceId}: ${error}`);
-      return { fps: null, frameTimeMs: null, jankFrames: null };
+      return { fps: null, frameTimeMs: null, jankFrames: null, rawJankCounters: null };
     }
   }
 
