@@ -243,23 +243,12 @@ export class PerformanceMonitor {
 
       device.lastFastTick = now;
 
-      // Calculate jank delta from cumulative counters
+      // Jank counters are now per-interval (since we reset gfxinfo after each read)
       let jankFrames: number | null = null;
       if (gfx.rawJankCounters) {
         const curr = gfx.rawJankCounters;
-        const prev = device.prevJankCounters;
-        if (prev) {
-          // Compute delta (new jank since last sample)
-          const deltaMissedVsync = Math.max(0, curr.missedVsync - prev.missedVsync);
-          const deltaSlowUi = Math.max(0, curr.slowUi - prev.slowUi);
-          const deltaDeadlineMissed = Math.max(0, curr.deadlineMissed - prev.deadlineMissed);
-          jankFrames = deltaMissedVsync + deltaSlowUi + deltaDeadlineMissed;
-        } else {
-          // First sample - report 0 jank (we don't know what happened before)
-          jankFrames = 0;
-        }
-        // Update previous counters for next delta calculation
-        device.prevJankCounters = curr;
+        // Sum all jank indicators for this interval
+        jankFrames = curr.missedVsync + curr.slowUi + curr.deadlineMissed;
       }
 
       const metrics = {
@@ -308,7 +297,8 @@ export class PerformanceMonitor {
 
   /**
    * Collect graphics metrics from dumpsys gfxinfo.
-   * Parses FPS, frame time percentiles, and raw jank counters (cumulative).
+   * Parses FPS, frame time percentiles, and raw jank counters.
+   * Resets gfxinfo after reading to get fresh data for the next interval.
    * Jank delta calculation happens in sampleDevice.
    */
   private async collectGfxMetrics(device: MonitoredDevice): Promise<GfxMetrics & { rawJankCounters: RawJankCounters | null }> {
@@ -319,13 +309,15 @@ export class PerformanceMonitor {
         platform: "android",
       });
 
-      const { stdout } = await adb.executeCommand(`shell dumpsys gfxinfo ${device.packageName}`);
+      // Read and reset gfxinfo in one command to get fresh interval data
+      // The 'reset' flag clears stats after reading, so next read reflects only new frames
+      const { stdout } = await adb.executeCommand(`shell dumpsys gfxinfo ${device.packageName} reset`);
 
-      // Parse 50th percentile frame time
+      // Parse 50th percentile frame time (now reflects only frames since last reset)
       const p50Match = stdout.match(/50th percentile:\s+(\d+(?:\.\d+)?)ms/);
       const frameTimeMs = p50Match ? parseFloat(p50Match[1]) : null;
 
-      // Parse cumulative jank counters
+      // Parse jank counters (now reflects only jank since last reset)
       const missedVsync = parseInt(stdout.match(/Missed Vsync:\s+(\d+)/)?.[1] || "0", 10);
       const slowUi = parseInt(stdout.match(/Slow UI thread:\s+(\d+)/)?.[1] || "0", 10);
       const deadlineMissed = parseInt(stdout.match(/Frame deadline missed:\s+(\d+)/)?.[1] || "0", 10);

@@ -75,9 +75,9 @@ describe("PerformanceMonitor", () => {
   });
 
   function setupDefaultAdbResponses(adb: FakeAdbClient): void {
-    // gfxinfo response
+    // gfxinfo response (with reset flag for per-interval metrics)
     adb.setCommandResult(
-      "shell dumpsys gfxinfo com.example.app",
+      "shell dumpsys gfxinfo com.example.app reset",
       `
         50th percentile: 8.5ms
         90th percentile: 12.3ms
@@ -241,7 +241,7 @@ describe("PerformanceMonitor", () => {
 
     it("should prevent concurrent tick execution", async () => {
       // Use a slow ADB response to test concurrent prevention
-      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app", "");
+      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app reset", "");
 
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
@@ -360,30 +360,30 @@ describe("PerformanceMonitor", () => {
       expect(data!.metrics.frameTimeMs).toBe(8.5);
     });
 
-    it("should calculate jank frames as delta between samples", async () => {
-      // First sample establishes baseline, returns 0 jank
-      // Second sample returns the delta
+    it("should calculate jank frames as sum of per-interval counters", async () => {
+      // With reset flag, each sample returns only jank since last reset
+      // Jank is the sum of all three indicators per interval
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
       monitor.startMonitoring("device-1", "com.example.app");
 
-      // First tick - baseline, jank should be 0
+      // First tick - jank should be sum of: 2 + 1 + 3 = 6 (from default setup)
       await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
       const data1 = fakePusher.getLastPushedData();
-      expect(data1!.metrics.jankFrames).toBe(0); // First sample = baseline
+      expect(data1!.metrics.jankFrames).toBe(6); // missedVsync(2) + slowUi(1) + deadlineMissed(3)
 
-      // Update counters to simulate new jank (increase by 5)
+      // Update counters to simulate new jank for second interval
       fakeAdbClient.setCommandResult(
-        "shell dumpsys gfxinfo com.example.app",
+        "shell dumpsys gfxinfo com.example.app reset",
         `
           50th percentile: 8.5ms
-          Missed Vsync: 5
-          Slow UI thread: 2
-          Frame deadline missed: 4
+          Missed Vsync: 3
+          Slow UI thread: 1
+          Frame deadline missed: 1
         `
       );
 
-      // Second tick - should report delta: (5-2) + (2-1) + (4-3) = 3 + 1 + 1 = 5
+      // Second tick - should report sum for this interval: 3 + 1 + 1 = 5
       await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
       const data2 = fakePusher.getLastPushedData();
       expect(data2!.metrics.jankFrames).toBe(5);
@@ -402,7 +402,7 @@ describe("PerformanceMonitor", () => {
     });
 
     it("should handle missing gfxinfo data gracefully", async () => {
-      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app", "No data available");
+      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app reset", "No data available");
 
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
@@ -413,7 +413,7 @@ describe("PerformanceMonitor", () => {
       const data = fakePusher.getLastPushedData();
       expect(data!.metrics.fps).toBeNull();
       expect(data!.metrics.frameTimeMs).toBeNull();
-      expect(data!.metrics.jankFrames).toBe(0); // First sample = baseline, returns 0
+      expect(data!.metrics.jankFrames).toBe(0); // Jank counters default to 0 when not found
     });
 
     it("should handle missing PID gracefully", async () => {
@@ -431,7 +431,7 @@ describe("PerformanceMonitor", () => {
 
     it("should handle ADB errors gracefully", async () => {
       fakeAdbClient.setCommandError(
-        "shell dumpsys gfxinfo com.example.app",
+        "shell dumpsys gfxinfo com.example.app reset",
         new Error("ADB connection failed")
       );
 
@@ -477,11 +477,11 @@ describe("PerformanceMonitor", () => {
   describe("multiple devices", () => {
     it("should push data for each monitored device", async () => {
       fakeAdbClient.setCommandResult(
-        "shell dumpsys gfxinfo com.app1",
+        "shell dumpsys gfxinfo com.app1 reset",
         "50th percentile: 10ms"
       );
       fakeAdbClient.setCommandResult(
-        "shell dumpsys gfxinfo com.app2",
+        "shell dumpsys gfxinfo com.app2 reset",
         "50th percentile: 12ms"
       );
       fakeAdbClient.setCommandResult("shell pidof com.app1", "111");
