@@ -1302,9 +1302,15 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
       if (message.type === "get_preference_result" && message.requestId) {
         const storageMessage = message as any;
+        // Build entry from key/value/type fields (Android sends flat structure, not nested entry)
+        const entry = storageMessage.found && storageMessage.key ? {
+          key: storageMessage.key,
+          value: storageMessage.value,
+          type: storageMessage.type
+        } : undefined;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, found: storageMessage.found ?? false,
-          entry: storageMessage.entry, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+          entry, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
         });
       }
 
