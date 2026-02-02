@@ -159,6 +159,17 @@ fun PerformanceDashboard(
                         trend = MetricTrend.Stable,
                         history = listOf(MetricDataPoint(update.timestamp, update.jankFrames.toFloat(), update.screenName)),
                     ),
+                    PerformanceMetric(
+                        id = "memory",
+                        type = MetricType.Memory,
+                        name = "Memory Usage",
+                        currentValue = update.memoryUsageMb,
+                        unit = "MB",
+                        thresholdWarning = 256f,
+                        thresholdCritical = 512f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(MetricDataPoint(update.timestamp, update.memoryUsageMb, update.screenName)),
+                    ),
                 )
             } else {
                 // Update existing metrics
@@ -186,6 +197,15 @@ fun PerformanceDashboard(
                                 screenName = update.screenName,
                             )).takeLast(120),
                             trend = calculateTrend(metric.currentValue, update.frameTimeMs),
+                        )
+                        MetricType.Memory -> metric.copy(
+                            currentValue = update.memoryUsageMb,
+                            history = (metric.history + MetricDataPoint(
+                                timestamp = update.timestamp,
+                                value = update.memoryUsageMb,
+                                screenName = update.screenName,
+                            )).takeLast(120),
+                            trend = calculateTrend(metric.currentValue, update.memoryUsageMb),
                         )
                         // TouchLatency requires actual touch interaction events, not streaming frame data
                         else -> metric
@@ -296,45 +316,8 @@ private fun PerformanceOverviewScreen(
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
     ) {
-        // Header with health status and live toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Performance Overview", fontSize = 18.sp)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Is this app healthy?",
-                        color = colors.text.normal.copy(alpha = 0.6f),
-                        fontSize = 12.sp,
-                    )
-                    // Live indicator
-                    if (hasStreamClient && isLive && lastUpdate != null) {
-                        LiveIndicator()
-                    }
-                }
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Live/Pause toggle (only show if stream client is available)
-                if (hasStreamClient) {
-                    LivePauseToggle(
-                        isLive = isLive,
-                        onToggle = onLiveToggle,
-                    )
-                }
-                // Overall health indicator
-                HealthBadge(status = run.overallHealth)
-            }
-        }
+        // Header
+        Text("Performance Overview", fontSize = 18.sp)
 
         // Real-time stats row (when live streaming)
         if (hasStreamClient && isLive && lastUpdate != null) {
@@ -580,26 +563,6 @@ private fun MetricDetailScreen(
         OutlinedButton(onClick = { /* TODO: Export snapshot */ }) {
             Text("Export Snapshot")
         }
-    }
-}
-
-@Composable
-private fun HealthBadge(status: HealthStatus) {
-    val (color, label) = when (status) {
-        HealthStatus.Healthy -> Color(0xFF4CAF50) to "Healthy"
-        HealthStatus.Warning -> Color(0xFFFFC107) to "Warning"
-        HealthStatus.Critical -> Color(0xFFFF5722) to "Critical"
-    }
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
-        Text(label, fontSize = 11.sp, color = color)
     }
 }
 
@@ -971,59 +934,6 @@ private fun ScreenMetricRow(
             fontSize = 10.sp,
             color = colors.text.normal.copy(alpha = 0.6f),
             modifier = Modifier.width(50.dp),
-        )
-    }
-}
-
-@Composable
-private fun LiveIndicator() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Pulsing red dot
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .background(Color(0xFFFF4444), CircleShape)
-        )
-        Text(
-            "LIVE",
-            fontSize = 9.sp,
-            color = Color(0xFFFF4444),
-        )
-    }
-}
-
-@Composable
-private fun LivePauseToggle(
-    isLive: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    val colors = JewelTheme.globalColors
-    val bgColor = if (isLive) Color(0xFF4CAF50).copy(alpha = 0.15f) else colors.text.normal.copy(alpha = 0.1f)
-    val borderColor = if (isLive) Color(0xFF4CAF50).copy(alpha = 0.3f) else colors.text.normal.copy(alpha = 0.2f)
-    val textColor = if (isLive) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.6f)
-
-    Row(
-        modifier = Modifier
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .background(bgColor, RoundedCornerShape(12.dp))
-            .clickable { onToggle(!isLive) }
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            if (isLive) "⏸" else "▶",
-            fontSize = 10.sp,
-            color = textColor,
-        )
-        Text(
-            if (isLive) "Pause" else "Live",
-            fontSize = 10.sp,
-            color = textColor,
         )
     }
 }

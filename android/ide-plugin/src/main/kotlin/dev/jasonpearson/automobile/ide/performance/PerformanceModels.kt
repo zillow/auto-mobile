@@ -11,6 +11,7 @@ enum class MetricType {
     Jank,              // Missed frames / UI stuttering
     FPS,               // Frames per second time series
     FrameTime,         // Time to render a single frame (ms)
+    Memory,            // Memory usage in MB
 }
 
 data class PerformanceMetric(
