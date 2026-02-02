@@ -46,6 +46,7 @@ import {
   computeChecksum,
 } from "../ScreenshotBackoffScheduler";
 import { getFailureRecorder } from "../../failures/FailureRecorder";
+import { getPerformanceMonitor } from "../../performance/PerformanceMonitor";
 import type { StackTraceElement } from "../../../server/failuresResources";
 import type {
   PreferenceFile,
@@ -1450,9 +1451,12 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     // Start screenshot backoff
     this.startScreenshotBackoff();
 
-    // Track foreground package for context
+    // Track foreground package for context and start performance monitoring
     if (data.packageName && data.packageName !== this.lastForegroundPackage) {
       this.lastForegroundPackage = data.packageName;
+      // Start performance monitoring for this device/package
+      const monitor = getPerformanceMonitor();
+      monitor.startMonitoring(this.device.deviceId, data.packageName);
     }
 
     // Notify hierarchy navigation detector

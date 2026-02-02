@@ -6,6 +6,7 @@ import {
   DEFAULT_THRESHOLDS,
   PerformancePushSocketServer,
 } from "../../daemon/performancePushSocketServer";
+import { getDeviceDataStreamServer, PerformanceStreamData } from "../../daemon/deviceDataStreamSocketServer";
 import { defaultAdbClientFactory, AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 
 interface GfxMetrics {
@@ -284,6 +285,22 @@ export class PerformanceMonitor {
       };
 
       server.pushPerformanceData(data);
+
+      // Also push to the observation stream for IDE plugin
+      const observationServer = getDeviceDataStreamServer();
+      if (observationServer) {
+        const streamData: PerformanceStreamData = {
+          fps: metrics.fps ?? 0,
+          frameTimeMs: metrics.frameTimeMs ?? 0,
+          jankFrames: jankFrames ?? 0,
+          droppedFrames: 0, // Not tracked in real-time monitoring
+          memoryUsageMb: metrics.memoryUsageMb ?? 0,
+          cpuUsagePercent: metrics.cpuUsagePercent ?? 0,
+          screenName: null, // Could be enhanced with current activity
+          isResponsive: data.health !== "critical",
+        };
+        observationServer.pushPerformanceUpdate(device.deviceId, streamData);
+      }
     } catch (error) {
       logger.debug(`[PerformanceMonitor] Error sampling ${device.deviceId}: ${error}`);
     }
