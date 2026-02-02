@@ -58,6 +58,10 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
         when (method) {
           "listFiles" -> handleListFiles(driver)
           "getPreferences" -> handleGetPreferences(driver, extras)
+          "getPreference" -> handleGetPreference(driver, extras)
+          "setValue" -> handleSetValue(driver, extras)
+          "removeValue" -> handleRemoveValue(driver, extras)
+          "clearFile" -> handleClearFile(driver, extras)
           "subscribeToFile" -> handleSubscribeToFile(driver, extras)
           "unsubscribeFromFile" -> handleUnsubscribeFromFile(driver, extras)
           "getChanges" -> handleGetChanges(driver, extras)
@@ -137,6 +141,140 @@ class SharedPreferencesInspectorProvider : ContentProvider() {
         "[" + set.joinToString(",") { "\"$it\"" } + "]"
       }
       else -> value.toString()
+    }
+  }
+
+  /**
+   * Handles getPreference - returns a single preference value by key.
+   *
+   * @param extras Must contain "fileName" and "key" strings
+   * @return JSON with the preference entry or null if not found
+   */
+  private fun handleGetPreference(driver: SharedPreferencesDriver, extras: Bundle?): String {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+    val key =
+      extras.getString("key") ?: throw IllegalArgumentException("key required")
+
+    val entry = driver.getPreference(fileName, key)
+    val protocolEntry = entry?.let {
+      StorageEntry(
+        key = it.key,
+        value = serializeValue(it.value, it.type),
+        type = it.type.name,
+      )
+    }
+
+    val response = StorageResponse.SinglePreference(
+      fileName = fileName,
+      key = key,
+      entry = protocolEntry,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
+  }
+
+  /**
+   * Handles setValue - sets a preference value.
+   *
+   * @param extras Must contain "fileName", "key", "value", and "type" strings
+   * @return JSON with success status
+   */
+  private fun handleSetValue(driver: SharedPreferencesDriver, extras: Bundle?): String {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+    val key =
+      extras.getString("key") ?: throw IllegalArgumentException("key required")
+    val valueStr = extras.getString("value")
+    val typeStr =
+      extras.getString("type") ?: throw IllegalArgumentException("type required")
+
+    val type = try {
+      KeyValueType.valueOf(typeStr)
+    } catch (e: IllegalArgumentException) {
+      throw IllegalArgumentException("Invalid type: $typeStr")
+    }
+
+    val value = deserializeValue(valueStr, type)
+    driver.setValue(fileName, key, value, type)
+
+    val response = StorageResponse.OperationSuccess(
+      operation = "setValue",
+      fileName = fileName,
+      key = key,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
+  }
+
+  /**
+   * Handles removeValue - removes a preference by key.
+   *
+   * @param extras Must contain "fileName" and "key" strings
+   * @return JSON with success status
+   */
+  private fun handleRemoveValue(driver: SharedPreferencesDriver, extras: Bundle?): String {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+    val key =
+      extras.getString("key") ?: throw IllegalArgumentException("key required")
+
+    driver.removeValue(fileName, key)
+
+    val response = StorageResponse.OperationSuccess(
+      operation = "removeValue",
+      fileName = fileName,
+      key = key,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
+  }
+
+  /**
+   * Handles clearFile - clears all preferences in a file.
+   *
+   * @param extras Must contain "fileName" string
+   * @return JSON with success status
+   */
+  private fun handleClearFile(driver: SharedPreferencesDriver, extras: Bundle?): String {
+    val fileName =
+      extras?.getString("fileName") ?: throw IllegalArgumentException("fileName required")
+
+    driver.clear(fileName)
+
+    val response = StorageResponse.OperationSuccess(
+      operation = "clearFile",
+      fileName = fileName,
+      key = null,
+    )
+    return StorageProtocolSerializer.responseToJson(response)
+  }
+
+  /**
+   * Deserializes a string value to the appropriate type.
+   */
+  private fun deserializeValue(valueStr: String?, type: KeyValueType): Any? {
+    if (valueStr == null) return null
+
+    return when (type) {
+      KeyValueType.STRING -> valueStr
+      KeyValueType.INT -> valueStr.toIntOrNull() ?: throw IllegalArgumentException("Invalid INT value: $valueStr")
+      KeyValueType.LONG -> valueStr.toLongOrNull() ?: throw IllegalArgumentException("Invalid LONG value: $valueStr")
+      KeyValueType.FLOAT -> valueStr.toFloatOrNull() ?: throw IllegalArgumentException("Invalid FLOAT value: $valueStr")
+      KeyValueType.BOOLEAN -> valueStr.toBooleanStrictOrNull() ?: throw IllegalArgumentException("Invalid BOOLEAN value: $valueStr")
+      KeyValueType.STRING_SET -> {
+        // Parse JSON array format: ["a","b","c"]
+        val trimmed = valueStr.trim()
+        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+          throw IllegalArgumentException("STRING_SET must be a JSON array: $valueStr")
+        }
+        val inner = trimmed.substring(1, trimmed.length - 1)
+        if (inner.isBlank()) {
+          emptySet<String>()
+        } else {
+          inner.split(",")
+            .map { it.trim().removeSurrounding("\"") }
+            .toSet()
+        }
+      }
+      KeyValueType.UNKNOWN -> throw IllegalArgumentException("Cannot deserialize UNKNOWN type")
     }
   }
 

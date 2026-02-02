@@ -101,19 +101,26 @@ class StorageSubscriptionManager(
    * @return Result with list of preference file info or error
    */
   fun listPreferenceFiles(packageName: String): Result<List<PreferenceFileInfo>> {
+    Log.d(TAG, "listPreferenceFiles: packageName=$packageName")
     return try {
       val authority = packageName + AUTHORITY_SUFFIX
       val uri = Uri.parse("content://$authority")
+      Log.d(TAG, "listPreferenceFiles: calling contentResolver.call with authority=$authority")
       val result = context.contentResolver.call(uri, "listFiles", null, null)
+      Log.d(TAG, "listPreferenceFiles: contentResolver.call returned, result=$result")
 
       if (result == null) {
+        Log.w(TAG, "listPreferenceFiles: result is null (SDK not installed)")
         Result.failure(StorageError.SdkNotInstalled(packageName))
       } else if (!result.getBoolean("success", false)) {
         val error = result.getString("error") ?: "Unknown error"
+        Log.w(TAG, "listPreferenceFiles: result.success=false, error=$error")
         Result.failure(StorageError.SdkError(error))
       } else {
         val responseJson = result.getString("result") ?: "{}"
+        Log.d(TAG, "listPreferenceFiles: responseJson=$responseJson")
         val response = StorageProtocolSerializer.responseFromJson(responseJson)
+        Log.d(TAG, "listPreferenceFiles: parsed response type=${response?.let { it::class.simpleName } ?: "null"}")
         when (response) {
           is StorageResponse.FileList -> {
             val files = response.files.map { file ->
@@ -123,12 +130,17 @@ class StorageSubscriptionManager(
                 entryCount = file.entryCount,
               )
             }
+            Log.d(TAG, "listPreferenceFiles: returning ${files.size} files")
             Result.success(files)
           }
-          else -> Result.failure(StorageError.SdkError("Unexpected response type"))
+          else -> {
+            Log.w(TAG, "listPreferenceFiles: unexpected response type: ${response?.let { it::class.simpleName } ?: "null"}")
+            Result.failure(StorageError.SdkError("Unexpected response type"))
+          }
         }
       }
     } catch (e: SecurityException) {
+      Log.e(TAG, "listPreferenceFiles: SecurityException (SDK not installed)", e)
       Result.failure(StorageError.SdkNotInstalled(packageName))
     } catch (e: Exception) {
       Log.e(TAG, "Error listing preference files for $packageName", e)
@@ -267,6 +279,187 @@ class StorageSubscriptionManager(
   /** Returns all active subscriptions. */
   fun getActiveSubscriptions(): List<StorageSubscription> {
     return subscriptions.values.map { it.subscription }
+  }
+
+  /**
+   * Gets a single preference value by key.
+   *
+   * @param packageName The target app package name
+   * @param fileName The preferences file name
+   * @param key The key to retrieve
+   * @return Result with the preference entry (null if key not found) or error
+   */
+  fun getPreference(packageName: String, fileName: String, key: String): Result<PreferenceEntry?> {
+    return try {
+      val authority = packageName + AUTHORITY_SUFFIX
+      val uri = Uri.parse("content://$authority")
+      val extras = Bundle().apply {
+        putString("fileName", fileName)
+        putString("key", key)
+      }
+      val result = context.contentResolver.call(uri, "getPreference", null, extras)
+
+      if (result == null) {
+        Result.failure(StorageError.SdkNotInstalled(packageName))
+      } else if (!result.getBoolean("success", false)) {
+        val error = result.getString("error") ?: "Unknown error"
+        val errorType = result.getString("errorType")
+        if (errorType == "FileNotFound") {
+          Result.failure(StorageError.FileNotFound(fileName))
+        } else {
+          Result.failure(StorageError.SdkError(error))
+        }
+      } else {
+        val responseJson = result.getString("result") ?: "{}"
+        val response = StorageProtocolSerializer.responseFromJson(responseJson)
+        when (response) {
+          is StorageResponse.SinglePreference -> {
+            val entry = response.entry?.let {
+              PreferenceEntry(
+                key = it.key,
+                value = it.value,
+                type = it.type,
+              )
+            }
+            Result.success(entry)
+          }
+          else -> Result.failure(StorageError.SdkError("Unexpected response type"))
+        }
+      }
+    } catch (e: SecurityException) {
+      Result.failure(StorageError.SdkNotInstalled(packageName))
+    } catch (e: Exception) {
+      Log.e(TAG, "Error getting preference for $packageName:$fileName:$key", e)
+      Result.failure(StorageError.SdkError(e.message ?: "Unknown error"))
+    }
+  }
+
+  /**
+   * Sets a preference value.
+   *
+   * @param packageName The target app package name
+   * @param fileName The preferences file name
+   * @param key The key to set
+   * @param value The serialized value (or null)
+   * @param type The type of the value (STRING, INT, LONG, FLOAT, BOOLEAN, STRING_SET)
+   * @return Result with success or error
+   */
+  fun setPreference(
+    packageName: String,
+    fileName: String,
+    key: String,
+    value: String?,
+    type: String,
+  ): Result<Unit> {
+    return try {
+      val authority = packageName + AUTHORITY_SUFFIX
+      val uri = Uri.parse("content://$authority")
+      val extras = Bundle().apply {
+        putString("fileName", fileName)
+        putString("key", key)
+        if (value != null) putString("value", value)
+        putString("type", type)
+      }
+      val result = context.contentResolver.call(uri, "setValue", null, extras)
+
+      if (result == null) {
+        Result.failure(StorageError.SdkNotInstalled(packageName))
+      } else if (!result.getBoolean("success", false)) {
+        val error = result.getString("error") ?: "Unknown error"
+        val errorType = result.getString("errorType")
+        if (errorType == "FileNotFound") {
+          Result.failure(StorageError.FileNotFound(fileName))
+        } else {
+          Result.failure(StorageError.SdkError(error))
+        }
+      } else {
+        Log.d(TAG, "Set preference $packageName:$fileName:$key")
+        Result.success(Unit)
+      }
+    } catch (e: SecurityException) {
+      Result.failure(StorageError.SdkNotInstalled(packageName))
+    } catch (e: Exception) {
+      Log.e(TAG, "Error setting preference for $packageName:$fileName:$key", e)
+      Result.failure(StorageError.SdkError(e.message ?: "Unknown error"))
+    }
+  }
+
+  /**
+   * Removes a preference value.
+   *
+   * @param packageName The target app package name
+   * @param fileName The preferences file name
+   * @param key The key to remove
+   * @return Result with success or error
+   */
+  fun removePreference(packageName: String, fileName: String, key: String): Result<Unit> {
+    return try {
+      val authority = packageName + AUTHORITY_SUFFIX
+      val uri = Uri.parse("content://$authority")
+      val extras = Bundle().apply {
+        putString("fileName", fileName)
+        putString("key", key)
+      }
+      val result = context.contentResolver.call(uri, "removeValue", null, extras)
+
+      if (result == null) {
+        Result.failure(StorageError.SdkNotInstalled(packageName))
+      } else if (!result.getBoolean("success", false)) {
+        val error = result.getString("error") ?: "Unknown error"
+        val errorType = result.getString("errorType")
+        if (errorType == "FileNotFound") {
+          Result.failure(StorageError.FileNotFound(fileName))
+        } else {
+          Result.failure(StorageError.SdkError(error))
+        }
+      } else {
+        Log.d(TAG, "Removed preference $packageName:$fileName:$key")
+        Result.success(Unit)
+      }
+    } catch (e: SecurityException) {
+      Result.failure(StorageError.SdkNotInstalled(packageName))
+    } catch (e: Exception) {
+      Log.e(TAG, "Error removing preference for $packageName:$fileName:$key", e)
+      Result.failure(StorageError.SdkError(e.message ?: "Unknown error"))
+    }
+  }
+
+  /**
+   * Clears all preferences in a file.
+   *
+   * @param packageName The target app package name
+   * @param fileName The preferences file name
+   * @return Result with success or error
+   */
+  fun clearPreferences(packageName: String, fileName: String): Result<Unit> {
+    return try {
+      val authority = packageName + AUTHORITY_SUFFIX
+      val uri = Uri.parse("content://$authority")
+      val extras = Bundle().apply {
+        putString("fileName", fileName)
+      }
+      val result = context.contentResolver.call(uri, "clearFile", null, extras)
+
+      if (result == null) {
+        Result.failure(StorageError.SdkNotInstalled(packageName))
+      } else if (!result.getBoolean("success", false)) {
+        val error = result.getString("error") ?: "Unknown error"
+        val errorType = result.getString("errorType")
+        if (errorType == "FileNotFound") {
+          Result.failure(StorageError.FileNotFound(fileName))
+        } else {
+          Result.failure(StorageError.SdkError(error))
+        }
+      } else {
+        Log.d(TAG, "Cleared preferences $packageName:$fileName")
+        Result.success(Unit)
+      }
+    } catch (e: SecurityException) {
+      Result.failure(StorageError.SdkNotInstalled(packageName))
+    } catch (e: Exception) {
+      Log.e(TAG, "Error clearing preferences for $packageName:$fileName", e)
+      Result.failure(StorageError.SdkError(e.message ?: "Unknown error"))
+    }
   }
 
   /** Cleans up all subscriptions and observers. Call when the service is destroyed. */

@@ -453,3 +453,53 @@ data class UnsubscribeStorageResult(
   val fileName: String,
   val error: String? = null,
 ) : WebSocketResponse()
+
+@Serializable
+@SerialName("get_preference_result")
+data class GetPreferenceResult(
+  override val timestamp: Long,
+  val requestId: String? = null,
+  val success: Boolean,
+  val packageName: String,
+  val fileName: String,
+  val key: String,
+  val value: String? = null,
+  val type: String? = null,
+  val found: Boolean = false,
+  val error: String? = null,
+) : WebSocketResponse()
+
+@Serializable
+@SerialName("set_preference_result")
+data class SetPreferenceResult(
+  override val timestamp: Long,
+  val requestId: String? = null,
+  val success: Boolean,
+  val packageName: String,
+  val fileName: String,
+  val key: String,
+  val error: String? = null,
+) : WebSocketResponse()
+
+@Serializable
+@SerialName("remove_preference_result")
+data class RemovePreferenceResult(
+  override val timestamp: Long,
+  val requestId: String? = null,
+  val success: Boolean,
+  val packageName: String,
+  val fileName: String,
+  val key: String,
+  val error: String? = null,
+) : WebSocketResponse()
+
+@Serializable
+@SerialName("clear_preferences_result")
+data class ClearPreferencesResult(
+  override val timestamp: Long,
+  val requestId: String? = null,
+  val success: Boolean,
+  val packageName: String,
+  val fileName: String,
+  val error: String? = null,
+) : WebSocketResponse()

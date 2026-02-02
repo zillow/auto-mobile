@@ -97,9 +97,12 @@ async function getStorageFilesResource(params: Record<string, string>): Promise<
   const decodedPackage = decodeURIComponent(packageName);
   const uri = buildFilesUri(deviceId, decodedPackage);
 
+  logger.info(`[StorageResources] getStorageFilesResource: deviceId=${deviceId}, packageName=${decodedPackage}`);
+
   try {
     const device = await findBootedAndroidDevice(deviceId);
     if (!device) {
+      logger.warn(`[StorageResources] Device not found: ${deviceId}`);
       return {
         uri,
         mimeType: "application/json",
@@ -107,8 +110,10 @@ async function getStorageFilesResource(params: Record<string, string>): Promise<
       };
     }
 
+    logger.info(`[StorageResources] Found device: ${device.deviceId}, calling listPreferenceFiles`);
     const client = AccessibilityServiceClient.getInstance(device);
     const files = await client.listPreferenceFiles(decodedPackage);
+    logger.info(`[StorageResources] listPreferenceFiles returned ${files.length} files`);
     const lastUpdated = new Date().toISOString();
     const hash = generateHash(files);
 

@@ -14,4 +14,8 @@ sealed class SharedPreferencesError(message: String) : Exception(message) {
 
   /** Error reading preferences. */
   class ReadError(cause: String) : SharedPreferencesError("Read error: $cause")
+
+  /** Invalid type for value. */
+  class InvalidType(type: String, reason: String) :
+    SharedPreferencesError("Invalid type $type: $reason")
 }

@@ -1,6 +1,7 @@
 import type {
   PreferenceFile,
   KeyValueEntry,
+  KeyValueType,
   StorageSubscription,
   StorageChangedEvent,
 } from "../../storage/storageTypes";
@@ -53,4 +54,48 @@ export interface StorageClient {
    * @returns Function to remove the listener
    */
   addStorageChangeListener(callback: (event: StorageChangedEvent) => void): () => void;
+
+  /**
+   * Get a single preference entry by key.
+   *
+   * @param packageName - The package name of the app
+   * @param fileName - Name of the preference file
+   * @param key - The key to retrieve
+   * @returns Promise resolving to the entry if found, null if not found
+   */
+  getPreference(packageName: string, fileName: string, key: string): Promise<KeyValueEntry | null>;
+
+  /**
+   * Set a preference value.
+   *
+   * @param packageName - The package name of the app
+   * @param fileName - Name of the preference file
+   * @param key - The key to set
+   * @param value - The value to set (serialized as string, or null)
+   * @param type - The type of the value (STRING, INT, LONG, FLOAT, BOOLEAN, STRING_SET)
+   */
+  setPreference(
+    packageName: string,
+    fileName: string,
+    key: string,
+    value: string | null,
+    type: KeyValueType
+  ): Promise<void>;
+
+  /**
+   * Remove a preference entry.
+   *
+   * @param packageName - The package name of the app
+   * @param fileName - Name of the preference file
+   * @param key - The key to remove
+   */
+  removePreference(packageName: string, fileName: string, key: string): Promise<void>;
+
+  /**
+   * Clear all preferences in a file.
+   *
+   * @param packageName - The package name of the app
+   * @param fileName - Name of the preference file to clear
+   */
+  clearPreferenceStore(packageName: string, fileName: string): Promise<void>;
 }

@@ -501,6 +501,9 @@ fun AutoMobileToolWindowContent() {
           }
           Dashboard.Storage -> StorageDashboard(
               dataSourceMode = dataSourceMode,
+              clientProvider = clientProvider,
+              deviceId = activeDeviceId,
+              packageName = selectedAppId,
           )
           Dashboard.Failures -> FailuresDashboard(
               onNavigateToScreen = { screenName ->

@@ -26,7 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
+import com.intellij.openapi.diagnostic.Logger
+import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
+
+private val LOG = Logger.getInstance("StorageDashboard")
 
 /**
  * Storage tab options.
@@ -43,6 +47,9 @@ enum class StorageTab(val title: String, val icon: String) {
 fun StorageDashboard(
     modifier: Modifier = Modifier,
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
+    clientProvider: (() -> AutoMobileClient)? = null,
+    deviceId: String? = null,
+    packageName: String? = null,
 ) {
     val colors = JewelTheme.globalColors
     var selectedTab by remember { mutableStateOf(StorageTab.Database) }
@@ -53,19 +60,28 @@ fun StorageDashboard(
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(dataSourceMode) {
+    LaunchedEffect(dataSourceMode, clientProvider, deviceId, packageName) {
+        LOG.info("StorageDashboard LaunchedEffect: mode=$dataSourceMode, clientProvider=${if (clientProvider != null) "present" else "null"}, deviceId=$deviceId, packageName=$packageName")
         isLoading = true
         error = null
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createStorageDataSource(dataSourceMode)
+                val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createStorageDataSource(
+                    dataSourceMode,
+                    clientProvider,
+                    deviceId,
+                    packageName
+                )
+                LOG.info("StorageDashboard: Created data source: ${dataSource::class.simpleName}")
 
                 // Fetch databases
                 when (val result = dataSource.getDatabases()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
+                        LOG.info("StorageDashboard: getDatabases success, count=${result.data.size}")
                         databases = result.data
                     }
                     is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {
+                        LOG.warn("StorageDashboard: getDatabases error: ${result.message}")
                         error = result.message
                     }
                     is dev.jasonpearson.automobile.ide.datasource.Result.Loading -> {
@@ -74,12 +90,18 @@ fun StorageDashboard(
                 }
 
                 // Fetch key-value files
+                LOG.info("StorageDashboard: Calling getKeyValueFiles...")
                 when (val result = dataSource.getKeyValueFiles()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
+                        LOG.info("StorageDashboard: getKeyValueFiles success, count=${result.data.size}")
+                        result.data.forEach { file ->
+                            LOG.info("StorageDashboard:   File: ${file.name}, entries=${file.entries.size}")
+                        }
                         keyValueFiles = result.data
                         isLoading = false
                     }
                     is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {
+                        LOG.warn("StorageDashboard: getKeyValueFiles error: ${result.message}")
                         if (error == null) error = result.message
                         isLoading = false
                     }
@@ -88,6 +110,7 @@ fun StorageDashboard(
                     }
                 }
             } catch (e: Exception) {
+                LOG.error("StorageDashboard: Exception during data fetch", e)
                 error = e.message ?: "Unknown error"
                 isLoading = false
             }

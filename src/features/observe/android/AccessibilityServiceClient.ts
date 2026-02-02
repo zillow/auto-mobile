@@ -1267,7 +1267,8 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       }
 
       // Handle storage result messages
-      if (message.type === "list_preference_files_result" && message.requestId) {
+      // Note: Android sends "preference_files" but we register with "list_preference_files"
+      if (message.type === "preference_files" && message.requestId) {
         const storageMessage = message as any;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, files: storageMessage.files || [],
@@ -1275,7 +1276,8 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         });
       }
 
-      if (message.type === "get_preferences_result" && message.requestId) {
+      // Note: Android sends "preferences" but we register with "get_preferences"
+      if (message.type === "preferences" && message.requestId) {
         const storageMessage = message as any;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, entries: storageMessage.entries || [],
@@ -1292,6 +1294,35 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       }
 
       if (message.type === "unsubscribe_storage_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "get_preference_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, found: storageMessage.found ?? false,
+          entry: storageMessage.entry, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "set_preference_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "remove_preference_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "clear_preferences_result" && message.requestId) {
         const storageMessage = message as any;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error

@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.ide.datasource
 
+import com.intellij.openapi.diagnostic.Logger
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.daemon.McpConnectionException
 import dev.jasonpearson.automobile.ide.storage.DatabaseInfo
@@ -11,6 +12,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+
+private val LOG = Logger.getInstance("RealStorageDataSource")
 
 /**
  * Real storage data source that fetches from MCP resources.
@@ -33,29 +36,50 @@ class RealStorageDataSource(
     }
 
     override suspend fun getKeyValueFiles(): Result<List<KeyValueFile>> {
-        val provider = clientProvider ?: return Result.Success(emptyList())
-        val device = deviceId ?: return Result.Error("No device ID provided")
-        val pkg = packageName ?: return Result.Error("No package name provided")
+        LOG.info("getKeyValueFiles: clientProvider=${if (clientProvider != null) "present" else "null"}, deviceId=$deviceId, packageName=$packageName")
+
+        val provider = clientProvider ?: run {
+            LOG.warn("getKeyValueFiles: No clientProvider")
+            return Result.Error("Not connected to MCP server. Please select a device first.")
+        }
+        val device = deviceId ?: run {
+            LOG.warn("getKeyValueFiles: No deviceId provided")
+            return Result.Error("No device ID provided")
+        }
+        val pkg = packageName ?: run {
+            LOG.warn("getKeyValueFiles: No packageName provided")
+            return Result.Error("No package name provided")
+        }
 
         return try {
             val client = provider()
+            LOG.info("getKeyValueFiles: Got client: ${client::class.simpleName}")
 
             // First, get the list of storage files
             val filesUri = buildStorageFilesUri(device, pkg)
+            LOG.info("getKeyValueFiles: Fetching files from URI: $filesUri")
             val filesContents = client.readResource(filesUri)
+            LOG.info("getKeyValueFiles: Got ${filesContents.size} content items")
             val filesText = filesContents.firstOrNull()?.text
-                ?: return Result.Success(emptyList())
+            if (filesText == null) {
+                LOG.warn("getKeyValueFiles: No text content in response")
+                return Result.Success(emptyList())
+            }
+            LOG.info("getKeyValueFiles: Response text (first 500 chars): ${filesText.take(500)}")
 
             val filesResponse = json.decodeFromString(McpStorageFilesResponse.serializer(), filesText)
+            LOG.info("getKeyValueFiles: Parsed response, files count=${filesResponse.files.size}, error=${filesResponse.error}")
 
             // Check for error in response
             if (filesResponse.error != null) {
+                LOG.warn("getKeyValueFiles: Response contains error: ${filesResponse.error}")
                 return Result.Error(filesResponse.error)
             }
 
             // For each file, fetch its entries
             val keyValueFiles = filesResponse.files.map { file ->
                 val entriesUri = buildStorageEntriesUri(device, pkg, file.name)
+                LOG.info("getKeyValueFiles: Fetching entries for ${file.name} from: $entriesUri")
                 val entriesContents = client.readResource(entriesUri)
                 val entriesText = entriesContents.firstOrNull()?.text
 
@@ -64,6 +88,7 @@ class RealStorageDataSource(
                         McpStorageEntriesResponse.serializer(),
                         entriesText
                     )
+                    LOG.info("getKeyValueFiles: File ${file.name} has ${entriesResponse.entries.size} entries")
                     entriesResponse.entries.map { entry ->
                         KeyValueEntry(
                             key = entry.key,
@@ -72,6 +97,7 @@ class RealStorageDataSource(
                         )
                     }
                 } else {
+                    LOG.warn("getKeyValueFiles: No entries text for ${file.name}")
                     emptyList()
                 }
 
@@ -83,10 +109,13 @@ class RealStorageDataSource(
                 )
             }
 
+            LOG.info("getKeyValueFiles: Returning ${keyValueFiles.size} files")
             Result.Success(keyValueFiles)
         } catch (e: McpConnectionException) {
+            LOG.error("getKeyValueFiles: MCP connection error", e)
             Result.Error("MCP server not available: ${e.message}")
         } catch (e: Exception) {
+            LOG.error("getKeyValueFiles: Exception during fetch", e)
             Result.Error("Failed to load storage data: ${e.message}")
         }
     }

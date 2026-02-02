@@ -271,6 +271,43 @@ data class UnsubscribeStorage(
   val fileName: String,
 ) : WebSocketRequest()
 
+@Serializable
+@SerialName("get_preference")
+data class GetPreference(
+  override val requestId: String? = null,
+  val packageName: String,
+  val fileName: String,
+  val key: String,
+) : WebSocketRequest()
+
+@Serializable
+@SerialName("set_preference")
+data class SetPreference(
+  override val requestId: String? = null,
+  val packageName: String,
+  val fileName: String,
+  val key: String,
+  val value: String?,
+  val valueType: String,
+) : WebSocketRequest()
+
+@Serializable
+@SerialName("remove_preference")
+data class RemovePreference(
+  override val requestId: String? = null,
+  val packageName: String,
+  val fileName: String,
+  val key: String,
+) : WebSocketRequest()
+
+@Serializable
+@SerialName("clear_preferences")
+data class ClearPreferences(
+  override val requestId: String? = null,
+  val packageName: String,
+  val fileName: String,
+) : WebSocketRequest()
+
 // =============================================================================
 // Configuration Requests
 // =============================================================================
