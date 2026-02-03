@@ -85,12 +85,28 @@ import dev.jasonpearson.automobile.ide.test.TestDashboard
 
 private val LOG = Logger.getInstance("AutoMobileToolWindow")
 
-private fun showNotification(title: String, content: String, type: NotificationType = NotificationType.INFORMATION) {
+private fun showNotification(
+    title: String,
+    content: String,
+    type: NotificationType = NotificationType.INFORMATION,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     try {
-        NotificationGroupManager.getInstance()
+        val notification = NotificationGroupManager.getInstance()
             .getNotificationGroup("AutoMobile")
             .createNotification(title, content, type)
-            .notify(null)
+
+        if (actionText != null && onAction != null) {
+            notification.addAction(object : com.intellij.notification.NotificationAction(actionText) {
+                override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent, notification: com.intellij.notification.Notification) {
+                    onAction()
+                    notification.expire()
+                }
+            })
+        }
+
+        notification.notify(null)
     } catch (e: Exception) {
         LOG.error("Failed to show notification: $title - $content", e)
     }
@@ -188,6 +204,9 @@ fun AutoMobileToolWindowContent() {
 
   // Data source mode (Fake/Real) - global toggle for all dashboards
   var dataSourceMode by remember { mutableStateOf(DataSourceMode.Real) }
+
+  // Pending failure ID for deep linking from notifications
+  var pendingFailureId by remember { mutableStateOf<String?>(null) }
 
   // App selector state (for Navigation dashboard filtering)
   var selectedAppId by remember { mutableStateOf<String?>(null) }
@@ -519,18 +538,28 @@ fun AutoMobileToolWindowContent() {
                   // FileEditorManager.getInstance(project).openFile(virtualFile, true)
               },
               onNewFailureNotification = { notification ->
+                  // Only show notifications for crashes and ANRs, not non-fatals or tool failures
                   val typeLabel = when (notification.type) {
                       dev.jasonpearson.automobile.ide.failures.FailureType.Crash -> "Crash"
                       dev.jasonpearson.automobile.ide.failures.FailureType.ANR -> "ANR"
-                      dev.jasonpearson.automobile.ide.failures.FailureType.ToolCallFailure -> "Tool Failure"
-                      dev.jasonpearson.automobile.ide.failures.FailureType.NonFatal -> "Non-Fatal"
+                      else -> null // Don't notify for non-fatals or tool failures
                   }
-                  showNotification(
-                      "New $typeLabel Detected",
-                      notification.title,
-                      NotificationType.WARNING,
-                  )
+                  if (typeLabel != null) {
+                      showNotification(
+                          title = "New $typeLabel Detected",
+                          content = notification.title,
+                          type = NotificationType.WARNING,
+                          actionText = "View",
+                          onAction = {
+                              // Deep link to the Failures tab with this specific failure
+                              pendingFailureId = notification.groupId
+                              selectedIndex = dashboardOrder.indexOf(Dashboard.Failures)
+                          },
+                      )
+                  }
               },
+              initialSelectedFailureId = pendingFailureId,
+              onFailureSelected = { pendingFailureId = null },
               dataSourceMode = dataSourceMode,
               clientProvider = clientProvider,
               streamingDataSource = streamingFailuresDataSource,

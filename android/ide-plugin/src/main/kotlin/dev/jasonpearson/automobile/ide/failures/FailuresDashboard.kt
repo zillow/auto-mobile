@@ -60,6 +60,8 @@ fun FailuresDashboard(
     onNavigateToTest: (String) -> Unit = {},
     onNavigateToSource: (fileName: String, lineNumber: Int) -> Unit = { _, _ -> },
     onNewFailureNotification: ((FailureNotification) -> Unit)? = null,
+    initialSelectedFailureId: String? = null,
+    onFailureSelected: (() -> Unit)? = null,
     clientProvider: (() -> AutoMobileClient)? = null,
     streamingDataSource: StreamingFailuresDataSourceInterface? = null,
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
@@ -102,6 +104,7 @@ fun FailuresDashboard(
 
     var selectedFailure by remember { mutableStateOf<FailureGroup?>(null) }
     var filterType by remember { mutableStateOf<FailureType?>(null) }
+    var pendingSelectedFailureId by remember { mutableStateOf(initialSelectedFailureId) }
 
     // Streaming state
     var streamingError by remember { mutableStateOf<String?>(null) }
@@ -126,6 +129,19 @@ fun FailuresDashboard(
         }
     }
 
+    // Handle pending selected failure ID (for deep linking from notifications)
+    LaunchedEffect(pendingSelectedFailureId, failureGroups) {
+        val targetId = pendingSelectedFailureId ?: return@LaunchedEffect
+        if (failureGroups.isEmpty()) return@LaunchedEffect
+
+        val targetFailure = failureGroups.find { it.id == targetId }
+        if (targetFailure != null) {
+            selectedFailure = targetFailure
+            pendingSelectedFailureId = null
+            onFailureSelected?.invoke()
+        }
+    }
+
     // Real-time notifications via streaming (with automatic reconnection)
     LaunchedEffect(activeStreamingSource, reconnectAttempt) {
         if (activeStreamingSource == null) return@LaunchedEffect
@@ -139,9 +155,10 @@ fun FailuresDashboard(
                         reconnectAttempt = 0
                         streamingError = null
 
-                        // Process each new notification
-                        result.data.forEach { notification ->
-                            onNewFailureNotification?.invoke(notification)
+                        // Only notify for the most recent notification (by timestamp)
+                        val mostRecent = result.data.maxByOrNull { it.timestamp }
+                        if (mostRecent != null) {
+                            onNewFailureNotification?.invoke(mostRecent)
                         }
                     }
                     is DataSourceResult.Error -> {

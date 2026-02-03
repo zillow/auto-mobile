@@ -349,12 +349,20 @@ export class FailureAnalyticsRepository {
       .where("failure_occurrences.timestamp", "<=", endTime)
       .execute();
 
-    // Create buckets
+    // Pre-create all buckets for the time range with zero values
     const buckets = new Map<number, { crashes: number; anrs: number; toolFailures: number; nonfatals: number }>();
+    const firstBucketStart = Math.floor(startTime / bucketMs) * bucketMs;
+    const lastBucketStart = Math.floor(endTime / bucketMs) * bucketMs;
 
+    for (let bucketStart = firstBucketStart; bucketStart <= lastBucketStart; bucketStart += bucketMs) {
+      buckets.set(bucketStart, { crashes: 0, anrs: 0, toolFailures: 0, nonfatals: 0 });
+    }
+
+    // Fill in data from occurrences
     for (const occ of occurrences) {
       const bucketStart = Math.floor(occ.timestamp / bucketMs) * bucketMs;
-      const bucket = buckets.get(bucketStart) ?? { crashes: 0, anrs: 0, toolFailures: 0, nonfatals: 0 };
+      const bucket = buckets.get(bucketStart);
+      if (!bucket) {continue;} // Should not happen, but guard against it
 
       switch (occ.type) {
         case "crash":
@@ -370,8 +378,6 @@ export class FailureAnalyticsRepository {
           bucket.nonfatals++;
           break;
       }
-
-      buckets.set(bucketStart, bucket);
     }
 
     // Convert to sorted array
