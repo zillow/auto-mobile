@@ -30,6 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -37,6 +40,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.platform.LocalDensity
@@ -68,6 +74,8 @@ fun DeviceScreenView(
     hierarchy: UIElementInfo?,
     selectedElementId: String?,
     hoveredElementId: String?,
+    flashElementId: String? = null,
+    onFlashComplete: () -> Unit = {},
     onElementSelected: (String?) -> Unit,
     onElementHovered: (String?) -> Unit,
     showTapTargetIssues: Boolean = false,
@@ -109,6 +117,29 @@ fun DeviceScreenView(
         if (hierarchy != null && hoveredElementId != null) {
             LayoutInspectorMockData.findElementById(hierarchy, hoveredElementId)
         } else null
+    }
+
+    // Flash element for highlight animation on double-click
+    val flashElement = remember(hierarchy, flashElementId) {
+        if (hierarchy != null && flashElementId != null) {
+            LayoutInspectorMockData.findElementById(hierarchy, flashElementId)
+        } else null
+    }
+
+    // Flash animation state
+    var flashAlpha by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(flashElementId) {
+        if (flashElementId != null) {
+            // Animate flash: bright -> fade out
+            repeat(3) { // 3 flashes
+                flashAlpha = 0.8f
+                kotlinx.coroutines.delay(100)
+                flashAlpha = 0.3f
+                kotlinx.coroutines.delay(100)
+            }
+            flashAlpha = 0f
+            onFlashComplete()
+        }
     }
 
     // Find non-compliant tap targets (clickable elements smaller than 48x48dp)
@@ -217,15 +248,39 @@ fun DeviceScreenView(
                 return deviceX to deviceY
             }
 
+            // Focus requester for keyboard events
+            val focusRequester = remember { FocusRequester() }
+
+            // Request focus when an element is selected
+            LaunchedEffect(selectedElementId) {
+                if (selectedElementId != null) {
+                    focusRequester.requestFocus()
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            offsetX += dragAmount.x
-                            offsetY += dragAmount.y
+                    .focusRequester(focusRequester)
+                    .focusTarget()
+                    .onKeyEvent { keyEvent ->
+                        // Handle Escape to deselect
+                        if (keyEvent.key == Key.Escape && selectedElementId != null) {
+                            onElementSelected(null)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .pointerInput(selectedElementId) {
+                        // Only allow pan/drag when an element is selected
+                        if (selectedElementId != null) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                offsetX += dragAmount.x
+                                offsetY += dragAmount.y
+                            }
                         }
                     }
                     .pointerInput(hierarchy) {
@@ -251,12 +306,15 @@ fun DeviceScreenView(
                         onElementHovered(null)
                     }
                     .onPointerEvent(PointerEventType.Scroll) { event ->
-                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
-                        val scrollDelta = change.scrollDelta.y
-                        if (scrollDelta != 0f) {
-                            val zoomFactor = if (scrollDelta > 0) 0.95f else 1.05f
-                            val newScale = (scale * zoomFactor).coerceIn(0.1f, 5f)
-                            zoomAroundPoint(newScale, change.position.x, change.position.y)
+                        // Only allow zoom when an element is selected
+                        if (selectedElementId != null) {
+                            val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                            val scrollDelta = change.scrollDelta.y
+                            if (scrollDelta != 0f) {
+                                val zoomFactor = if (scrollDelta > 0) 0.95f else 1.05f
+                                val newScale = (scale * zoomFactor).coerceIn(0.1f, 5f)
+                                zoomAroundPoint(newScale, change.position.x, change.position.y)
+                            }
                         }
                     }
             ) {
@@ -327,6 +385,28 @@ fun DeviceScreenView(
                                         // Fill with semi-transparent blue
                                         drawRect(
                                             color = Color(0xFF2196F3).copy(alpha = 0.1f),
+                                            topLeft = Offset(scaledLeft, scaledTop),
+                                            size = Size(scaledWidth, scaledHeight),
+                                        )
+                                    }
+
+                                    // Flash element highlight (yellow/gold flash on double-click)
+                                    if (flashElement != null && flashAlpha > 0f) {
+                                        val bounds = flashElement.bounds
+                                        val scaledLeft = bounds.left * deviceToFrameScale
+                                        val scaledTop = bounds.top * deviceToFrameScale
+                                        val scaledWidth = bounds.width * deviceToFrameScale
+                                        val scaledHeight = bounds.height * deviceToFrameScale
+                                        // Draw bright yellow border
+                                        drawRect(
+                                            color = Color(0xFFFFD700).copy(alpha = flashAlpha),
+                                            topLeft = Offset(scaledLeft, scaledTop),
+                                            size = Size(scaledWidth, scaledHeight),
+                                            style = Stroke(width = 4f),
+                                        )
+                                        // Fill with semi-transparent yellow
+                                        drawRect(
+                                            color = Color(0xFFFFD700).copy(alpha = flashAlpha * 0.3f),
                                             topLeft = Offset(scaledLeft, scaledTop),
                                             size = Size(scaledWidth, scaledHeight),
                                         )

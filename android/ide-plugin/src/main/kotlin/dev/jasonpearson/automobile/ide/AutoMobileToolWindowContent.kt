@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -63,9 +64,15 @@ import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
 import dev.jasonpearson.automobile.ide.datasource.InstalledApp
 import dev.jasonpearson.automobile.ide.datasource.Result
+import dev.jasonpearson.automobile.ide.failures.DataSourceResult
 import dev.jasonpearson.automobile.ide.failures.FailureNotification
 import dev.jasonpearson.automobile.ide.failures.FailuresDashboard
+import dev.jasonpearson.automobile.ide.failures.FailureSeverity
+import dev.jasonpearson.automobile.ide.failures.FailureType
+import dev.jasonpearson.automobile.ide.failures.FakeFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.McpFailuresDataSource
 import dev.jasonpearson.automobile.ide.failures.StreamingFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.TimeAggregation
 import dev.jasonpearson.automobile.ide.mcp.McpProcess
 import dev.jasonpearson.automobile.ide.mcp.McpConnectionType
 import dev.jasonpearson.automobile.ide.mcp.FakeMcpProcessDetector
@@ -77,7 +84,14 @@ import dev.jasonpearson.automobile.ide.daemon.McpHttpClient
 import dev.jasonpearson.automobile.ide.daemon.McpDaemonClient
 import dev.jasonpearson.automobile.ide.daemon.DaemonSocketPaths
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
+import dev.jasonpearson.automobile.ide.daemon.FailuresPushSocketClient
+import dev.jasonpearson.automobile.ide.failures.FailuresVerticalPanel
+import dev.jasonpearson.automobile.ide.failures.DateRange
 import dev.jasonpearson.automobile.ide.layout.LayoutInspectorDashboard
+import dev.jasonpearson.automobile.ide.performance.PerformanceVerticalPanel
+import dev.jasonpearson.automobile.ide.settings.AutoMobileSettings
+import dev.jasonpearson.automobile.ide.tabs.HorizontalTab
+import dev.jasonpearson.automobile.ide.tabs.HorizontalTabBar
 import dev.jasonpearson.automobile.ide.navigation.NavigationDashboard
 import dev.jasonpearson.automobile.ide.performance.PerformanceDashboard
 import dev.jasonpearson.automobile.ide.storage.StorageDashboard
@@ -188,6 +202,50 @@ fun AutoMobileToolWindowContent() {
   var draggedIndex by remember { mutableStateOf<Int?>(null) }
   var dropTargetIndex by remember { mutableStateOf<Int?>(null) }
 
+  // New layout state - vertical panels (Failures, Performance) on right side
+  var isFailuresPanelCollapsed by remember { mutableStateOf(true) }
+  var isPerformancePanelCollapsed by remember { mutableStateOf(true) }
+  var failuresPanelWidthPx by remember { mutableFloatStateOf(450f) }  // 300 * 1.5
+  var performancePanelWidthPx by remember { mutableFloatStateOf(450f) }  // 300 * 1.5
+
+  // Horizontal tabs at bottom (Navigation, Test Runs, Storage)
+  val horizontalTabs = remember {
+      listOf(
+          HorizontalTab("navigation", "Navigation", "🧭"),
+          HorizontalTab("test_runs", "Test Runs", "🧪"),
+          HorizontalTab("storage", "Storage", "💾"),
+      )
+  }
+  var selectedHorizontalTabId by remember { mutableStateOf<String?>(null) }
+
+  // Track live performance metrics for collapsed Performance panel
+  var currentFps by remember { mutableStateOf<Float?>(null) }
+  var currentFrameTimeMs by remember { mutableStateOf<Float?>(null) }
+  var currentJankFrames by remember { mutableStateOf<Int?>(null) }
+  var currentMemoryMb by remember { mutableStateOf<Float?>(null) }
+  var currentTouchLatencyMs by remember { mutableStateOf<Float?>(null) }
+
+  // Track failure counts by type for collapsed Failures panel
+  var crashCount by remember { mutableIntStateOf(0) }
+  var anrCount by remember { mutableIntStateOf(0) }
+  var toolFailureCount by remember { mutableIntStateOf(0) }
+  var nonFatalCount by remember { mutableIntStateOf(0) }
+  var hasNewCriticalFailure by remember { mutableStateOf(false) }
+
+  // Load persisted date range setting
+  val settings = remember { AutoMobileSettings.getInstance() }
+  var failuresDateRange by remember {
+    val saved = settings.failuresDateRange
+    val initial = DateRange.entries.find { it.label == saved } ?: DateRange.TwentyFourHours
+    mutableStateOf(initial)
+  }
+
+  // Foreground app filter toggle state
+  var isForegroundFilterEnabled by remember { mutableStateOf(false) }
+
+  // Test recording state
+  var isRecordingTest by remember { mutableStateOf(false) }
+
   // Mock booted devices - will be replaced with real data
   val activeDeviceIdState = remember { mutableStateOf<String?>(null) }  // null = show MCP panel in Real mode
   val isDevicePanelExpandedState = remember { mutableStateOf(true) }  // Start expanded to show MCP servers
@@ -260,10 +318,50 @@ fun AutoMobileToolWindowContent() {
   // Created once and shared across the app lifecycle
   val observationStreamClient = remember { ObservationStreamClient() }
 
+  // Push socket client for real-time failure notifications
+  // Created once and shared across the app lifecycle
+  val failuresPushClient = remember { FailuresPushSocketClient() }
+
   // Streaming failures data source for real-time failure notifications
   // Only created in Real mode since Fake mode creates its own FakeFailuresDataSource
   val streamingFailuresDataSource = remember(dataSourceMode) {
       if (dataSourceMode == DataSourceMode.Real) StreamingFailuresDataSource() else null
+  }
+
+  // Fetch initial failure counts on startup (before Failures panel is opened)
+  LaunchedEffect(dataSourceMode, failuresDateRange, clientProvider) {
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+      try {
+        val dataSource = when (dataSourceMode) {
+          DataSourceMode.Fake -> FakeFailuresDataSource()
+          DataSourceMode.Real -> clientProvider?.let { McpFailuresDataSource(it) }
+        }
+        if (dataSource != null) {
+          // Use appropriate aggregation for the selected date range
+          val aggregation = when (failuresDateRange) {
+            DateRange.OneHour -> TimeAggregation.Minute
+            DateRange.TwentyFourHours -> TimeAggregation.Hour
+            DateRange.ThreeDays -> TimeAggregation.Hour
+            DateRange.SevenDays -> TimeAggregation.Day
+            DateRange.ThirtyDays -> TimeAggregation.Day
+          }
+          when (val result = dataSource.getTimelineData(failuresDateRange, aggregation)) {
+            is DataSourceResult.Success -> {
+              val data = result.data
+              crashCount = data.dataPoints.sumOf { it.crashes }
+              anrCount = data.dataPoints.sumOf { it.anrs }
+              toolFailureCount = data.dataPoints.sumOf { it.toolFailures }
+              nonFatalCount = data.dataPoints.sumOf { it.nonfatals }
+            }
+            is DataSourceResult.Error -> {
+              // Keep zeros on error
+            }
+          }
+        }
+      } catch (e: Exception) {
+        LOG.warn("Failed to fetch initial failure counts", e)
+      }
+    }
   }
 
   // Connect/disconnect observation stream based on active device
@@ -295,6 +393,30 @@ fun AutoMobileToolWindowContent() {
       }
   }
 
+  // Connect/disconnect failures push client based on data source mode
+  DisposableEffect(dataSourceMode, failuresPushClient) {
+      if (dataSourceMode == DataSourceMode.Real) {
+          LOG.info("Connecting failures push client")
+          failuresPushClient.connect()
+      }
+      onDispose {
+          LOG.info("Disconnecting failures push client")
+          failuresPushClient.disconnect()
+      }
+  }
+
+  // Periodic connection health check for failures push - reconnect if dropped
+  LaunchedEffect(dataSourceMode, failuresPushClient) {
+      if (dataSourceMode != DataSourceMode.Real) return@LaunchedEffect
+      while (true) {
+          kotlinx.coroutines.delay(5000) // Check every 5 seconds
+          if (!failuresPushClient.isConnected()) {
+              LOG.info("Failures push disconnected, attempting reconnect")
+              failuresPushClient.connect()
+          }
+      }
+  }
+
   // Listen for hierarchy updates to update foreground app state in real-time
   LaunchedEffect(observationStreamClient) {
       observationStreamClient.hierarchyUpdates.collect { update ->
@@ -310,6 +432,17 @@ fun AutoMobileToolWindowContent() {
                   }
               }
           }
+      }
+  }
+
+  // Listen for performance updates to update collapsed Performance panel summary
+  LaunchedEffect(observationStreamClient) {
+      observationStreamClient.performanceUpdates.collect { update ->
+          currentFps = update.fps
+          currentFrameTimeMs = update.frameTimeMs
+          currentJankFrames = update.jankFrames
+          currentMemoryMb = update.memoryUsageMb
+          currentTouchLatencyMs = update.touchLatencyMs
       }
   }
 
@@ -441,7 +574,7 @@ fun AutoMobileToolWindowContent() {
   }
 
   val colors = JewelTheme.globalColors
-  val isCurrentlyOnNavigation = dashboardOrder[selectedIndex] == Dashboard.Navigation
+  val isCurrentlyOnNavigation = selectedHorizontalTabId == "navigation"
 
   // Header should fade when navigation nodes exceed bounds and user isn't hovering header
   var isHeaderHovered by remember { mutableStateOf(false) }
@@ -453,122 +586,12 @@ fun AutoMobileToolWindowContent() {
   val density = LocalDensity.current
   val headerHeightDp = with(density) { headerHeight.toDp() }
 
-  Box(modifier = Modifier.fillMaxSize()) {
-    // Dashboard Content - only show when a device is selected
-    if (!isDevicePanelExpanded && activeDeviceId != null) {
-      // Navigation fills entire space so nodes can extend under header when zoomed
-      // Other dashboards have top padding to stay below header
-      Box(
-          modifier = Modifier
-              .fillMaxSize()
-              .then(if (!isCurrentlyOnNavigation) Modifier.padding(top = headerHeightDp) else Modifier)
-      ) {
-        when (dashboardOrder[selectedIndex]) {
-          Dashboard.Navigation -> NavigationDashboard(
-              highlightedScreens = replayHighlightedScreens,
-              onHighlightCleared = {
-                  testFlowScreens = emptyList()
-                  isReplaying = false
-              },
-              onFocusModeChanged = { focused ->
-                  isNavigationFocused = focused
-              },
-              headerHeightPx = headerHeight.toFloat(),
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              selectedAppId = selectedAppId,
-              observationStreamClient = observationStreamClient,
-          )
-          Dashboard.Test -> TestDashboard(
-              onOpenFile = { filePath ->
-                  // TODO: Open file in IDE editor
-              },
-              onNavigateToGraph = { screens ->
-                  // Set up test flow replay
-                  testFlowScreens = screens
-                  isReplaying = true
-                  currentReplayIndex = 0
-                  selectedIndex = 0  // Switch to Navigation tab
-              },
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              observationStreamClient = observationStreamClient,
-          )
-          Dashboard.Performance -> {
-              LOG.info("Rendering PerformanceDashboard with observationStreamClient: ${observationStreamClient.hashCode()}")
-              PerformanceDashboard(
-                  onNavigateToScreen = { screenName ->
-                      // Switch to Navigation tab and highlight the screen
-                      selectedIndex = 0
-                  },
-                  onNavigateToTest = { testName ->
-                      // Switch to Test tab
-                      selectedIndex = 1
-                  },
-                  dataSourceMode = dataSourceMode,
-                  clientProvider = clientProvider,
-                  observationStreamClient = observationStreamClient,
-              )
-          }
-          Dashboard.Layout -> {
-              LOG.info("Rendering LayoutInspectorDashboard with observationStreamClient: ${observationStreamClient.hashCode()}")
-              LayoutInspectorDashboard(
-                  dataSourceMode = dataSourceMode,
-                  clientProvider = clientProvider,
-                  observationStreamClient = observationStreamClient,
-              )
-          }
-          Dashboard.Storage -> StorageDashboard(
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              deviceId = activeDeviceId,
-              packageName = selectedAppId,
-          )
-          Dashboard.Failures -> FailuresDashboard(
-              onNavigateToScreen = { screenName ->
-                  // Switch to Navigation tab and highlight the screen
-                  selectedIndex = dashboardOrder.indexOf(Dashboard.Navigation)
-              },
-              onNavigateToTest = { testName ->
-                  // Switch to Test tab
-                  selectedIndex = dashboardOrder.indexOf(Dashboard.Test)
-              },
-              onNavigateToSource = { fileName, lineNumber ->
-                  // TODO: Use OpenFileDescriptor to navigate to source
-                  // FileEditorManager.getInstance(project).openFile(virtualFile, true)
-              },
-              onNewFailureNotification = { notification ->
-                  // Only show notifications for crashes and ANRs, not non-fatals or tool failures
-                  val typeLabel = when (notification.type) {
-                      dev.jasonpearson.automobile.ide.failures.FailureType.Crash -> "Crash"
-                      dev.jasonpearson.automobile.ide.failures.FailureType.ANR -> "ANR"
-                      else -> null // Don't notify for non-fatals or tool failures
-                  }
-                  if (typeLabel != null) {
-                      showNotification(
-                          title = "New $typeLabel Detected",
-                          content = notification.title,
-                          type = NotificationType.WARNING,
-                          actionText = "View",
-                          onAction = {
-                              // Deep link to the Failures tab with this specific failure
-                              pendingFailureId = notification.groupId
-                              selectedIndex = dashboardOrder.indexOf(Dashboard.Failures)
-                          },
-                      )
-                  }
-              },
-              initialSelectedFailureId = pendingFailureId,
-              onFailureSelected = { pendingFailureId = null },
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              streamingDataSource = streamingFailuresDataSource,
-          )
-        }
-      }
-    }
+  // Min/max widths for vertical panels
+  val minPanelWidthPx = with(density) { 225.dp.toPx() }  // 150dp * 1.5
+  val maxPanelWidthPx = with(density) { 500.dp.toPx() }
 
-    // Header + Tabs overlay (rendered on top with solid background)
+  Column(modifier = Modifier.fillMaxSize()) {
+    // Header (rendered on top with solid background)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -660,7 +683,7 @@ fun AutoMobileToolWindowContent() {
               connectedMcpProcess = process
           },
           suppressAutoSelect = userNavigatedToDevices,
-          // App selector props
+          // App selector props (kept for backwards compatibility)
           installedApps = installedApps,
           selectedAppId = selectedAppId,
           isAppListLoading = isAppListLoading,
@@ -672,39 +695,214 @@ fun AutoMobileToolWindowContent() {
               LOG.info("App selected: $appId")
           },
           showAppSelector = activeDeviceId != null && !isDevicePanelExpanded,
+          // Foreground app toggle props
+          isForegroundFilterEnabled = isForegroundFilterEnabled,
+          foregroundAppName = installedApps.find { it.isForeground }?.displayName
+              ?: installedApps.find { it.isForeground }?.packageName,
+          onForegroundFilterToggle = { enabled ->
+              isForegroundFilterEnabled = enabled
+              // When enabled, auto-select foreground app; when disabled, clear selection
+              if (enabled) {
+                  val fgApp = installedApps.find { it.isForeground }
+                  if (fgApp != null) {
+                      selectedAppId = fgApp.packageName
+                  }
+              }
+          },
+          // Record test props
+          isRecordingTest = isRecordingTest,
+          onRecordTestToggle = {
+              isRecordingTest = !isRecordingTest
+              if (isRecordingTest) {
+                  LOG.info("Started test recording")
+              } else {
+                  LOG.info("Stopped test recording")
+              }
+          },
       )
+    }
 
-      // Dashboard Tabs with drag-and-drop reordering - hidden when device panel is expanded
-      println("Tab visibility check: isDevicePanelExpanded=$isDevicePanelExpanded, activeDeviceId=$activeDeviceId")
-      if (!isDevicePanelExpanded && activeDeviceId != null) {
-        println("TABS VISIBLE: Showing DraggableTabs")
-        LOG.debug("Showing tabs: isDevicePanelExpanded=$isDevicePanelExpanded, activeDeviceId=$activeDeviceId")
+    // Main content area - only show when a device is selected
+    // Wrapped in a scrollable column so expanding horizontal tabs doesn't compress the layout
+    if (!isDevicePanelExpanded && activeDeviceId != null) {
+      BoxWithConstraints(
+          modifier = Modifier.weight(1f)
+      ) {
+        // Calculate height for main content so horizontal tabs are at bottom
+        // Subtract ~40dp for horizontal tab bar height
+        val horizontalTabBarHeight = 40.dp
+        val mainContentHeight = maxHeight - horizontalTabBarHeight
 
-        DraggableTabs(
-            tabs = dashboardOrder,
-            selectedIndex = selectedIndex,
-            onTabSelected = { index ->
-                LOG.info("Tab selected: $index (${dashboardOrder[index]})")
-                selectedIndex = index
-            },
-            onReorder = { fromIndex, toIndex ->
-                val item = dashboardOrder.removeAt(fromIndex)
-                dashboardOrder.add(toIndex, item)
-                // Adjust selected index if needed
-                when {
-                    fromIndex == selectedIndex -> selectedIndex = toIndex
-                    fromIndex < selectedIndex && toIndex >= selectedIndex -> selectedIndex--
-                    fromIndex > selectedIndex && toIndex <= selectedIndex -> selectedIndex++
-                }
-            },
-            draggedIndex = draggedIndex,
-            onDragStart = { draggedIndex = it },
-            onDragEnd = { draggedIndex = null; dropTargetIndex = null },
-            dropTargetIndex = dropTargetIndex,
-            onDropTargetChanged = { dropTargetIndex = it },
-        )
-      } else {
-        LOG.debug("Tabs hidden: isDevicePanelExpanded=$isDevicePanelExpanded, activeDeviceId=$activeDeviceId")
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+          // Main content: Layout Inspector (central) + Failures/Performance (right vertical panels)
+          Row(
+              modifier = Modifier
+                  .fillMaxWidth()
+                  .height(mainContentHeight)  // Dynamic height based on window size
+          ) {
+            // Central Layout Inspector (expands to fill available space)
+            LayoutInspectorDashboard(
+                modifier = Modifier.weight(1f),
+                dataSourceMode = dataSourceMode,
+                clientProvider = clientProvider,
+                observationStreamClient = observationStreamClient,
+            )
+
+            // Right vertical panels: Failures and Performance
+            FailuresVerticalPanel(
+                isCollapsed = isFailuresPanelCollapsed,
+                onToggle = { isFailuresPanelCollapsed = !isFailuresPanelCollapsed },
+                widthPx = failuresPanelWidthPx,
+                onWidthChange = { delta ->
+                    failuresPanelWidthPx = (failuresPanelWidthPx - delta).coerceIn(minPanelWidthPx, maxPanelWidthPx)
+                },
+                dateRangeLabel = failuresDateRange.label,
+                crashCount = crashCount,
+                anrCount = anrCount,
+                toolFailureCount = toolFailureCount,
+                nonFatalCount = nonFatalCount,
+                onNavigateToScreen = { screenName ->
+                    // Switch to Navigation and highlight the screen
+                    selectedHorizontalTabId = "navigation"
+                },
+                onNavigateToTest = { testName ->
+                    // Switch to Test Runs
+                    selectedHorizontalTabId = "test_runs"
+                },
+                onNavigateToSource = { fileName, lineNumber ->
+                    // TODO: Use OpenFileDescriptor to navigate to source
+                },
+                onNewFailureNotification = { notification ->
+                    // Track if it's critical
+                    if (notification.severity == FailureSeverity.Critical ||
+                        notification.severity == FailureSeverity.High) {
+                        hasNewCriticalFailure = true
+                    }
+                    // Only show notifications for crashes and ANRs
+                    val typeLabel = when (notification.type) {
+                        FailureType.Crash -> "Crash"
+                        FailureType.ANR -> "ANR"
+                        else -> null
+                    }
+                    if (typeLabel != null) {
+                        showNotification(
+                            title = "New $typeLabel Detected",
+                            content = notification.title,
+                            type = NotificationType.WARNING,
+                            actionText = "View",
+                            onAction = {
+                                // Expand failures panel and deep link
+                                isFailuresPanelCollapsed = false
+                                pendingFailureId = notification.groupId
+                            },
+                        )
+                    }
+                },
+                initialSelectedFailureId = pendingFailureId,
+                onFailureSelected = { pendingFailureId = null },
+                onDateRangeChanged = { newRange ->
+                    failuresDateRange = newRange
+                    // Persist to settings
+                    settings.failuresDateRange = newRange.label
+                },
+                onFailureCountsChanged = { newCrashCount, newAnrCount, newToolFailureCount, newNonFatalCount ->
+                    crashCount = newCrashCount
+                    anrCount = newAnrCount
+                    toolFailureCount = newToolFailureCount
+                    nonFatalCount = newNonFatalCount
+                },
+                initialDateRange = failuresDateRange,
+                dataSourceMode = dataSourceMode,
+                clientProvider = clientProvider,
+                streamingDataSource = streamingFailuresDataSource,
+                failuresPushClient = failuresPushClient,
+            )
+
+            PerformanceVerticalPanel(
+                isCollapsed = isPerformancePanelCollapsed,
+                onToggle = { isPerformancePanelCollapsed = !isPerformancePanelCollapsed },
+                widthPx = performancePanelWidthPx,
+                onWidthChange = { delta ->
+                    performancePanelWidthPx = (performancePanelWidthPx - delta).coerceIn(minPanelWidthPx, maxPanelWidthPx)
+                },
+                currentFps = currentFps,
+                currentFrameTimeMs = currentFrameTimeMs,
+                currentJankFrames = currentJankFrames,
+                currentMemoryMb = currentMemoryMb,
+                currentTouchLatencyMs = currentTouchLatencyMs,
+                onNavigateToScreen = { screenName ->
+                    selectedHorizontalTabId = "navigation"
+                },
+                onNavigateToTest = { testName ->
+                    selectedHorizontalTabId = "test_runs"
+                },
+                dataSourceMode = dataSourceMode,
+                clientProvider = clientProvider,
+                observationStreamClient = observationStreamClient,
+            )
+          }
+
+          // Bottom horizontal tabs (Navigation, Test Runs, Storage)
+          HorizontalTabBar(
+              tabs = horizontalTabs,
+              selectedTabId = selectedHorizontalTabId,
+              onTabSelected = { tabId ->
+                  selectedHorizontalTabId = tabId
+              },
+          )
+
+          // Expanded horizontal tab content
+          if (selectedHorizontalTabId != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(350.dp)  // Fixed height for horizontal tab content
+            ) {
+              when (selectedHorizontalTabId) {
+                "navigation" -> NavigationDashboard(
+                    highlightedScreens = replayHighlightedScreens,
+                    onHighlightCleared = {
+                        testFlowScreens = emptyList()
+                        isReplaying = false
+                    },
+                    onFocusModeChanged = { focused ->
+                        isNavigationFocused = focused
+                    },
+                    headerHeightPx = headerHeight.toFloat(),
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    selectedAppId = selectedAppId,
+                    observationStreamClient = observationStreamClient,
+                )
+                "test_runs" -> TestDashboard(
+                    onOpenFile = { filePath ->
+                        // TODO: Open file in IDE editor
+                    },
+                    onNavigateToGraph = { screens ->
+                        // Set up test flow replay
+                        testFlowScreens = screens
+                        isReplaying = true
+                        currentReplayIndex = 0
+                        selectedHorizontalTabId = "navigation"  // Switch to Navigation tab
+                    },
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    observationStreamClient = observationStreamClient,
+                )
+                "storage" -> StorageDashboard(
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    deviceId = activeDeviceId,
+                    packageName = selectedAppId,
+                )
+              }
+            }
+          }
+        } // end scrollable Column
       }
     }
   }
@@ -731,7 +929,7 @@ private fun GlobalShellHeader(
     onMcpDeviceSelected: (deviceId: String, deviceName: String?) -> Unit = { _, _ -> },
     onProcessConnected: (McpProcess?) -> Unit = {},
     suppressAutoSelect: Boolean = false,
-    // App selector props
+    // App selector props (kept for backwards compatibility, but FG toggle is preferred)
     installedApps: List<InstalledApp> = emptyList(),
     selectedAppId: String? = null,
     isAppListLoading: Boolean = false,
@@ -739,6 +937,13 @@ private fun GlobalShellHeader(
     onAppDropdownExpandedChange: (Boolean) -> Unit = {},
     onAppSelected: (String?) -> Unit = {},
     showAppSelector: Boolean = false,
+    // Foreground app toggle props
+    isForegroundFilterEnabled: Boolean = false,
+    foregroundAppName: String? = null,
+    onForegroundFilterToggle: (Boolean) -> Unit = {},
+    // Record test props
+    isRecordingTest: Boolean = false,
+    onRecordTestToggle: () -> Unit = {},
 ) {
   val colors = JewelTheme.globalColors
 
@@ -859,15 +1064,21 @@ private fun GlobalShellHeader(
           }
         }
 
-        // App selector (shown when device selected and apps loaded)
-        if (showAppSelector && installedApps.isNotEmpty()) {
-          AppSelectorDropdown(
-              installedApps = installedApps,
-              selectedAppId = selectedAppId,
-              isLoading = isAppListLoading,
-              expanded = appDropdownExpanded,
-              onExpandedChange = onAppDropdownExpandedChange,
-              onAppSelected = onAppSelected,
+        // Foreground app toggle (replaces app selector dropdown)
+        if (showAppSelector) {
+          ForegroundAppToggle(
+              isEnabled = isForegroundFilterEnabled,
+              foregroundAppName = foregroundAppName,
+              onToggle = onForegroundFilterToggle,
+          )
+        }
+
+        // Record test button (shown when device connected)
+        if (activeDeviceId != null) {
+          RecordTestButton(
+              isRecording = isRecordingTest,
+              onToggle = onRecordTestToggle,
+              enabled = activeDeviceId != null,
           )
         }
 
@@ -2997,6 +3208,122 @@ private fun AppDropdownItem(
                 "\u2713",
                 fontSize = 12.sp,
                 color = Color(0xFF4CAF50),
+            )
+        }
+    }
+}
+
+/**
+ * Toggle for filtering by foreground app. When enabled, filters all data by the current
+ * foreground app. When disabled, shows "All Apps".
+ */
+@Composable
+private fun ForegroundAppToggle(
+    isEnabled: Boolean,
+    foregroundAppName: String?,
+    onToggle: (Boolean) -> Unit,
+) {
+    val colors = JewelTheme.globalColors
+    val displayText = if (isEnabled && foregroundAppName != null) {
+        foregroundAppName
+    } else {
+        "All Apps"
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "FG:",
+            fontSize = 11.sp,
+            maxLines = 1,
+            softWrap = false,
+            color = colors.text.normal.copy(alpha = 0.5f),
+        )
+
+        Row(
+            modifier = Modifier
+                .background(
+                    if (isEnabled) Color(0xFF4CAF50).copy(alpha = 0.15f) else colors.text.normal.copy(alpha = 0.05f),
+                    RoundedCornerShape(4.dp),
+                )
+                .clickable { onToggle(!isEnabled) }
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Toggle indicator
+            Box(
+                modifier = Modifier
+                    .size(width = 24.dp, height = 14.dp)
+                    .background(
+                        if (isEnabled) Color(0xFF4CAF50).copy(alpha = 0.4f) else colors.text.normal.copy(alpha = 0.2f),
+                        RoundedCornerShape(7.dp),
+                    ),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(2.dp)
+                        .size(10.dp)
+                        .align(if (isEnabled) Alignment.CenterEnd else Alignment.CenterStart)
+                        .background(
+                            if (isEnabled) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.5f),
+                            CircleShape,
+                        ),
+                )
+            }
+
+            Text(
+                displayText,
+                fontSize = 11.sp,
+                color = if (isEnabled) Color(0xFF4CAF50) else colors.text.normal,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * Button to start/stop test recording. Shows red dot when recording.
+ */
+@Composable
+private fun RecordTestButton(
+    isRecording: Boolean,
+    onToggle: () -> Unit,
+    enabled: Boolean,
+) {
+    val colors = JewelTheme.globalColors
+    val buttonColor = if (isRecording) Color(0xFFE53935) else colors.text.normal
+
+    Tooltip(tooltip = { Text(if (isRecording) "Stop Recording" else "Record Test", fontSize = 11.sp) }) {
+        Row(
+            modifier = Modifier
+                .background(
+                    if (isRecording) Color(0xFFE53935).copy(alpha = 0.15f) else colors.text.normal.copy(alpha = 0.08f),
+                    RoundedCornerShape(4.dp),
+                )
+                .clickable(enabled = enabled, onClick = onToggle)
+                .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Record indicator (circle or stop icon)
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(
+                        if (isRecording) Color(0xFFE53935) else buttonColor.copy(alpha = if (enabled) 0.6f else 0.3f),
+                        if (isRecording) CircleShape else RoundedCornerShape(1.dp),
+                    ),
+            )
+
+            Text(
+                if (isRecording) "Stop" else "Record",
+                fontSize = 10.sp,
+                color = if (isRecording) Color(0xFFE53935) else buttonColor.copy(alpha = if (enabled) 0.7f else 0.4f),
             )
         }
     }

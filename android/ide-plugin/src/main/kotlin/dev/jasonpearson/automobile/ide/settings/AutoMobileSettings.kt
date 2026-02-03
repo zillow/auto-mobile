@@ -12,6 +12,7 @@ interface SettingsProvider {
   var testPlanOutputDirectory: String
   var fogModeEnabled: Boolean
   var autoFocusEnabled: Boolean
+  var failuresDateRange: String  // "1h", "24h", "3d", "7d", "30d"
 }
 
 @State(
@@ -23,6 +24,7 @@ class AutoMobileSettings : PersistentStateComponent<AutoMobileSettings>, Setting
   override var testPlanOutputDirectory: String = "test/resources/test-plans"
   override var fogModeEnabled: Boolean = true
   override var autoFocusEnabled: Boolean = true
+  override var failuresDateRange: String = "24h"  // Default to 24 hours
 
   override fun getState(): AutoMobileSettings = this
 

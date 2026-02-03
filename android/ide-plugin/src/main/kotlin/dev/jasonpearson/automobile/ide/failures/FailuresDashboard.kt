@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
@@ -62,10 +63,14 @@ fun FailuresDashboard(
     onNewFailureNotification: ((FailureNotification) -> Unit)? = null,
     initialSelectedFailureId: String? = null,
     onFailureSelected: (() -> Unit)? = null,
+    initialDateRange: DateRange = DateRange.TwentyFourHours,
+    onDateRangeChanged: ((DateRange) -> Unit)? = null,
+    onFailureCountsChanged: ((crashCount: Int, anrCount: Int, toolFailureCount: Int, nonFatalCount: Int) -> Unit)? = null,
     clientProvider: (() -> AutoMobileClient)? = null,
     streamingDataSource: StreamingFailuresDataSourceInterface? = null,
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     modifier: Modifier = Modifier,
+    failuresPushClient: FailuresPushSocketClient? = null,  // Shared client managed at app level
 ) {
     val scope = rememberCoroutineScope()
 
@@ -110,8 +115,9 @@ fun FailuresDashboard(
     var streamingError by remember { mutableStateOf<String?>(null) }
     var reconnectAttempt by remember { mutableIntStateOf(0) }
 
-    // Push socket client for real-time updates
-    val pushClient = remember { FailuresPushSocketClient() }
+    // Push socket client for real-time updates - use provided or create local
+    val pushClient = failuresPushClient ?: remember { FailuresPushSocketClient() }
+    val isLocalPushClient = failuresPushClient == null
 
     // Load data when data source changes or retry is triggered
     LaunchedEffect(currentDataSource, dataSourceMode, retryCounter) {
@@ -191,12 +197,14 @@ fun FailuresDashboard(
         }
     }
 
-    // Connect to push socket for real-time updates in real mode
-    LaunchedEffect(dataSourceMode) {
-        if (dataSourceMode == DataSourceMode.Real) {
-            pushClient.connect()
-        } else {
-            pushClient.disconnect()
+    // Connect to push socket for real-time updates in real mode (only for local client)
+    LaunchedEffect(dataSourceMode, isLocalPushClient) {
+        if (isLocalPushClient) {
+            if (dataSourceMode == DataSourceMode.Real) {
+                pushClient.connect()
+            } else {
+                pushClient.disconnect()
+            }
         }
     }
 
@@ -217,10 +225,12 @@ fun FailuresDashboard(
         }
     }
 
-    // Cleanup on unmount
-    DisposableEffect(Unit) {
+    // Cleanup on unmount (only for local client)
+    DisposableEffect(isLocalPushClient) {
         onDispose {
-            pushClient.disconnect()
+            if (isLocalPushClient) {
+                pushClient.disconnect()
+            }
         }
     }
 
@@ -252,6 +262,9 @@ fun FailuresDashboard(
                     }
                 },
                 pushClient = pushClient,
+                initialDateRange = initialDateRange,
+                onDateRangeChanged = onDateRangeChanged,
+                onFailureCountsChanged = onFailureCountsChanged,
             )
         }
     }
@@ -310,6 +323,9 @@ private fun FailureListView(
     fakeDataSource: FakeFailuresDataSource?,
     onTriggerFakeFailure: () -> Unit,
     pushClient: FailuresPushSocketClient? = null,
+    initialDateRange: DateRange = DateRange.TwentyFourHours,
+    onDateRangeChanged: ((DateRange) -> Unit)? = null,
+    onFailureCountsChanged: ((crashCount: Int, anrCount: Int, toolFailureCount: Int, nonFatalCount: Int) -> Unit)? = null,
 ) {
     val colors = JewelTheme.globalColors
     val filteredFailures = if (filterType != null) {
@@ -318,7 +334,7 @@ private fun FailureListView(
         failures
     }
 
-    var dateRange by remember { mutableStateOf(DateRange.TwentyFourHours) }
+    var dateRange by remember { mutableStateOf(initialDateRange) }
     var timeAggregation by remember { mutableStateOf(TimeAggregation.Hour) }
 
     // Auto-switch aggregation when date range changes and current agg is invalid
@@ -328,6 +344,8 @@ private fun FailureListView(
         if (bestAgg != timeAggregation) {
             timeAggregation = bestAgg
         }
+        // Notify parent of date range change
+        onDateRangeChanged?.invoke(dateRange)
     }
 
     // Timeline data state
@@ -341,6 +359,13 @@ private fun FailureListView(
             is DataSourceResult.Success -> {
                 timelineData = result.data
                 timelineLoading = false
+                // Report failure counts to parent
+                val data = result.data
+                val crashCount = data.dataPoints.sumOf { it.crashes }
+                val anrCount = data.dataPoints.sumOf { it.anrs }
+                val toolFailureCount = data.dataPoints.sumOf { it.toolFailures }
+                val nonFatalCount = data.dataPoints.sumOf { it.nonfatals }
+                onFailureCountsChanged?.invoke(crashCount, anrCount, toolFailureCount, nonFatalCount)
             }
             is DataSourceResult.Error -> {
                 timelineData = null
@@ -357,6 +382,13 @@ private fun FailureListView(
                 when (val result = dataSource.getTimelineData(dateRange, timeAggregation)) {
                     is DataSourceResult.Success -> {
                         timelineData = result.data
+                        // Report updated failure counts to parent
+                        val data = result.data
+                        val crashCount = data.dataPoints.sumOf { it.crashes }
+                        val anrCount = data.dataPoints.sumOf { it.anrs }
+                        val toolFailureCount = data.dataPoints.sumOf { it.toolFailures }
+                        val nonFatalCount = data.dataPoints.sumOf { it.nonfatals }
+                        onFailureCountsChanged?.invoke(crashCount, anrCount, toolFailureCount, nonFatalCount)
                     }
                     is DataSourceResult.Error -> {
                         // Don't clear timeline on refresh failures
@@ -371,73 +403,157 @@ private fun FailureListView(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        // Date range and aggregation selectors
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Date range selector
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                    .padding(4.dp),
-            ) {
-                DateRange.entries.forEach { range ->
-                    val isSelected = range == dateRange
-                    Box(
+        // Date range and aggregation selectors - stack when narrow
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val isNarrow = maxWidth < 400.dp
+
+            if (isNarrow) {
+                // Stack vertically when narrow
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Date range selector
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
-                            .background(
-                                if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
-                                RoundedCornerShape(4.dp),
-                            )
-                            .clickable { dateRange = range }
-                            .pointerHoverIcon(PointerIcon.Hand)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                            .padding(4.dp),
+                    ) {
+                        DateRange.entries.forEach { range ->
+                            val isSelected = range == dateRange
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
+                                        RoundedCornerShape(4.dp),
+                                    )
+                                    .clickable { dateRange = range }
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    range.label,
+                                    fontSize = 10.sp,
+                                    color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+
+                    // Aggregation selector
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            range.label,
+                            "Group by:",
                             fontSize = 10.sp,
-                            color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                            color = colors.text.normal.copy(alpha = 0.5f),
+                            maxLines = 1,
                         )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                .padding(4.dp),
+                        ) {
+                            validAggregations.forEach { agg ->
+                                val isSelected = agg == timeAggregation
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
+                                            RoundedCornerShape(4.dp),
+                                        )
+                                        .clickable { timeAggregation = agg }
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                ) {
+                                    Text(
+                                        agg.label,
+                                        fontSize = 10.sp,
+                                        color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-            }
-
-            // Aggregation selector (only show valid options)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Group by:",
-                    fontSize = 10.sp,
-                    color = colors.text.normal.copy(alpha = 0.5f),
-                )
+            } else {
+                // Side by side when wide
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                        .padding(4.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    validAggregations.forEach { agg ->
-                        val isSelected = agg == timeAggregation
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
-                                    RoundedCornerShape(4.dp),
+                    // Date range selector
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                            .padding(4.dp),
+                    ) {
+                        DateRange.entries.forEach { range ->
+                            val isSelected = range == dateRange
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
+                                        RoundedCornerShape(4.dp),
+                                    )
+                                    .clickable { dateRange = range }
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    range.label,
+                                    fontSize = 10.sp,
+                                    color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                                    maxLines = 1,
                                 )
-                                .clickable { timeAggregation = agg }
-                                .pointerHoverIcon(PointerIcon.Hand)
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            }
+                        }
+                    }
+
+                    // Aggregation selector (only show valid options)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Group by:",
+                            fontSize = 10.sp,
+                            color = colors.text.normal.copy(alpha = 0.5f),
+                            maxLines = 1,
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                .padding(4.dp),
                         ) {
-                            Text(
-                                agg.label,
-                                fontSize = 10.sp,
-                                color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
-                            )
+                            validAggregations.forEach { agg ->
+                                val isSelected = agg == timeAggregation
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
+                                            RoundedCornerShape(4.dp),
+                                        )
+                                        .clickable { timeAggregation = agg }
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                ) {
+                                    Text(
+                                        agg.label,
+                                        fontSize = 10.sp,
+                                        color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -600,22 +716,29 @@ private fun FailureListView(
 
         Spacer(Modifier.height(16.dp))
 
-        // Filter chips
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Filter chips - responsive to width
+        BoxWithConstraints(
             modifier = Modifier.padding(bottom = 12.dp),
         ) {
-            FilterChip(
-                label = "All",
-                isSelected = filterType == null,
-                onClick = { onFilterChanged(null) },
-            )
-            FailureType.entries.forEach { type ->
+            val showLabels = maxWidth > 300.dp
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 FilterChip(
-                    label = "${type.icon} ${type.label}",
-                    isSelected = filterType == type,
-                    onClick = { onFilterChanged(type) },
+                    label = "All",
+                    isSelected = filterType == null,
+                    showLabel = true, // Always show "All"
+                    onClick = { onFilterChanged(null) },
                 )
+                FailureType.entries.forEach { type ->
+                    FilterChip(
+                        label = type.label,
+                        icon = type.icon,
+                        isSelected = filterType == type,
+                        showLabel = showLabels,
+                        onClick = { onFilterChanged(type) },
+                    )
+                }
             }
         }
 
@@ -681,12 +804,20 @@ private fun FailureListView(
 @Composable
 private fun FilterChip(
     label: String,
+    icon: String? = null,
     isSelected: Boolean,
+    showLabel: Boolean = true,
     onClick: () -> Unit,
 ) {
     val colors = JewelTheme.globalColors
     val bgColor = if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent
     val borderColor = if (isSelected) colors.text.normal.copy(alpha = 0.3f) else colors.text.normal.copy(alpha = 0.2f)
+
+    val displayText = when {
+        icon != null && showLabel -> "$icon $label"
+        icon != null -> icon
+        else -> label
+    }
 
     Box(
         modifier = Modifier
@@ -696,7 +827,7 @@ private fun FilterChip(
             .pointerHoverIcon(PointerIcon.Hand)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Text(label, fontSize = 11.sp, maxLines = 1)
+        Text(displayText, fontSize = 11.sp, maxLines = 1)
     }
 }
 
@@ -705,30 +836,50 @@ private fun StatBox(
     label: String,
     value: String,
     color: Color,
+    emoji: String? = null,
     delta: String? = null,
     deltaPositive: Boolean = false,
+    showLabel: Boolean = true,
 ) {
     val colors = JewelTheme.globalColors
+
+    // Auto-size font based on value length to prevent overflow
+    val valueFontSize = when {
+        value.length <= 3 -> 18.sp
+        value.length <= 5 -> 14.sp
+        else -> 12.sp
+    }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             value,
-            fontSize = 18.sp,
+            fontSize = valueFontSize,
             fontWeight = FontWeight.Bold,
             color = color,
+            maxLines = 1,
         )
         if (delta != null) {
             Text(
                 delta,
                 fontSize = 9.sp,
                 color = if (deltaPositive) Color(0xFF4CAF50) else Color(0xFFE53935),
+                maxLines = 1,
             )
         }
-        Text(
-            label,
-            fontSize = 10.sp,
-            color = colors.text.normal.copy(alpha = 0.5f),
-        )
+        if (showLabel) {
+            Text(
+                if (emoji != null) "$emoji $label" else label,
+                fontSize = 10.sp,
+                color = colors.text.normal.copy(alpha = 0.5f),
+                maxLines = 1,
+            )
+        } else if (emoji != null) {
+            Text(
+                emoji,
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -759,38 +910,53 @@ private fun EventTrendsSection(
             .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
             .padding(12.dp),
     ) {
-        // Stats row
-        Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
+        // Stats row - responsive to width
+        BoxWithConstraints(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         ) {
-            StatBox(
-                label = "Crashes",
-                value = formatNumber(totalCrashes),
-                color = FailureType.Crash.color,
-                delta = if (crashDelta != 0) "${if (crashDelta > 0) "+" else ""}$crashDelta%" else null,
-                deltaPositive = crashDelta < 0,
-            )
-            StatBox(
-                label = "ANRs",
-                value = formatNumber(totalAnrs),
-                color = FailureType.ANR.color,
-            )
-            StatBox(
-                label = "Tool Errors",
-                value = formatNumber(totalToolFailures),
-                color = FailureType.ToolCallFailure.color,
-            )
-            StatBox(
-                label = "Non-Fatal",
-                value = formatNumber(totalNonfatals),
-                color = FailureType.NonFatal.color,
-            )
-            StatBox(
-                label = "Total",
-                value = formatNumber(totalCrashes + totalAnrs + totalToolFailures + totalNonfatals),
-                color = colors.text.normal,
-            )
+            val showLabels = maxWidth > 350.dp
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                StatBox(
+                    label = "Crashes",
+                    value = formatNumber(totalCrashes),
+                    color = FailureType.Crash.color,
+                    emoji = FailureType.Crash.icon,
+                    delta = if (crashDelta != 0) "${if (crashDelta > 0) "+" else ""}$crashDelta%" else null,
+                    deltaPositive = crashDelta < 0,
+                    showLabel = showLabels,
+                )
+                StatBox(
+                    label = "ANRs",
+                    value = formatNumber(totalAnrs),
+                    color = FailureType.ANR.color,
+                    emoji = FailureType.ANR.icon,
+                    showLabel = showLabels,
+                )
+                StatBox(
+                    label = "Tool Errors",
+                    value = formatNumber(totalToolFailures),
+                    color = FailureType.ToolCallFailure.color,
+                    emoji = FailureType.ToolCallFailure.icon,
+                    showLabel = showLabels,
+                )
+                StatBox(
+                    label = "Non-Fatal",
+                    value = formatNumber(totalNonfatals),
+                    color = FailureType.NonFatal.color,
+                    emoji = FailureType.NonFatal.icon,
+                    showLabel = showLabels,
+                )
+                StatBox(
+                    label = "Total",
+                    value = formatNumber(totalCrashes + totalAnrs + totalToolFailures + totalNonfatals),
+                    color = colors.text.normal,
+                    emoji = "📊",
+                    showLabel = showLabels,
+                )
+            }
         }
 
         // Bar chart
@@ -884,26 +1050,43 @@ private fun FailureBarChart(
         }
 
         // X-axis labels (show every few labels to avoid crowding)
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            // Dynamically adjust label density based on available width
             val labelStep = when {
-                data.size <= 7 -> 1
-                data.size <= 14 -> 2
-                data.size <= 24 -> 4
-                else -> 10
-            }
-            data.filterIndexed { index, _ -> index % labelStep == 0 || index == data.lastIndex }
-                .forEach { point ->
-                    Text(
-                        point.label,
-                        fontSize = 8.sp,
-                        color = colors.text.normal.copy(alpha = 0.4f),
-                    )
+                maxWidth < 200.dp -> when {
+                    data.size <= 4 -> 1
+                    else -> data.size // Show only first and last
                 }
+                maxWidth < 300.dp -> when {
+                    data.size <= 4 -> 1
+                    data.size <= 8 -> 2
+                    else -> 4
+                }
+                else -> when {
+                    data.size <= 7 -> 1
+                    data.size <= 14 -> 2
+                    data.size <= 24 -> 4
+                    else -> 10
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                data.filterIndexed { index, _ -> index % labelStep == 0 || index == data.lastIndex }
+                    .forEach { point ->
+                        Text(
+                            point.label,
+                            fontSize = 8.sp,
+                            color = colors.text.normal.copy(alpha = 0.4f),
+                            maxLines = 1,
+                        )
+                    }
+            }
         }
     }
 }
@@ -1510,9 +1693,11 @@ private fun OccurrenceRow(occurrence: FailureOccurrence) {
     }
 }
 
-private val numberFormat = java.text.NumberFormat.getNumberInstance()
-
-private fun formatNumber(value: Int): String = numberFormat.format(value)
+private fun formatNumber(value: Int): String = when {
+    value >= 1_000_000 -> String.format("%.1f", value / 1_000_000.0).removeSuffix(".0") + "m"
+    value >= 1_000 -> String.format("%.1f", value / 1_000.0).removeSuffix(".0") + "k"
+    else -> value.toString()
+}
 
 internal fun formatTimeAgo(timestamp: Long, clock: Clock = SystemClock): String {
     val diff = clock.nowMs() - timestamp
