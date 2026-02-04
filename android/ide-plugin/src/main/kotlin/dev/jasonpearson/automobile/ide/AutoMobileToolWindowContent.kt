@@ -658,11 +658,17 @@ fun AutoMobileToolWindowContent() {
               println("Setting activeDeviceId to: $deviceId")
               println("Setting isDevicePanelExpanded to: false")
               LOG.info("MCP device selected: $deviceId")
-              // Store the real device info
+              // Store the real device info - detect type from device name
+              val name = deviceName ?: deviceId
+              val isIOS = name.contains("iPhone", ignoreCase = true) ||
+                          name.contains("iPad", ignoreCase = true) ||
+                          name.contains("iOS", ignoreCase = true) ||
+                          name.contains("Apple", ignoreCase = true)
+              val deviceType = if (isIOS) DeviceType.iOSSimulator else DeviceType.AndroidEmulator
               realDevice = BootedDevice(
                   id = deviceId,
-                  name = deviceName ?: deviceId,
-                  type = DeviceType.AndroidEmulator, // TODO: detect actual type
+                  name = name,
+                  type = deviceType,
                   status = "Connected",
                   foregroundApp = null,
                   connectedAt = System.currentTimeMillis()
