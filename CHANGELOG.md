@@ -1,5 +1,56 @@
 # Changelog
 
+## [v0.0.9] - 2026-02-04
+### Added
+- Test Runners: Cascade MCP tool failures to JUnitRunner/XCTestRunner via executePlan response ([#1078](https://github.com/kaeawc/auto-mobile/issues/1078)) (android, ios, testing)
+- IDE Plugin: Add Cancel button to Record Test entry screen ([#1075](https://github.com/kaeawc/auto-mobile/issues/1075)) (intellij plugin)
+- IDE Plugin: Add 'Refine' button to simplify exported test plans with AI ([#1074](https://github.com/kaeawc/auto-mobile/issues/1074)) (intellij plugin, ai)
+- IDE Plugin: Merge Exploratory Test into Record Test UX ([#1072](https://github.com/kaeawc/auto-mobile/issues/1072)) (intellij plugin)
+- IDE Plugin: Expose startTestRecording MCP tool ([#1071](https://github.com/kaeawc/auto-mobile/issues/1071)) (intellij plugin)
+- IDE Plugin: Expose exportPlan MCP tool for Finish Recording ([#1070](https://github.com/kaeawc/auto-mobile/issues/1070)) (intellij plugin)
+- [IDE Plugin] Wire up StreamingFailuresDataSource for real-time failure updates ([#1066](https://github.com/kaeawc/auto-mobile/issues/1066)) (intellij plugin)
+- [SDK] Add handled exceptions API for non-fatal error reporting ([#1065](https://github.com/kaeawc/auto-mobile/issues/1065)) (android)
+- [IDE Plugin] Implement RealStorageDataSource for key-value storage inspection ([#1064](https://github.com/kaeawc/auto-mobile/issues/1064)) (intellij plugin)
+- [MCP Server] Add storage inspection tools and Unix socket push channel for key-value data ([#1063](https://github.com/kaeawc/auto-mobile/issues/1063))
+- [AccessibilityService] Add WebSocket message types for storage data and real-time sync ([#1062](https://github.com/kaeawc/auto-mobile/issues/1062)) (android)
+- [SDK] Add SharedPreferences/DataStore reading API for key-value storage inspection ([#1061](https://github.com/kaeawc/auto-mobile/issues/1061)) (android)
+- Live performance data for currently selected app ([#1060](https://github.com/kaeawc/auto-mobile/issues/1060)) (performance, intellij plugin)
+- Navigation Graph should only accept named nodes ([#1059](https://github.com/kaeawc/auto-mobile/issues/1059))
+- Navigation Graph Fog Mode ([#1058](https://github.com/kaeawc/auto-mobile/issues/1058))
+- Research: iOS real-time screen streaming options ([#1034](https://github.com/kaeawc/auto-mobile/issues/1034)) (ios, research)
+- Android: Implement video server JAR (VirtualDisplay + MediaCodec) ([#1031](https://github.com/kaeawc/auto-mobile/issues/1031)) (android)
+- Research: Android real-time screen streaming architecture (MediaProjection/MediaCodec) ([#1030](https://github.com/kaeawc/auto-mobile/issues/1030)) (research)
+- Feature: Android SharedPreferences Inspection and Management ([#1021](https://github.com/kaeawc/auto-mobile/issues/1021)) (android, devxp, testing)
+- Feature: Crash and ANR Monitoring via ADB, simctl, and AccessibilityService ([#1020](https://github.com/kaeawc/auto-mobile/issues/1020)) (android, ios, devxp, testing)
+- Feature: Database Inspection and Management for Android AutoMobile SDK ([#1019](https://github.com/kaeawc/auto-mobile/issues/1019)) (android, devxp, testing)
+- feat(mcp): add setUI tool for declarative form field population ([#986](https://github.com/kaeawc/auto-mobile/issues/986)) (android, ai)
+- IDE plugin: Compose charting for performance timelines ([#306](https://github.com/kaeawc/auto-mobile/issues/306)) (android, intellij plugin)
+- IDE Plugin: Display recent performance debug data ([#283](https://github.com/kaeawc/auto-mobile/issues/283)) (android, performance, intellij plugin)
+- IDE plugin: MCP resource viewer UI ([#255](https://github.com/kaeawc/auto-mobile/issues/255)) (intellij plugin)
+- IDE plugin: add source mapping support ([#247](https://github.com/kaeawc/auto-mobile/issues/247)) (intellij plugin)
+### Changed
+- refactor: move src/features/observe/accessibility/ to src/features/observe/android/ ([#1123](https://github.com/kaeawc/auto-mobile/issues/1123)) (android)
+- refactor: consolidate screenshot utilities ([#1121](https://github.com/kaeawc/auto-mobile/issues/1121))
+- refactor: decompose SwipeOn - extract overlay detection and scroll-until ([#1120](https://github.com/kaeawc/auto-mobile/issues/1120)) (android)
+- refactor: decompose ViewHierarchy - separate screenshot handling ([#1119](https://github.com/kaeawc/auto-mobile/issues/1119)) (android)
+- refactor: decompose TapOnElement - extract focus navigation ([#1118](https://github.com/kaeawc/auto-mobile/issues/1118)) (android)
+- refactor: replace getInstance() singletons with constructor injection ([#1117](https://github.com/kaeawc/auto-mobile/issues/1117))
+- refactor: add interfaces for ObserveScreen, Window, AwaitIdle ([#1116](https://github.com/kaeawc/auto-mobile/issues/1116))
+- refactor: decompose XCTestServiceClient using delegate pattern ([#1115](https://github.com/kaeawc/auto-mobile/issues/1115)) (ios)
+- refactor: migrate raw setTimeout/setInterval to Timer interface ([#1114](https://github.com/kaeawc/auto-mobile/issues/1114))
+- refactor: replace inline retry logic with DefaultRetryExecutor ([#1113](https://github.com/kaeawc/auto-mobile/issues/1113))
+- refactor: consolidate ad-hoc caches to use TTLCache ([#1112](https://github.com/kaeawc/auto-mobile/issues/1112))
+- Decompose Explore.ts (1870 lines) ([#1108](https://github.com/kaeawc/auto-mobile/issues/1108))
+- Decompose AccessibilityServiceClient.ts (4652 lines) ([#1107](https://github.com/kaeawc/auto-mobile/issues/1107)) (android)
+- Migrate remaining AdbClient instantiations to AdbClientFactory ([#1106](https://github.com/kaeawc/auto-mobile/issues/1106)) (android)
+- Dead Code Detection: Threshold Exceeded ([#1027](https://github.com/kaeawc/auto-mobile/issues/1027)) (automated, dead-code)
+### Fixed
+- pressButton should properly await fresh view hierarchy before returning observation ([#1051](https://github.com/kaeawc/auto-mobile/issues/1051))
+### Other
+- perf: explore queueMicrotask optimization for FakeTimer ([#1130](https://github.com/kaeawc/auto-mobile/issues/1130)) (devxp, performance)
+- Navigation nodes should preserve aspect ratio instead of cropping screenshots ([#1052](https://github.com/kaeawc/auto-mobile/issues/1052)) (android, devxp, intellij plugin)
+- Research: DevXP for work profile app install tracking ([#754](https://github.com/kaeawc/auto-mobile/issues/754)) (android, devxp, research)
+
 ## [v0.0.8] - 2026-01-24
 ### Added
 - View hierarchy contains duplicate elements from merged sources ([#999](https://github.com/kaeawc/auto-mobile/issues/999)) (performance)

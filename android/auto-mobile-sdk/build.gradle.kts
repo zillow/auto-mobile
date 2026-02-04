@@ -33,7 +33,7 @@ android {
   buildFeatures { compose = true }
 }
 
-version = "0.0.8-SNAPSHOT"
+version = "0.0.9-SNAPSHOT"
 
 dependencies {
   // Protocol module for type-safe event serialization
