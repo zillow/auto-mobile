@@ -222,8 +222,18 @@ ensure_node() {
       if [[ -f "${nvmrc_path}" ]]; then
         log_info "Found .nvmrc, running nvm use..."
         if nvm use 2>/dev/null; then
-          log_info "Node.js $(node --version) activated via .nvmrc"
-          return 0
+          # Validate the activated version meets requirements
+          local nvmrc_version
+          nvmrc_version=$(node --version | sed 's/^v//')
+          local nvmrc_major
+          nvmrc_major=$(echo "${nvmrc_version}" | cut -d. -f1)
+          if [[ "${nvmrc_major}" -ge "${REQUIRED_NODE_MAJOR}" ]]; then
+            log_info "Node.js v${nvmrc_version} activated via .nvmrc"
+            return 0
+          else
+            log_warn ".nvmrc specifies Node.js ${nvmrc_major}.x but ${REQUIRED_NODE_MAJOR}.x required"
+            log_warn "Consider updating .nvmrc to ${REQUIRED_NODE_MAJOR}"
+          fi
         fi
       fi
 
