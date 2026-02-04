@@ -680,8 +680,8 @@ jobs:
           name: playground-app-apk
           path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
 
-  publish-junit-runner-snapshot:
-    name: "Publish JUnitRunner Snapshot"
+  publish-android-libraries-snapshot:
+    name: "Publish Android Libraries Snapshot"
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs:
@@ -713,21 +713,21 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
-      - name: "Read JUnitRunner version"
-        id: junit-runner-version
+      - name: "Read library version"
+        id: library-version
         shell: bash
         run: |
-          version_line=$(grep -E '^version = "' android/junit-runner/build.gradle.kts || true)
-          if [ -z "$version_line" ]; then
-            echo "Could not find JUnitRunner version in android/junit-runner/build.gradle.kts" >&2
+          # Read VERSION_NAME from gradle.properties (single source of truth)
+          version=$(grep -E '^VERSION_NAME=' android/gradle.properties | cut -d'=' -f2)
+          if [ -z "$version" ]; then
+            echo "Could not find VERSION_NAME in android/gradle.properties" >&2
             exit 1
           fi
-          version=$(echo "$version_line" | sed -E 's/version = "([^"]+)"/\1/')
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "JUnitRunner version: $version"
+          echo "Library version: $version"
 
       - name: "Verify Maven Central credentials"
-        if: ${{ endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        if: ${{ endsWith(steps.library-version.outputs.version, '-SNAPSHOT') }}
         shell: bash
         run: |
           if [ -z "$MAVEN_USERNAME" ] || [ -z "$MAVEN_PASSWORD" ]; then
@@ -736,7 +736,7 @@ jobs:
           fi
 
       - name: "Export signing credentials"
-        if: ${{ endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        if: ${{ endsWith(steps.library-version.outputs.version, '-SNAPSHOT') }}
         shell: bash
         run: |
           if [ -n "$SIGNING_IN_MEMORY_KEY" ]; then
@@ -750,9 +750,9 @@ jobs:
           fi
 
       - uses: ./.github/actions/gradle-task-run
-        if: ${{ endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        if: ${{ endsWith(steps.library-version.outputs.version, '-SNAPSHOT') }}
         with:
-          gradle-tasks: ":junit-runner:publishToMavenCentral"
+          gradle-tasks: ":junit-runner:publishToMavenCentral :auto-mobile-sdk:publishToMavenCentral"
           gradle-project-directory: "android"
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
@@ -763,9 +763,9 @@ jobs:
           release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Skip snapshot publish (non-snapshot version)"
-        if: ${{ !endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        if: ${{ !endsWith(steps.library-version.outputs.version, '-SNAPSHOT') }}
         run: |
-          echo "Skipping publish. Version is ${{ steps.junit-runner-version.outputs.version }}."
+          echo "Skipping publish. Version is ${{ steps.library-version.outputs.version }}."
 
 #  playground-app-unit-tests:
 #    name: "Build Playground App"
@@ -978,3 +978,49 @@ jobs:
             exit 1
           fi
           echo "::notice::MCP context threshold benchmark passed - all thresholds satisfied"
+
+  # =============================================================================
+  # Tag Release (triggers release.yml workflow)
+  # =============================================================================
+
+  tag-release:
+    name: "Create Release Tag"
+    runs-on: ubuntu-latest
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      startsWith(github.event.head_commit.message, 'chore: bump versions to v')
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Extract version and create tag"
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          # Extract version from commit message
+          VERSION=$(echo "$COMMIT_MESSAGE" | sed -n 's/chore: bump versions to v\([0-9.]*\).*/\1/p')
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not extract version from commit message: $COMMIT_MESSAGE"
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          echo "Creating tag: $TAG"
+
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Skipping."
+            exit 0
+          fi
+
+          # Create and push tag
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+          echo "Successfully created and pushed tag: $TAG"

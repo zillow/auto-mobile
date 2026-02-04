@@ -33,7 +33,7 @@ android {
   buildFeatures { compose = true }
 }
 
-version = "0.0.9-SNAPSHOT"
+// Version comes from root project's gradle.properties (VERSION_NAME)
 
 dependencies {
   // Protocol module for type-safe event serialization
@@ -77,43 +77,37 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 mavenPublishing {
-  publishToMavenCentral()
-  signAllPublications()
-
-  coordinates("dev.jasonpearson.auto-mobile", "auto-mobile-sdk", project.version.toString())
+  // Coordinates: group and version from root, artifact from local gradle.properties
+  coordinates(
+      property("GROUP").toString(),
+      property("POM_ARTIFACT_ID").toString(),
+      version.toString(),
+  )
 
   pom {
-    name.set("AutoMobile SDK")
-    description.set(
-        "Android library SDK for hooking into navigation events across various frameworks (XML, Compose, Circuit, etc.)"
-    )
+    name.set(property("POM_NAME").toString())
+    description.set(property("POM_DESCRIPTION").toString())
     inceptionYear.set("2025")
-    url.set("https://kaeawc.github.io/auto-mobile/")
+    url.set(property("POM_URL").toString())
     licenses {
       license {
-        name.set("The Apache Software License, Version 2.0")
-        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+        name.set(property("POM_LICENCE_NAME").toString())
+        url.set(property("POM_LICENCE_URL").toString())
         distribution.set("repo")
       }
     }
     developers {
       developer {
-        id.set("Jason Pearson")
-        name.set("Jason Pearson")
-        url.set("https://github.com/kaeawc/")
-        email.set("jason.d.pearson@gmail.com")
+        id.set(property("POM_DEVELOPER_ID").toString())
+        name.set(property("POM_DEVELOPER_NAME").toString())
+        url.set("https://github.com/${property("POM_DEVELOPER_ID")}/")
+        email.set(property("POM_DEVELOPER_EMAIL").toString())
       }
     }
     scm {
-      url.set("https://github.com/kaeawc/auto-mobile/")
-      connection.set("scm:git:git://github.com/kaeawc/auto-mobile.git")
-      developerConnection.set("scm:git:ssh://git@github.com/kaeawc/auto-mobile.git")
+      url.set(property("POM_SCM_URL").toString())
+      connection.set(property("POM_SCM_CONNECTION").toString())
+      developerConnection.set(property("POM_SCM_DEV_CONNECTION").toString())
     }
-  }
-}
-
-tasks.configureEach {
-  if (name == "generateMetadataFileForMavenPublication") {
-    dependsOn("plainJavadocJar")
   }
 }

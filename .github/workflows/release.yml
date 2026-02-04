@@ -38,7 +38,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: Setup Android SDK
@@ -172,6 +172,20 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
 
+      - name: Publish Android Libraries to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
+        run: |
+          cd android
+          # Override VERSION_NAME with the release version from git tag (not the SNAPSHOT in gradle.properties)
+          ./gradlew :junit-runner:publishAndReleaseToMavenCentral :auto-mobile-sdk:publishAndReleaseToMavenCentral \
+            -PVERSION_NAME=${{ steps.version.outputs.version }} \
+            --no-configuration-cache
+
       - name: Free Disk Space
         uses: endersonmenezes/free-disk-space@v3
         with:
@@ -221,7 +235,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: AutoMobile v${{ steps.version.outputs.version }}
           body_path: release_notes.txt
@@ -239,14 +253,24 @@ jobs:
           echo "**Version:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**APK Built:** accessibility-service-debug.apk" >> $GITHUB_STEP_SUMMARY
           echo "**SHA256:** \`${{ steps.verify_checksum.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**npm Published:** https://www.npmjs.com/package/@kaeawc/auto-mobile/v/${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Docker Hub Published:** https://hub.docker.com/r/kaeawc/auto-mobile/tags" >> $GITHUB_STEP_SUMMARY
-          echo "**GitHub Release:** https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- **npm:** https://www.npmjs.com/package/@kaeawc/auto-mobile/v/${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Hub:** https://hub.docker.com/r/kaeawc/auto-mobile/tags" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release:** https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Maven Central:** [auto-mobile-junit-runner](https://central.sonatype.com/artifact/dev.jasonpearson.auto-mobile/auto-mobile-junit-runner)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Maven Central:** [auto-mobile-sdk](https://central.sonatype.com/artifact/dev.jasonpearson.auto-mobile/auto-mobile-sdk)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "docker pull kaeawc/auto-mobile:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "docker pull kaeawc/auto-mobile:latest" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Maven Central" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`kotlin" >> $GITHUB_STEP_SUMMARY
+          echo "testImplementation(\"dev.jasonpearson.auto-mobile:auto-mobile-junit-runner:${{ steps.version.outputs.version }}\")" >> $GITHUB_STEP_SUMMARY
+          echo "implementation(\"dev.jasonpearson.auto-mobile:auto-mobile-sdk:${{ steps.version.outputs.version }}\")" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Checksum Baked Into Package" >> $GITHUB_STEP_SUMMARY

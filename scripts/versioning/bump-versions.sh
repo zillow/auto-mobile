@@ -91,6 +91,23 @@ PY
 update_json_version "package.json" "$new_version" "$dry_run"
 update_json_version ".claude-plugin/plugin.json" "$new_version" "$dry_run"
 
+# Update VERSION_NAME in android/gradle.properties (single source of truth for Android libraries)
+update_gradle_properties_version() {
+  local path="$1"
+  local version="$2"
+  local dry="$3"
+  if [[ "$dry" == true ]]; then
+    echo "Would update VERSION_NAME to $version in $path"
+    return 0
+  fi
+  if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' "s/^VERSION_NAME=.*/VERSION_NAME=$version/" "$path"
+  else
+    sed -i "s/^VERSION_NAME=.*/VERSION_NAME=$version/" "$path"
+  fi
+}
+update_gradle_properties_version "android/gradle.properties" "${snapshot_version}" "$dry_run"
+
 # Update marketplace.json plugin version (nested in plugins[0].version)
 update_marketplace_plugin_version() {
   local path="$1"

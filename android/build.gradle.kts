@@ -21,11 +21,25 @@ plugins {
   alias(libs.plugins.mavenPublish) apply false
 }
 
+// Read version from gradle.properties
+val versionName: String = property("VERSION_NAME") as String
+val groupName: String = property("GROUP") as String
+
+allprojects {
+  group = groupName
+  version = versionName
+}
+
 plugins.withId(libs.plugins.mavenPublish.get().pluginId) {
   if (project.path != ":compiler") {
     apply(plugin = "org.jetbrains.dokka")
   }
-  configure<MavenPublishBaseExtension> { publishToMavenCentral(automaticRelease = true) }
+
+  // Configure vanniktech to publish to Maven Central with automatic release
+  configure<MavenPublishBaseExtension> {
+    publishToMavenCentral(automaticRelease = true)
+    signAllPublications()
+  }
 
   // configuration required to produce unique META-INF/*.kotlin_module file names
   tasks.withType<KotlinCompile>().configureEach {

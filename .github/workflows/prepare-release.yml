@@ -7,9 +7,6 @@ on:
         description: "New npm version (semver, without -SNAPSHOT)"
         required: true
         type: string
-  pull_request:
-    types: [closed]
-    branches: [main]
 
 permissions:
   contents: write
@@ -18,7 +15,6 @@ permissions:
 
 jobs:
   prepare:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -95,34 +91,3 @@ jobs:
         with:
           pull-request-number: ${{ steps.create_pr.outputs.pull-request-number }}
           merge-method: squash
-
-  tag-release:
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'chore/bump-versions-')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
-
-      - name: Create and push tag
-        run: |
-          VERSION=$(jq -r .version package.json)
-          TAG="v${VERSION}"
-
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists. Skipping."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG"
-          git push origin "$TAG"

@@ -15,7 +15,7 @@ java {
   withSourcesJar()
 }
 
-version = "0.0.9-SNAPSHOT"
+// Version comes from root project's gradle.properties (VERSION_NAME)
 
 dependencies {
   // Shared validation module
@@ -55,39 +55,37 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 mavenPublishing {
-  publishToMavenCentral()
-  signAllPublications()
-
+  // Coordinates: group and version from root, artifact from local gradle.properties
   coordinates(
-      "dev.jasonpearson.auto-mobile",
-      "auto-mobile-junit-runner",
-      project.version.toString(),
+      property("GROUP").toString(),
+      property("POM_ARTIFACT_ID").toString(),
+      version.toString(),
   )
 
   pom {
-    name.set("AutoMobile JUnit Runner")
-    description.set("Runs AutoMobile JUnit tests with AutoMobile CLI.")
+    name.set(property("POM_NAME").toString())
+    description.set(property("POM_DESCRIPTION").toString())
     inceptionYear.set("2025")
-    url.set("https://kaeawc.github.io/auto-mobile/")
+    url.set(property("POM_URL").toString())
     licenses {
       license {
-        name.set("The Apache Software License, Version 2.0")
-        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+        name.set(property("POM_LICENCE_NAME").toString())
+        url.set(property("POM_LICENCE_URL").toString())
         distribution.set("repo")
       }
     }
     developers {
       developer {
-        id.set("Jason Pearson")
-        name.set("Jason Pearson")
-        url.set("https://github.com/kaeawc/")
-        email.set("jason.d.pearson@gmail.com")
+        id.set(property("POM_DEVELOPER_ID").toString())
+        name.set(property("POM_DEVELOPER_NAME").toString())
+        url.set("https://github.com/${property("POM_DEVELOPER_ID")}/")
+        email.set(property("POM_DEVELOPER_EMAIL").toString())
       }
     }
     scm {
-      url.set("https://github.com/kaeawc/auto-mobile/")
-      connection.set("scm:git:git://github.com/kaeawc/auto-mobile.git")
-      developerConnection.set("scm:git:ssh://git@github.com/kaeawc/auto-mobile.git")
+      url.set(property("POM_SCM_URL").toString())
+      connection.set(property("POM_SCM_CONNECTION").toString())
+      developerConnection.set(property("POM_SCM_DEV_CONNECTION").toString())
     }
   }
 }
