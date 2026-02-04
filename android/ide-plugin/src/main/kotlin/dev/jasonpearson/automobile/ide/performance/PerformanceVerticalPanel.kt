@@ -60,6 +60,11 @@ fun PerformanceVerticalPanel(
                 dataSourceMode = dataSourceMode,
                 clientProvider = clientProvider,
                 observationStreamClient = observationStreamClient,
+                initialFps = currentFps,
+                initialFrameTimeMs = currentFrameTimeMs,
+                initialJankFrames = currentJankFrames,
+                initialMemoryMb = currentMemoryMb,
+                initialTouchLatencyMs = currentTouchLatencyMs,
             )
         }
     }

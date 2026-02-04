@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +31,7 @@ data class HorizontalTab(
 
 /**
  * Simple horizontal tab bar for bottom panels (no drag-and-drop).
+ * Progressively hides text labels starting from rightmost tab as width decreases.
  */
 @Composable
 fun HorizontalTabBar(
@@ -40,42 +42,60 @@ fun HorizontalTabBar(
 ) {
     val colors = JewelTheme.globalColors
 
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .background(colors.text.normal.copy(alpha = 0.02f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { tab ->
-            val isSelected = tab.id == selectedTabId
+        // Calculate how many tabs can show text based on available width
+        // Each tab with text needs ~100dp, icon-only needs ~40dp
+        // Progressively hide text from rightmost tab first
+        val availableWidth = maxWidth
+        val tabsWithText = when {
+            availableWidth >= 450.dp -> tabs.size      // All tabs show text
+            availableWidth >= 360.dp -> tabs.size - 1  // Hide rightmost (Diagnostics)
+            availableWidth >= 280.dp -> tabs.size - 2  // Hide 2 rightmost (Storage, Diagnostics)
+            availableWidth >= 200.dp -> tabs.size - 3  // Hide 3 rightmost (Test Runs, Storage, Diagnostics)
+            else -> 0                                   // All icon-only
+        }
 
-            Box(
-                modifier = Modifier
-                    .background(
-                        if (isSelected) colors.text.normal.copy(alpha = 0.1f) else Color.Transparent,
-                        RoundedCornerShape(6.dp),
-                    )
-                    .clickable {
-                        // Toggle selection - clicking selected tab deselects it
-                        onTabSelected(if (isSelected) null else tab.id)
-                    }
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                val isSelected = tab.id == selectedTabId
+                val showText = index < tabsWithText
+
+                Box(
+                    modifier = Modifier
+                        .background(
+                            if (isSelected) colors.text.normal.copy(alpha = 0.1f) else Color.Transparent,
+                            RoundedCornerShape(6.dp),
+                        )
+                        .clickable {
+                            // Toggle selection - clicking selected tab deselects it
+                            onTabSelected(if (isSelected) null else tab.id)
+                        }
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .padding(horizontal = if (showText) 12.dp else 8.dp, vertical = 6.dp),
                 ) {
-                    Text(tab.icon, fontSize = 12.sp)
-                    Text(
-                        tab.title,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        softWrap = false,
-                        color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(tab.icon, fontSize = 12.sp)
+                        if (showText) {
+                            Text(
+                                tab.title,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                            )
+                        }
+                    }
                 }
             }
         }

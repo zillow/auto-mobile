@@ -56,13 +56,103 @@ fun PerformanceDashboard(
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
     observationStreamClient: ObservationStreamClient? = null,  // Shared stream client for real-time updates
+    // Initial metrics from parent to avoid empty state flicker when opening
+    initialFps: Float? = null,
+    initialFrameTimeMs: Float? = null,
+    initialJankFrames: Int? = null,
+    initialMemoryMb: Float? = null,
+    initialTouchLatencyMs: Float? = null,
 ) {
     var currentScreen by remember { mutableStateOf(PerformanceScreen.Overview) }
     var selectedMetric by remember { mutableStateOf<PerformanceMetric?>(null) }
 
+    // Build initial run from passed metrics to avoid empty state flicker
+    val initialRun = remember(initialFps, initialFrameTimeMs, initialJankFrames, initialMemoryMb, initialTouchLatencyMs) {
+        if (initialFps != null || initialMemoryMb != null) {
+            val timestamp = System.currentTimeMillis()
+            PerformanceRun(
+                id = "live-run-$timestamp",
+                name = "Live Performance Data",
+                timestamp = timestamp,
+                durationMs = 0,
+                deviceName = "Unknown",
+                overallHealth = HealthStatus.Healthy,
+                metrics = buildList {
+                    if (initialFps != null) {
+                        add(PerformanceMetric(
+                            id = "fps",
+                            type = MetricType.FPS,
+                            name = "Frame Rate",
+                            currentValue = initialFps,
+                            unit = "fps",
+                            thresholdWarning = 55f,
+                            thresholdCritical = 45f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialFps, null)),
+                        ))
+                    }
+                    if (initialFrameTimeMs != null) {
+                        add(PerformanceMetric(
+                            id = "frame_time",
+                            type = MetricType.FrameTime,
+                            name = "Frame Time",
+                            currentValue = initialFrameTimeMs,
+                            unit = "ms",
+                            thresholdWarning = 18f,
+                            thresholdCritical = 33f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialFrameTimeMs, null)),
+                        ))
+                    }
+                    if (initialJankFrames != null) {
+                        add(PerformanceMetric(
+                            id = "jank",
+                            type = MetricType.Jank,
+                            name = "Jank (Missed Frames)",
+                            currentValue = initialJankFrames.toFloat(),
+                            unit = "frames",
+                            thresholdWarning = 5f,
+                            thresholdCritical = 10f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialJankFrames.toFloat(), null)),
+                        ))
+                    }
+                    if (initialMemoryMb != null) {
+                        add(PerformanceMetric(
+                            id = "memory",
+                            type = MetricType.Memory,
+                            name = "Memory Usage",
+                            currentValue = initialMemoryMb,
+                            unit = "MB",
+                            thresholdWarning = 256f,
+                            thresholdCritical = 512f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialMemoryMb, null)),
+                        ))
+                    }
+                    if (initialTouchLatencyMs != null) {
+                        add(PerformanceMetric(
+                            id = "touch_latency",
+                            type = MetricType.TouchLatency,
+                            name = "Touch Latency",
+                            currentValue = initialTouchLatencyMs,
+                            unit = "ms",
+                            thresholdWarning = 100f,
+                            thresholdCritical = 200f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialTouchLatencyMs, null)),
+                        ))
+                    }
+                },
+                anomalies = emptyList(),
+                screensAnalyzed = emptyList(),
+            )
+        } else null
+    }
+
     // Fetch performance run from data source
-    var currentRun by remember { mutableStateOf<PerformanceRun?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var currentRun by remember { mutableStateOf(initialRun) }
+    var isLoading by remember { mutableStateOf(initialRun == null) }
     var error by remember { mutableStateOf<String?>(null) }
 
     // Real-time performance metrics history (for live streaming)
@@ -279,8 +369,13 @@ fun PerformanceDashboard(
         }
     }
 
-    // Initial fetch as fallback (in case stream hasn't pushed yet)
+    // Initial fetch as fallback (only if we don't already have data from initial metrics)
     LaunchedEffect(dataSourceMode, clientProvider) {
+        // Skip fetch if we already have data from initial metrics
+        if (currentRun != null) {
+            isLoading = false
+            return@LaunchedEffect
+        }
         isLoading = true
         error = null
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -288,7 +383,10 @@ fun PerformanceDashboard(
                 val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createPerformanceDataSource(dataSourceMode, clientProvider)
                 when (val result = dataSource.getPerformanceRun()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
-                        currentRun = result.data
+                        // Only update if we still don't have data (stream might have pushed by now)
+                        if (currentRun == null) {
+                            currentRun = result.data
+                        }
                         isLoading = false
                     }
                     is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {

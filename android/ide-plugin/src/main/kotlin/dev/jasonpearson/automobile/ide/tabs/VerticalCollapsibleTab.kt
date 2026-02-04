@@ -49,18 +49,32 @@ fun VerticalCollapsibleTab(
 
     if (isCollapsed) {
         // Collapsed state: vertical tab aligned to top with optional content below
-        Box(
+        Row(
             modifier = Modifier
-                .width(24.dp)
+                .width(28.dp)  // 24dp + 4dp padding
                 .fillMaxHeight()
-                .background(colors.text.normal.copy(alpha = 0.03f))
                 .clickable(onClick = onToggle)
                 .pointerHoverIcon(PointerIcon.Hand),
         ) {
-            Column(
-                modifier = Modifier.fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            // Left edge indicator (2dp lighter color)
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(colors.text.normal.copy(alpha = 0.08f)),
+            )
+            // Main collapsed bar content with left padding
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(colors.text.normal.copy(alpha = 0.03f))
+                    .padding(start = 4.dp),
             ) {
+                Column(
+                    modifier = Modifier.fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                 // Rotated title text positioned at top
                 // Use layout modifier to swap width/height for proper measurement of rotated text
                 Text(
@@ -91,13 +105,14 @@ fun VerticalCollapsibleTab(
                         .rotate(-90f),
                 )
 
-                // Custom collapsed content (badges, metrics, etc.)
-                if (collapsedContent != null) {
-                    Box(
-                        modifier = Modifier.padding(top = 8.dp),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
-                        collapsedContent()
+                    // Custom collapsed content (badges, metrics, etc.)
+                    if (collapsedContent != null) {
+                        Box(
+                            modifier = Modifier.padding(top = 8.dp),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            collapsedContent()
+                        }
                     }
                 }
             }

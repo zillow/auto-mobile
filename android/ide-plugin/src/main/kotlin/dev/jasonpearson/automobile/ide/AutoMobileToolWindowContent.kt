@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package dev.jasonpearson.automobile.ide
 
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +64,7 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
+import dev.jasonpearson.automobile.ide.diagnostics.DiagnosticsDashboard
 import dev.jasonpearson.automobile.ide.datasource.InstalledApp
 import dev.jasonpearson.automobile.ide.datasource.Result
 import dev.jasonpearson.automobile.ide.failures.DataSourceResult
@@ -197,7 +200,6 @@ private fun selectDefaultApp(apps: List<InstalledApp>, deviceType: DeviceType?):
 @Composable
 fun AutoMobileToolWindowContent() {
   var selectedIndex by remember { mutableIntStateOf(0) }
-  var isLive by remember { mutableStateOf(true) }
   val dashboardOrder = remember { mutableStateListOf(*Dashboard.entries.toTypedArray()) }
   var draggedIndex by remember { mutableStateOf<Int?>(null) }
   var dropTargetIndex by remember { mutableStateOf<Int?>(null) }
@@ -208,12 +210,13 @@ fun AutoMobileToolWindowContent() {
   var failuresPanelWidthPx by remember { mutableFloatStateOf(450f) }  // 300 * 1.5
   var performancePanelWidthPx by remember { mutableFloatStateOf(450f) }  // 300 * 1.5
 
-  // Horizontal tabs at bottom (Navigation, Test Runs, Storage)
+  // Horizontal tabs at bottom (Navigation, Test Runs, Storage, Diagnostics)
   val horizontalTabs = remember {
       listOf(
           HorizontalTab("navigation", "Navigation", "🧭"),
           HorizontalTab("test_runs", "Test Runs", "🧪"),
           HorizontalTab("storage", "Storage", "💾"),
+          HorizontalTab("diagnostics", "Diagnostics", "🩺"),
       )
   }
   var selectedHorizontalTabId by remember { mutableStateOf<String?>(null) }
@@ -240,11 +243,7 @@ fun AutoMobileToolWindowContent() {
     mutableStateOf(initial)
   }
 
-  // Foreground app filter toggle state
-  var isForegroundFilterEnabled by remember { mutableStateOf(false) }
 
-  // Test recording state
-  var isRecordingTest by remember { mutableStateOf(false) }
 
   // Mock booted devices - will be replaced with real data
   val activeDeviceIdState = remember { mutableStateOf<String?>(null) }  // null = show MCP panel in Real mode
@@ -617,8 +616,6 @@ fun AutoMobileToolWindowContent() {
                   userNavigatedToDevices = false  // Reset when device selected
               }
           },
-          isLive = isLive,
-          onLiveToggle = { isLive = it },
           isDevicePanelExpanded = isDevicePanelExpanded,
           availableEmulators = availableEmulators,
           systemImages = systemImages,
@@ -634,9 +631,6 @@ fun AutoMobileToolWindowContent() {
           needsSetup = needsSetup,
           onSetupClick = {
               // TODO: Open setup wizard/dialog
-          },
-          onDoctorClick = {
-              // TODO: Run diagnostics
           },
           dataSourceMode = dataSourceMode,
           onDataSourceModeChanged = { mode ->
@@ -693,31 +687,6 @@ fun AutoMobileToolWindowContent() {
               selectedAppId = appId
               appDropdownExpanded = false
               LOG.info("App selected: $appId")
-          },
-          showAppSelector = activeDeviceId != null && !isDevicePanelExpanded,
-          // Foreground app toggle props
-          isForegroundFilterEnabled = isForegroundFilterEnabled,
-          foregroundAppName = installedApps.find { it.isForeground }?.displayName
-              ?: installedApps.find { it.isForeground }?.packageName,
-          onForegroundFilterToggle = { enabled ->
-              isForegroundFilterEnabled = enabled
-              // When enabled, auto-select foreground app; when disabled, clear selection
-              if (enabled) {
-                  val fgApp = installedApps.find { it.isForeground }
-                  if (fgApp != null) {
-                      selectedAppId = fgApp.packageName
-                  }
-              }
-          },
-          // Record test props
-          isRecordingTest = isRecordingTest,
-          onRecordTestToggle = {
-              isRecordingTest = !isRecordingTest
-              if (isRecordingTest) {
-                  LOG.info("Started test recording")
-              } else {
-                  LOG.info("Stopped test recording")
-              }
           },
       )
     }
@@ -899,7 +868,25 @@ fun AutoMobileToolWindowContent() {
                     deviceId = activeDeviceId,
                     packageName = selectedAppId,
                 )
+                "diagnostics" -> DiagnosticsDashboard(
+                    connectedMcpProcess = connectedMcpProcess,
+                    dataSourceMode = dataSourceMode,
+                )
               }
+            }
+          } else {
+            // Empty state when no tab is selected
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+              Text(
+                  "Select a tab above to view content",
+                  fontSize = 12.sp,
+                  color = colors.text.normal.copy(alpha = 0.4f),
+              )
             }
           }
         } // end scrollable Column
@@ -913,8 +900,6 @@ private fun GlobalShellHeader(
     devices: List<BootedDevice>,
     activeDeviceId: String?,
     onDeviceSelected: (String) -> Unit,
-    isLive: Boolean,
-    onLiveToggle: (Boolean) -> Unit,
     isDevicePanelExpanded: Boolean = false,
     availableEmulators: List<AvailableEmulator> = emptyList(),
     systemImages: List<SystemImage> = emptyList(),
@@ -923,7 +908,6 @@ private fun GlobalShellHeader(
     onCollapsePanel: () -> Unit = {},
     needsSetup: Boolean = false,
     onSetupClick: () -> Unit = {},
-    onDoctorClick: () -> Unit = {},
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     onDataSourceModeChanged: (DataSourceMode) -> Unit = {},
     onMcpDeviceSelected: (deviceId: String, deviceName: String?) -> Unit = { _, _ -> },
@@ -936,14 +920,6 @@ private fun GlobalShellHeader(
     appDropdownExpanded: Boolean = false,
     onAppDropdownExpandedChange: (Boolean) -> Unit = {},
     onAppSelected: (String?) -> Unit = {},
-    showAppSelector: Boolean = false,
-    // Foreground app toggle props
-    isForegroundFilterEnabled: Boolean = false,
-    foregroundAppName: String? = null,
-    onForegroundFilterToggle: (Boolean) -> Unit = {},
-    // Record test props
-    isRecordingTest: Boolean = false,
-    onRecordTestToggle: () -> Unit = {},
 ) {
   val colors = JewelTheme.globalColors
 
@@ -952,199 +928,162 @@ private fun GlobalShellHeader(
           .fillMaxWidth()
           .background(JewelTheme.globalColors.panelBackground),
   ) {
-    BoxWithConstraints(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      val isCompact = maxWidth < 400.dp
-
-      Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-      ) {
-        // Left side: Device selection (only in Fake mode)
-        if (dataSourceMode == DataSourceMode.Fake) {
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            if (!isCompact) {
-              Text(
-                  "Devices:",
-                  fontSize = 11.sp,
-                  maxLines = 1,
-                  softWrap = false,
-                  color = colors.text.normal.copy(alpha = 0.5f),
-              )
-            }
-
-            // Device icons
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-              devices.forEach { device ->
-                DeviceIcon(
-                    device = device,
-                    isActive = device.id == activeDeviceId,
-                    isLive = isLive && device.id == activeDeviceId,
-                    onClick = { onDeviceSelected(device.id) },
-                )
-              }
-            }
-          }
-        } else {
-          // Real mode: show MCP server indicator or empty space
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            // Show "Devices:" when a device is selected, "MCP Servers" otherwise
-            if (activeDeviceId != null) {
-              Text(
-                  "Devices:",
-                  fontSize = 11.sp,
-                  maxLines = 1,
-                  softWrap = false,
-                  color = Color(0xFF2196F3),
-                  modifier = Modifier
-                      .clickable {
-                          // Clicking "Devices:" expands the device panel
-                          // We need to deselect the device and expand the panel
-                          onDeviceSelected("")
-                      }
-                      .pointerHoverIcon(PointerIcon.Hand),
-              )
-
-              // Show device buttons next to "Devices:"
-              devices.forEach { device ->
-                val isActive = device.id == activeDeviceId
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (isActive) Color(0xFF2196F3).copy(alpha = 0.15f)
-                            else colors.text.normal.copy(alpha = 0.08f),
-                            RoundedCornerShape(4.dp),
-                        )
-                        .clickable {
-                            if (device.id == activeDeviceId) {
-                                // Tapping active device expands panel to show more devices
-                                onDeviceSelected("")
-                            } else {
-                                onDeviceSelected(device.id)
-                            }
-                        }
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        device.name,
-                        fontSize = 11.sp,
-                        color = if (isActive) Color(0xFF2196F3) else colors.text.normal.copy(alpha = 0.7f),
-                    )
-                }
-              }
-            } else {
-              Text(
-                  "🔌",
-                  fontSize = 14.sp,
-              )
-              if (!isCompact) {
-                Text(
-                    "MCP Servers",
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    color = colors.text.normal.copy(alpha = 0.7f),
-                )
-              }
-            }
-          }
-        }
-
-        // Foreground app toggle (replaces app selector dropdown)
-        if (showAppSelector) {
-          ForegroundAppToggle(
-              isEnabled = isForegroundFilterEnabled,
-              foregroundAppName = foregroundAppName,
-              onToggle = onForegroundFilterToggle,
-          )
-        }
-
-        // Record test button (shown when device connected)
-        if (activeDeviceId != null) {
-          RecordTestButton(
-              isRecording = isRecordingTest,
-              onToggle = onRecordTestToggle,
-              enabled = activeDeviceId != null,
-          )
-        }
-
-        // Right side: Setup button (conditional), Doctor button, Live toggle (hidden when panel expanded)
+      // Left side: Device selection
+      if (dataSourceMode == DataSourceMode.Fake) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-          // Setup AutoMobile button (shown when service not detected)
-          if (needsSetup) {
-            Box(
-                modifier = Modifier
-                    .background(Color(0xFF2196F3).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                    .clickable(onClick = onSetupClick)
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-              Text(
-                  "Setup",
-                  fontSize = 10.sp,
-                  maxLines = 1,
-                  softWrap = false,
-                  color = Color(0xFF64B5F6),
+          Text(
+              "Devices:",
+              fontSize = 11.sp,
+              maxLines = 1,
+              softWrap = false,
+              color = colors.text.normal.copy(alpha = 0.5f),
+          )
+
+          // Device icons
+          Row(
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            devices.forEach { device ->
+              DeviceIcon(
+                  device = device,
+                  isActive = device.id == activeDeviceId,
+                  onClick = { onDeviceSelected(device.id) },
               )
             }
           }
-
-          // Doctor button (always visible)
-          Tooltip(tooltip = { Text("Run diagnostics", fontSize = 11.sp) }) {
-            Box(
+        }
+      } else {
+        // Real mode: show MCP server indicator or empty space
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          // Show "Devices:" when a device is selected, "MCP Servers" otherwise
+          if (activeDeviceId != null) {
+            Text(
+                "Devices:",
+                fontSize = 11.sp,
+                maxLines = 1,
+                softWrap = false,
+                color = Color(0xFF2196F3),
                 modifier = Modifier
-                    .background(colors.text.normal.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
-                    .clickable(onClick = onDoctorClick)
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-              Text("🩺", fontSize = 12.sp)
-            }
-          }
+                    .clickable {
+                        // Clicking "Devices:" expands the device panel
+                        // We need to deselect the device and expand the panel
+                        onDeviceSelected("")
+                    }
+                    .pointerHoverIcon(PointerIcon.Hand),
+            )
 
-          // Data source toggle (Fake/Real)
-          DataSourceToggle(
-              currentMode = dataSourceMode,
-              onModeChanged = onDataSourceModeChanged,
-          )
-
-          // Live toggle (only in Fake mode when viewing a device)
-          if (dataSourceMode == DataSourceMode.Fake && !isDevicePanelExpanded) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-              if (!isCompact) {
-                Text(
-                    "Live",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    color = if (isLive) colors.text.normal else colors.text.normal.copy(alpha = 0.5f),
-                )
+            // Show device buttons next to "Devices:" using emojis with tooltips
+            devices.forEach { device ->
+              val isActive = device.id == activeDeviceId
+              val deviceEmoji = when (device.type) {
+                  DeviceType.AndroidEmulator, DeviceType.AndroidPhysical -> "\uD83E\uDD16"  // 🤖
+                  DeviceType.iOSSimulator, DeviceType.iOSPhysical -> "\uD83C\uDF4E"  // 🍎
               }
-              LiveToggle(isLive = isLive, onToggle = onLiveToggle)
+              Tooltip(
+                  tooltip = {
+                      Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                          Text(device.name, fontSize = 12.sp)
+                          Text(
+                              "Status: ${device.status}",
+                              fontSize = 10.sp,
+                              color = colors.text.normal.copy(alpha = 0.6f),
+                          )
+                          device.foregroundApp?.let { app ->
+                              Text(
+                                  "App: $app",
+                                  fontSize = 10.sp,
+                                  color = colors.text.normal.copy(alpha = 0.6f),
+                              )
+                          }
+                      }
+                  },
+              ) {
+                  Box(
+                      modifier = Modifier
+                          .background(
+                              if (isActive) Color(0xFF2196F3).copy(alpha = 0.15f)
+                              else colors.text.normal.copy(alpha = 0.08f),
+                              RoundedCornerShape(4.dp),
+                          )
+                          .clickable {
+                              if (device.id == activeDeviceId) {
+                                  // Tapping active device expands panel to show more devices
+                                  onDeviceSelected("")
+                              } else {
+                                  onDeviceSelected(device.id)
+                              }
+                          }
+                          .pointerHoverIcon(PointerIcon.Hand)
+                          .padding(horizontal = 8.dp, vertical = 4.dp),
+                  ) {
+                      Text(
+                          deviceEmoji,
+                          fontSize = 14.sp,
+                      )
+                  }
+              }
             }
+          } else {
+            Text(
+                "🔌",
+                fontSize = 14.sp,
+            )
+            Text(
+                "MCP Servers",
+                fontSize = 11.sp,
+                maxLines = 1,
+                softWrap = false,
+                color = colors.text.normal.copy(alpha = 0.7f),
+            )
           }
         }
+      }
+
+      // Right side: Setup button (conditional), Real Data toggle, Live toggle
+      Row(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        // Setup AutoMobile button (shown when service not detected)
+        if (needsSetup) {
+          Box(
+              modifier = Modifier
+                  .background(Color(0xFF2196F3).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                  .clickable(onClick = onSetupClick)
+                  .pointerHoverIcon(PointerIcon.Hand)
+                  .padding(horizontal = 8.dp, vertical = 4.dp),
+          ) {
+            Text(
+                "Setup",
+                fontSize = 10.sp,
+                maxLines = 1,
+                softWrap = false,
+                color = Color(0xFF64B5F6),
+            )
+          }
+        }
+
+        // Real Data switch
+        RealDataSwitch(
+            isRealData = dataSourceMode == DataSourceMode.Real,
+            onToggle = { isReal ->
+                onDataSourceModeChanged(if (isReal) DataSourceMode.Real else DataSourceMode.Fake)
+            },
+        )
       }
     }
 
@@ -1173,7 +1112,6 @@ private fun GlobalShellHeader(
 private fun DeviceIcon(
     device: BootedDevice,
     isActive: Boolean,
-    isLive: Boolean,
     onClick: () -> Unit,
 ) {
   val colors = JewelTheme.globalColors
@@ -1181,8 +1119,7 @@ private fun DeviceIcon(
       if (isActive) colors.text.normal.copy(alpha = 0.15f)
       else colors.text.normal.copy(alpha = 0.05f)
   val borderColor =
-      if (isActive && isLive) Color(0xFF4CAF50)
-      else if (isActive) colors.text.normal.copy(alpha = 0.4f)
+      if (isActive) colors.text.normal.copy(alpha = 0.4f)
       else Color.Transparent
   val iconColor =
       if (isActive) colors.text.normal
@@ -1262,84 +1199,46 @@ private fun AppleDeviceIcon(color: Color) {
 }
 
 @Composable
-private fun DataSourceToggle(
-    currentMode: DataSourceMode,
-    onModeChanged: (DataSourceMode) -> Unit,
+private fun RealDataSwitch(
+    isRealData: Boolean,
+    onToggle: (Boolean) -> Unit,
 ) {
     val colors = JewelTheme.globalColors
+    val trackColor = if (isRealData) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.3f)
+    val thumbColor = Color.White
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        DataSourceMode.entries.forEach { mode ->
-            val isSelected = mode == currentMode
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+        Text(
+            "Real Data",
+            fontSize = 11.sp,
+            maxLines = 1,
+            softWrap = false,
+            color = if (isRealData) colors.text.normal else colors.text.normal.copy(alpha = 0.5f),
+        )
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(18.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(trackColor)
+                .clickable { onToggle(!isRealData) }
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(2.dp),
+        ) {
+            Box(
                 modifier = Modifier
-                    .background(
-                        if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
-                        RoundedCornerShape(4.dp),
-                    )
-                    .clickable { onModeChanged(mode) }
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                // Radio indicator
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(
-                            if (isSelected) Color(0xFF4CAF50) else Color.Transparent,
-                            CircleShape,
-                        )
-                        .border(
-                            1.dp,
-                            if (isSelected) Color(0xFF4CAF50)
-                            else colors.text.normal.copy(alpha = 0.4f),
-                            CircleShape,
-                        ),
-                )
-                androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
-                Text(
-                    mode.name,
-                    fontSize = 10.sp,
-                    color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
-                )
-            }
+                    .size(14.dp)
+                    .offset(x = if (isRealData) 14.dp else 0.dp)
+                    .clip(CircleShape)
+                    .background(thumbColor),
+            )
         }
     }
 }
 
-@Composable
-private fun LiveToggle(isLive: Boolean, onToggle: (Boolean) -> Unit) {
-  val colors = JewelTheme.globalColors
-  val trackColor =
-      if (isLive) Color(0xFF4CAF50).copy(alpha = 0.4f)
-      else colors.text.normal.copy(alpha = 0.2f)
-  val thumbColor =
-      if (isLive) Color(0xFF4CAF50)
-      else colors.text.normal.copy(alpha = 0.5f)
-
-  Box(
-      modifier =
-          Modifier.size(width = 32.dp, height = 18.dp)
-              .background(trackColor, shape = RoundedCornerShape(9.dp))
-              .clickable { onToggle(!isLive) }
-              .pointerHoverIcon(PointerIcon.Hand),
-  ) {
-    Box(
-        modifier =
-            Modifier.padding(2.dp)
-                .size(14.dp)
-                .align(if (isLive) Alignment.CenterEnd else Alignment.CenterStart)
-                .background(thumbColor, shape = CircleShape),
-    )
-  }
-}
 
 @Composable
 private fun DraggableTabs(
@@ -3208,122 +3107,6 @@ private fun AppDropdownItem(
                 "\u2713",
                 fontSize = 12.sp,
                 color = Color(0xFF4CAF50),
-            )
-        }
-    }
-}
-
-/**
- * Toggle for filtering by foreground app. When enabled, filters all data by the current
- * foreground app. When disabled, shows "All Apps".
- */
-@Composable
-private fun ForegroundAppToggle(
-    isEnabled: Boolean,
-    foregroundAppName: String?,
-    onToggle: (Boolean) -> Unit,
-) {
-    val colors = JewelTheme.globalColors
-    val displayText = if (isEnabled && foregroundAppName != null) {
-        foregroundAppName
-    } else {
-        "All Apps"
-    }
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            "FG:",
-            fontSize = 11.sp,
-            maxLines = 1,
-            softWrap = false,
-            color = colors.text.normal.copy(alpha = 0.5f),
-        )
-
-        Row(
-            modifier = Modifier
-                .background(
-                    if (isEnabled) Color(0xFF4CAF50).copy(alpha = 0.15f) else colors.text.normal.copy(alpha = 0.05f),
-                    RoundedCornerShape(4.dp),
-                )
-                .clickable { onToggle(!isEnabled) }
-                .pointerHoverIcon(PointerIcon.Hand)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Toggle indicator
-            Box(
-                modifier = Modifier
-                    .size(width = 24.dp, height = 14.dp)
-                    .background(
-                        if (isEnabled) Color(0xFF4CAF50).copy(alpha = 0.4f) else colors.text.normal.copy(alpha = 0.2f),
-                        RoundedCornerShape(7.dp),
-                    ),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(2.dp)
-                        .size(10.dp)
-                        .align(if (isEnabled) Alignment.CenterEnd else Alignment.CenterStart)
-                        .background(
-                            if (isEnabled) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.5f),
-                            CircleShape,
-                        ),
-                )
-            }
-
-            Text(
-                displayText,
-                fontSize = 11.sp,
-                color = if (isEnabled) Color(0xFF4CAF50) else colors.text.normal,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-/**
- * Button to start/stop test recording. Shows red dot when recording.
- */
-@Composable
-private fun RecordTestButton(
-    isRecording: Boolean,
-    onToggle: () -> Unit,
-    enabled: Boolean,
-) {
-    val colors = JewelTheme.globalColors
-    val buttonColor = if (isRecording) Color(0xFFE53935) else colors.text.normal
-
-    Tooltip(tooltip = { Text(if (isRecording) "Stop Recording" else "Record Test", fontSize = 11.sp) }) {
-        Row(
-            modifier = Modifier
-                .background(
-                    if (isRecording) Color(0xFFE53935).copy(alpha = 0.15f) else colors.text.normal.copy(alpha = 0.08f),
-                    RoundedCornerShape(4.dp),
-                )
-                .clickable(enabled = enabled, onClick = onToggle)
-                .pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Record indicator (circle or stop icon)
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        if (isRecording) Color(0xFFE53935) else buttonColor.copy(alpha = if (enabled) 0.6f else 0.3f),
-                        if (isRecording) CircleShape else RoundedCornerShape(1.dp),
-                    ),
-            )
-
-            Text(
-                if (isRecording) "Stop" else "Record",
-                fontSize = 10.sp,
-                color = if (isRecording) Color(0xFFE53935) else buttonColor.copy(alpha = if (enabled) 0.7f else 0.4f),
             )
         }
     }
