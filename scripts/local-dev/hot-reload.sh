@@ -1,0 +1,888 @@
+#!/usr/bin/env bash
+#
+# AutoMobile hot-reload development workflow.
+#
+# This script watches all components in a single loop and processes changes in order:
+#   1. IntelliJ/Android Studio IDE plugin
+#   2. Android AccessibilityService (with sha updates for TypeScript)
+#   3. iOS XCTestService (with sha updates for TypeScript)
+#   4. MCP TypeScript daemon
+#
+# Usage:
+#   ./scripts/local-dev/hot-reload.sh [options]
+#
+# Options:
+#   --ide <name>         Pre-select IDE by name (skip prompt)
+#   --device <id>        Target specific ADB device
+#   --simulator <udid>   Target specific iOS simulator
+#   --skip-ai            Skip AI agent prompt
+#   --once               Build all components once and exit
+#   --poll-interval <s>  File watch interval (default: 2)
+#   --no-ide-restart     Install IDE plugin without restarting
+#   --no-android         Skip Android hot-reload
+#   --no-ios             Skip iOS hot-reload
+#   --help               Show help
+#
+# Environment:
+#   ANDROID_SERIAL       ADB device id override
+#   AI_YOLO_MODE         If set, launch Claude/Codex with auto-accept flags
+#   XCTESTSERVICE_PORT   Override XCTestService port (default: 8765)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+export PROJECT_ROOT
+
+# Source library files
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/deps.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/adb.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/apk.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/ide-plugin.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/xctestservice.sh"
+
+# Path constants
+ANDROID_DIR="${PROJECT_ROOT}/android"
+SERVICE_DIR="${ANDROID_DIR}/accessibility-service"
+APK_PATH="${SERVICE_DIR}/build/outputs/apk/debug/accessibility-service-debug.apk"
+XCTEST_SERVICE_DIR="${PROJECT_ROOT}/ios/XCTestService"
+DERIVED_DATA_PATH="/tmp/automobile-xctestservice"
+MCP_JSON="${PROJECT_ROOT}/.mcp.json"
+CODEX_CONFIG_DIR="${HOME}/.codex"
+CODEX_TOML="${CODEX_CONFIG_DIR}/config.toml"
+PID_FILE="${PROJECT_ROOT}/.automobile-hot-reload.pid"
+
+# CLI options with defaults
+IDE_NAME=""
+DEVICE_ID=""
+SIMULATOR_ID=""
+SKIP_AI=false
+RUN_ONCE=false
+POLL_INTERVAL=2
+NO_IDE_RESTART=false
+NO_ANDROID=false
+NO_IOS=false
+
+# Runtime state
+IDE_PLUGINS_DIR=""
+IDE_PLUGIN_ENABLED=false
+ANDROID_ENABLED=false
+IOS_ENABLED=false
+HAVE_DEVICE=false
+
+# Track last hashes for change detection
+LAST_IDE_PLUGIN_HASH=""
+LAST_APK_HASH=""
+LAST_IOS_HASH=""
+LAST_TS_HASH=""
+
+# Track device/simulator state
+LAST_ADB_DEVICES=""
+LAST_SIMULATOR=""
+APK_NEEDS_INSTALL=false
+IOS_NEEDS_RESTART=false
+
+usage() {
+  cat << EOF
+Usage: $0 [options]
+
+AutoMobile unified hot-reload development workflow.
+
+Watches all components in a single loop:
+  1. IntelliJ/Android Studio IDE plugin
+  2. Android AccessibilityService (with sha updates)
+  3. iOS XCTestService (with sha updates)
+  4. MCP TypeScript daemon
+
+Options:
+  --ide <name>         Pre-select IDE by name (e.g., "Android Studio")
+  --device <id>        Target specific ADB device
+  --simulator <udid>   Target specific iOS simulator
+  --skip-ai            Skip AI agent prompt (still runs watchers)
+  --once               Build all components once and exit
+  --poll-interval <s>  File watch interval (default: 2)
+  --no-ide-restart     Install IDE plugin without restarting
+  --no-android         Skip Android hot-reload
+  --no-ios             Skip iOS hot-reload
+  --help               Show this help text
+
+Environment variables:
+  ANDROID_SERIAL       ADB device id override
+  AI_YOLO_MODE         If set, launch Claude/Codex with auto-accept flags
+  XCTESTSERVICE_PORT   Override XCTestService port (default: 8765)
+EOF
+}
+
+# Kill any previous hot-reload processes
+kill_previous() {
+  if [[ -f "${PID_FILE}" ]]; then
+    local old_pid
+    old_pid=$(cat "${PID_FILE}" 2>/dev/null || true)
+    if [[ -n "${old_pid}" ]] && kill -0 "${old_pid}" 2>/dev/null; then
+      log_info "Killing previous hot-reload process (PID ${old_pid})..."
+      kill "${old_pid}" 2>/dev/null || true
+      sleep 1
+      if kill -0 "${old_pid}" 2>/dev/null; then
+        kill -9 "${old_pid}" 2>/dev/null || true
+      fi
+    fi
+    rm -f "${PID_FILE}"
+  fi
+
+  local pids
+  pids=$(pgrep -f "hot-reload.sh" 2>/dev/null | grep -v "$$" || true)
+  if [[ -n "${pids}" ]]; then
+    log_info "Killing orphaned hot-reload processes..."
+    echo "${pids}" | xargs kill 2>/dev/null || true
+  fi
+}
+
+# Update .mcp.json for local stdio development
+update_mcp_json() {
+  log_info "Updating ${MCP_JSON} for local development..."
+
+  cat > "${MCP_JSON}" << EOF
+{
+  "mcpServers": {
+    "auto-mobile": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@kaeawc/auto-mobile",
+        "--debug",
+        "--debug-perf"
+      ]
+    }
+  }
+}
+EOF
+}
+
+# Update ~/.codex/config.toml for local stdio development
+update_codex_toml() {
+  log_info "Updating ${CODEX_TOML} for local development..."
+
+  mkdir -p "${CODEX_CONFIG_DIR}"
+
+  cat > "${CODEX_TOML}" << EOF
+# Codex configuration for AutoMobile development
+# Auto-generated by hot-reload.sh
+
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile", "--debug", "--debug-perf"]
+EOF
+}
+
+# Reload MCP daemon by restarting the daemon process
+reload_mcp_daemon() {
+  log_info "Restarting MCP daemon..."
+  if command -v auto-mobile >/dev/null 2>&1; then
+    auto-mobile --daemon restart --debug --debug-perf 2>&1 | while read -r line; do
+      log_info "[daemon] ${line}"
+    done
+  else
+    local pids
+    pids=$(pgrep -f "auto-mobile.*--daemon-mode" 2>/dev/null || true)
+    if [[ -n "${pids}" ]]; then
+      log_info "Killing daemon processes: ${pids}"
+      echo "${pids}" | xargs kill 2>/dev/null || true
+    fi
+  fi
+}
+
+# List TypeScript source files to watch
+list_ts_files() {
+  local src_dir="${PROJECT_ROOT}/src"
+  if [[ -d "${src_dir}" ]]; then
+    find "${src_dir}" -type f -name "*.ts" 2>/dev/null || true
+  fi
+}
+
+# Compute hash of TypeScript file timestamps
+hash_ts_state() {
+  list_ts_files | while read -r file; do
+    if [[ -f "${file}" ]]; then
+      stat_entry "${file}" 2>/dev/null || true
+    fi
+  done | sort | hash_stream
+}
+
+# Build TypeScript
+build_typescript() {
+  log_info "Building TypeScript..."
+  if (cd "${PROJECT_ROOT}" && bun run build); then
+    log_info "TypeScript build complete."
+    return 0
+  else
+    log_warn "TypeScript build failed."
+    return 1
+  fi
+}
+
+# iOS-specific file list (separate from APK file list)
+list_ios_watch_files() {
+  local watch_dirs=(
+    "${XCTEST_SERVICE_DIR}/Sources"
+    "${XCTEST_SERVICE_DIR}/Tests"
+    "${XCTEST_SERVICE_DIR}/XCTestServiceApp"
+  )
+  local extra_files=(
+    "${XCTEST_SERVICE_DIR}/project.yml"
+    "${XCTEST_SERVICE_DIR}/XCTestService.xcodeproj/project.pbxproj"
+  )
+
+  if command -v rg >/dev/null 2>&1; then
+    rg --files "${watch_dirs[@]}" -g '!**/build/**' 2>/dev/null || true
+  else
+    find "${watch_dirs[@]}" -type f ! -path "*/build/*" 2>/dev/null || true
+  fi
+
+  for file in "${extra_files[@]}"; do
+    if [[ -f "${file}" ]]; then
+      echo "${file}"
+    fi
+  done
+}
+
+# iOS-specific hash (separate from APK hash)
+hash_ios_watch_state() {
+  list_ios_watch_files | while read -r file; do
+    if [[ -f "${file}" ]]; then
+      stat_entry "${file}" 2>/dev/null || true
+    fi
+  done | sort | hash_stream
+}
+
+# APK-specific file list (renamed from hash_watch_state collision)
+list_apk_watch_files() {
+  local watch_dirs=(
+    "${SERVICE_DIR}"
+    "${ANDROID_DIR}/auto-mobile-sdk"
+  )
+  local extra_files=(
+    "${ANDROID_DIR}/build.gradle.kts"
+    "${ANDROID_DIR}/settings.gradle.kts"
+    "${ANDROID_DIR}/gradle.properties"
+  )
+
+  if command -v rg >/dev/null 2>&1; then
+    rg --files "${watch_dirs[@]}" -g '!**/build/**' 2>/dev/null || true
+  else
+    find "${watch_dirs[@]}" -type f ! -path "*/build/*" 2>/dev/null || true
+  fi
+
+  for file in "${extra_files[@]}"; do
+    if [[ -f "${file}" ]]; then
+      echo "${file}"
+    fi
+  done
+}
+
+# APK-specific hash (renamed from hash_watch_state collision)
+hash_apk_watch_state() {
+  list_apk_watch_files | while read -r file; do
+    if [[ -f "${file}" ]]; then
+      stat_entry "${file}" 2>/dev/null || true
+    fi
+  done | sort | hash_stream
+}
+
+# Restart IDE using full path (not relying on Spotlight)
+# Uses direct binary execution instead of 'open -a "..."'
+restart_ide_full_path() {
+  if [[ -z "${SELECTED_IDE_NAME}" || -z "${SELECTED_IDE_PATH}" ]]; then
+    log_error "No IDE selected. Call select_ide first."
+    return 1
+  fi
+
+  log_info "Restarting ${SELECTED_IDE_NAME}..."
+
+  # Extract app name for osascript
+  local app_name
+  app_name=$(basename "${SELECTED_IDE_PATH}" .app)
+
+  # Determine the binary name inside the .app bundle
+  local binary_name
+  if [[ "${SELECTED_IDE_TYPE}" == "android-studio" ]]; then
+    binary_name="studio"
+  else
+    binary_name="idea"
+  fi
+
+  # Find the actual binary path
+  local binary_path="${SELECTED_IDE_PATH}/Contents/MacOS/${binary_name}"
+  if [[ ! -x "${binary_path}" ]]; then
+    log_warn "Binary not found at ${binary_path}, falling back to open command"
+    binary_path=""
+  fi
+
+  # Step 1: Graceful quit via osascript
+  log_info "Sending quit signal..."
+  osascript -e "tell application \"${app_name}\" to quit" 2>/dev/null || true
+
+  # Step 2: Wait for exit (max 10s)
+  local count=0
+  local process_pattern="${binary_name}"
+
+  while pgrep -f "${process_pattern}" >/dev/null 2>&1 && [[ ${count} -lt 10 ]]; do
+    sleep 1
+    ((count++))
+  done
+
+  # Step 3: Force kill if still running
+  if pgrep -f "${process_pattern}" >/dev/null 2>&1; then
+    log_warn "Force killing IDE..."
+    pkill -9 -f "${process_pattern}" 2>/dev/null || true
+    sleep 1
+  fi
+
+  # Step 4: Relaunch using full binary path (completely bypasses Spotlight)
+  log_info "Launching ${app_name} from ${SELECTED_IDE_PATH}..."
+  if [[ -n "${binary_path}" ]]; then
+    # Launch the binary directly in background
+    # This completely bypasses Spotlight and Launch Services
+    nohup "${binary_path}" >/dev/null 2>&1 &
+  else
+    # Fallback: use open with full .app path (still avoids Spotlight name lookup)
+    open "${SELECTED_IDE_PATH}"
+  fi
+
+  log_info "IDE restarted."
+  return 0
+}
+
+# Setup IDE plugin
+setup_ide_plugin() {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    log_warn "IDE plugin hot-reload only supported on macOS."
+    return 1
+  fi
+
+  if ! ensure_gum; then
+    if [[ -z "${IDE_NAME}" ]]; then
+      log_warn "gum not available. Use --ide <name> to specify the IDE."
+      return 1
+    fi
+  fi
+
+  log_info "Detecting installed IDEs..."
+  if ! select_ide "${IDE_NAME}"; then
+    log_error "IDE selection failed."
+    return 1
+  fi
+
+  IDE_PLUGINS_DIR=$(get_ide_plugins_dir)
+  if [[ -z "${IDE_PLUGINS_DIR}" ]]; then
+    log_error "Could not determine plugins directory."
+    return 1
+  fi
+
+  log_info "Plugins directory: ${IDE_PLUGINS_DIR}"
+  # shellcheck disable=SC2153  # IDE_PLUGIN_DIR is defined in lib/ide-plugin.sh
+  log_info "IDE plugin source: ${IDE_PLUGIN_DIR}/src"
+
+  log_info "Building IDE plugin..."
+  if ! build_ide_plugin; then
+    log_error "IDE plugin build failed. Fix errors and retry."
+    return 1
+  fi
+
+  if ! install_ide_plugin "${IDE_PLUGINS_DIR}"; then
+    log_error "IDE plugin install failed."
+    return 1
+  fi
+
+  return 0
+}
+
+# Setup Android
+setup_android() {
+  if [[ "${NO_ANDROID}" == "true" ]]; then
+    log_info "Android hot-reload disabled via --no-android."
+    return 1
+  fi
+
+  resolve_adb
+
+  if resolve_device; then
+    HAVE_DEVICE=true
+  fi
+
+  if [[ -n "${DEVICE_ID}" ]]; then
+    log_info "Target device: ${DEVICE_ID}"
+  elif [[ "${HAVE_DEVICE}" == "true" ]]; then
+    log_info "Target: all connected devices"
+  else
+    log_info "Target: no devices (will install when available)"
+  fi
+
+  log_info "APK path: ${APK_PATH}"
+  log_info "Building AccessibilityService..."
+
+  if ! build_apk; then
+    log_error "Initial APK build failed. Fix errors and retry."
+    return 1
+  fi
+
+  if [[ "${HAVE_DEVICE}" == "true" ]]; then
+    if ! install_apk; then
+      log_warn "Initial install failed. Will retry when devices connect."
+    fi
+  else
+    log_info "No devices connected. APK built and ready for install."
+  fi
+
+  return 0
+}
+
+# Setup iOS
+setup_ios() {
+  if [[ "${NO_IOS}" == "true" ]]; then
+    log_info "iOS hot-reload disabled via --no-ios."
+    return 1
+  fi
+
+  if ! command -v xcodebuild >/dev/null 2>&1; then
+    log_warn "xcodebuild not found. Skipping iOS setup."
+    return 1
+  fi
+
+  if [[ ! -d "${XCTEST_SERVICE_DIR}" ]]; then
+    log_warn "XCTestService directory not found: ${XCTEST_SERVICE_DIR}"
+    return 1
+  fi
+
+  if [[ -n "${SIMULATOR_ID}" ]]; then
+    export SIMULATOR_ID_OVERRIDE="${SIMULATOR_ID}"
+    log_info "Target simulator: ${SIMULATOR_ID} (must be booted)"
+  else
+    log_info "Target: booted simulator"
+  fi
+
+  log_info "Derived data: ${DERIVED_DATA_PATH}"
+  log_info "Building XCTestService..."
+
+  if ! build_xctestservice; then
+    log_warn "Initial XCTestService build failed. Will retry on changes."
+    return 1
+  fi
+
+  return 0
+}
+
+# Get current booted simulator
+get_current_simulator() {
+  if [[ -n "${SIMULATOR_ID_OVERRIDE:-}" ]]; then
+    if xcrun simctl list devices booted -j 2>/dev/null | \
+      grep -q "\"${SIMULATOR_ID_OVERRIDE}\""; then
+      echo "${SIMULATOR_ID_OVERRIDE}"
+    fi
+  else
+    xcrun simctl list devices booted -j 2>/dev/null | \
+      grep -o '"udid" : "[^"]*"' | head -1 | sed 's/"udid" : "//;s/"$//'
+  fi
+}
+
+# Unified watch loop
+unified_watch_loop() {
+  local poll_interval="${1:-2}"
+
+  log_info "Starting unified watch loop (poll interval ${poll_interval}s)..."
+  log_info "Watching: IDE plugin=$(bool_str ${IDE_PLUGIN_ENABLED}), Android=$(bool_str ${ANDROID_ENABLED}), iOS=$(bool_str ${IOS_ENABLED}), TypeScript=true"
+  log_info "Press Ctrl+C to stop."
+
+  # Initialize hashes
+  if [[ "${IDE_PLUGIN_ENABLED}" == "true" ]]; then
+    LAST_IDE_PLUGIN_HASH="$(hash_ide_plugin_state)"
+  fi
+  if [[ "${ANDROID_ENABLED}" == "true" ]]; then
+    LAST_APK_HASH="$(hash_apk_watch_state)"
+  fi
+  if [[ "${IOS_ENABLED}" == "true" ]]; then
+    LAST_IOS_HASH="$(hash_ios_watch_state)"
+  fi
+  LAST_TS_HASH="$(hash_ts_state)"
+
+  # Initialize device state
+  if [[ "${ANDROID_ENABLED}" == "true" ]]; then
+    LAST_ADB_DEVICES=$(get_connected_devices | sort | tr '\n' ' ')
+  fi
+  if [[ "${IOS_ENABLED}" == "true" ]]; then
+    LAST_SIMULATOR="$(get_current_simulator)"
+  fi
+
+  while true; do
+    sleep "${poll_interval}"
+
+    # === 1. Check IDE plugin changes ===
+    if [[ "${IDE_PLUGIN_ENABLED}" == "true" ]]; then
+      local next_ide_hash
+      next_ide_hash="$(hash_ide_plugin_state)"
+      if [[ "${next_ide_hash}" != "${LAST_IDE_PLUGIN_HASH}" ]]; then
+        log_info "[IDE Plugin] Change detected. Rebuilding..."
+        LAST_IDE_PLUGIN_HASH="${next_ide_hash}"
+
+        if build_ide_plugin; then
+          if install_ide_plugin "${IDE_PLUGINS_DIR}"; then
+            if [[ "${NO_IDE_RESTART}" != "true" ]]; then
+              restart_ide_full_path
+            else
+              log_info "[IDE Plugin] Installed. Restart IDE to apply changes."
+            fi
+          else
+            log_warn "[IDE Plugin] Install failed; waiting for next change."
+          fi
+        else
+          log_warn "[IDE Plugin] Build failed; waiting for next change."
+        fi
+
+        LAST_IDE_PLUGIN_HASH="$(hash_ide_plugin_state)"
+      fi
+    fi
+
+    # === 2. Check Android changes ===
+    if [[ "${ANDROID_ENABLED}" == "true" ]]; then
+      # Check device list changes
+      local current_devices
+      current_devices=$(get_connected_devices | sort | tr '\n' ' ')
+      local devices_changed=false
+
+      if [[ "${current_devices}" != "${LAST_ADB_DEVICES}" ]]; then
+        devices_changed=true
+        if [[ -n "${current_devices}" ]] && [[ -z "${LAST_ADB_DEVICES}" ]]; then
+          log_info "[Android] Device(s) connected: ${current_devices}"
+        elif [[ -z "${current_devices}" ]] && [[ -n "${LAST_ADB_DEVICES}" ]]; then
+          log_info "[Android] All devices disconnected."
+        elif [[ -n "${current_devices}" ]]; then
+          log_info "[Android] Device list changed: ${current_devices}"
+        fi
+        LAST_ADB_DEVICES="${current_devices}"
+      fi
+
+      # Check file changes
+      local next_apk_hash
+      next_apk_hash="$(hash_apk_watch_state)"
+      local files_changed=false
+
+      if [[ "${next_apk_hash}" != "${LAST_APK_HASH}" ]]; then
+        files_changed=true
+        LAST_APK_HASH="${next_apk_hash}"
+      fi
+
+      # Rebuild if files changed
+      if [[ "${files_changed}" == "true" ]]; then
+        log_info "[Android] Change detected. Rebuilding..."
+        if build_apk; then
+          APK_NEEDS_INSTALL=true
+          LAST_APK_HASH="$(hash_apk_watch_state)"
+        else
+          log_warn "[Android] Build failed; waiting for next change."
+        fi
+      fi
+
+      # Install if pending and devices available
+      if [[ "${APK_NEEDS_INSTALL}" == "true" ]] || [[ "${devices_changed}" == "true" ]]; then
+        if [[ -n "${current_devices}" ]] && [[ -f "${APK_PATH}" ]]; then
+          if install_apk; then
+            APK_NEEDS_INSTALL=false
+            local checksum
+            checksum="$(compute_checksum)"
+            if [[ -n "${checksum}" ]]; then
+              log_info "[Android] APK sha256: ${checksum}"
+              update_checksum "${checksum}"
+            fi
+          else
+            log_warn "[Android] Install failed; will retry."
+          fi
+        fi
+      fi
+    fi
+
+    # === 3. Check iOS changes ===
+    if [[ "${IOS_ENABLED}" == "true" ]]; then
+      # Check simulator state
+      local current_simulator
+      current_simulator="$(get_current_simulator)"
+
+      if [[ "${current_simulator}" != "${LAST_SIMULATOR}" ]]; then
+        if [[ -n "${current_simulator}" ]]; then
+          log_info "[iOS] Booted simulator: ${current_simulator}"
+          IOS_NEEDS_RESTART=true
+        else
+          log_warn "[iOS] No booted simulator detected."
+        fi
+        LAST_SIMULATOR="${current_simulator}"
+      fi
+
+      # Check file changes
+      local next_ios_hash
+      next_ios_hash="$(hash_ios_watch_state)"
+
+      if [[ "${next_ios_hash}" != "${LAST_IOS_HASH}" ]]; then
+        log_info "[iOS] Change detected. Rebuilding..."
+        if build_xctestservice; then
+          LAST_IOS_HASH="$(hash_ios_watch_state)"
+          IOS_NEEDS_RESTART=true
+          # Update TypeScript checksum after iOS build
+          local ios_checksum
+          ios_checksum="$(get_xctestrun_path | hash_stream)"
+          if [[ -n "${ios_checksum}" ]]; then
+            log_info "[iOS] Build hash: ${ios_checksum:0:16}..."
+          fi
+        else
+          log_warn "[iOS] Build failed; waiting for next change."
+        fi
+      fi
+
+      # Check if XCTestService process died
+      if [[ -n "${XCODEBUILD_PID}" ]] && ! kill -0 "${XCODEBUILD_PID}" 2>/dev/null; then
+        log_warn "[iOS] XCTestService process exited."
+        XCODEBUILD_PID=""
+        IOS_NEEDS_RESTART=true
+      fi
+
+      # Restart if needed
+      if [[ "${IOS_NEEDS_RESTART}" == "true" ]] && [[ -n "${LAST_SIMULATOR}" ]]; then
+        stop_xctestservice
+        start_xctestservice "${LAST_SIMULATOR}"
+        IOS_NEEDS_RESTART=false
+      fi
+    fi
+
+    # === 4. Check TypeScript changes ===
+    local next_ts_hash
+    next_ts_hash="$(hash_ts_state)"
+    if [[ "${next_ts_hash}" != "${LAST_TS_HASH}" ]]; then
+      log_info "[TypeScript] Change detected. Rebuilding and reloading MCP daemon..."
+      if build_typescript; then
+        reload_mcp_daemon
+      fi
+      LAST_TS_HASH="${next_ts_hash}"
+    fi
+  done
+}
+
+# Helper for boolean display
+bool_str() {
+  if [[ "$1" == "true" ]]; then
+    echo "yes"
+  else
+    echo "no"
+  fi
+}
+
+# Prompt user to select an AI coding assistant
+prompt_ai() {
+  if ! ensure_gum; then
+    log_warn "Skipping AI prompt (gum not available)."
+    return
+  fi
+
+  clear
+
+  local choice
+  choice=$(gum choose --header "Start an AI coding assistant?" "Claude Code" "Codex" "Neither")
+
+  # Disable cleanup trap before exec
+  trap - EXIT INT TERM
+
+  case "${choice}" in
+    "Claude Code")
+      log_info "Starting Claude Code..."
+      log_info "Hot-reload running in background."
+      if [[ -n "${AI_YOLO_MODE:-}" ]]; then
+        log_info "AI_YOLO_MODE enabled - using --dangerously-skip-permissions"
+        exec claude --dangerously-skip-permissions
+      else
+        exec claude
+      fi
+      ;;
+    "Codex")
+      log_info "Starting Codex..."
+      log_info "Hot-reload running in background."
+      if [[ -n "${AI_YOLO_MODE:-}" ]]; then
+        log_info "AI_YOLO_MODE enabled - using --full-auto"
+        exec codex --full-auto
+      else
+        exec codex
+      fi
+      ;;
+    "Neither")
+      log_info "Hot-reload running. Use 'tail -f scratch/*.log' to monitor."
+      ;;
+  esac
+}
+
+# Cleanup on exit
+cleanup() {
+  log_info "Cleaning up..."
+  stop_xctestservice
+  rm -f "${PID_FILE}"
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --ide)
+      if [[ $# -lt 2 ]]; then
+        log_error "--ide requires a value."
+        usage
+        exit 1
+      fi
+      IDE_NAME="$2"
+      shift 2
+      ;;
+    --device)
+      if [[ $# -lt 2 ]]; then
+        log_error "--device requires a value."
+        usage
+        exit 1
+      fi
+      DEVICE_ID="$2"
+      shift 2
+      ;;
+    --simulator)
+      if [[ $# -lt 2 ]]; then
+        log_error "--simulator requires a value."
+        usage
+        exit 1
+      fi
+      SIMULATOR_ID="$2"
+      shift 2
+      ;;
+    --skip-ai)
+      SKIP_AI=true
+      shift
+      ;;
+    --once)
+      RUN_ONCE=true
+      shift
+      ;;
+    --poll-interval)
+      if [[ $# -lt 2 ]]; then
+        log_error "--poll-interval requires a value."
+        usage
+        exit 1
+      fi
+      POLL_INTERVAL="$2"
+      shift 2
+      ;;
+    --no-ide-restart)
+      NO_IDE_RESTART=true
+      shift
+      ;;
+    --no-android)
+      NO_ANDROID=true
+      shift
+      ;;
+    --no-ios)
+      NO_IOS=true
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      log_error "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+# Set up cleanup trap
+trap cleanup EXIT INT TERM
+
+# Ensure scratch directory exists
+mkdir -p "${PROJECT_ROOT}/scratch"
+
+# Check and install dependencies
+if ! ensure_dependencies; then
+  log_error "Dependency check failed. Exiting."
+  exit 1
+fi
+
+log_info "=== AutoMobile Unified Hot-Reload ==="
+
+# Setup IDE plugin
+if setup_ide_plugin; then
+  IDE_PLUGIN_ENABLED=true
+  log_info "IDE plugin setup complete."
+else
+  log_warn "IDE plugin setup failed. Continuing without IDE plugin hot-reload."
+fi
+
+# Setup Android
+if setup_android; then
+  ANDROID_ENABLED=true
+  log_info "Android setup complete."
+else
+  log_warn "Android setup failed or disabled. Continuing without Android hot-reload."
+fi
+
+# Setup iOS
+if setup_ios; then
+  IOS_ENABLED=true
+  log_info "iOS setup complete."
+else
+  log_warn "iOS setup failed or disabled. Continuing without iOS hot-reload."
+fi
+
+# Handle --once mode
+if [[ "${RUN_ONCE}" == "true" ]]; then
+  log_info "Run-once mode complete."
+  if [[ "${IDE_PLUGIN_ENABLED}" == "true" && "${NO_IDE_RESTART}" != "true" ]]; then
+    restart_ide_full_path
+  fi
+  exit 0
+fi
+
+# Kill previous processes before writing our PID
+kill_previous
+
+# Save PID for later cleanup
+echo "$$" > "${PID_FILE}"
+
+# Update config files
+update_mcp_json
+update_codex_toml
+
+# Change to project root
+cd "${PROJECT_ROOT}"
+
+# Restart IDE for initial plugin install
+if [[ "${IDE_PLUGIN_ENABLED}" == "true" && "${NO_IDE_RESTART}" != "true" ]]; then
+  restart_ide_full_path
+fi
+
+# Start initial iOS XCTestService if simulator available
+if [[ "${IOS_ENABLED}" == "true" ]]; then
+  initial_simulator="$(get_current_simulator)"
+  if [[ -n "${initial_simulator}" ]]; then
+    start_xctestservice "${initial_simulator}"
+    LAST_SIMULATOR="${initial_simulator}"
+  fi
+fi
+
+if [[ "${SKIP_AI}" == "true" ]]; then
+  log_info "Hot-reload running."
+  log_info "MCP config: ${MCP_JSON}"
+  unified_watch_loop "${POLL_INTERVAL}"
+else
+  # Run watch loop in background and prompt for AI
+  (unified_watch_loop "${POLL_INTERVAL}") >> "${PROJECT_ROOT}/scratch/hot-reload.log" 2>&1 &
+  WATCHER_PID=$!
+  log_info "Watch loop started (PID ${WATCHER_PID})"
+  log_info "Logs: ${PROJECT_ROOT}/scratch/hot-reload.log"
+  sleep 2
+  prompt_ai
+fi
