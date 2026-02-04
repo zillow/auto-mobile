@@ -95,7 +95,10 @@ detect_spotlight_ides() {
     fi
   done < <(mdfind "kMDItemCFBundleIdentifier == 'com.jetbrains.intellij*'" 2>/dev/null || true)
 
-  printf '%s\n' "${apps[@]}"
+  # Only print if array is non-empty (avoids unbound variable error with set -u)
+  if [[ ${#apps[@]} -gt 0 ]]; then
+    printf '%s\n' "${apps[@]}"
+  fi
 }
 
 # Get access time for a path (for sorting by recency)
