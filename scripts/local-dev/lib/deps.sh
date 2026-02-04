@@ -64,9 +64,18 @@ version_gte() {
 }
 
 # Prompt user with gum (or fallback to read)
+# In non-interactive mode (no TTY), returns based on default value
 prompt_confirm() {
   local message="$1"
   local default="${2:-yes}"
+
+  # Check if we have a TTY for interactive prompts
+  if [[ ! -t 0 ]]; then
+    # Non-interactive mode: use default value
+    log_info "${message} (auto-accepting: ${default})"
+    [[ "${default}" == "yes" ]]
+    return
+  fi
 
   if command -v gum >/dev/null 2>&1; then
     if [[ "${default}" == "yes" ]]; then
@@ -157,10 +166,32 @@ gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/yum.repos.d/charm.repo
   return 1
 }
 
+# Check if nvm has a specific node version installed
+nvm_has_version() {
+  local version="$1"
+  # nvm ls returns installed versions; check if our major version is there
+  nvm ls "${version}" 2>/dev/null | grep -q "v${version}" 2>/dev/null
+}
+
+# Offer to create .nvmrc file for the project
+offer_nvmrc() {
+  local nvmrc_path="${PROJECT_ROOT}/.nvmrc"
+
+  if [[ -f "${nvmrc_path}" ]]; then
+    return 0
+  fi
+
+  if prompt_confirm "Create .nvmrc file to persist Node.js version for this project?"; then
+    echo "${REQUIRED_NODE_MAJOR}" > "${nvmrc_path}"
+    log_info "Created ${nvmrc_path} with Node.js ${REQUIRED_NODE_MAJOR}"
+  fi
+}
+
 # Ensure node is installed at the required version
 ensure_node() {
   local current_version=""
   local current_major=""
+  local nvmrc_path="${PROJECT_ROOT}/.nvmrc"
 
   # Check if node is available
   if command -v node >/dev/null 2>&1; then
@@ -183,16 +214,38 @@ ensure_node() {
   if [[ -n "${NVM_DIR:-}" ]] || [[ -d "${HOME}/.nvm" ]]; then
     local nvm_dir="${NVM_DIR:-${HOME}/.nvm}"
     if [[ -s "${nvm_dir}/nvm.sh" ]]; then
-      log_info "nvm detected. Attempting to install/use node ${REQUIRED_NODE_MAJOR}..."
-
       # Source nvm
       # shellcheck disable=SC1091
       source "${nvm_dir}/nvm.sh"
 
+      # Check if .nvmrc exists and use it
+      if [[ -f "${nvmrc_path}" ]]; then
+        log_info "Found .nvmrc, running nvm use..."
+        if nvm use 2>/dev/null; then
+          log_info "Node.js $(node --version) activated via .nvmrc"
+          return 0
+        fi
+      fi
+
+      # Check if required version is already installed
+      if nvm_has_version "${REQUIRED_NODE_MAJOR}"; then
+        log_info "Node.js ${REQUIRED_NODE_MAJOR} already installed via nvm. Switching..."
+        if nvm use "${REQUIRED_NODE_MAJOR}"; then
+          log_info "Node.js $(node --version) activated via nvm."
+          offer_nvmrc
+          return 0
+        fi
+      fi
+
+      # Version not installed, prompt to install
       if prompt_confirm "Install Node.js ${REQUIRED_NODE_MAJOR} via nvm?"; then
-        if run_with_spinner "Installing Node.js ${REQUIRED_NODE_MAJOR}" nvm install "${REQUIRED_NODE_MAJOR}"; then
+        # nvm is a shell function, not an executable, so we can't use run_with_spinner
+        # (gum spawns a subprocess that won't have the function loaded)
+        log_info "Installing Node.js ${REQUIRED_NODE_MAJOR} via nvm..."
+        if nvm install "${REQUIRED_NODE_MAJOR}"; then
           nvm use "${REQUIRED_NODE_MAJOR}"
           log_info "Node.js $(node --version) installed and activated via nvm."
+          offer_nvmrc
           return 0
         else
           log_error "Failed to install Node.js via nvm."
@@ -328,6 +381,29 @@ ensure_bun() {
   return 1
 }
 
+# Build and install auto-mobile globally from local project
+ensure_auto_mobile() {
+  # Always build the project to pick up latest changes
+  log_info "Building TypeScript project..."
+  if ! (cd "${PROJECT_ROOT}" && bun run build); then
+    log_error "Failed to build TypeScript project."
+    return 1
+  fi
+
+  # Always reinstall globally to pick up changes
+  log_info "Installing auto-mobile globally via npm link..."
+  if (cd "${PROJECT_ROOT}" && npm link 2>/dev/null); then
+    if command -v auto-mobile >/dev/null 2>&1; then
+      log_info "auto-mobile CLI installed globally."
+      return 0
+    fi
+  fi
+
+  log_error "Failed to install auto-mobile globally."
+  log_error "Try running manually: cd ${PROJECT_ROOT} && npm link"
+  return 1
+}
+
 # Run all dependency checks
 ensure_dependencies() {
   log_info "Checking dependencies..."
@@ -347,6 +423,12 @@ ensure_dependencies() {
   # Check/install bun
   if ! ensure_bun; then
     log_error "Bun installation failed or was declined."
+    return 1
+  fi
+
+  # Check/install auto-mobile globally
+  if ! ensure_auto_mobile; then
+    log_error "auto-mobile global installation failed."
     return 1
   fi
 
