@@ -14,6 +14,23 @@ import type { ScreenshotService } from "./interfaces/ScreenshotService";
 import { XCTestServiceClient } from "./ios/XCTestServiceClient";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 
+/** Secure file mode: owner read/write only */
+const SECURE_FILE_MODE = 0o600;
+
+/**
+ * Write buffer to file atomically with secure permissions.
+ * Uses "wx" flag to fail if file exists (prevents TOCTOU race) and
+ * mode 0o600 for owner-only read/write access.
+ */
+async function writeFileSecure(filePath: string, data: Buffer): Promise<void> {
+  const handle = await fs.promises.open(filePath, "wx", SECURE_FILE_MODE);
+  try {
+    await handle.write(data);
+  } finally {
+    await handle.close();
+  }
+}
+
 export interface ScreenshotOptions {
   format?: "png" | "webp";
   quality?: number;
@@ -261,9 +278,9 @@ export class TakeScreenshot implements ScreenshotService {
         };
       }
 
-      // Decode base64 and save to file
+      // Decode base64 and save to file securely
       const imageBuffer = Buffer.from(result.data, "base64");
-      await fs.writeFile(finalPath, imageBuffer);
+      await writeFileSecure(finalPath, imageBuffer);
 
       const durationMs = Date.now() - startTime;
       logger.info(`[SCREENSHOT] iOS screenshot captured in ${durationMs}ms, saved to ${finalPath}`);
@@ -351,11 +368,11 @@ export class TakeScreenshot implements ScreenshotService {
     const decodeDuration = Date.now() - decodeStartTime;
     logger.info(`[SCREENSHOT] Base64 decode took ${decodeDuration}ms, buffer size: ${imageBuffer.length} bytes`);
 
-    // Handle format conversion and save
+    // Handle format conversion and save securely
     if (options.format !== "webp") {
       // For PNG, save directly
       const saveStartTime = Date.now();
-      await fs.writeFile(finalPath, imageBuffer);
+      await writeFileSecure(finalPath, imageBuffer);
       const saveDuration = Date.now() - saveStartTime;
       logger.info(`[SCREENSHOT] PNG file save took ${saveDuration}ms`);
     } else {
@@ -370,9 +387,9 @@ export class TakeScreenshot implements ScreenshotService {
       const convertDuration = Date.now() - convertStartTime;
       logger.info(`[SCREENSHOT] WebP conversion took ${convertDuration}ms`);
 
-      // Save the webp file
+      // Save the webp file securely
       const saveStartTime = Date.now();
-      await fs.writeFile(finalPath, convertedImage);
+      await writeFileSecure(finalPath, convertedImage);
       const saveDuration = Date.now() - saveStartTime;
       logger.info(`[SCREENSHOT] WebP file save took ${saveDuration}ms`);
     }
@@ -449,9 +466,9 @@ export class TakeScreenshot implements ScreenshotService {
         const convertDuration = Date.now() - convertStartTime;
         logger.info(`[SCREENSHOT] WebP conversion took ${convertDuration}ms`);
 
-        // Save the webp file and remove temp file
+        // Save the webp file securely and remove temp file
         const saveStartTime = Date.now();
-        await fs.writeFile(finalPath, convertedImage);
+        await writeFileSecure(finalPath, convertedImage);
         await fs.remove(tempLocalFile);
         const saveDuration = Date.now() - saveStartTime;
         logger.info(`[SCREENSHOT] WebP file save took ${saveDuration}ms`);
