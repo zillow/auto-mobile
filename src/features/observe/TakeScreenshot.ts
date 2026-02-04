@@ -9,7 +9,7 @@ import { Image } from "../../utils/image-utils";
 import { BootedDevice } from "../../models";
 import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
-import { getTempDir, TEMP_SUBDIRS, SECURE_DIR_MODE } from "../../utils/tempDir";
+import { ensureSecureTempDirSync, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ScreenshotService } from "./interfaces/ScreenshotService";
 import { XCTestServiceClient } from "./ios/XCTestServiceClient";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
@@ -25,8 +25,19 @@ export class TakeScreenshot implements ScreenshotService {
   private adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
   private window: Window;
-  private static cacheDir: string = getTempDir(TEMP_SUBDIRS.SCREENSHOTS);
+  private static cacheDir: string | null = null;
   private static readonly MAX_CACHE_SIZE_BYTES = 128 * 1024 * 1024; // 128MB
+
+  /**
+   * Get the cache directory, creating it with secure permissions if needed.
+   * Uses lazy initialization to ensure the directory is created securely.
+   */
+  private static getCacheDir(): string {
+    if (!TakeScreenshot.cacheDir) {
+      TakeScreenshot.cacheDir = ensureSecureTempDirSync(TEMP_SUBDIRS.SCREENSHOTS);
+    }
+    return TakeScreenshot.cacheDir;
+  }
 
   /**
    * Create a TakeScreenshot instance
@@ -53,12 +64,7 @@ export class TakeScreenshot implements ScreenshotService {
     }
     this.window = new Window(device, this.adbFactory);
 
-    // Ensure cache directory exists with secure permissions
-    if (!fs.existsSync(TakeScreenshot.cacheDir)) {
-      fs.mkdirSync(TakeScreenshot.cacheDir, { recursive: true, mode: SECURE_DIR_MODE });
-    }
-
-    // Manage cache size
+    // Manage cache size (getCacheDir ensures directory exists with secure permissions)
     this.cleanupCache();
   }
 
@@ -67,13 +73,13 @@ export class TakeScreenshot implements ScreenshotService {
    */
   private async cleanupCache(): Promise<void> {
     try {
-      if (!fs.existsSync(TakeScreenshot.cacheDir)) {return;}
+      const cacheDir = TakeScreenshot.getCacheDir();
 
       // Get all files in cache with their stats
-      const files = await fs.readdir(TakeScreenshot.cacheDir);
+      const files = await fs.readdir(cacheDir);
       const fileStats = await Promise.all(
         files.map(async file => {
-          const filePath = path.join(TakeScreenshot.cacheDir, file);
+          const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath);
           return { path: filePath, stats, mtime: stats.mtime.getTime() };
         })
@@ -109,7 +115,7 @@ export class TakeScreenshot implements ScreenshotService {
    */
   generateScreenshotPath(timestamp: number, options: ScreenshotOptions): string {
     const fileExtension = options.format === "webp" ? "webp" : "png";
-    return path.join(TakeScreenshot.cacheDir, `screenshot_${timestamp}.${fileExtension}`);
+    return path.join(TakeScreenshot.getCacheDir(), `screenshot_${timestamp}.${fileExtension}`);
   }
 
   /**
