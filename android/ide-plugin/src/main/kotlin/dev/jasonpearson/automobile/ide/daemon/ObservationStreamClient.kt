@@ -278,7 +278,7 @@ class ObservationStreamClient {
             }
             "performance_update" -> {
                 val perfData = response.performanceData
-                log.info("Performance update received - deviceId=${response.deviceId}, fps=${perfData?.fps}, jankFrames=${perfData?.jankFrames}")
+                log.info("Performance update received - deviceId=${response.deviceId}, fps=${perfData?.fps}, jankFrames=${perfData?.jankFrames}, touchLatencyMs=${perfData?.touchLatencyMs}, ttiMs=${perfData?.timeToInteractiveMs}")
                 if (perfData != null) {
                     val update = PerformanceStreamUpdate(
                         deviceId = response.deviceId,
@@ -289,6 +289,8 @@ class ObservationStreamClient {
                         droppedFrames = perfData.droppedFrames,
                         memoryUsageMb = perfData.memoryUsageMb,
                         cpuUsagePercent = perfData.cpuUsagePercent,
+                        touchLatencyMs = perfData.touchLatencyMs,
+                        timeToInteractiveMs = perfData.timeToInteractiveMs,
                         screenName = perfData.screenName,
                         isResponsive = perfData.isResponsive,
                     )
@@ -413,6 +415,8 @@ data class PerformanceStreamData(
     val droppedFrames: Int,
     val memoryUsageMb: Float,
     val cpuUsagePercent: Float,
+    val touchLatencyMs: Float? = null,
+    val timeToInteractiveMs: Float? = null,
     val screenName: String? = null,
     val isResponsive: Boolean = true,
 )
@@ -426,6 +430,8 @@ data class PerformanceStreamUpdate(
     val droppedFrames: Int,
     val memoryUsageMb: Float,
     val cpuUsagePercent: Float,
+    val touchLatencyMs: Float?,
+    val timeToInteractiveMs: Float?,
     val screenName: String?,
     val isResponsive: Boolean,
 )

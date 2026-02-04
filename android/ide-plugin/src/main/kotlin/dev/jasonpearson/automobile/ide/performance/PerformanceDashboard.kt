@@ -1,7 +1,6 @@
 package dev.jasonpearson.automobile.ide.performance
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,15 +34,13 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.jewel.foundation.theme.JewelTheme
-import org.jetbrains.jewel.ui.component.Link
-import org.jetbrains.jewel.ui.component.OutlinedButton
-import org.jetbrains.jewel.ui.component.Text
 import com.intellij.openapi.diagnostic.Logger
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
-import dev.jasonpearson.automobile.ide.daemon.PerformanceStreamUpdate
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
+import org.jetbrains.jewel.foundation.theme.JewelTheme
+import org.jetbrains.jewel.ui.component.Link
+import org.jetbrains.jewel.ui.component.Text
 
 private val LOG = Logger.getInstance("PerformanceDashboard")
 
@@ -60,46 +56,115 @@ fun PerformanceDashboard(
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
     observationStreamClient: ObservationStreamClient? = null,  // Shared stream client for real-time updates
+    // Initial metrics from parent to avoid empty state flicker when opening
+    initialFps: Float? = null,
+    initialFrameTimeMs: Float? = null,
+    initialJankFrames: Int? = null,
+    initialMemoryMb: Float? = null,
+    initialTouchLatencyMs: Float? = null,
 ) {
     var currentScreen by remember { mutableStateOf(PerformanceScreen.Overview) }
     var selectedMetric by remember { mutableStateOf<PerformanceMetric?>(null) }
-    var selectedScreenFilter by remember { mutableStateOf<String?>(null) }
-    var compareRunId by remember { mutableStateOf<String?>(null) }
 
-    // Live/Paused mode for real-time streaming
-    var isLive by remember { mutableStateOf(true) }
+    // Build initial run from passed metrics to avoid empty state flicker
+    val initialRun = remember(initialFps, initialFrameTimeMs, initialJankFrames, initialMemoryMb, initialTouchLatencyMs) {
+        if (initialFps != null || initialMemoryMb != null) {
+            val timestamp = System.currentTimeMillis()
+            PerformanceRun(
+                id = "live-run-$timestamp",
+                name = "Live Performance Data",
+                timestamp = timestamp,
+                durationMs = 0,
+                deviceName = "Unknown",
+                overallHealth = HealthStatus.Healthy,
+                metrics = buildList {
+                    if (initialFps != null) {
+                        add(PerformanceMetric(
+                            id = "fps",
+                            type = MetricType.FPS,
+                            name = "Frame Rate",
+                            currentValue = initialFps,
+                            unit = "fps",
+                            thresholdWarning = 55f,
+                            thresholdCritical = 45f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialFps, null)),
+                        ))
+                    }
+                    if (initialFrameTimeMs != null) {
+                        add(PerformanceMetric(
+                            id = "frame_time",
+                            type = MetricType.FrameTime,
+                            name = "Frame Time",
+                            currentValue = initialFrameTimeMs,
+                            unit = "ms",
+                            thresholdWarning = 18f,
+                            thresholdCritical = 33f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialFrameTimeMs, null)),
+                        ))
+                    }
+                    if (initialJankFrames != null) {
+                        add(PerformanceMetric(
+                            id = "jank",
+                            type = MetricType.Jank,
+                            name = "Jank (Missed Frames)",
+                            currentValue = initialJankFrames.toFloat(),
+                            unit = "frames",
+                            thresholdWarning = 5f,
+                            thresholdCritical = 10f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialJankFrames.toFloat(), null)),
+                        ))
+                    }
+                    if (initialMemoryMb != null) {
+                        add(PerformanceMetric(
+                            id = "memory",
+                            type = MetricType.Memory,
+                            name = "Memory Usage",
+                            currentValue = initialMemoryMb,
+                            unit = "MB",
+                            thresholdWarning = 256f,
+                            thresholdCritical = 512f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialMemoryMb, null)),
+                        ))
+                    }
+                    if (initialTouchLatencyMs != null) {
+                        add(PerformanceMetric(
+                            id = "touch_latency",
+                            type = MetricType.TouchLatency,
+                            name = "Touch Latency",
+                            currentValue = initialTouchLatencyMs,
+                            unit = "ms",
+                            thresholdWarning = 100f,
+                            thresholdCritical = 200f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialTouchLatencyMs, null)),
+                        ))
+                    }
+                },
+                anomalies = emptyList(),
+                screensAnalyzed = emptyList(),
+            )
+        } else null
+    }
 
     // Fetch performance run from data source
-    var currentRun by remember { mutableStateOf<PerformanceRun?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var currentRun by remember { mutableStateOf(initialRun) }
+    var isLoading by remember { mutableStateOf(initialRun == null) }
     var error by remember { mutableStateOf<String?>(null) }
 
     // Real-time performance metrics history (for live streaming)
     var realtimeMetricsHistory by remember { mutableStateOf<List<MetricDataPoint>>(emptyList()) }
-    var lastPerformanceUpdate by remember { mutableStateOf<PerformanceStreamUpdate?>(null) }
 
-    // Screen names from navigation graph for filtering
-    var availableScreens by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    // Collect navigation updates to populate screen filter
+    // Collect real-time performance updates from the stream
     LaunchedEffect(observationStreamClient) {
         if (observationStreamClient == null) return@LaunchedEffect
 
-        observationStreamClient.navigationUpdates.collect { update ->
-            // Extract screen names from navigation nodes
-            val screenNames = update.nodes.map { it.screenName }.distinct().sorted()
-            availableScreens = screenNames
-        }
-    }
-
-    // Collect real-time performance updates from the stream
-    LaunchedEffect(observationStreamClient, isLive) {
-        if (observationStreamClient == null || !isLive) return@LaunchedEffect
-
         LOG.info("Starting performance updates collection from stream client")
         observationStreamClient.performanceUpdates.collect { update ->
-            LOG.info("Received performance update - fps=${update.fps}, jankFrames=${update.jankFrames}, screenName=${update.screenName}")
-            lastPerformanceUpdate = update
+            LOG.info("Received performance update - fps=${update.fps}, jankFrames=${update.jankFrames}, touchLatencyMs=${update.touchLatencyMs}, ttiMs=${update.timeToInteractiveMs}, screenName=${update.screenName}")
 
             // Add to real-time history (keep last 120 data points for sparklines)
             val newPoint = MetricDataPoint(
@@ -110,8 +175,99 @@ fun PerformanceDashboard(
             realtimeMetricsHistory = (realtimeMetricsHistory + newPoint).takeLast(120)
 
             // Update the current run with real-time data
-            currentRun?.let { run ->
-                val updatedMetrics = run.metrics.map { metric ->
+            val run = currentRun ?: PerformanceRun(
+                id = "live-run-${System.currentTimeMillis()}",
+                name = "Live Performance Data",
+                timestamp = System.currentTimeMillis(),
+                durationMs = 0,
+                deviceName = update.deviceId ?: "Unknown",
+                overallHealth = HealthStatus.Healthy,
+                metrics = emptyList(),
+                anomalies = emptyList(),
+                screensAnalyzed = emptyList(),
+            )
+
+            // Create metrics from streaming data if they don't exist, otherwise update
+            val updatedMetrics = if (run.metrics.isEmpty()) {
+                // Create new metrics from live data
+                buildList {
+                    add(PerformanceMetric(
+                        id = "fps",
+                        type = MetricType.FPS,
+                        name = "Frame Rate",
+                        currentValue = update.fps,
+                        unit = "fps",
+                        thresholdWarning = 55f,
+                        thresholdCritical = 45f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(newPoint),
+                    ))
+                    add(PerformanceMetric(
+                        id = "frame_time",
+                        type = MetricType.FrameTime,
+                        name = "Frame Time",
+                        currentValue = update.frameTimeMs,
+                        unit = "ms",
+                        thresholdWarning = 18f,
+                        thresholdCritical = 33f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(MetricDataPoint(update.timestamp, update.frameTimeMs, update.screenName)),
+                    ))
+                    add(PerformanceMetric(
+                        id = "jank",
+                        type = MetricType.Jank,
+                        name = "Jank (Missed Frames)",
+                        currentValue = update.jankFrames.toFloat(),
+                        unit = "frames",
+                        thresholdWarning = 5f,
+                        thresholdCritical = 10f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(MetricDataPoint(update.timestamp, update.jankFrames.toFloat(), update.screenName)),
+                    ))
+                    add(PerformanceMetric(
+                        id = "memory",
+                        type = MetricType.Memory,
+                        name = "Memory Usage",
+                        currentValue = update.memoryUsageMb,
+                        unit = "MB",
+                        thresholdWarning = 256f,
+                        thresholdCritical = 512f,
+                        trend = MetricTrend.Stable,
+                        history = listOf(MetricDataPoint(update.timestamp, update.memoryUsageMb, update.screenName)),
+                    ))
+                    // Add touch latency if available
+                    update.touchLatencyMs?.let { latency ->
+                        add(PerformanceMetric(
+                            id = "touch_latency",
+                            type = MetricType.TouchLatency,
+                            name = "Touch Latency",
+                            currentValue = latency,
+                            unit = "ms",
+                            thresholdWarning = 100f,
+                            thresholdCritical = 200f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(update.timestamp, latency, update.screenName)),
+                        ))
+                    }
+                    // Add time to interactive if available
+                    update.timeToInteractiveMs?.let { tti ->
+                        add(PerformanceMetric(
+                            id = "tti",
+                            type = MetricType.TimeToInteractive,
+                            name = "Time to Interactive",
+                            currentValue = tti,
+                            unit = "ms",
+                            thresholdWarning = 700f,
+                            thresholdCritical = 1500f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(update.timestamp, tti, update.screenName)),
+                        ))
+                    }
+                }
+            } else {
+                // Update existing metrics
+                val existingMetricTypes = run.metrics.map { it.type }.toSet()
+                val updatedExisting = run.metrics.map { metric ->
                     when (metric.type) {
                         MetricType.FPS -> metric.copy(
                             currentValue = update.fps,
@@ -136,25 +292,90 @@ fun PerformanceDashboard(
                             )).takeLast(120),
                             trend = calculateTrend(metric.currentValue, update.frameTimeMs),
                         )
-                        // TouchLatency requires actual touch interaction events, not streaming frame data
+                        MetricType.Memory -> metric.copy(
+                            currentValue = update.memoryUsageMb,
+                            history = (metric.history + MetricDataPoint(
+                                timestamp = update.timestamp,
+                                value = update.memoryUsageMb,
+                                screenName = update.screenName,
+                            )).takeLast(120),
+                            trend = calculateTrend(metric.currentValue, update.memoryUsageMb),
+                        )
+                        MetricType.TouchLatency -> {
+                            val latency = update.touchLatencyMs ?: metric.currentValue
+                            metric.copy(
+                                currentValue = latency,
+                                history = (metric.history + MetricDataPoint(
+                                    timestamp = update.timestamp,
+                                    value = latency,
+                                    screenName = update.screenName,
+                                )).takeLast(120),
+                                trend = calculateTrend(metric.currentValue, latency),
+                            )
+                        }
+                        MetricType.TimeToInteractive -> {
+                            val tti = update.timeToInteractiveMs ?: metric.currentValue
+                            metric.copy(
+                                currentValue = tti,
+                                history = (metric.history + MetricDataPoint(
+                                    timestamp = update.timestamp,
+                                    value = tti,
+                                    screenName = update.screenName,
+                                )).takeLast(120),
+                                trend = calculateTrend(metric.currentValue, tti),
+                            )
+                        }
                         else -> metric
                     }
                 }
-
-                // Detect anomalies from real-time data
-                val newAnomalies = detectAnomalies(update, updatedMetrics)
-
-                currentRun = run.copy(
-                    metrics = updatedMetrics,
-                    anomalies = (run.anomalies + newAnomalies).distinctBy { it.id }.takeLast(50),
-                    overallHealth = calculateOverallHealth(updatedMetrics),
-                )
+                // Add new metrics that weren't in the initial set
+                buildList {
+                    addAll(updatedExisting)
+                    // Add touch latency if it becomes available and doesn't exist
+                    if (!existingMetricTypes.contains(MetricType.TouchLatency) && update.touchLatencyMs != null) {
+                        add(PerformanceMetric(
+                            id = "touch_latency",
+                            type = MetricType.TouchLatency,
+                            name = "Touch Latency",
+                            currentValue = update.touchLatencyMs!!,
+                            unit = "ms",
+                            thresholdWarning = 100f,
+                            thresholdCritical = 200f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(update.timestamp, update.touchLatencyMs!!, update.screenName)),
+                        ))
+                    }
+                    // Add TTI if it becomes available and doesn't exist
+                    if (!existingMetricTypes.contains(MetricType.TimeToInteractive) && update.timeToInteractiveMs != null) {
+                        add(PerformanceMetric(
+                            id = "tti",
+                            type = MetricType.TimeToInteractive,
+                            name = "Time to Interactive",
+                            currentValue = update.timeToInteractiveMs!!,
+                            unit = "ms",
+                            thresholdWarning = 700f,
+                            thresholdCritical = 1500f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(update.timestamp, update.timeToInteractiveMs!!, update.screenName)),
+                        ))
+                    }
+                }
             }
+
+            currentRun = run.copy(
+                metrics = updatedMetrics,
+                overallHealth = calculateOverallHealth(updatedMetrics),
+            )
         }
     }
 
-    // Initial fetch as fallback (in case stream hasn't pushed yet)
+    // Initial fetch as fallback (only if we don't already have data from initial metrics)
     LaunchedEffect(dataSourceMode, clientProvider) {
+        // Skip fetch if we already have data from initial metrics
+        if (currentRun != null) {
+            isLoading = false
+            return@LaunchedEffect
+        }
         isLoading = true
         error = null
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -162,7 +383,10 @@ fun PerformanceDashboard(
                 val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createPerformanceDataSource(dataSourceMode, clientProvider)
                 when (val result = dataSource.getPerformanceRun()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
-                        currentRun = result.data
+                        // Only update if we still don't have data (stream might have pushed by now)
+                        if (currentRun == null) {
+                            currentRun = result.data
+                        }
                         isLoading = false
                     }
                     is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {
@@ -182,42 +406,23 @@ fun PerformanceDashboard(
 
     when (currentScreen) {
         PerformanceScreen.Overview -> currentRun?.let { run ->
-            // Merge screens from run and navigation graph
-            val allScreens = (run.screensAnalyzed + availableScreens).distinct().sorted()
-            val updatedRun = if (allScreens != run.screensAnalyzed) {
-                run.copy(screensAnalyzed = allScreens)
-            } else {
-                run
-            }
-
             PerformanceOverviewScreen(
-                run = updatedRun,
-                selectedScreenFilter = selectedScreenFilter,
-                onScreenFilterChanged = { selectedScreenFilter = it },
+                run = run,
                 onMetricSelected = { metric ->
                     selectedMetric = metric
                     currentScreen = PerformanceScreen.MetricDetail
                 },
-                onAnomalyClicked = { anomaly ->
-                    anomaly.screenName?.let { onNavigateToScreen(it) }
-                },
-                onCompareRuns = { compareRunId = it },
-                isLive = isLive,
-                onLiveToggle = { isLive = it },
-                hasStreamClient = observationStreamClient != null,
-                lastUpdate = lastPerformanceUpdate,
             )
         }
         PerformanceScreen.MetricDetail -> {
-            val metric = selectedMetric
+            // Get the latest version of the metric from currentRun for real-time updates
             val run = currentRun
+            val metric = run?.metrics?.find { it.type == selectedMetric?.type } ?: selectedMetric
             if (metric != null && run != null) {
                 MetricDetailScreen(
                     metric = metric,
                     run = run,
                     onBack = { currentScreen = PerformanceScreen.Overview },
-                    onScreenClicked = onNavigateToScreen,
-                    onTestClicked = onNavigateToTest,
                 )
             } else {
                 currentScreen = PerformanceScreen.Overview
@@ -229,15 +434,7 @@ fun PerformanceDashboard(
 @Composable
 private fun PerformanceOverviewScreen(
     run: PerformanceRun,
-    selectedScreenFilter: String?,
-    onScreenFilterChanged: (String?) -> Unit,
     onMetricSelected: (PerformanceMetric) -> Unit,
-    onAnomalyClicked: (PerformanceAnomaly) -> Unit,
-    onCompareRuns: (String?) -> Unit,
-    isLive: Boolean = true,
-    onLiveToggle: (Boolean) -> Unit = {},
-    hasStreamClient: Boolean = false,
-    lastUpdate: PerformanceStreamUpdate? = null,
 ) {
     val colors = JewelTheme.globalColors
     val scrollState = rememberScrollState()
@@ -245,84 +442,34 @@ private fun PerformanceOverviewScreen(
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
     ) {
-        // Header with health status and live toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Performance Overview", fontSize = 18.sp)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Is this app healthy?",
-                        color = colors.text.normal.copy(alpha = 0.6f),
-                        fontSize = 12.sp,
-                    )
-                    // Live indicator
-                    if (hasStreamClient && isLive && lastUpdate != null) {
-                        LiveIndicator()
-                    }
-                }
-            }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        if (run.metrics.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                // Live/Pause toggle (only show if stream client is available)
-                if (hasStreamClient) {
-                    LivePauseToggle(
-                        isLive = isLive,
-                        onToggle = onLiveToggle,
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Waiting for performance data...",
+                        fontSize = 13.sp,
+                        color = colors.text.normal.copy(alpha = 0.6f),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Interact with your app to see metrics",
+                        fontSize = 11.sp,
+                        color = colors.text.normal.copy(alpha = 0.4f),
                     )
                 }
-                // Overall health indicator
-                HealthBadge(status = run.overallHealth)
             }
         }
-
-        // Real-time stats row (when live streaming)
-        if (hasStreamClient && isLive && lastUpdate != null) {
-            Spacer(Modifier.height(12.dp))
-            RealTimeStatsRow(update = lastUpdate)
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Screen filter chips
-        Text("Filter by Screen", fontSize = 12.sp, color = colors.text.normal.copy(alpha = 0.6f))
-        Spacer(Modifier.height(6.dp))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            FilterChip(
-                label = "All",
-                selected = selectedScreenFilter == null,
-                onClick = { onScreenFilterChanged(null) },
-            )
-            run.screensAnalyzed.take(4).forEach { screen ->
-                FilterChip(
-                    label = screen,
-                    selected = selectedScreenFilter == screen,
-                    onClick = { onScreenFilterChanged(screen) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // Metrics grid
-        Text("Metrics", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
-        Spacer(Modifier.height(8.dp))
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val isWide = maxWidth >= 400.dp
-            if (isWide) {
+            if (isWide && run.metrics.isNotEmpty()) {
                 // 2 columns
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     run.metrics.chunked(2).forEach { row ->
@@ -343,7 +490,7 @@ private fun PerformanceOverviewScreen(
                         }
                     }
                 }
-            } else {
+            } else if (run.metrics.isNotEmpty()) {
                 // Single column
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     run.metrics.forEach { metric ->
@@ -357,61 +504,6 @@ private fun PerformanceOverviewScreen(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-
-        // Anomalies section
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Anomalies", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
-            Text(
-                "${run.anomalies.size} detected",
-                fontSize = 11.sp,
-                color = colors.text.normal.copy(alpha = 0.5f),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-
-        if (run.anomalies.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "No anomalies detected",
-                    fontSize = 12.sp,
-                    color = colors.text.normal.copy(alpha = 0.5f),
-                )
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                run.anomalies.forEach { anomaly ->
-                    AnomalyRow(
-                        anomaly = anomaly,
-                        onClick = { onAnomalyClicked(anomaly) },
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // Compare runs section
-        Text("Compare Runs", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { onCompareRuns(PerformanceMockData.previousRun.id) }) {
-                Text("vs Previous Run")
-            }
-            OutlinedButton(onClick = { /* TODO: Select baseline */ }) {
-                Text("Select Baseline...")
-            }
-        }
     }
 }
 
@@ -420,14 +512,9 @@ private fun MetricDetailScreen(
     metric: PerformanceMetric,
     run: PerformanceRun,
     onBack: () -> Unit,
-    onScreenClicked: (String) -> Unit,
-    onTestClicked: (String) -> Unit,
 ) {
     val colors = JewelTheme.globalColors
     val scrollState = rememberScrollState()
-
-    // Find anomalies related to this metric
-    val relatedAnomalies = run.anomalies.filter { it.metricType == metric.type }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp),
@@ -443,27 +530,14 @@ private fun MetricDetailScreen(
         ) {
             Column {
                 Text(metric.name, fontSize = 18.sp)
-                Text(
-                    "Deep dive into metric over time",
-                    color = colors.text.normal.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                )
             }
             CurrentValueDisplay(metric = metric)
         }
 
         Spacer(Modifier.height(20.dp))
 
-        // Timeline graph
-        Text("Timeline", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
-        Spacer(Modifier.height(8.dp))
-
-        MetricTimelineGraph(
-            metric = metric,
-            onPointClicked = { point ->
-                point.screenName?.let { onScreenClicked(it) }
-            },
-        )
+        // Timeline graph (updates in real-time as metric.history is updated)
+        MetricTimelineGraph(metric = metric)
 
         Spacer(Modifier.height(20.dp))
 
@@ -484,94 +558,6 @@ private fun MetricDetailScreen(
                 color = Color(0xFFFF5722),
             )
         }
-
-        Spacer(Modifier.height(20.dp))
-
-        // Related anomalies
-        if (relatedAnomalies.isNotEmpty()) {
-            Text("Related Anomalies", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
-            Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                relatedAnomalies.forEach { anomaly ->
-                    AnomalyRow(
-                        anomaly = anomaly,
-                        onClick = { anomaly.screenName?.let { onScreenClicked(it) } },
-                    )
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-        }
-
-        // Screen breakdown
-        Text("By Screen", fontSize = 14.sp, color = colors.text.normal.copy(alpha = 0.8f))
-        Spacer(Modifier.height(8.dp))
-
-        val screenAverages = metric.history
-            .filter { it.screenName != null }
-            .groupBy { it.screenName!! }
-            .mapValues { (_, points) -> points.map { it.value }.average().toFloat() }
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            screenAverages.entries.sortedByDescending { it.value }.forEach { (screen, avg) ->
-                ScreenMetricRow(
-                    screenName = screen,
-                    value = avg,
-                    unit = metric.unit,
-                    maxValue = screenAverages.values.maxOrNull() ?: avg,
-                    onClick = { onScreenClicked(screen) },
-                )
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        // Export action
-        OutlinedButton(onClick = { /* TODO: Export snapshot */ }) {
-            Text("Export Snapshot")
-        }
-    }
-}
-
-@Composable
-private fun HealthBadge(status: HealthStatus) {
-    val (color, label) = when (status) {
-        HealthStatus.Healthy -> Color(0xFF4CAF50) to "Healthy"
-        HealthStatus.Warning -> Color(0xFFFFC107) to "Warning"
-        HealthStatus.Critical -> Color(0xFFFF5722) to "Critical"
-    }
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
-        Text(label, fontSize = 11.sp, color = color)
-    }
-}
-
-@Composable
-private fun FilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val colors = JewelTheme.globalColors
-    val bgColor = if (selected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent
-    val borderColor = if (selected) colors.text.normal.copy(alpha = 0.3f) else colors.text.normal.copy(alpha = 0.15f)
-    val textColor = if (selected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f)
-
-    Box(
-        modifier = Modifier
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .background(bgColor, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        Text(label, fontSize = 11.sp, color = textColor)
     }
 }
 
@@ -655,23 +641,50 @@ private fun MetricCard(
             MiniSparkline(
                 data = metric.history.takeLast(20).map { it.value },
                 color = statusColor,
+                metricType = metric.type,
                 modifier = Modifier.fillMaxWidth().height(24.dp),
             )
         }
     }
 }
 
+/**
+ * Get fixed Y-axis range for a metric type.
+ * Returns Pair(minValue, maxValue) for consistent chart scaling.
+ */
+private fun getFixedYAxisRange(metricType: MetricType): Pair<Float, Float> {
+    return when (metricType) {
+        MetricType.FPS -> 0f to 120f
+        MetricType.FrameTime -> 0f to 5000f // 5 seconds
+        MetricType.Memory -> 0f to 1024f // 1 GB
+        MetricType.TouchLatency -> 0f to 2000f // 2 seconds
+        MetricType.Jank -> 0f to 30f // 30 missed frames
+        MetricType.TimeToInteractive -> 0f to 5000f // 5 seconds
+        MetricType.TimeToFirstFrame -> 0f to 5000f // 5 seconds
+    }
+}
+
+/**
+ * Convert a value to logarithmic scale for chart display.
+ * Maps values from [0, max] to [0, 1] using log scale.
+ */
+private fun toLogScale(value: Float, max: Float): Float {
+    if (value <= 0f || max <= 0f) return 0f
+    // Use log(1 + value) to handle 0 values smoothly
+    // Normalize to [0, 1] range
+    return kotlin.math.ln(1f + value) / kotlin.math.ln(1f + max)
+}
+
 @Composable
 private fun MiniSparkline(
     data: List<Float>,
     color: Color,
+    metricType: MetricType,
     modifier: Modifier = Modifier,
 ) {
     if (data.isEmpty()) return
 
-    val minVal = data.minOrNull() ?: 0f
-    val maxVal = data.maxOrNull() ?: 1f
-    val range = (maxVal - minVal).coerceAtLeast(0.1f)
+    val (_, fixedMax) = getFixedYAxisRange(metricType)
 
     Box(
         modifier = modifier.drawBehind {
@@ -682,7 +695,10 @@ private fun MiniSparkline(
 
             data.forEachIndexed { index, value ->
                 val x = index * stepX
-                val y = size.height - ((value - minVal) / range * size.height)
+                // Use logarithmic scale
+                val clampedValue = value.coerceIn(0f, fixedMax)
+                val normalizedY = toLogScale(clampedValue, fixedMax)
+                val y = size.height - (normalizedY * size.height)
 
                 if (index == 0) {
                     path.moveTo(x, y)
@@ -698,52 +714,6 @@ private fun MiniSparkline(
             )
         }
     )
-}
-
-@Composable
-private fun AnomalyRow(
-    anomaly: PerformanceAnomaly,
-    onClick: () -> Unit,
-) {
-    val colors = JewelTheme.globalColors
-    val severityColor = when (anomaly.severity) {
-        HealthStatus.Warning -> Color(0xFFFFC107)
-        HealthStatus.Critical -> Color(0xFFFF5722)
-        else -> colors.text.normal.copy(alpha = 0.5f)
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.size(8.dp).background(severityColor, CircleShape))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(anomaly.message, fontSize = 12.sp)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                anomaly.screenName?.let {
-                    Text(it, fontSize = 10.sp, color = colors.text.normal.copy(alpha = 0.5f))
-                }
-                anomaly.testName?.let {
-                    Text("• $it", fontSize = 10.sp, color = colors.text.normal.copy(alpha = 0.5f))
-                }
-            }
-        }
-
-        Text(
-            "${anomaly.value.toInt()} > ${anomaly.threshold.toInt()}",
-            fontSize = 10.sp,
-            color = severityColor,
-        )
-    }
 }
 
 @Composable
@@ -773,57 +743,51 @@ private fun CurrentValueDisplay(metric: PerformanceMetric) {
 @Composable
 private fun MetricTimelineGraph(
     metric: PerformanceMetric,
-    onPointClicked: (MetricDataPoint) -> Unit,
 ) {
-    val colors = JewelTheme.globalColors
     val data = metric.history
 
     if (data.isEmpty()) return
 
-    val minVal = data.minOf { it.value }
-    val maxVal = data.maxOf { it.value }
-    val range = (maxVal - minVal).coerceAtLeast(0.1f)
+    // Use fixed Y-axis range based on metric type
+    val (_, fixedMax) = getFixedYAxisRange(metric.type)
+
+    // Calculate status color (same as tile cards)
+    val statusColor = when {
+        metric.type == MetricType.FPS -> {
+            // For FPS, lower is worse
+            when {
+                metric.currentValue < metric.thresholdCritical -> Color(0xFFFF5722)
+                metric.currentValue < metric.thresholdWarning -> Color(0xFFFFC107)
+                else -> Color(0xFF4CAF50)
+            }
+        }
+        else -> {
+            // For other metrics (latency, time, jank), higher is worse
+            when {
+                metric.currentValue > metric.thresholdCritical -> Color(0xFFFF5722)
+                metric.currentValue > metric.thresholdWarning -> Color(0xFFFFC107)
+                else -> Color(0xFF4CAF50)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(150.dp)
-            .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-            .padding(8.dp)
             .drawBehind {
                 if (data.size < 2) return@drawBehind
 
                 val stepX = size.width / (data.size - 1)
 
-                // Draw threshold lines
-                val warningY = size.height - ((metric.thresholdWarning - minVal) / range * size.height)
-                val criticalY = size.height - ((metric.thresholdCritical - minVal) / range * size.height)
-
-                // Warning threshold
-                if (warningY in 0f..size.height) {
-                    drawLine(
-                        color = Color(0xFFFFC107).copy(alpha = 0.3f),
-                        start = Offset(0f, warningY),
-                        end = Offset(size.width, warningY),
-                        strokeWidth = 1f,
-                    )
-                }
-
-                // Critical threshold
-                if (criticalY in 0f..size.height) {
-                    drawLine(
-                        color = Color(0xFFFF5722).copy(alpha = 0.3f),
-                        start = Offset(0f, criticalY),
-                        end = Offset(size.width, criticalY),
-                        strokeWidth = 1f,
-                    )
-                }
-
-                // Draw data line
+                // Draw data line (same style as tile sparkline, with log scale)
                 val path = Path()
                 data.forEachIndexed { index, point ->
                     val x = index * stepX
-                    val y = size.height - ((point.value - minVal) / range * size.height)
+                    // Use logarithmic scale
+                    val clampedValue = point.value.coerceIn(0f, fixedMax)
+                    val normalizedY = toLogScale(clampedValue, fixedMax)
+                    val y = size.height - (normalizedY * size.height)
 
                     if (index == 0) {
                         path.moveTo(x, y)
@@ -834,21 +798,9 @@ private fun MetricTimelineGraph(
 
                 drawPath(
                     path = path,
-                    color = Color(0xFF2196F3),
+                    color = statusColor.copy(alpha = 0.6f),
                     style = Stroke(width = 2f),
                 )
-
-                // Draw points
-                data.forEachIndexed { index, point ->
-                    val x = index * stepX
-                    val y = size.height - ((point.value - minVal) / range * size.height)
-
-                    drawCircle(
-                        color = Color(0xFF2196F3),
-                        radius = 3f,
-                        center = Offset(x, y),
-                    )
-                }
             }
     )
 }
@@ -875,185 +827,6 @@ private fun ThresholdIndicator(
     }
 }
 
-@Composable
-private fun ScreenMetricRow(
-    screenName: String,
-    value: Float,
-    unit: String,
-    maxValue: Float,
-    onClick: () -> Unit,
-) {
-    val colors = JewelTheme.globalColors
-    val progress = (value / maxValue).coerceIn(0f, 1f)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            screenName,
-            fontSize = 11.sp,
-            modifier = Modifier.width(80.dp),
-        )
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(8.dp)
-                .background(colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress)
-                    .height(8.dp)
-                    .background(Color(0xFF2196F3), RoundedCornerShape(4.dp))
-            )
-        }
-
-        Text(
-            "${value.toInt()}$unit",
-            fontSize = 10.sp,
-            color = colors.text.normal.copy(alpha = 0.6f),
-            modifier = Modifier.width(50.dp),
-        )
-    }
-}
-
-@Composable
-private fun LiveIndicator() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Pulsing red dot
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .background(Color(0xFFFF4444), CircleShape)
-        )
-        Text(
-            "LIVE",
-            fontSize = 9.sp,
-            color = Color(0xFFFF4444),
-        )
-    }
-}
-
-@Composable
-private fun LivePauseToggle(
-    isLive: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    val colors = JewelTheme.globalColors
-    val bgColor = if (isLive) Color(0xFF4CAF50).copy(alpha = 0.15f) else colors.text.normal.copy(alpha = 0.1f)
-    val borderColor = if (isLive) Color(0xFF4CAF50).copy(alpha = 0.3f) else colors.text.normal.copy(alpha = 0.2f)
-    val textColor = if (isLive) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.6f)
-
-    Row(
-        modifier = Modifier
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .background(bgColor, RoundedCornerShape(12.dp))
-            .clickable { onToggle(!isLive) }
-            .pointerHoverIcon(PointerIcon.Hand)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            if (isLive) "⏸" else "▶",
-            fontSize = 10.sp,
-            color = textColor,
-        )
-        Text(
-            if (isLive) "Pause" else "Live",
-            fontSize = 10.sp,
-            color = textColor,
-        )
-    }
-}
-
-@Composable
-private fun RealTimeStatsRow(update: PerformanceStreamUpdate) {
-    val colors = JewelTheme.globalColors
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.text.normal.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        RealTimeStat(
-            label = "FPS",
-            value = "${update.fps.toInt()}",
-            color = when {
-                update.fps >= 55 -> Color(0xFF4CAF50)
-                update.fps >= 45 -> Color(0xFFFFC107)
-                else -> Color(0xFFFF5722)
-            },
-        )
-        RealTimeStat(
-            label = "Frame Time",
-            value = "${update.frameTimeMs.toInt()}ms",
-            color = when {
-                update.frameTimeMs <= 16 -> Color(0xFF4CAF50)
-                update.frameTimeMs <= 33 -> Color(0xFFFFC107)
-                else -> Color(0xFFFF5722)
-            },
-        )
-        RealTimeStat(
-            label = "Jank",
-            value = "${update.jankFrames}",
-            color = when {
-                update.jankFrames == 0 -> Color(0xFF4CAF50)
-                update.jankFrames <= 3 -> Color(0xFFFFC107)
-                else -> Color(0xFFFF5722)
-            },
-        )
-        RealTimeStat(
-            label = "Memory",
-            value = "${update.memoryUsageMb.toInt()}MB",
-            color = Color(0xFF2196F3),
-        )
-        if (update.screenName != null) {
-            RealTimeStat(
-                label = "Screen",
-                value = update.screenName,
-                color = colors.text.normal.copy(alpha = 0.7f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun RealTimeStat(
-    label: String,
-    value: String,
-    color: Color,
-) {
-    val colors = JewelTheme.globalColors
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            value,
-            fontSize = 16.sp,
-            color = color,
-        )
-        Text(
-            label,
-            fontSize = 10.sp,
-            color = colors.text.normal.copy(alpha = 0.5f),
-        )
-    }
-}
-
 // Helper function to calculate metric trend
 private fun calculateTrend(oldValue: Float, newValue: Float): MetricTrend {
     val diff = newValue - oldValue
@@ -1062,73 +835,6 @@ private fun calculateTrend(oldValue: Float, newValue: Float): MetricTrend {
         diff < -1f -> MetricTrend.Down
         else -> MetricTrend.Stable
     }
-}
-
-// Helper function to detect anomalies from real-time update
-private fun detectAnomalies(
-    update: PerformanceStreamUpdate,
-    metrics: List<PerformanceMetric>,
-): List<PerformanceAnomaly> {
-    val anomalies = mutableListOf<PerformanceAnomaly>()
-
-    // Check FPS anomaly
-    val fpsMetric = metrics.find { it.type == MetricType.FPS }
-    if (fpsMetric != null && update.fps < fpsMetric.thresholdWarning) {
-        val severity = if (update.fps < fpsMetric.thresholdCritical) HealthStatus.Critical else HealthStatus.Warning
-        anomalies.add(
-            PerformanceAnomaly(
-                id = "fps-${update.timestamp}",
-                metricType = MetricType.FPS,
-                severity = severity,
-                message = "FPS drop detected: ${update.fps.toInt()} fps",
-                timestamp = update.timestamp,
-                screenName = update.screenName,
-                testName = null,
-                value = update.fps,
-                threshold = fpsMetric.thresholdWarning,
-            )
-        )
-    }
-
-    // Check jank anomaly
-    val jankMetric = metrics.find { it.type == MetricType.Jank }
-    if (jankMetric != null && update.jankFrames > jankMetric.thresholdWarning) {
-        val severity = if (update.jankFrames > jankMetric.thresholdCritical) HealthStatus.Critical else HealthStatus.Warning
-        anomalies.add(
-            PerformanceAnomaly(
-                id = "jank-${update.timestamp}",
-                metricType = MetricType.Jank,
-                severity = severity,
-                message = "Jank detected: ${update.jankFrames} dropped frames",
-                timestamp = update.timestamp,
-                screenName = update.screenName,
-                testName = null,
-                value = update.jankFrames.toFloat(),
-                threshold = jankMetric.thresholdWarning,
-            )
-        )
-    }
-
-    // Check frame time anomaly (>16ms means can't hit 60fps)
-    val frameTimeMetric = metrics.find { it.type == MetricType.FrameTime }
-    if (frameTimeMetric != null && update.frameTimeMs > frameTimeMetric.thresholdWarning) {
-        val severity = if (update.frameTimeMs > frameTimeMetric.thresholdCritical) HealthStatus.Critical else HealthStatus.Warning
-        anomalies.add(
-            PerformanceAnomaly(
-                id = "frametime-${update.timestamp}",
-                metricType = MetricType.FrameTime,
-                severity = severity,
-                message = "Slow frame: ${update.frameTimeMs.toInt()}ms render time",
-                timestamp = update.timestamp,
-                screenName = update.screenName,
-                testName = null,
-                value = update.frameTimeMs,
-                threshold = frameTimeMetric.thresholdWarning,
-            )
-        )
-    }
-
-    return anomalies
 }
 
 // Helper function to calculate overall health from metrics

@@ -4,6 +4,7 @@ package dev.jasonpearson.automobile.ide.layout
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,6 +74,7 @@ fun HierarchyTreeView(
     hoveredElementId: String?,
     onElementSelected: (String?) -> Unit,
     onElementHovered: (String?) -> Unit,
+    onElementDoubleClicked: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
@@ -180,6 +183,7 @@ fun HierarchyTreeView(
                                 }
                             },
                             onSelect = { onElementSelected(node.element.id) },
+                            onDoubleClick = { onElementDoubleClicked?.invoke(node.element.id) },
                             onHoverChange = { isHovered ->
                                 onElementHovered(if (isHovered) node.element.id else null)
                             },
@@ -256,6 +260,7 @@ private fun TreeNodeRow(
     isHovered: Boolean,
     onToggleExpand: () -> Unit,
     onSelect: () -> Unit,
+    onDoubleClick: () -> Unit,
     onHoverChange: (Boolean) -> Unit,
 ) {
     val colors = JewelTheme.globalColors
@@ -271,7 +276,12 @@ private fun TreeNodeRow(
         modifier = Modifier
             .widthIn(min = 200.dp)  // Minimum width to ensure content doesn't wrap
             .background(bgColor)
-            .clickable(onClick = onSelect)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onSelect() },
+                    onDoubleTap = { onDoubleClick() },
+                )
+            }
             .onPointerEvent(PointerEventType.Enter) { onHoverChange(true) }
             .onPointerEvent(PointerEventType.Exit) { onHoverChange(false) }
             .pointerHoverIcon(PointerIcon.Hand)

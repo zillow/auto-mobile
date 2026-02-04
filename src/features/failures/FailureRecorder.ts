@@ -471,9 +471,9 @@ export class FailureRecorder implements FailureRecorderService {
     if (appFrame) {
       const fileName = appFrame.fileName ?? appFrame.className.split(".").pop();
       const line = appFrame.lineNumber ? `:${appFrame.lineNumber}` : "";
-      return `[Non-Fatal] ${exceptionType} in ${appFrame.methodName} (${fileName}${line})`;
+      return `${exceptionType} in ${appFrame.methodName} (${fileName}${line})`;
     }
-    return `[Non-Fatal] ${exceptionType}`;
+    return `${exceptionType}`;
   }
 
   private calculateToolFailureSeverity(errorCode?: string): FailureSeverity {

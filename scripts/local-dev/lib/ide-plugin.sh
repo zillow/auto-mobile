@@ -114,23 +114,31 @@ get_all_ides() {
   local ides=()
   local seen_paths=()
 
+  log_info "Scanning for JetBrains IDEs..."
+
   # Collect from Toolbox first
+  log_info "Checking JetBrains Toolbox..."
   while IFS= read -r line; do
     if [[ -n "${line}" ]]; then
       local path
       path=$(echo "${line}" | cut -d'|' -f3)
+      log_info "  Toolbox candidate: ${path}"
       if [[ -d "${path}" ]]; then
         ides+=("${line}")
         seen_paths+=("${path}")
+      else
+        log_info "    (path does not exist, skipping)"
       fi
     fi
   done < <(detect_toolbox_ides)
 
   # Add Spotlight results if not already seen
+  log_info "Checking Spotlight index..."
   while IFS= read -r line; do
     if [[ -n "${line}" ]]; then
       local path
       path=$(echo "${line}" | cut -d'|' -f3)
+      log_info "  Spotlight candidate: ${path}"
       local already_seen=false
       if [[ ${#seen_paths[@]} -gt 0 ]]; then
         for seen in "${seen_paths[@]}"; do
@@ -140,11 +148,17 @@ get_all_ides() {
           fi
         done
       fi
-      if [[ "${already_seen}" == "false" && -d "${path}" ]]; then
+      if [[ "${already_seen}" == "true" ]]; then
+        log_info "    (already found via Toolbox, skipping)"
+      elif [[ ! -d "${path}" ]]; then
+        log_info "    (path does not exist, skipping)"
+      else
         ides+=("${line}")
       fi
     fi
   done < <(detect_spotlight_ides)
+
+  log_info "Found ${#ides[@]} IDE(s)"
 
   # Sort by access time (most recent first)
   if [[ ${#ides[@]} -gt 0 ]]; then

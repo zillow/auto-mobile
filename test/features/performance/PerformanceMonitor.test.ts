@@ -4,11 +4,15 @@ import {
   _resetPerformanceMonitor,
   PerformanceDataPusher,
   ServerGetter,
+  SimCtlClientFactory,
+  ExecFileAsyncFn,
 } from "../../../src/features/performance/PerformanceMonitor";
 import { LivePerformanceData } from "../../../src/daemon/performancePushSocketServer";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import { FakeAdbClient } from "../../fakes/FakeAdbClient";
+import { SimCtl } from "../../../src/utils/ios-cmdline-tools/SimCtlClient";
+import { ExecResult } from "../../../src/models";
 
 /**
  * Helper to advance time and wait for async callbacks to complete.
@@ -75,10 +79,11 @@ describe("PerformanceMonitor", () => {
   });
 
   function setupDefaultAdbResponses(adb: FakeAdbClient): void {
-    // gfxinfo response
+    // gfxinfo response (with reset flag for per-interval metrics)
     adb.setCommandResult(
-      "shell dumpsys gfxinfo com.example.app",
+      "shell dumpsys gfxinfo com.example.app reset",
       `
+        Total frames rendered: 100
         50th percentile: 8.5ms
         90th percentile: 12.3ms
         95th percentile: 15.7ms
@@ -241,7 +246,7 @@ describe("PerformanceMonitor", () => {
 
     it("should prevent concurrent tick execution", async () => {
       // Use a slow ADB response to test concurrent prevention
-      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app", "");
+      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app reset", "");
 
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
@@ -360,30 +365,31 @@ describe("PerformanceMonitor", () => {
       expect(data!.metrics.frameTimeMs).toBe(8.5);
     });
 
-    it("should calculate jank frames as delta between samples", async () => {
-      // First sample establishes baseline, returns 0 jank
-      // Second sample returns the delta
+    it("should calculate jank frames as sum of per-interval counters", async () => {
+      // With reset flag, each sample returns only jank since last reset
+      // Jank is the sum of all three indicators per interval
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
       monitor.startMonitoring("device-1", "com.example.app");
 
-      // First tick - baseline, jank should be 0
+      // First tick - jank should be sum of: 2 + 1 + 3 = 6 (from default setup)
       await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
       const data1 = fakePusher.getLastPushedData();
-      expect(data1!.metrics.jankFrames).toBe(0); // First sample = baseline
+      expect(data1!.metrics.jankFrames).toBe(6); // missedVsync(2) + slowUi(1) + deadlineMissed(3)
 
-      // Update counters to simulate new jank (increase by 5)
+      // Update counters to simulate new jank for second interval
       fakeAdbClient.setCommandResult(
-        "shell dumpsys gfxinfo com.example.app",
+        "shell dumpsys gfxinfo com.example.app reset",
         `
+          Total frames rendered: 50
           50th percentile: 8.5ms
-          Missed Vsync: 5
-          Slow UI thread: 2
-          Frame deadline missed: 4
+          Missed Vsync: 3
+          Slow UI thread: 1
+          Frame deadline missed: 1
         `
       );
 
-      // Second tick - should report delta: (5-2) + (2-1) + (4-3) = 3 + 1 + 1 = 5
+      // Second tick - should report sum for this interval: 3 + 1 + 1 = 5
       await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
       const data2 = fakePusher.getLastPushedData();
       expect(data2!.metrics.jankFrames).toBe(5);
@@ -402,7 +408,7 @@ describe("PerformanceMonitor", () => {
     });
 
     it("should handle missing gfxinfo data gracefully", async () => {
-      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app", "No data available");
+      fakeAdbClient.setCommandResult("shell dumpsys gfxinfo com.example.app reset", "No data available");
 
       monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
       monitor.start();
@@ -413,7 +419,32 @@ describe("PerformanceMonitor", () => {
       const data = fakePusher.getLastPushedData();
       expect(data!.metrics.fps).toBeNull();
       expect(data!.metrics.frameTimeMs).toBeNull();
-      expect(data!.metrics.jankFrames).toBe(0); // First sample = baseline, returns 0
+      expect(data!.metrics.jankFrames).toBe(0); // Jank counters default to 0 when not found
+    });
+
+    it("should return null frame time when no frames were rendered", async () => {
+      // When app is idle, gfxinfo shows "Total frames rendered: 0" with garbage P50 values
+      fakeAdbClient.setCommandResult(
+        "shell dumpsys gfxinfo com.example.app reset",
+        `
+          Total frames rendered: 0
+          50th percentile: 4950ms
+          Missed Vsync: 0
+          Slow UI thread: 0
+          Frame deadline missed: 0
+        `
+      );
+
+      monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter);
+      monitor.start();
+      monitor.startMonitoring("device-1", "com.example.app");
+
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+      const data = fakePusher.getLastPushedData();
+      expect(data!.metrics.fps).toBeNull(); // No frames = no FPS
+      expect(data!.metrics.frameTimeMs).toBeNull(); // Ignore garbage P50 when no frames
+      expect(data!.metrics.jankFrames).toBe(0);
     });
 
     it("should handle missing PID gracefully", async () => {
@@ -431,7 +462,7 @@ describe("PerformanceMonitor", () => {
 
     it("should handle ADB errors gracefully", async () => {
       fakeAdbClient.setCommandError(
-        "shell dumpsys gfxinfo com.example.app",
+        "shell dumpsys gfxinfo com.example.app reset",
         new Error("ADB connection failed")
       );
 
@@ -477,12 +508,12 @@ describe("PerformanceMonitor", () => {
   describe("multiple devices", () => {
     it("should push data for each monitored device", async () => {
       fakeAdbClient.setCommandResult(
-        "shell dumpsys gfxinfo com.app1",
-        "50th percentile: 10ms"
+        "shell dumpsys gfxinfo com.app1 reset",
+        "Total frames rendered: 10\n50th percentile: 10ms"
       );
       fakeAdbClient.setCommandResult(
-        "shell dumpsys gfxinfo com.app2",
-        "50th percentile: 12ms"
+        "shell dumpsys gfxinfo com.app2 reset",
+        "Total frames rendered: 10\n50th percentile: 12ms"
       );
       fakeAdbClient.setCommandResult("shell pidof com.app1", "111");
       fakeAdbClient.setCommandResult("shell pidof com.app2", "222");
@@ -509,5 +540,212 @@ describe("PerformanceMonitor", () => {
       expect(device1Data!.packageName).toBe("com.app1");
       expect(device2Data!.packageName).toBe("com.app2");
     });
+  });
+});
+
+/**
+ * Fake SimCtl implementation for testing iOS monitoring.
+ */
+class FakeSimCtl implements SimCtl {
+  private commandResults = new Map<string, ExecResult>();
+  private commandErrors = new Map<string, Error>();
+
+  setCommandResult(command: string, stdout: string, stderr = ""): void {
+    this.commandResults.set(command, { stdout, stderr });
+  }
+
+  setCommandError(command: string, error: Error): void {
+    this.commandErrors.set(command, error);
+  }
+
+  async executeCommand(command: string): Promise<ExecResult> {
+    if (this.commandErrors.has(command)) {
+      throw this.commandErrors.get(command);
+    }
+    const result = this.commandResults.get(command);
+    if (result) {
+      return result;
+    }
+    // Return empty result by default
+    return { stdout: "", stderr: "" };
+  }
+
+  // Implement other SimCtl methods as no-ops for testing
+  setDevice(): void {}
+  async isAvailable(): Promise<boolean> { return true; }
+  async isSimulatorRunning(): Promise<boolean> { return false; }
+  async startSimulator(): Promise<any> { return {}; }
+  async killSimulator(): Promise<void> {}
+  async waitForSimulatorReady(): Promise<any> { return {}; }
+  async listSimulatorImages(): Promise<any[]> { return []; }
+  async getBootedSimulators(): Promise<any[]> { return []; }
+  async getDeviceInfo(): Promise<any> { return null; }
+  async bootSimulator(): Promise<any> { return {}; }
+  async getDeviceTypes(): Promise<any[]> { return []; }
+  async getRuntimes(): Promise<any[]> { return []; }
+  async createSimulator(): Promise<string> { return ""; }
+  async deleteSimulator(): Promise<void> {}
+  async listApps(): Promise<any[]> { return []; }
+  async launchApp(): Promise<any> { return { success: true }; }
+  async terminateApp(): Promise<void> {}
+  async installApp(): Promise<void> {}
+  async uninstallApp(): Promise<void> {}
+  async getScreenSize(): Promise<any> { return { width: 390, height: 844 }; }
+  async setAppearance(): Promise<void> {}
+}
+
+/**
+ * Fake SimCtlClientFactory for testing.
+ */
+class FakeSimCtlClientFactory implements SimCtlClientFactory {
+  private fakeSimCtl: FakeSimCtl;
+
+  constructor(fakeSimCtl: FakeSimCtl) {
+    this.fakeSimCtl = fakeSimCtl;
+  }
+
+  create(): SimCtl {
+    return this.fakeSimCtl;
+  }
+}
+
+/**
+ * Create a fake execFileAsync function for iOS testing.
+ * Returns the provided stdout for all calls, or throws if errorToThrow is set.
+ */
+function createFakeExecFileAsync(options: {
+  stdout?: string;
+  errorToThrow?: Error;
+}): ExecFileAsyncFn {
+  return async (): Promise<{ stdout: string; stderr: string }> => {
+    if (options.errorToThrow) {
+      throw options.errorToThrow;
+    }
+    return { stdout: options.stdout ?? "", stderr: "" };
+  };
+}
+
+describe("PerformanceMonitor iOS", () => {
+  let fakeTimer: FakeTimer;
+  let fakeAdbFactory: FakeAdbClientFactory;
+  let fakeAdbClient: FakeAdbClient;
+  let fakeSimCtl: FakeSimCtl;
+  let fakeSimCtlFactory: FakeSimCtlClientFactory;
+  let fakePusher: FakePerformancePusher;
+  let serverGetter: ServerGetter;
+  let monitor: PerformanceMonitor;
+
+  beforeEach(() => {
+    fakeTimer = new FakeTimer();
+    fakeAdbClient = new FakeAdbClient();
+    fakeAdbFactory = new FakeAdbClientFactory(fakeAdbClient);
+    fakeSimCtl = new FakeSimCtl();
+    fakeSimCtlFactory = new FakeSimCtlClientFactory(fakeSimCtl);
+    fakePusher = new FakePerformancePusher();
+    serverGetter = () => fakePusher;
+  });
+
+  afterEach(() => {
+    if (monitor) {
+      monitor.stop();
+    }
+    _resetPerformanceMonitor();
+    fakeTimer.reset();
+  });
+
+  it("should collect iOS CPU metrics via ps aux", async () => {
+    // Set up fake ps aux response on the host
+    const fakeExec = createFakeExecFileAsync({
+      stdout: `USER     PID %CPU %MEM      VSZ    RSS   TT  STAT STARTED      TIME COMMAND
+root       1  0.0  0.0   407056   1632   ??  Ss   Mon09AM   0:01.23 /sbin/launchd
+mobile 12345 15.5  2.3  1234567  89012   ??  Ss   10:00AM   1:23.45 com.example.iosapp`
+    });
+
+    monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter, fakeSimCtlFactory, fakeExec);
+    monitor.start();
+    monitor.startMonitoring("ios-device-1", "com.example.iosapp", "ios");
+
+    await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+    const data = fakePusher.getLastPushedData();
+    expect(data).toBeDefined();
+    expect(data!.deviceId).toBe("ios-device-1");
+    expect(data!.packageName).toBe("com.example.iosapp");
+    expect(data!.metrics.cpuUsagePercent).toBe(15.5);
+  });
+
+  it("should collect iOS memory metrics via ps aux (RSS)", async () => {
+    // Set up fake ps aux response on the host
+    const fakeExec = createFakeExecFileAsync({
+      stdout: `USER     PID %CPU %MEM      VSZ    RSS   TT  STAT STARTED      TIME COMMAND
+mobile 12345 5.0  2.3  1234567 102400   ??  Ss   10:00AM   1:23.45 com.example.iosapp`
+    });
+
+    monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter, fakeSimCtlFactory, fakeExec);
+    monitor.start();
+    monitor.startMonitoring("ios-device-1", "com.example.iosapp", "ios");
+
+    // Advance enough for slow metrics (memory)
+    await advanceTimeAndWait(fakeTimer, PerformanceMonitor.SLOW_INTERVAL_MS);
+
+    const data = fakePusher.getLastPushedData();
+    expect(data).toBeDefined();
+    // RSS is 102400 KB = 100 MB
+    expect(data!.metrics.memoryUsageMb).toBe(100);
+  });
+
+  it("should return null FPS/frame time for iOS (not available)", async () => {
+    const fakeExec = createFakeExecFileAsync({
+      stdout: `mobile 12345 5.0  2.3  1234567 102400   ??  Ss   10:00AM   1:23.45 com.example.iosapp`
+    });
+
+    monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter, fakeSimCtlFactory, fakeExec);
+    monitor.start();
+    monitor.startMonitoring("ios-device-1", "com.example.iosapp", "ios");
+
+    await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+    const data = fakePusher.getLastPushedData();
+    expect(data).toBeDefined();
+    // FPS and frame time are not available on iOS
+    expect(data!.metrics.fps).toBeNull();
+    expect(data!.metrics.frameTimeMs).toBeNull();
+    expect(data!.metrics.jankFrames).toBeNull();
+    expect(data!.metrics.touchLatencyMs).toBeNull();
+  });
+
+  it("should handle iOS process not found gracefully", async () => {
+    // ps aux returns output but doesn't include our bundle ID
+    const fakeExec = createFakeExecFileAsync({
+      stdout: `USER     PID %CPU %MEM      VSZ    RSS   TT  STAT STARTED      TIME COMMAND
+root       1  0.0  0.0   407056   1632   ??  Ss   Mon09AM   0:01.23 /sbin/launchd`
+    });
+
+    monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter, fakeSimCtlFactory, fakeExec);
+    monitor.start();
+    monitor.startMonitoring("ios-device-1", "com.example.iosapp", "ios");
+
+    await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+    const data = fakePusher.getLastPushedData();
+    expect(data).toBeDefined();
+    expect(data!.metrics.cpuUsagePercent).toBeNull();
+    expect(data!.metrics.memoryUsageMb).toBeNull();
+  });
+
+  it("should handle exec errors gracefully", async () => {
+    const fakeExec = createFakeExecFileAsync({
+      errorToThrow: new Error("Command failed")
+    });
+
+    monitor = new PerformanceMonitor(fakeTimer, fakeAdbFactory, serverGetter, fakeSimCtlFactory, fakeExec);
+    monitor.start();
+    monitor.startMonitoring("ios-device-1", "com.example.iosapp", "ios");
+
+    await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+    const data = fakePusher.getLastPushedData();
+    expect(data).toBeDefined();
+    expect(data!.metrics.cpuUsagePercent).toBeNull();
   });
 });

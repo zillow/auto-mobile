@@ -14,6 +14,7 @@ import dev.jasonpearson.automobile.playground.navigation.AppNavigation
 import dev.jasonpearson.automobile.playground.navigation.DeepLinkManager
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.EnableComposeObservableApi
+import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 
 class MainActivity : ComponentActivity() {
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity() {
 
     // Initialize AutoMobile SDK for navigation tracking
     AutoMobileSDK.initialize(applicationContext)
+    // Enable SharedPreferences inspection in debug builds
+    SharedPreferencesInspector.setEnabled(true)
     Log.d(TAG, "AutoMobileSDK initialized")
 
     // Initialize analytics tracking

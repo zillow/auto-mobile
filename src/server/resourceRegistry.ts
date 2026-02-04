@@ -166,6 +166,7 @@ class ResourceRegistryClass {
     // Set handler for reading resource content
     server.server.setRequestHandler(ReadResourceRequestSchema, async request => {
       const { uri } = request.params;
+      logger.info(`[ResourceRegistry] ReadResource request for URI: ${uri}`);
 
       // Check for common incorrect URI schemes and provide helpful error messages
       const schemeMatch = uri.match(/^([a-z][a-z0-9+.-]*):\/?\/?/i);

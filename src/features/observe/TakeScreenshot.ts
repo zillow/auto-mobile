@@ -9,8 +9,27 @@ import { Image } from "../../utils/image-utils";
 import { BootedDevice } from "../../models";
 import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
-import { getTempDir, TEMP_SUBDIRS, SECURE_DIR_MODE } from "../../utils/tempDir";
+import { ensureSecureTempDirSync, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ScreenshotService } from "./interfaces/ScreenshotService";
+import { XCTestServiceClient } from "./ios/XCTestServiceClient";
+import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
+
+/** Secure file mode: owner read/write only */
+const SECURE_FILE_MODE = 0o600;
+
+/**
+ * Write buffer to file atomically with secure permissions.
+ * Uses "wx" flag to fail if file exists (prevents TOCTOU race) and
+ * mode 0o600 for owner-only read/write access.
+ */
+async function writeFileSecure(filePath: string, data: Buffer): Promise<void> {
+  const handle = await fs.promises.open(filePath, "wx", SECURE_FILE_MODE);
+  try {
+    await handle.write(data);
+  } finally {
+    await handle.close();
+  }
+}
 
 export interface ScreenshotOptions {
   format?: "png" | "webp";
@@ -23,8 +42,19 @@ export class TakeScreenshot implements ScreenshotService {
   private adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
   private window: Window;
-  private static cacheDir: string = getTempDir(TEMP_SUBDIRS.SCREENSHOTS);
+  private static cacheDir: string | null = null;
   private static readonly MAX_CACHE_SIZE_BYTES = 128 * 1024 * 1024; // 128MB
+
+  /**
+   * Get the cache directory, creating it with secure permissions if needed.
+   * Uses lazy initialization to ensure the directory is created securely.
+   */
+  private static getCacheDir(): string {
+    if (!TakeScreenshot.cacheDir) {
+      TakeScreenshot.cacheDir = ensureSecureTempDirSync(TEMP_SUBDIRS.SCREENSHOTS);
+    }
+    return TakeScreenshot.cacheDir;
+  }
 
   /**
    * Create a TakeScreenshot instance
@@ -51,12 +81,7 @@ export class TakeScreenshot implements ScreenshotService {
     }
     this.window = new Window(device, this.adbFactory);
 
-    // Ensure cache directory exists with secure permissions
-    if (!fs.existsSync(TakeScreenshot.cacheDir)) {
-      fs.mkdirSync(TakeScreenshot.cacheDir, { recursive: true, mode: SECURE_DIR_MODE });
-    }
-
-    // Manage cache size
+    // Manage cache size (getCacheDir ensures directory exists with secure permissions)
     this.cleanupCache();
   }
 
@@ -65,13 +90,13 @@ export class TakeScreenshot implements ScreenshotService {
    */
   private async cleanupCache(): Promise<void> {
     try {
-      if (!fs.existsSync(TakeScreenshot.cacheDir)) {return;}
+      const cacheDir = TakeScreenshot.getCacheDir();
 
       // Get all files in cache with their stats
-      const files = await fs.readdir(TakeScreenshot.cacheDir);
+      const files = await fs.readdir(cacheDir);
       const fileStats = await Promise.all(
         files.map(async file => {
-          const filePath = path.join(TakeScreenshot.cacheDir, file);
+          const filePath = path.join(cacheDir, file);
           const stats = await fs.stat(filePath);
           return { path: filePath, stats, mtime: stats.mtime.getTime() };
         })
@@ -107,7 +132,7 @@ export class TakeScreenshot implements ScreenshotService {
    */
   generateScreenshotPath(timestamp: number, options: ScreenshotOptions): string {
     const fileExtension = options.format === "webp" ? "webp" : "png";
-    return path.join(TakeScreenshot.cacheDir, `screenshot_${timestamp}.${fileExtension}`);
+    return path.join(TakeScreenshot.getCacheDir(), `screenshot_${timestamp}.${fileExtension}`);
   }
 
   /**
@@ -223,17 +248,88 @@ export class TakeScreenshot implements ScreenshotService {
   }
 
   /**
-   * Capture screenshot using screencap method with fallback
+   * Capture screenshot using XCTestService
    * @param finalPath - Path to save the screenshot
    * @returns ScreenshotResult with path to the saved screenshot or error
    */
   private async captureiOSScreenshot(
     finalPath: string,
   ): Promise<ScreenshotResult> {
-    return {
-      success: true,
-      path: finalPath,
-    } as ScreenshotResult;
+    const startTime = Date.now();
+
+    try {
+      const client = XCTestServiceClient.getInstance(this.device);
+
+      // Ensure connected before requesting screenshot
+      if (!await client.ensureConnected()) {
+        return {
+          success: false,
+          error: "Failed to connect to XCTestService",
+        };
+      }
+
+      // Request screenshot from XCTestService
+      const result = await client.requestScreenshot(10000); // 10 second timeout
+
+      if (!result.success || !result.data) {
+        return {
+          success: false,
+          error: result.error || "No screenshot data returned",
+        };
+      }
+
+      // Decode base64 and save to file securely
+      const imageBuffer = Buffer.from(result.data, "base64");
+      await writeFileSecure(finalPath, imageBuffer);
+
+      const durationMs = Date.now() - startTime;
+      logger.info(`[SCREENSHOT] iOS screenshot captured in ${durationMs}ms, saved to ${finalPath}`);
+
+      // Push to observation stream for IDE plugins
+      this.pushScreenshotToStream(result.data, imageBuffer);
+
+      return {
+        success: true,
+        path: finalPath,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`[SCREENSHOT] iOS screenshot capture failed: ${errorMessage}`);
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Push screenshot to the device data stream for IDE plugins.
+   */
+  private pushScreenshotToStream(base64Data: string, imageBuffer: Buffer): void {
+    const server = getDeviceDataStreamServer();
+    if (!server) {
+      return;
+    }
+
+    // Try to get dimensions from the image
+    let width = 1080;
+    let height = 2340;
+
+    try {
+      // PNG header contains dimensions at bytes 16-24
+      if (imageBuffer.length >= 24 && imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) {
+        width = imageBuffer.readUInt32BE(16);
+        height = imageBuffer.readUInt32BE(20);
+      }
+    } catch {
+      // Use defaults if we can't read dimensions
+    }
+
+    try {
+      server.pushScreenshotUpdate(this.device.deviceId, base64Data, width, height);
+    } catch (error) {
+      logger.debug(`[SCREENSHOT] Failed to push screenshot to observation stream: ${error}`);
+    }
   }
 
   /**
@@ -272,11 +368,11 @@ export class TakeScreenshot implements ScreenshotService {
     const decodeDuration = Date.now() - decodeStartTime;
     logger.info(`[SCREENSHOT] Base64 decode took ${decodeDuration}ms, buffer size: ${imageBuffer.length} bytes`);
 
-    // Handle format conversion and save
+    // Handle format conversion and save securely
     if (options.format !== "webp") {
       // For PNG, save directly
       const saveStartTime = Date.now();
-      await fs.writeFile(finalPath, imageBuffer);
+      await writeFileSecure(finalPath, imageBuffer);
       const saveDuration = Date.now() - saveStartTime;
       logger.info(`[SCREENSHOT] PNG file save took ${saveDuration}ms`);
     } else {
@@ -291,9 +387,9 @@ export class TakeScreenshot implements ScreenshotService {
       const convertDuration = Date.now() - convertStartTime;
       logger.info(`[SCREENSHOT] WebP conversion took ${convertDuration}ms`);
 
-      // Save the webp file
+      // Save the webp file securely
       const saveStartTime = Date.now();
-      await fs.writeFile(finalPath, convertedImage);
+      await writeFileSecure(finalPath, convertedImage);
       const saveDuration = Date.now() - saveStartTime;
       logger.info(`[SCREENSHOT] WebP file save took ${saveDuration}ms`);
     }
@@ -370,9 +466,9 @@ export class TakeScreenshot implements ScreenshotService {
         const convertDuration = Date.now() - convertStartTime;
         logger.info(`[SCREENSHOT] WebP conversion took ${convertDuration}ms`);
 
-        // Save the webp file and remove temp file
+        // Save the webp file securely and remove temp file
         const saveStartTime = Date.now();
-        await fs.writeFile(finalPath, convertedImage);
+        await writeFileSecure(finalPath, convertedImage);
         await fs.remove(tempLocalFile);
         const saveDuration = Date.now() - saveStartTime;
         logger.info(`[SCREENSHOT] WebP file save took ${saveDuration}ms`);

@@ -11,6 +11,7 @@
 		052E12A5C50F95E644253CEB /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38BA6768C288E782FD4BF007 /* Protocols.swift */; };
 		0C0DA069D9B774797B08050D /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF3CE124F2A6CD97A0B61A20 /* Fakes.swift */; };
 		196923B8D693CBFA0F64FBE8 /* ElementLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA85B8D1F76B85F7A40A9AC1 /* ElementLocator.swift */; };
+		1CBED464F7D1B710B643881E /* DisplayLinkFPSMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EA14AF39E5922831951BB12 /* DisplayLinkFPSMonitor.swift */; };
 		26BE4CDC25C50AF275B5D62D /* ElementLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA85B8D1F76B85F7A40A9AC1 /* ElementLocator.swift */; };
 		2CF1BFE1F9C343DDC3327B62 /* XCTestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56827EE4350DFB34C181E6F9 /* XCTestService.swift */; };
 		2E3CACA8F6B100AA92191D14 /* PerfProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2405456E61E2BE2AB9837DD /* PerfProvider.swift */; };
@@ -19,10 +20,12 @@
 		3E431C908DCDEFB2E52F4564 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E0ED91DB46F9FC23B3868E /* Models.swift */; };
 		471BDC31826855445CB0FF30 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B265512A37308C098B3E01 /* AppDelegate.swift */; };
 		5151C4235C549690408DE674 /* PerfProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3ADC91E330FEFCD9882A30A /* PerfProviderTests.swift */; };
+		551E811C748D7EB78D4353FD /* PerformanceMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7998D5E41C12A3CF4AEC9BD6 /* PerformanceMetrics.swift */; };
 		66FB888E218A443091A2DD8B /* XCTestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56827EE4350DFB34C181E6F9 /* XCTestService.swift */; };
 		682BCA31038636F8DDBFEBA7 /* HierarchyDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86213D75803C8AA93B9583F /* HierarchyDebouncer.swift */; };
 		6BE1A8BAB50B6EC54287A6C6 /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6802366B39546509F431F39 /* ModelsTests.swift */; };
 		76C282F48CB5169159D6A6D9 /* PerfProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2405456E61E2BE2AB9837DD /* PerfProvider.swift */; };
+		99C289B4D07B9C159E98DB4E /* PerformanceMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7998D5E41C12A3CF4AEC9BD6 /* PerformanceMetrics.swift */; };
 		9CA64759740038CD0BACC740 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DE1E4D00CEF199F076EBE /* WebSocketServer.swift */; };
 		A056201FD1164D5BD940F478 /* CommandHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E6580240FAAEF11D3AE486 /* CommandHandler.swift */; };
 		A296D70736925E1B71FCE929 /* XCTestService.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9788C24D07660B4E2960BC91 /* XCTestService.framework */; };
@@ -35,6 +38,7 @@
 		EFF6AEFF4C9BA793D21D1FE0 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E0ED91DB46F9FC23B3868E /* Models.swift */; };
 		F16F89D0CE46B3F7EA09DC0E /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DE1E4D00CEF199F076EBE /* WebSocketServer.swift */; };
 		F2C455F1A1F5B8F75E0A80EC /* XCTestService.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9788C24D07660B4E2960BC91 /* XCTestService.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F7919FB4A4FA6F3332E736B4 /* DisplayLinkFPSMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EA14AF39E5922831951BB12 /* DisplayLinkFPSMonitor.swift */; };
 		FCEF451F5F925373E2FB5A2C /* XCTestService.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9788C24D07660B4E2960BC91 /* XCTestService.framework */; };
 /* End PBXBuildFile section */
 
@@ -95,10 +99,12 @@
 		3E3ECFB96E6F3A2EC111980D /* XCTestServiceUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = XCTestServiceUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		56827EE4350DFB34C181E6F9 /* XCTestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCTestService.swift; sourceTree = "<group>"; };
 		68B265512A37308C098B3E01 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		7998D5E41C12A3CF4AEC9BD6 /* PerformanceMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMetrics.swift; sourceTree = "<group>"; };
 		7B65ACD5F3352EAF7DF305F8 /* GesturePerformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GesturePerformer.swift; sourceTree = "<group>"; };
 		8098B3F86909EF6EDFF01D23 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		952BC86A5C17183D97D8BD16 /* XCTestServiceApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = XCTestServiceApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9788C24D07660B4E2960BC91 /* XCTestService.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = XCTestService.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		9EA14AF39E5922831951BB12 /* DisplayLinkFPSMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayLinkFPSMonitor.swift; sourceTree = "<group>"; };
 		A36DE1E4D00CEF199F076EBE /* WebSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketServer.swift; sourceTree = "<group>"; };
 		B2405456E61E2BE2AB9837DD /* PerfProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfProvider.swift; sourceTree = "<group>"; };
 		B3ADC91E330FEFCD9882A30A /* PerfProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfProviderTests.swift; sourceTree = "<group>"; };
@@ -170,11 +176,13 @@
 			isa = PBXGroup;
 			children = (
 				F7E6580240FAAEF11D3AE486 /* CommandHandler.swift */,
+				9EA14AF39E5922831951BB12 /* DisplayLinkFPSMonitor.swift */,
 				FA85B8D1F76B85F7A40A9AC1 /* ElementLocator.swift */,
 				BF3CE124F2A6CD97A0B61A20 /* Fakes.swift */,
 				7B65ACD5F3352EAF7DF305F8 /* GesturePerformer.swift */,
 				D86213D75803C8AA93B9583F /* HierarchyDebouncer.swift */,
 				F0E0ED91DB46F9FC23B3868E /* Models.swift */,
+				7998D5E41C12A3CF4AEC9BD6 /* PerformanceMetrics.swift */,
 				B2405456E61E2BE2AB9837DD /* PerfProvider.swift */,
 				38BA6768C288E782FD4BF007 /* Protocols.swift */,
 				A36DE1E4D00CEF199F076EBE /* WebSocketServer.swift */,
@@ -365,12 +373,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				E4386D208A9A2B600DD0C5F0 /* CommandHandler.swift in Sources */,
+				1CBED464F7D1B710B643881E /* DisplayLinkFPSMonitor.swift in Sources */,
 				26BE4CDC25C50AF275B5D62D /* ElementLocator.swift in Sources */,
 				0C0DA069D9B774797B08050D /* Fakes.swift in Sources */,
 				AFF0F4FB01A3EF5919FEDA22 /* GesturePerformer.swift in Sources */,
 				B542B471C14DBC8AFD9DB912 /* HierarchyDebouncer.swift in Sources */,
 				3E431C908DCDEFB2E52F4564 /* Models.swift in Sources */,
 				76C282F48CB5169159D6A6D9 /* PerfProvider.swift in Sources */,
+				99C289B4D07B9C159E98DB4E /* PerformanceMetrics.swift in Sources */,
 				052E12A5C50F95E644253CEB /* Protocols.swift in Sources */,
 				9CA64759740038CD0BACC740 /* WebSocketServer.swift in Sources */,
 				2CF1BFE1F9C343DDC3327B62 /* XCTestService.swift in Sources */,
@@ -390,11 +400,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A056201FD1164D5BD940F478 /* CommandHandler.swift in Sources */,
+				F7919FB4A4FA6F3332E736B4 /* DisplayLinkFPSMonitor.swift in Sources */,
 				196923B8D693CBFA0F64FBE8 /* ElementLocator.swift in Sources */,
 				2EB2329D4CC93BCE10835479 /* GesturePerformer.swift in Sources */,
 				682BCA31038636F8DDBFEBA7 /* HierarchyDebouncer.swift in Sources */,
 				EFF6AEFF4C9BA793D21D1FE0 /* Models.swift in Sources */,
 				2E3CACA8F6B100AA92191D14 /* PerfProvider.swift in Sources */,
+				551E811C748D7EB78D4353FD /* PerformanceMetrics.swift in Sources */,
 				B52D39007BB9B35F65DA162B /* Protocols.swift in Sources */,
 				F16F89D0CE46B3F7EA09DC0E /* WebSocketServer.swift in Sources */,
 				66FB888E218A443091A2DD8B /* XCTestService.swift in Sources */,

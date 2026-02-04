@@ -96,6 +96,55 @@ sealed class StorageRequest {
   @Serializable
   @SerialName("get_listened_files")
   data object GetListenedFiles : StorageRequest()
+
+  /**
+   * Get a single preference value by key.
+   * Method: "getPreference"
+   * Extras: fileName (String), key (String)
+   */
+  @Serializable
+  @SerialName("get_preference")
+  data class GetPreference(
+    val fileName: String,
+    val key: String,
+  ) : StorageRequest()
+
+  /**
+   * Set a preference value.
+   * Method: "setValue"
+   * Extras: fileName (String), key (String), value (String), type (String)
+   */
+  @Serializable
+  @SerialName("set_value")
+  data class SetValue(
+    val fileName: String,
+    val key: String,
+    val value: String?,
+    val type: String,
+  ) : StorageRequest()
+
+  /**
+   * Remove a preference value.
+   * Method: "removeValue"
+   * Extras: fileName (String), key (String)
+   */
+  @Serializable
+  @SerialName("remove_value")
+  data class RemoveValue(
+    val fileName: String,
+    val key: String,
+  ) : StorageRequest()
+
+  /**
+   * Clear all preferences in a file.
+   * Method: "clearFile"
+   * Extras: fileName (String)
+   */
+  @Serializable
+  @SerialName("clear_file")
+  data class ClearFile(
+    val fileName: String,
+  ) : StorageRequest()
 }
 
 // =============================================================================
@@ -173,6 +222,29 @@ sealed class StorageResponse {
   data class Error(
     val errorType: String,
     val message: String,
+  ) : StorageResponse()
+
+  /**
+   * Response for getPreference request.
+   */
+  @Serializable
+  @SerialName("single_preference")
+  data class SinglePreference(
+    val fileName: String,
+    val key: String,
+    /** The preference entry, or null if key not found. */
+    val entry: StorageEntry?,
+  ) : StorageResponse()
+
+  /**
+   * Response for successful write operations (setValue, removeValue, clearFile).
+   */
+  @Serializable
+  @SerialName("operation_success")
+  data class OperationSuccess(
+    val operation: String,
+    val fileName: String,
+    val key: String?,
   ) : StorageResponse()
 }
 
@@ -278,6 +350,10 @@ object StorageProtocolSerializer {
       is StorageRequest.CheckAvailability -> "checkAvailability"
       is StorageRequest.ListFiles -> "listFiles"
       is StorageRequest.GetPreferences -> "getPreferences"
+      is StorageRequest.GetPreference -> "getPreference"
+      is StorageRequest.SetValue -> "setValue"
+      is StorageRequest.RemoveValue -> "removeValue"
+      is StorageRequest.ClearFile -> "clearFile"
       is StorageRequest.Subscribe -> "subscribeToFile"
       is StorageRequest.Unsubscribe -> "unsubscribeFromFile"
       is StorageRequest.GetChanges -> "getChanges"

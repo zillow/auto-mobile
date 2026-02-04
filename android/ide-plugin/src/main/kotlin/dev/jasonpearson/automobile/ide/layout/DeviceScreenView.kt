@@ -30,6 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -37,6 +40,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.platform.LocalDensity
@@ -68,6 +74,8 @@ fun DeviceScreenView(
     hierarchy: UIElementInfo?,
     selectedElementId: String?,
     hoveredElementId: String?,
+    flashElementId: String? = null,
+    onFlashComplete: () -> Unit = {},
     onElementSelected: (String?) -> Unit,
     onElementHovered: (String?) -> Unit,
     showTapTargetIssues: Boolean = false,
@@ -85,6 +93,10 @@ fun DeviceScreenView(
 
     // Track refitTrigger to reset fit state when panels change
     var lastRefitTrigger by remember { mutableStateOf<Any?>(null) }
+
+    // Track previous viewport dimensions for auto-centering on resize
+    var prevViewportWidth by remember { mutableFloatStateOf(0f) }
+    var prevViewportHeight by remember { mutableFloatStateOf(0f) }
 
     // Decode screenshot to ImageBitmap
     val imageBitmap = remember(screenshotData) {
@@ -109,6 +121,29 @@ fun DeviceScreenView(
         if (hierarchy != null && hoveredElementId != null) {
             LayoutInspectorMockData.findElementById(hierarchy, hoveredElementId)
         } else null
+    }
+
+    // Flash element for highlight animation on double-click
+    val flashElement = remember(hierarchy, flashElementId) {
+        if (hierarchy != null && flashElementId != null) {
+            LayoutInspectorMockData.findElementById(hierarchy, flashElementId)
+        } else null
+    }
+
+    // Flash animation state
+    var flashAlpha by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(flashElementId) {
+        if (flashElementId != null) {
+            // Animate flash: bright -> fade out
+            repeat(3) { // 3 flashes
+                flashAlpha = 0.8f
+                kotlinx.coroutines.delay(100)
+                flashAlpha = 0.3f
+                kotlinx.coroutines.delay(100)
+            }
+            flashAlpha = 0f
+            onFlashComplete()
+        }
     }
 
     // Find non-compliant tap targets (clickable elements smaller than 48x48dp)
@@ -173,6 +208,19 @@ fun DeviceScreenView(
                 }
             }
 
+            // Auto-center when viewport dimensions change (window resize)
+            LaunchedEffect(viewportWidth, viewportHeight) {
+                if (hasInitialFit && prevViewportWidth > 0 && prevViewportHeight > 0) {
+                    // Adjust offset to keep content centered when viewport resizes
+                    val deltaX = (viewportWidth - prevViewportWidth) / 2
+                    val deltaY = (viewportHeight - prevViewportHeight) / 2
+                    offsetX += deltaX
+                    offsetY += deltaY
+                }
+                prevViewportWidth = viewportWidth
+                prevViewportHeight = viewportHeight
+            }
+
             // Auto-fit on initial load or when refit is triggered
             LaunchedEffect(viewportWidth, viewportHeight, frameWidthPx, frameHeightPx, hasInitialFit) {
                 if (!hasInitialFit && viewportWidth > 0 && viewportHeight > 0 && frameWidthPx > 0) {
@@ -185,11 +233,18 @@ fun DeviceScreenView(
                         1f  // Don't scale up beyond 1.0 initially
                     ).coerceIn(0.3f, 1f)
 
-                    scale = fitScale
+                    // Only change scale if it would increase (don't auto-shrink on window resize)
+                    // This allows expanding when window grows but keeps current zoom when shrinking
+                    if (fitScale > scale || scale == 1f) {
+                        scale = fitScale
+                    }
                     // Center the device frame in viewport
                     offsetX = (viewportWidth - frameWidthPx * scale) / 2
                     offsetY = (viewportHeight - frameHeightPx * scale) / 2
                     hasInitialFit = true
+                    // Initialize previous viewport dimensions
+                    prevViewportWidth = viewportWidth
+                    prevViewportHeight = viewportHeight
                 }
             }
 
@@ -217,11 +272,33 @@ fun DeviceScreenView(
                 return deviceX to deviceY
             }
 
+            // Focus requester for keyboard events
+            val focusRequester = remember { FocusRequester() }
+
+            // Request focus when an element is selected
+            LaunchedEffect(selectedElementId) {
+                if (selectedElementId != null) {
+                    focusRequester.requestFocus()
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
+                    .focusRequester(focusRequester)
+                    .focusTarget()
+                    .onKeyEvent { keyEvent ->
+                        // Handle Escape to deselect
+                        if (keyEvent.key == Key.Escape && selectedElementId != null) {
+                            onElementSelected(null)
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     .pointerInput(Unit) {
+                        // Allow pan/drag to move the viewport
                         detectDragGestures { change, dragAmount ->
                             change.consume()
                             offsetX += dragAmount.x
@@ -251,12 +328,15 @@ fun DeviceScreenView(
                         onElementHovered(null)
                     }
                     .onPointerEvent(PointerEventType.Scroll) { event ->
-                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
-                        val scrollDelta = change.scrollDelta.y
-                        if (scrollDelta != 0f) {
-                            val zoomFactor = if (scrollDelta > 0) 0.95f else 1.05f
-                            val newScale = (scale * zoomFactor).coerceIn(0.1f, 5f)
-                            zoomAroundPoint(newScale, change.position.x, change.position.y)
+                        // Only allow zoom when an element is selected
+                        if (selectedElementId != null) {
+                            val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                            val scrollDelta = change.scrollDelta.y
+                            if (scrollDelta != 0f) {
+                                val zoomFactor = if (scrollDelta > 0) 0.95f else 1.05f
+                                val newScale = (scale * zoomFactor).coerceIn(0.1f, 5f)
+                                zoomAroundPoint(newScale, change.position.x, change.position.y)
+                            }
                         }
                     }
             ) {
@@ -286,23 +366,25 @@ fun DeviceScreenView(
                                 .drawWithContent {
                                     drawContent()
 
-                                    // Scale factor: drawing context is in frame pixels, bounds are in device pixels
-                                    // Use actual image dimensions for accurate overlay positioning.
-                                    // This is critical because screenWidth/screenHeight from stream may not match
-                                    // the actual screenshot dimensions (e.g., if derived from app window bounds
-                                    // which exclude status bar, while screenshot includes full screen).
+                                    // Scale factor: drawing context is in frame pixels, bounds may be in:
+                                    // - iOS points (logical pixels, need scaling by screen scale factor)
+                                    // - Android pixels (device pixels, match screenshot directly)
+                                    //
+                                    // We use the root element bounds to calculate the correct scale.
+                                    // The root bounds represent the full screen in the hierarchy's coordinate system,
+                                    // so scaling from root bounds to frame width handles both iOS and Android.
                                     val imageWidth = imageBitmap.width
-                                    val imageHeight = imageBitmap.height
-                                    val deviceToFrameScale = if (imageWidth > 0) size.width / imageWidth.toFloat() else 1f
+                                    val rootBoundsWidth = hierarchy?.bounds?.width ?: imageWidth
+                                    val boundsToFrameScale = if (rootBoundsWidth > 0) size.width / rootBoundsWidth.toFloat() else 1f
 
                                     // Draw element overlays
                                     // Hovered element (gray)
                                     if (hoveredElement != null && hoveredElement.id != selectedElementId) {
                                         val bounds = hoveredElement.bounds
-                                        val scaledLeft = bounds.left * deviceToFrameScale
-                                        val scaledTop = bounds.top * deviceToFrameScale
-                                        val scaledWidth = bounds.width * deviceToFrameScale
-                                        val scaledHeight = bounds.height * deviceToFrameScale
+                                        val scaledLeft = bounds.left * boundsToFrameScale
+                                        val scaledTop = bounds.top * boundsToFrameScale
+                                        val scaledWidth = bounds.width * boundsToFrameScale
+                                        val scaledHeight = bounds.height * boundsToFrameScale
                                         drawRect(
                                             color = Color.Gray.copy(alpha = 0.5f),
                                             topLeft = Offset(scaledLeft, scaledTop),
@@ -314,10 +396,10 @@ fun DeviceScreenView(
                                     // Selected element (blue)
                                     if (selectedElement != null) {
                                         val bounds = selectedElement.bounds
-                                        val scaledLeft = bounds.left * deviceToFrameScale
-                                        val scaledTop = bounds.top * deviceToFrameScale
-                                        val scaledWidth = bounds.width * deviceToFrameScale
-                                        val scaledHeight = bounds.height * deviceToFrameScale
+                                        val scaledLeft = bounds.left * boundsToFrameScale
+                                        val scaledTop = bounds.top * boundsToFrameScale
+                                        val scaledWidth = bounds.width * boundsToFrameScale
+                                        val scaledHeight = bounds.height * boundsToFrameScale
                                         drawRect(
                                             color = Color(0xFF2196F3),
                                             topLeft = Offset(scaledLeft, scaledTop),
@@ -332,14 +414,36 @@ fun DeviceScreenView(
                                         )
                                     }
 
+                                    // Flash element highlight (yellow/gold flash on double-click)
+                                    if (flashElement != null && flashAlpha > 0f) {
+                                        val bounds = flashElement.bounds
+                                        val scaledLeft = bounds.left * boundsToFrameScale
+                                        val scaledTop = bounds.top * boundsToFrameScale
+                                        val scaledWidth = bounds.width * boundsToFrameScale
+                                        val scaledHeight = bounds.height * boundsToFrameScale
+                                        // Draw bright yellow border
+                                        drawRect(
+                                            color = Color(0xFFFFD700).copy(alpha = flashAlpha),
+                                            topLeft = Offset(scaledLeft, scaledTop),
+                                            size = Size(scaledWidth, scaledHeight),
+                                            style = Stroke(width = 4f),
+                                        )
+                                        // Fill with semi-transparent yellow
+                                        drawRect(
+                                            color = Color(0xFFFFD700).copy(alpha = flashAlpha * 0.3f),
+                                            topLeft = Offset(scaledLeft, scaledTop),
+                                            size = Size(scaledWidth, scaledHeight),
+                                        )
+                                    }
+
                                     // Non-compliant tap targets (orange/red)
                                     if (showTapTargetIssues) {
                                         for (element in nonCompliantElements) {
                                             val bounds = element.bounds
-                                            val scaledLeft = bounds.left * deviceToFrameScale
-                                            val scaledTop = bounds.top * deviceToFrameScale
-                                            val scaledWidth = bounds.width * deviceToFrameScale
-                                            val scaledHeight = bounds.height * deviceToFrameScale
+                                            val scaledLeft = bounds.left * boundsToFrameScale
+                                            val scaledTop = bounds.top * boundsToFrameScale
+                                            val scaledWidth = bounds.width * boundsToFrameScale
+                                            val scaledHeight = bounds.height * boundsToFrameScale
 
                                             // Draw orange border
                                             drawRect(
@@ -424,6 +528,8 @@ private fun ZoomControls(
         Text(
             "${(scale * 100).toInt()}%",
             fontSize = 9.sp,
+            maxLines = 1,
+            softWrap = false,
             color = colors.text.normal.copy(alpha = 0.5f),
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 2.dp),
         )
@@ -449,6 +555,7 @@ private fun ZoomButton(label: String, onClick: () -> Unit) {
 /**
  * Toggle for tap target compliance highlighting.
  * Shows the number of non-compliant elements when enabled.
+ * Uses finger emoji when width is too narrow.
  */
 @Composable
 private fun TapTargetComplianceToggle(
@@ -468,12 +575,11 @@ private fun TapTargetComplianceToggle(
         colors.text.normal.copy(alpha = 0.1f)
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.Start,
+    BoxWithConstraints(
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
+        val isCompact = maxWidth < 150.dp
+
         Row(
             modifier = Modifier
                 .background(backgroundColor, RoundedCornerShape(4.dp))
@@ -484,24 +590,36 @@ private fun TapTargetComplianceToggle(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // Warning icon
+            // Checkbox indicator
             Text(
-                text = if (enabled && issueCount > 0) "\u26A0" else "\u2B1A",  // Warning or empty square
+                text = if (enabled) "\u2611" else "\u2610",  // ☑ checked or ☐ unchecked
                 fontSize = 12.sp,
                 color = if (enabled) Color(0xFFFF6B00) else colors.text.normal.copy(alpha = 0.5f),
             )
 
-            Text(
-                text = "Tap Targets",
-                fontSize = 11.sp,
-                color = if (enabled) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
-            )
+            if (isCompact) {
+                // Finger emoji for compact mode
+                Text(
+                    text = "\uD83D\uDC46",  // 👆
+                    fontSize = 12.sp,
+                )
+            } else {
+                Text(
+                    text = "Tap Targets",
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    color = if (enabled) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+                )
+            }
 
             // Show issue count when enabled
             if (enabled) {
                 Text(
-                    text = "($issueCount)",
+                    text = if (isCompact) "$issueCount" else "($issueCount)",
                     fontSize = 11.sp,
+                    maxLines = 1,
+                    softWrap = false,
                     color = if (issueCount > 0) Color(0xFFFF6B00) else colors.text.normal.copy(alpha = 0.5f),
                 )
             }

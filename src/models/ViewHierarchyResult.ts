@@ -37,6 +37,8 @@ export interface ViewHierarchyResult {
   screenWidth?: number;
   /** Screen height from accessibility service (eliminates need for dumpsys) */
   screenHeight?: number;
+  /** iOS screen scale factor (e.g., 2.0 for @2x, 3.0 for @3x retina). Converts points to pixels. */
+  screenScale?: number;
   /** Display rotation: 0=portrait, 1=landscape90, 2=reverse, 3=landscape270 */
   rotation?: number;
   /** System insets (status bar, nav bar, gesture insets) */

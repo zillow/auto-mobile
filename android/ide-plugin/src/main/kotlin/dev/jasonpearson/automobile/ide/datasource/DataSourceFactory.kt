@@ -7,6 +7,7 @@ import dev.jasonpearson.automobile.ide.failures.FailuresDataSource
 import dev.jasonpearson.automobile.ide.failures.FakeFailuresDataSource
 import dev.jasonpearson.automobile.ide.failures.McpFailuresDataSource
 import dev.jasonpearson.automobile.ide.failures.StreamingFailuresDataSource
+import dev.jasonpearson.automobile.ide.storage.StoragePlatform
 
 /**
  * Factory for creating data source implementations based on the current mode.
@@ -67,16 +68,18 @@ object DataSourceFactory {
      * @param clientProvider Optional function to provide an AutoMobileClient for MCP access
      * @param deviceId The device ID to fetch storage data for (required for Real mode)
      * @param packageName The package name of the app to inspect (required for Real mode)
+     * @param platform The storage platform (Android or iOS)
      */
     fun createStorageDataSource(
         mode: DataSourceMode,
         clientProvider: (() -> AutoMobileClient)? = null,
         deviceId: String? = null,
         packageName: String? = null,
+        platform: StoragePlatform = StoragePlatform.Android,
     ): StorageDataSource {
         return when (mode) {
             DataSourceMode.Fake -> FakeStorageDataSource()
-            DataSourceMode.Real -> RealStorageDataSource(clientProvider, deviceId, packageName)
+            DataSourceMode.Real -> RealStorageDataSource(clientProvider, deviceId, packageName, platform)
         }
     }
 
@@ -84,14 +87,16 @@ object DataSourceFactory {
      * Creates a layout data source based on the specified mode.
      * @param mode The data source mode (Fake or Real)
      * @param clientProvider Optional function to provide an AutoMobileClient for MCP access
+     * @param platform The device platform ("android" or "ios")
      */
     fun createLayoutDataSource(
         mode: DataSourceMode,
         clientProvider: (() -> AutoMobileClient)? = null,
+        platform: String = "android",
     ): LayoutDataSource {
         return when (mode) {
             DataSourceMode.Fake -> FakeLayoutDataSource()
-            DataSourceMode.Real -> RealLayoutDataSource(clientProvider)
+            DataSourceMode.Real -> RealLayoutDataSource(clientProvider, platform)
         }
     }
 

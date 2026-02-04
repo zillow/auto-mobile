@@ -6,4 +6,5 @@ class FakeSettingsProvider(
     override var testPlanOutputDirectory: String = "test/resources/test-plans",
     override var fogModeEnabled: Boolean = true,
     override var autoFocusEnabled: Boolean = true,
+    override var failuresDateRange: String = "24h",
 ) : SettingsProvider

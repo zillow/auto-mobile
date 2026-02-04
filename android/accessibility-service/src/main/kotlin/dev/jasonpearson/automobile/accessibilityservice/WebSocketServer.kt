@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -182,6 +183,19 @@ class WebSocketServer(
         ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
         null,
     private val onUnsubscribeStorage:
+        ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
+        null,
+    // Storage write operation callbacks
+    private val onGetPreference:
+        ((requestId: String?, packageName: String, fileName: String, key: String) -> Unit)? =
+        null,
+    private val onSetPreference:
+        ((requestId: String?, packageName: String, fileName: String, key: String, value: String?, type: String) -> Unit)? =
+        null,
+    private val onRemovePreference:
+        ((requestId: String?, packageName: String, fileName: String, key: String) -> Unit)? =
+        null,
+    private val onClearPreferences:
         ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
         null,
 ) {
@@ -718,6 +732,65 @@ class WebSocketServer(
             onUnsubscribeStorage?.invoke(request.requestId, packageName, fileName)
           } else {
             Log.w(TAG, "unsubscribe_storage request missing packageName or fileName")
+          }
+        }
+        "get_preference" -> {
+          Log.d(TAG, "Received get_preference request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          val key = try {
+            // Key might be in extras or a field - try to extract from JSON
+            val keyField = json.parseToJsonElement(message).jsonObject["key"]?.toString()?.trim('"')
+            keyField
+          } catch (e: Exception) { null }
+          if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank() && !key.isNullOrBlank()) {
+            onGetPreference?.invoke(request.requestId, packageName, fileName, key)
+          } else {
+            Log.w(TAG, "get_preference request missing packageName, fileName, or key")
+          }
+        }
+        "set_preference" -> {
+          Log.d(TAG, "Received set_preference request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          try {
+            val jsonObj = json.parseToJsonElement(message).jsonObject
+            val key = jsonObj["key"]?.toString()?.trim('"')
+            val value = jsonObj["value"]?.let {
+              if (it.toString() == "null") null else it.toString().trim('"')
+            }
+            val valueType = jsonObj["valueType"]?.toString()?.trim('"')
+            if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank() && !key.isNullOrBlank() && !valueType.isNullOrBlank()) {
+              onSetPreference?.invoke(request.requestId, packageName, fileName, key, value, valueType)
+            } else {
+              Log.w(TAG, "set_preference request missing required fields")
+            }
+          } catch (e: Exception) {
+            Log.w(TAG, "set_preference request failed to parse: ${e.message}")
+          }
+        }
+        "remove_preference" -> {
+          Log.d(TAG, "Received remove_preference request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          val key = try {
+            val keyField = json.parseToJsonElement(message).jsonObject["key"]?.toString()?.trim('"')
+            keyField
+          } catch (e: Exception) { null }
+          if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank() && !key.isNullOrBlank()) {
+            onRemovePreference?.invoke(request.requestId, packageName, fileName, key)
+          } else {
+            Log.w(TAG, "remove_preference request missing packageName, fileName, or key")
+          }
+        }
+        "clear_preferences" -> {
+          Log.d(TAG, "Received clear_preferences request (requestId: ${request.requestId})")
+          val packageName = request.packageName
+          val fileName = request.fileName
+          if (!packageName.isNullOrBlank() && !fileName.isNullOrBlank()) {
+            onClearPreferences?.invoke(request.requestId, packageName, fileName)
+          } else {
+            Log.w(TAG, "clear_preferences request missing packageName or fileName")
           }
         }
         else -> {

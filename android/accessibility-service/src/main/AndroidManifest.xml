@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+  <!-- Package visibility for Android 11+ to access ContentProviders in other apps -->
+  <!-- This permission allows the accessibility service to query any installed package -->
+  <!-- Required for storage inspection to work with any app that has the AutoMobile SDK -->
+  <!-- Note: This is appropriate for a debugging/development tool like AutoMobile -->
+  <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
   <!-- Permissions required for accessibility service -->
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />

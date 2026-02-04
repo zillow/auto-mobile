@@ -46,6 +46,7 @@ import {
   computeChecksum,
 } from "../ScreenshotBackoffScheduler";
 import { getFailureRecorder } from "../../failures/FailureRecorder";
+import { getPerformanceMonitor } from "../../performance/PerformanceMonitor";
 import type { StackTraceElement } from "../../../server/failuresResources";
 import type {
   PreferenceFile,
@@ -1034,8 +1035,16 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   // ===========================================================================
 
   private async setupPortForwarding(perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<void> {
+    // Verify port forwarding is still active even if we think it's set up
+    // Port forwarding can be lost if ADB server restarts or emulator restarts
     if (this.portForwardingSetup) {
-      return;
+      const isActive = await this.isPortForwardingActive();
+      if (isActive) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Port forwarding already active (localhost:${this.localPort})`);
+        return;
+      }
+      logger.info(`[ACCESSIBILITY_SERVICE] Port forwarding was lost, re-establishing...`);
+      this.portForwardingSetup = false;
     }
 
     try {
@@ -1054,6 +1063,26 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
       throw error;
+    }
+  }
+
+  /**
+   * Check if port forwarding is still active by querying adb forward --list
+   */
+  private async isPortForwardingActive(): Promise<boolean> {
+    try {
+      const result = await this.adb.executeCommand("forward --list");
+      const expectedForward = `tcp:${this.localPort} tcp:${PortManager.DEVICE_PORT}`;
+      // Check if our port forward entry exists in the list
+      // Format is: "serial tcp:localPort tcp:remotePort" per line
+      const isActive = result.stdout.includes(expectedForward);
+      if (!isActive) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Port forwarding not found in active forwards. Expected: ${expectedForward}`);
+      }
+      return isActive;
+    } catch (error) {
+      logger.debug(`[ACCESSIBILITY_SERVICE] Failed to check port forwarding status: ${error}`);
+      return false;
     }
   }
 
@@ -1267,7 +1296,8 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       }
 
       // Handle storage result messages
-      if (message.type === "list_preference_files_result" && message.requestId) {
+      // Note: Android sends "preference_files" but we register with "list_preference_files"
+      if (message.type === "preference_files" && message.requestId) {
         const storageMessage = message as any;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, files: storageMessage.files || [],
@@ -1275,7 +1305,8 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         });
       }
 
-      if (message.type === "get_preferences_result" && message.requestId) {
+      // Note: Android sends "preferences" but we register with "get_preferences"
+      if (message.type === "preferences" && message.requestId) {
         const storageMessage = message as any;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, entries: storageMessage.entries || [],
@@ -1292,6 +1323,41 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       }
 
       if (message.type === "unsubscribe_storage_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "get_preference_result" && message.requestId) {
+        const storageMessage = message as any;
+        // Build entry from key/value/type fields (Android sends flat structure, not nested entry)
+        const entry = storageMessage.found && storageMessage.key ? {
+          key: storageMessage.key,
+          value: storageMessage.value,
+          type: storageMessage.type
+        } : undefined;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, found: storageMessage.found ?? false,
+          entry, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "set_preference_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "remove_preference_result" && message.requestId) {
+        const storageMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
+        });
+      }
+
+      if (message.type === "clear_preferences_result" && message.requestId) {
         const storageMessage = message as any;
         this.requestManager.resolve(message.requestId, {
           success: storageMessage.success ?? false, totalTimeMs: storageMessage.totalTimeMs ?? 0, error: storageMessage.error
@@ -1413,9 +1479,12 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     // Start screenshot backoff
     this.startScreenshotBackoff();
 
-    // Track foreground package for context
+    // Track foreground package for context and start performance monitoring
     if (data.packageName && data.packageName !== this.lastForegroundPackage) {
       this.lastForegroundPackage = data.packageName;
+      // Start performance monitoring for this device/package
+      const monitor = getPerformanceMonitor();
+      monitor.startMonitoring(this.device.deviceId, data.packageName);
     }
 
     // Notify hierarchy navigation detector

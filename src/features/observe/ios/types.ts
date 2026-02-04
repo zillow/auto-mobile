@@ -54,6 +54,12 @@ export interface XCTestHierarchy {
   packageName: string;
   hierarchy: XCTestNode;
   windows?: ViewHierarchyWindowInfo[];
+  /** iOS screen scale factor (e.g., 2.0 for @2x, 3.0 for @3x retina) */
+  screenScale?: number;
+  /** Screen width in iOS points (logical pixels) */
+  screenWidth?: number;
+  /** Screen height in iOS points (logical pixels) */
+  screenHeight?: number;
   error?: string;
 }
 
@@ -67,6 +73,22 @@ export interface XCTestPerfTiming {
 }
 
 /**
+ * Interface for iOS performance snapshot from CADisplayLink FPS monitoring
+ */
+export interface XCTestPerformanceSnapshot {
+  timestamp: number;
+  fps?: number;
+  frameTimeMs?: number;
+  jankFrames?: number;
+  touchLatencyMs?: number;
+  ttffMs?: number;
+  ttiMs?: number;
+  cpuUsagePercent?: number;
+  memoryUsageMb?: number;
+  screenName?: string;
+}
+
+/**
  * Interface for WebSocket message from XCTestService
  */
 export interface WebSocketMessage {
@@ -74,6 +96,7 @@ export interface WebSocketMessage {
   timestamp?: number;
   requestId?: string;
   data?: XCTestHierarchy;
+  performanceData?: XCTestPerformanceSnapshot;
   format?: string;
   success?: boolean;
   totalTimeMs?: number;

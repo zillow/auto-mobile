@@ -186,6 +186,75 @@ class SharedPreferencesDriverImpl(
     }
   }
 
+  override fun getPreference(fileName: String, key: String): KeyValuePair? {
+    // Verify the file exists
+    val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
+    val prefFile = File(sharedPrefsDir, "$fileName.xml")
+
+    if (!fileSystemOperations.exists(prefFile)) {
+      throw SharedPreferencesError.FileNotFound(fileName)
+    }
+
+    val prefs = context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
+    val value = prefs.all[key] ?: return null
+    return KeyValuePair(key = key, value = value, type = detectType(value))
+  }
+
+  override fun setValue(fileName: String, key: String, value: Any?, type: KeyValueType) {
+    // Verify the file exists
+    val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
+    val prefFile = File(sharedPrefsDir, "$fileName.xml")
+
+    if (!fileSystemOperations.exists(prefFile)) {
+      throw SharedPreferencesError.FileNotFound(fileName)
+    }
+
+    val prefs = context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
+    val editor = prefs.edit()
+
+    when (type) {
+      KeyValueType.STRING -> editor.putString(key, value as? String)
+      KeyValueType.INT -> editor.putInt(key, (value as Number).toInt())
+      KeyValueType.LONG -> editor.putLong(key, (value as Number).toLong())
+      KeyValueType.FLOAT -> editor.putFloat(key, (value as Number).toFloat())
+      KeyValueType.BOOLEAN -> editor.putBoolean(key, value as Boolean)
+      KeyValueType.STRING_SET -> {
+        @Suppress("UNCHECKED_CAST")
+        val set = value as? Set<String> ?: throw SharedPreferencesError.InvalidType(type.name, "value is not a Set<String>")
+        editor.putStringSet(key, set)
+      }
+      KeyValueType.UNKNOWN -> throw SharedPreferencesError.InvalidType(type.name, "cannot set value with UNKNOWN type")
+    }
+
+    editor.apply()
+  }
+
+  override fun removeValue(fileName: String, key: String) {
+    // Verify the file exists
+    val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
+    val prefFile = File(sharedPrefsDir, "$fileName.xml")
+
+    if (!fileSystemOperations.exists(prefFile)) {
+      throw SharedPreferencesError.FileNotFound(fileName)
+    }
+
+    val prefs = context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
+    prefs.edit().remove(key).apply()
+  }
+
+  override fun clear(fileName: String) {
+    // Verify the file exists
+    val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
+    val prefFile = File(sharedPrefsDir, "$fileName.xml")
+
+    if (!fileSystemOperations.exists(prefFile)) {
+      throw SharedPreferencesError.FileNotFound(fileName)
+    }
+
+    val prefs = context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
+    prefs.edit().clear().apply()
+  }
+
   private fun detectType(value: Any?): KeyValueType {
     return when (value) {
       null -> KeyValueType.UNKNOWN

@@ -152,6 +152,7 @@ class LayoutInspectorState {
      * Update hierarchy data.
      * Called when receiving hierarchy updates from device.
      * Detects changed elements and tracks them for visual feedback.
+     * Clears selection if the selected element is no longer in the hierarchy.
      */
     fun updateHierarchy(newHierarchy: UIElementInfo) {
         // Detect changed elements by comparing with the previous hierarchy
@@ -164,6 +165,15 @@ class LayoutInspectorState {
 
         // Always update - Compose will efficiently diff the actual UI changes.
         hierarchy = newHierarchy
+
+        // Clear selection if the selected element no longer exists in the new hierarchy
+        val currentSelectedId = selectedElementId
+        if (currentSelectedId != null) {
+            val newElementsById = flattenToMap(newHierarchy)
+            if (!newElementsById.containsKey(currentSelectedId)) {
+                selectedElementId = null
+            }
+        }
     }
 
     /**

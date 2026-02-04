@@ -180,6 +180,39 @@ class FakeSharedPreferencesDriver : SharedPreferencesDriver {
     listeners.remove(listener)
   }
 
+  override fun getPreference(fileName: String, key: String): KeyValuePair? {
+    val data = preferenceFiles[fileName] ?: throw SharedPreferencesError.FileNotFound(fileName)
+    val value = data[key] ?: return null
+    return KeyValuePair(key = key, value = value, type = detectType(value))
+  }
+
+  override fun setValue(fileName: String, key: String, value: Any?, type: KeyValueType) {
+    val data = preferenceFiles[fileName] ?: throw SharedPreferencesError.FileNotFound(fileName)
+    data[key] = value
+    if (isListening(fileName)) {
+      queueChange(fileName, key, value)
+    }
+    notifyListeners(fileName, key)
+  }
+
+  override fun removeValue(fileName: String, key: String) {
+    val data = preferenceFiles[fileName] ?: throw SharedPreferencesError.FileNotFound(fileName)
+    data.remove(key)
+    if (isListening(fileName)) {
+      queueChange(fileName, key, null)
+    }
+    notifyListeners(fileName, key)
+  }
+
+  override fun clear(fileName: String) {
+    val data = preferenceFiles[fileName] ?: throw SharedPreferencesError.FileNotFound(fileName)
+    data.clear()
+    if (isListening(fileName)) {
+      queueChange(fileName, null, null)
+    }
+    notifyListeners(fileName, null)
+  }
+
   private fun detectType(value: Any?): KeyValueType {
     return when (value) {
       null -> KeyValueType.UNKNOWN

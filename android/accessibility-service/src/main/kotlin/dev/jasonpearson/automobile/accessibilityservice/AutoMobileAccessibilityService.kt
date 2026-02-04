@@ -746,6 +746,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onUnsubscribeStorage = { requestId, packageName, fileName ->
                 handleUnsubscribeStorage(requestId, packageName, fileName)
               },
+              onGetPreference = { requestId, packageName, fileName, key ->
+                handleGetPreference(requestId, packageName, fileName, key)
+              },
+              onSetPreference = { requestId, packageName, fileName, key, value, type ->
+                handleSetPreference(requestId, packageName, fileName, key, value, type)
+              },
+              onRemovePreference = { requestId, packageName, fileName, key ->
+                handleRemovePreference(requestId, packageName, fileName, key)
+              },
+              onClearPreferences = { requestId, packageName, fileName ->
+                handleClearPreferences(requestId, packageName, fileName)
+              },
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -4184,13 +4196,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   // ================= Storage Inspection Methods =================
 
   private fun handleListPreferenceFiles(requestId: String?, packageName: String) {
+    Log.d(TAG, "handleListPreferenceFiles: requestId=$requestId, packageName=$packageName")
     serviceScope.launch {
+      Log.d(TAG, "handleListPreferenceFiles: coroutine started, calling listPreferenceFiles")
       val result = storageSubscriptionManager.listPreferenceFiles(packageName)
+      Log.d(TAG, "handleListPreferenceFiles: result=$result")
       result.fold(
           onSuccess = { files ->
+            Log.d(TAG, "handleListPreferenceFiles: success, files count=${files.size}")
             broadcastPreferenceFilesResult(requestId, packageName, files, null)
           },
           onFailure = { error ->
+            Log.e(TAG, "handleListPreferenceFiles: failure, error=${error.message}", error)
             broadcastPreferenceFilesResult(requestId, packageName, null, error.message)
           },
       )
@@ -4235,6 +4252,83 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     serviceScope.launch {
       val success = storageSubscriptionManager.unsubscribe(packageName, fileName)
       broadcastUnsubscribeStorageResult(requestId, packageName, fileName, success)
+    }
+  }
+
+  private fun handleGetPreference(
+    requestId: String?,
+    packageName: String,
+    fileName: String,
+    key: String,
+  ) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.getPreference(packageName, fileName, key)
+      result.fold(
+        onSuccess = { entry ->
+          broadcastGetPreferenceResult(requestId, packageName, fileName, key, entry, null)
+        },
+        onFailure = { error ->
+          broadcastGetPreferenceResult(requestId, packageName, fileName, key, null, error.message)
+        },
+      )
+    }
+  }
+
+  private fun handleSetPreference(
+    requestId: String?,
+    packageName: String,
+    fileName: String,
+    key: String,
+    value: String?,
+    type: String,
+  ) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.setPreference(packageName, fileName, key, value, type)
+      result.fold(
+        onSuccess = {
+          broadcastSetPreferenceResult(requestId, packageName, fileName, key, null)
+        },
+        onFailure = { error ->
+          broadcastSetPreferenceResult(requestId, packageName, fileName, key, error.message)
+        },
+      )
+    }
+  }
+
+  private fun handleRemovePreference(
+    requestId: String?,
+    packageName: String,
+    fileName: String,
+    key: String,
+  ) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.removePreference(packageName, fileName, key)
+      result.fold(
+        onSuccess = {
+          broadcastRemovePreferenceResult(requestId, packageName, fileName, key, null)
+        },
+        onFailure = { error ->
+          broadcastRemovePreferenceResult(requestId, packageName, fileName, key, error.message)
+        },
+      )
+    }
+  }
+
+  private fun handleClearPreferences(
+    requestId: String?,
+    packageName: String,
+    fileName: String,
+  ) {
+    serviceScope.launch {
+      val result = storageSubscriptionManager.clearPreferences(packageName, fileName)
+      result.fold(
+        onSuccess = {
+          broadcastClearPreferencesResult(requestId, packageName, fileName, null)
+        },
+        onFailure = { error ->
+          broadcastClearPreferencesResult(requestId, packageName, fileName, error.message)
+        },
+      )
     }
   }
 
@@ -4364,6 +4458,154 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Broadcasted unsubscribe storage result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting unsubscribe storage result", e)
+    }
+  }
+
+  private suspend fun broadcastGetPreferenceResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      key: String,
+      entry: dev.jasonpearson.automobile.accessibilityservice.storage.PreferenceEntry?,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping get preference broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"get_preference_result","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        append(""","key":${jsonCompact.encodeToString(key)}""")
+        if (error != null) {
+          append(""","success":false,"found":false,"error":${jsonCompact.encodeToString(error)}""")
+        } else if (entry != null) {
+          append(""","success":true,"found":true""")
+          if (entry.value != null) {
+            val jsonValue = if (entry.type == "STRING") jsonCompact.encodeToString(entry.value) else entry.value
+            append(""","value":$jsonValue""")
+          } else {
+            append(""","value":null""")
+          }
+          append(""","type":${jsonCompact.encodeToString(entry.type)}""")
+        } else {
+          append(""","success":true,"found":false""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted get preference result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting get preference result", e)
+    }
+  }
+
+  private suspend fun broadcastSetPreferenceResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      key: String,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping set preference broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"set_preference_result","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        append(""","key":${jsonCompact.encodeToString(key)}""")
+        if (error != null) {
+          append(""","success":false,"error":${jsonCompact.encodeToString(error)}""")
+        } else {
+          append(""","success":true""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted set preference result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting set preference result", e)
+    }
+  }
+
+  private suspend fun broadcastRemovePreferenceResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      key: String,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping remove preference broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"remove_preference_result","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        append(""","key":${jsonCompact.encodeToString(key)}""")
+        if (error != null) {
+          append(""","success":false,"error":${jsonCompact.encodeToString(error)}""")
+        } else {
+          append(""","success":true""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted remove preference result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting remove preference result", e)
+    }
+  }
+
+  private suspend fun broadcastClearPreferencesResult(
+      requestId: String?,
+      packageName: String,
+      fileName: String,
+      error: String?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping clear preferences broadcast")
+      return
+    }
+
+    try {
+      val message = buildString {
+        append("""{"type":"clear_preferences_result","timestamp":${System.currentTimeMillis()}""")
+        if (requestId != null) {
+          append(""","requestId":"$requestId"""")
+        }
+        append(""","packageName":${jsonCompact.encodeToString(packageName)}""")
+        append(""","fileName":${jsonCompact.encodeToString(fileName)}""")
+        if (error != null) {
+          append(""","success":false,"error":${jsonCompact.encodeToString(error)}""")
+        } else {
+          append(""","success":true""")
+        }
+        append("}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted clear preferences result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting clear preferences result", e)
     }
   }
 

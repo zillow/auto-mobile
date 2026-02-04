@@ -35,19 +35,26 @@ export class DisplayedTimeMetricsCollector {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<DisplayedTimeMetric[]> {
     if (this.device.platform !== "android") {
+      logger.info(`[DisplayedTimeMetrics] Skipping - not Android platform`);
       return [];
     }
 
     const logcatTag = await this.getPreferredLogcatTag();
+    logger.info(`[DisplayedTimeMetrics] Using logcat tag: ${logcatTag}`);
+    const cmd = this.buildLogcatCommand(logcatTag);
+    logger.info(`[DisplayedTimeMetrics] Logcat command: ${cmd}`);
     try {
       const { stdout } = await perf.track("adbLogcatDisplayed", () =>
         this.adb.executeCommand(
-          this.buildLogcatCommand(logcatTag),
+          cmd,
           5000,
           1024 * 1024
         )
       );
-      return this.parseDisplayedMetrics(stdout, options);
+      logger.info(`[DisplayedTimeMetrics] Logcat output length: ${stdout.length} chars`);
+      const metrics = this.parseDisplayedMetrics(stdout, options);
+      logger.info(`[DisplayedTimeMetrics] Parsed ${metrics.length} metrics for package ${options.packageName} (window: ${options.startTimestampMs} - ${options.endTimestampMs})`);
+      return metrics;
     } catch (error) {
       logger.warn(`[DisplayedTimeMetrics] Failed to read logcat: ${error}`);
       return [];
@@ -81,6 +88,13 @@ export class DisplayedTimeMetricsCollector {
     const metrics: DisplayedTimeMetric[] = [];
     const lines = output.split("\n");
 
+    // Find all "Displayed" lines for debugging
+    const displayedLines = lines.filter(l => l.includes("Displayed"));
+    logger.info(`[DisplayedTimeMetrics] Found ${displayedLines.length} 'Displayed' lines in logcat`);
+    if (displayedLines.length > 0) {
+      logger.info(`[DisplayedTimeMetrics] Last few Displayed lines: ${displayedLines.slice(-3).join(" | ")}`);
+    }
+
     for (const line of lines) {
       const parsedLine = this.parseLogcatLine(line);
       if (!parsedLine) {
@@ -90,6 +104,10 @@ export class DisplayedTimeMetricsCollector {
       const { timestampMs, logcatTag, message } = parsedLine;
 
       if (timestampMs < options.startTimestampMs || timestampMs > options.endTimestampMs) {
+        // Log if we're filtering out a Displayed line due to timestamp
+        if (message.includes("Displayed") && message.includes(options.packageName)) {
+          logger.info(`[DisplayedTimeMetrics] Filtered by timestamp: logcatTs=${timestampMs}, window=[${options.startTimestampMs}, ${options.endTimestampMs}]`);
+        }
         continue;
       }
 
@@ -108,6 +126,7 @@ export class DisplayedTimeMetricsCollector {
         continue;
       }
 
+      logger.info(`[DisplayedTimeMetrics] Found metric: ${componentInfo.componentName} = ${displayedTimeMs}ms`);
       metrics.push({
         packageName: componentInfo.packageName,
         activityName: componentInfo.activityName,
@@ -124,7 +143,8 @@ export class DisplayedTimeMetricsCollector {
   private parseLogcatLine(
     line: string
   ): { timestampMs: number; logcatTag: DisplayedLogcatTag; message: string } | null {
-    const match = line.match(/^(\d+\.\d+)\s+\d+\s+\d+\s+[VDIWEF]\s+(\w+):\s+(.*)$/);
+    // Allow leading whitespace - logcat epoch format often has spaces before timestamp
+    const match = line.match(/^\s*(\d+\.\d+)\s+\d+\s+\d+\s+[VDIWEF]\s+(\w+):\s+(.*)$/);
     if (!match) {
       return null;
     }

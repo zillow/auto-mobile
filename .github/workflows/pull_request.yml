@@ -707,6 +707,19 @@ jobs:
         with:
           xcode-version: ${{ matrix.config.xcode }}
 
+      - name: "Install iOS Simulator Runtime"
+        run: |
+          # Check if iOS Simulator runtime is available by looking for simulator devices
+          if xcrun simctl list runtimes 2>/dev/null | grep -q "iOS"; then
+            echo "iOS Simulator runtime already installed"
+            xcrun simctl list runtimes | grep iOS | head -3
+          else
+            echo "Downloading iOS platform (this may take a few minutes)..."
+            xcodebuild -downloadPlatform iOS
+            echo "Verifying installation..."
+            xcrun simctl list runtimes | grep iOS || echo "Warning: iOS runtime not found after download"
+          fi
+
       - name: "Install XcodeGen"
         run: brew install xcodegen
 

@@ -106,6 +106,11 @@ public class ElementLocator: ElementLocating {
             foregroundApp = app
             foregroundBundleId = bundleId
             elementCache.removeAll()
+
+            // Track this bundle ID for future detection
+            if bundleId != "com.apple.springboard" {
+                observedBundleIds.insert(bundleId)
+            }
         }
 
         /// Detect and switch to the foreground application if current app is not in foreground
@@ -125,7 +130,6 @@ public class ElementLocator: ElementLocating {
                     }
                 }
 
-            let isSpringboardInForeground = stateInfo.springboardState == 4 // .runningForeground
             let isCurrentAppInForeground = stateInfo.currentAppState == 4 // .runningForeground
             let isCurrentAppSpringboard = stateInfo.currentBundleId == "com.apple.springboard"
 
@@ -142,6 +146,7 @@ public class ElementLocator: ElementLocating {
             // Try to find the foreground app by checking springboard
             if let detectedBundleId = perfProvider.track("detectForeground", block: { detectForegroundAppBundleId() }) {
                 if detectedBundleId != foregroundBundleId {
+                    print("[ElementLocator] Switching to foreground app: \(detectedBundleId)")
                     // Release old app before creating new one
                     foregroundApp = nil
                     foregroundBundleId = nil
@@ -150,13 +155,12 @@ public class ElementLocator: ElementLocating {
                     // Create new app instance for the detected bundle
                     foregroundApp = XCUIApplication(bundleIdentifier: detectedBundleId)
                     foregroundBundleId = detectedBundleId
+
+                    // Track this bundle ID for future detection
+                    observedBundleIds.insert(detectedBundleId)
                 }
-            } else if isSpringboardInForeground {
-                // Only clear foreground app if we couldn't detect any app AND springboard reports as foreground
-                foregroundApp = nil
-                foregroundBundleId = nil
-                elementCache.removeAll()
             }
+            // If detection fails, keep using current app instead of falling back to springboard
         }
 
         /// Get the current application to observe
@@ -215,7 +219,12 @@ public class ElementLocator: ElementLocating {
             "com.apple.clock", // Clock
             "com.apple.findmy", // Find My
             "com.apple.Passbook", // Wallet
+            "dev.jasonpearson.automobile.Playground", // AutoMobile Playground app
         ]
+
+        /// Bundle IDs that have been observed during this session
+        /// Used to check for foreground app without requiring hardcoded list
+        private var observedBundleIds: Set<String> = []
 
         /// Detect the bundle ID of the foreground app
         /// Returns nil if detection fails or springboard is in front
@@ -243,6 +252,7 @@ public class ElementLocator: ElementLocating {
                             return testApp.state.rawValue
                         }
                         if stateRawValue == 4 { // .runningForeground
+                            print("[ElementLocator] Found foreground app from springboard: \(bundleId)")
                             return bundleId
                         }
                     }
@@ -253,6 +263,28 @@ public class ElementLocator: ElementLocating {
                 }
             }
 
+            // Fallback: Check observed bundle IDs first (apps we've seen before)
+            let observedResult: String? = perfProvider.track("checkObserved") {
+                for bundleId in observedBundleIds {
+                    // Skip current app (we already know it's not in foreground)
+                    if bundleId == foregroundBundleId {
+                        continue
+                    }
+
+                    let stateRawValue: UInt = runOnMainThread {
+                        let testApp = XCUIApplication(bundleIdentifier: bundleId)
+                        return testApp.state.rawValue
+                    }
+                    if stateRawValue == 4 { // .runningForeground
+                        return bundleId
+                    }
+                }
+                return nil
+            }
+            if let found = observedResult {
+                return found
+            }
+
             // Fallback: Check common system apps directly
             // This is necessary because when another app is in foreground,
             // springboard's element tree may not contain that app's bundle ID
@@ -260,6 +292,10 @@ public class ElementLocator: ElementLocating {
                 for bundleId in Self.commonSystemApps {
                     // Skip current app (we already know it's not in foreground)
                     if bundleId == foregroundBundleId {
+                        continue
+                    }
+                    // Skip already checked in observedBundleIds
+                    if observedBundleIds.contains(bundleId) {
                         continue
                     }
 
@@ -276,28 +312,45 @@ public class ElementLocator: ElementLocating {
         }
 
         /// Collect all potential bundle IDs from springboard element tree
-        private func collectBundleIdsFromElement(_ element: XCUIElementSnapshot, into bundleIds: inout [String]) {
+        private func collectBundleIdsFromElement(_ element: XCUIElementSnapshot, into bundleIds: inout [String], depth: Int = 0) {
             let identifier = element.identifier
 
             // Many springboard elements have identifiers like "com.apple.AppName-window"
             // or just the bundle ID directly
-            if identifier.contains(".") && !identifier.contains(" ") {
-                // Looks like a bundle ID pattern
-                let cleanId = identifier.replacingOccurrences(of: "-window", with: "")
+            // Also handle formats like "@card:dev.jasonpearson.automobile.Playground:sceneID:..."
+            if !identifier.isEmpty {
+                var cleanId = identifier
+
+                // Handle @card: prefix format (e.g., "@card:dev.jasonpearson.automobile.Playground:sceneID:...")
+                if identifier.hasPrefix("@card:") {
+                    cleanId = String(identifier.dropFirst(6)) // Remove "@card:"
+                    // Take just the bundle ID part (before :sceneID: or similar)
+                    if let colonIndex = cleanId.firstIndex(of: ":") {
+                        cleanId = String(cleanId[..<colonIndex])
+                    }
+                }
+
+                // Clean up common suffixes
+                cleanId = cleanId.replacingOccurrences(of: "-window", with: "")
                     .replacingOccurrences(of: "-sceneID", with: "")
                     .replacingOccurrences(of: "-SceneWindow", with: "")
-                if cleanId.hasPrefix("com.") || cleanId.hasPrefix("io.") || cleanId.hasPrefix("org.") ||
-                    cleanId.hasPrefix("net.") || cleanId.hasPrefix("me.")
-                {
-                    if !bundleIds.contains(cleanId) {
-                        bundleIds.append(cleanId)
+
+                // Check if it looks like a bundle ID
+                if cleanId.contains(".") && !cleanId.contains(" ") {
+                    // Accept more bundle ID prefixes (including dev.)
+                    if cleanId.hasPrefix("com.") || cleanId.hasPrefix("io.") || cleanId.hasPrefix("org.") ||
+                        cleanId.hasPrefix("net.") || cleanId.hasPrefix("me.") || cleanId.hasPrefix("dev.")
+                    {
+                        if !bundleIds.contains(cleanId) {
+                            bundleIds.append(cleanId)
+                        }
                     }
                 }
             }
 
             // Recursively check children
             for child in element.children {
-                collectBundleIdsFromElement(child, into: &bundleIds)
+                collectBundleIdsFromElement(child, into: &bundleIds, depth: depth + 1)
             }
         }
 
@@ -397,11 +450,23 @@ public class ElementLocator: ElementLocating {
                 finalHierarchy = rootElement
             }
 
+            // Get screen scale and dimensions for coordinate conversion
+            // iOS reports bounds in points, but screenshots are in pixels
+            // screenScale converts: pixels = points * screenScale
+            let (screenScale, screenWidth, screenHeight): (Float, Int, Int) = runOnMainThread {
+                let scale = Float(UIScreen.main.scale)
+                let bounds = UIScreen.main.bounds
+                return (scale, Int(bounds.width), Int(bounds.height))
+            }
+
             return ViewHierarchy(
                 packageName: bundleId,
                 hierarchy: finalHierarchy,
                 windowInfo: windowInfo,
-                windows: [windowInfo]
+                windows: [windowInfo],
+                screenScale: screenScale,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight
             )
         }
 

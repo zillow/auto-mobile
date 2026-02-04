@@ -102,3 +102,41 @@ export interface UnsubscribeStorageResult {
   totalTimeMs: number;
   error?: string;
 }
+
+/**
+ * Result of a get_preference request.
+ */
+export interface GetPreferenceResult {
+  success: boolean;
+  found: boolean;
+  entry?: KeyValueEntry;
+  totalTimeMs: number;
+  error?: string;
+}
+
+/**
+ * Result of a set_preference request.
+ */
+export interface SetPreferenceResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+}
+
+/**
+ * Result of a remove_preference request.
+ */
+export interface RemovePreferenceResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+}
+
+/**
+ * Result of a clear_preferences request.
+ */
+export interface ClearPreferencesResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+}

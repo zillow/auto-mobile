@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, androidx.compose.ui.ExperimentalComposeUiApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package dev.jasonpearson.automobile.ide
 
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,11 +64,18 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
+import dev.jasonpearson.automobile.ide.diagnostics.DiagnosticsDashboard
 import dev.jasonpearson.automobile.ide.datasource.InstalledApp
 import dev.jasonpearson.automobile.ide.datasource.Result
+import dev.jasonpearson.automobile.ide.failures.DataSourceResult
 import dev.jasonpearson.automobile.ide.failures.FailureNotification
 import dev.jasonpearson.automobile.ide.failures.FailuresDashboard
+import dev.jasonpearson.automobile.ide.failures.FailureSeverity
+import dev.jasonpearson.automobile.ide.failures.FailureType
+import dev.jasonpearson.automobile.ide.failures.FakeFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.McpFailuresDataSource
 import dev.jasonpearson.automobile.ide.failures.StreamingFailuresDataSource
+import dev.jasonpearson.automobile.ide.failures.TimeAggregation
 import dev.jasonpearson.automobile.ide.mcp.McpProcess
 import dev.jasonpearson.automobile.ide.mcp.McpConnectionType
 import dev.jasonpearson.automobile.ide.mcp.FakeMcpProcessDetector
@@ -77,20 +87,44 @@ import dev.jasonpearson.automobile.ide.daemon.McpHttpClient
 import dev.jasonpearson.automobile.ide.daemon.McpDaemonClient
 import dev.jasonpearson.automobile.ide.daemon.DaemonSocketPaths
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
+import dev.jasonpearson.automobile.ide.daemon.FailuresPushSocketClient
+import dev.jasonpearson.automobile.ide.failures.FailuresVerticalPanel
+import dev.jasonpearson.automobile.ide.failures.DateRange
 import dev.jasonpearson.automobile.ide.layout.LayoutInspectorDashboard
+import dev.jasonpearson.automobile.ide.performance.PerformanceVerticalPanel
+import dev.jasonpearson.automobile.ide.settings.AutoMobileSettings
+import dev.jasonpearson.automobile.ide.tabs.HorizontalTab
+import dev.jasonpearson.automobile.ide.tabs.HorizontalTabBar
 import dev.jasonpearson.automobile.ide.navigation.NavigationDashboard
 import dev.jasonpearson.automobile.ide.performance.PerformanceDashboard
 import dev.jasonpearson.automobile.ide.storage.StorageDashboard
+import dev.jasonpearson.automobile.ide.storage.StoragePlatform
 import dev.jasonpearson.automobile.ide.test.TestDashboard
 
 private val LOG = Logger.getInstance("AutoMobileToolWindow")
 
-private fun showNotification(title: String, content: String, type: NotificationType = NotificationType.INFORMATION) {
+private fun showNotification(
+    title: String,
+    content: String,
+    type: NotificationType = NotificationType.INFORMATION,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     try {
-        NotificationGroupManager.getInstance()
+        val notification = NotificationGroupManager.getInstance()
             .getNotificationGroup("AutoMobile")
             .createNotification(title, content, type)
-            .notify(null)
+
+        if (actionText != null && onAction != null) {
+            notification.addAction(object : com.intellij.notification.NotificationAction(actionText) {
+                override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent, notification: com.intellij.notification.Notification) {
+                    onAction()
+                    notification.expire()
+                }
+            })
+        }
+
+        notification.notify(null)
     } catch (e: Exception) {
         LOG.error("Failed to show notification: $title - $content", e)
     }
@@ -167,10 +201,51 @@ private fun selectDefaultApp(apps: List<InstalledApp>, deviceType: DeviceType?):
 @Composable
 fun AutoMobileToolWindowContent() {
   var selectedIndex by remember { mutableIntStateOf(0) }
-  var isLive by remember { mutableStateOf(true) }
   val dashboardOrder = remember { mutableStateListOf(*Dashboard.entries.toTypedArray()) }
   var draggedIndex by remember { mutableStateOf<Int?>(null) }
   var dropTargetIndex by remember { mutableStateOf<Int?>(null) }
+
+  // New layout state - vertical panels (Failures, Performance) on right side
+  var isFailuresPanelCollapsed by remember { mutableStateOf(true) }
+  var isPerformancePanelCollapsed by remember { mutableStateOf(true) }
+  var failuresPanelWidthPx by remember { mutableFloatStateOf(450f) }  // 300 * 1.5
+  var performancePanelWidthPx by remember { mutableFloatStateOf(450f) }  // 300 * 1.5
+
+  // Horizontal tabs at bottom (Navigation, Test Runs, Storage, Diagnostics)
+  val horizontalTabs = remember {
+      listOf(
+          HorizontalTab("navigation", "Navigation", "🧭"),
+          HorizontalTab("test_runs", "Test Runs", "🧪"),
+          HorizontalTab("storage", "Storage", "💾"),
+          HorizontalTab("diagnostics", "Diagnostics", "🩺"),
+      )
+  }
+  var selectedHorizontalTabId by remember { mutableStateOf<String?>(null) }
+
+  // Track live performance metrics for collapsed Performance panel
+  var currentFps by remember { mutableStateOf<Float?>(null) }
+  var currentFrameTimeMs by remember { mutableStateOf<Float?>(null) }
+  var currentJankFrames by remember { mutableStateOf<Int?>(null) }
+  var currentMemoryMb by remember { mutableStateOf<Float?>(null) }
+  var currentTouchLatencyMs by remember { mutableStateOf<Float?>(null) }
+  var perfUpdateCounter by remember { mutableIntStateOf(0) }
+
+  // Track failure counts by type for collapsed Failures panel
+  var crashCount by remember { mutableIntStateOf(0) }
+  var anrCount by remember { mutableIntStateOf(0) }
+  var toolFailureCount by remember { mutableIntStateOf(0) }
+  var nonFatalCount by remember { mutableIntStateOf(0) }
+  var hasNewCriticalFailure by remember { mutableStateOf(false) }
+
+  // Load persisted date range setting
+  val settings = remember { AutoMobileSettings.getInstance() }
+  var failuresDateRange by remember {
+    val saved = settings.failuresDateRange
+    val initial = DateRange.entries.find { it.label == saved } ?: DateRange.TwentyFourHours
+    mutableStateOf(initial)
+  }
+
+
 
   // Mock booted devices - will be replaced with real data
   val activeDeviceIdState = remember { mutableStateOf<String?>(null) }  // null = show MCP panel in Real mode
@@ -188,6 +263,9 @@ fun AutoMobileToolWindowContent() {
 
   // Data source mode (Fake/Real) - global toggle for all dashboards
   var dataSourceMode by remember { mutableStateOf(DataSourceMode.Real) }
+
+  // Pending failure ID for deep linking from notifications
+  var pendingFailureId by remember { mutableStateOf<String?>(null) }
 
   // App selector state (for Navigation dashboard filtering)
   var selectedAppId by remember { mutableStateOf<String?>(null) }
@@ -241,10 +319,50 @@ fun AutoMobileToolWindowContent() {
   // Created once and shared across the app lifecycle
   val observationStreamClient = remember { ObservationStreamClient() }
 
+  // Push socket client for real-time failure notifications
+  // Created once and shared across the app lifecycle
+  val failuresPushClient = remember { FailuresPushSocketClient() }
+
   // Streaming failures data source for real-time failure notifications
   // Only created in Real mode since Fake mode creates its own FakeFailuresDataSource
   val streamingFailuresDataSource = remember(dataSourceMode) {
       if (dataSourceMode == DataSourceMode.Real) StreamingFailuresDataSource() else null
+  }
+
+  // Fetch initial failure counts on startup (before Failures panel is opened)
+  LaunchedEffect(dataSourceMode, failuresDateRange, clientProvider) {
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+      try {
+        val dataSource = when (dataSourceMode) {
+          DataSourceMode.Fake -> FakeFailuresDataSource()
+          DataSourceMode.Real -> clientProvider?.let { McpFailuresDataSource(it) }
+        }
+        if (dataSource != null) {
+          // Use appropriate aggregation for the selected date range
+          val aggregation = when (failuresDateRange) {
+            DateRange.OneHour -> TimeAggregation.Minute
+            DateRange.TwentyFourHours -> TimeAggregation.Hour
+            DateRange.ThreeDays -> TimeAggregation.Hour
+            DateRange.SevenDays -> TimeAggregation.Day
+            DateRange.ThirtyDays -> TimeAggregation.Day
+          }
+          when (val result = dataSource.getTimelineData(failuresDateRange, aggregation)) {
+            is DataSourceResult.Success -> {
+              val data = result.data
+              crashCount = data.dataPoints.sumOf { it.crashes }
+              anrCount = data.dataPoints.sumOf { it.anrs }
+              toolFailureCount = data.dataPoints.sumOf { it.toolFailures }
+              nonFatalCount = data.dataPoints.sumOf { it.nonfatals }
+            }
+            is DataSourceResult.Error -> {
+              // Keep zeros on error
+            }
+          }
+        }
+      } catch (e: Exception) {
+        LOG.warn("Failed to fetch initial failure counts", e)
+      }
+    }
   }
 
   // Connect/disconnect observation stream based on active device
@@ -276,6 +394,30 @@ fun AutoMobileToolWindowContent() {
       }
   }
 
+  // Connect/disconnect failures push client based on data source mode
+  DisposableEffect(dataSourceMode, failuresPushClient) {
+      if (dataSourceMode == DataSourceMode.Real) {
+          LOG.info("Connecting failures push client")
+          failuresPushClient.connect()
+      }
+      onDispose {
+          LOG.info("Disconnecting failures push client")
+          failuresPushClient.disconnect()
+      }
+  }
+
+  // Periodic connection health check for failures push - reconnect if dropped
+  LaunchedEffect(dataSourceMode, failuresPushClient) {
+      if (dataSourceMode != DataSourceMode.Real) return@LaunchedEffect
+      while (true) {
+          kotlinx.coroutines.delay(5000) // Check every 5 seconds
+          if (!failuresPushClient.isConnected()) {
+              LOG.info("Failures push disconnected, attempting reconnect")
+              failuresPushClient.connect()
+          }
+      }
+  }
+
   // Listen for hierarchy updates to update foreground app state in real-time
   LaunchedEffect(observationStreamClient) {
       observationStreamClient.hierarchyUpdates.collect { update ->
@@ -291,6 +433,18 @@ fun AutoMobileToolWindowContent() {
                   }
               }
           }
+      }
+  }
+
+  // Listen for performance updates to update collapsed Performance panel summary
+  LaunchedEffect(observationStreamClient) {
+      observationStreamClient.performanceUpdates.collect { update ->
+          currentFps = update.fps
+          currentFrameTimeMs = update.frameTimeMs
+          currentJankFrames = update.jankFrames
+          currentMemoryMb = update.memoryUsageMb
+          currentTouchLatencyMs = update.touchLatencyMs
+          perfUpdateCounter++
       }
   }
 
@@ -366,6 +520,12 @@ fun AutoMobileToolWindowContent() {
     // In Real mode, show connected MCP device if available
     listOfNotNull(realDevice)
   }
+
+  // Compute platform based on device type for iOS/Android-specific data flow
+  val isIOSDevice = realDevice?.type == DeviceType.iOSSimulator || realDevice?.type == DeviceType.iOSPhysical
+  val platformString = if (isIOSDevice) "ios" else "android"
+  val storagePlatform = if (isIOSDevice) StoragePlatform.iOS else StoragePlatform.Android
+
   val availableEmulators = remember {
     listOf(
         AvailableEmulator("pixel6", "Pixel 6 API 33", DeviceType.AndroidEmulator, "33"),
@@ -422,7 +582,7 @@ fun AutoMobileToolWindowContent() {
   }
 
   val colors = JewelTheme.globalColors
-  val isCurrentlyOnNavigation = dashboardOrder[selectedIndex] == Dashboard.Navigation
+  val isCurrentlyOnNavigation = selectedHorizontalTabId == "navigation"
 
   // Header should fade when navigation nodes exceed bounds and user isn't hovering header
   var isHeaderHovered by remember { mutableStateOf(false) }
@@ -434,109 +594,12 @@ fun AutoMobileToolWindowContent() {
   val density = LocalDensity.current
   val headerHeightDp = with(density) { headerHeight.toDp() }
 
-  Box(modifier = Modifier.fillMaxSize()) {
-    // Dashboard Content - only show when a device is selected
-    if (!isDevicePanelExpanded && activeDeviceId != null) {
-      // Navigation fills entire space so nodes can extend under header when zoomed
-      // Other dashboards have top padding to stay below header
-      Box(
-          modifier = Modifier
-              .fillMaxSize()
-              .then(if (!isCurrentlyOnNavigation) Modifier.padding(top = headerHeightDp) else Modifier)
-      ) {
-        when (dashboardOrder[selectedIndex]) {
-          Dashboard.Navigation -> NavigationDashboard(
-              highlightedScreens = replayHighlightedScreens,
-              onHighlightCleared = {
-                  testFlowScreens = emptyList()
-                  isReplaying = false
-              },
-              onFocusModeChanged = { focused ->
-                  isNavigationFocused = focused
-              },
-              headerHeightPx = headerHeight.toFloat(),
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              selectedAppId = selectedAppId,
-              observationStreamClient = observationStreamClient,
-          )
-          Dashboard.Test -> TestDashboard(
-              onOpenFile = { filePath ->
-                  // TODO: Open file in IDE editor
-              },
-              onNavigateToGraph = { screens ->
-                  // Set up test flow replay
-                  testFlowScreens = screens
-                  isReplaying = true
-                  currentReplayIndex = 0
-                  selectedIndex = 0  // Switch to Navigation tab
-              },
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              observationStreamClient = observationStreamClient,
-          )
-          Dashboard.Performance -> {
-              LOG.info("Rendering PerformanceDashboard with observationStreamClient: ${observationStreamClient.hashCode()}")
-              PerformanceDashboard(
-                  onNavigateToScreen = { screenName ->
-                      // Switch to Navigation tab and highlight the screen
-                      selectedIndex = 0
-                  },
-                  onNavigateToTest = { testName ->
-                      // Switch to Test tab
-                      selectedIndex = 1
-                  },
-                  dataSourceMode = dataSourceMode,
-                  clientProvider = clientProvider,
-                  observationStreamClient = observationStreamClient,
-              )
-          }
-          Dashboard.Layout -> {
-              LOG.info("Rendering LayoutInspectorDashboard with observationStreamClient: ${observationStreamClient.hashCode()}")
-              LayoutInspectorDashboard(
-                  dataSourceMode = dataSourceMode,
-                  clientProvider = clientProvider,
-                  observationStreamClient = observationStreamClient,
-              )
-          }
-          Dashboard.Storage -> StorageDashboard(
-              dataSourceMode = dataSourceMode,
-          )
-          Dashboard.Failures -> FailuresDashboard(
-              onNavigateToScreen = { screenName ->
-                  // Switch to Navigation tab and highlight the screen
-                  selectedIndex = dashboardOrder.indexOf(Dashboard.Navigation)
-              },
-              onNavigateToTest = { testName ->
-                  // Switch to Test tab
-                  selectedIndex = dashboardOrder.indexOf(Dashboard.Test)
-              },
-              onNavigateToSource = { fileName, lineNumber ->
-                  // TODO: Use OpenFileDescriptor to navigate to source
-                  // FileEditorManager.getInstance(project).openFile(virtualFile, true)
-              },
-              onNewFailureNotification = { notification ->
-                  val typeLabel = when (notification.type) {
-                      dev.jasonpearson.automobile.ide.failures.FailureType.Crash -> "Crash"
-                      dev.jasonpearson.automobile.ide.failures.FailureType.ANR -> "ANR"
-                      dev.jasonpearson.automobile.ide.failures.FailureType.ToolCallFailure -> "Tool Failure"
-                      dev.jasonpearson.automobile.ide.failures.FailureType.NonFatal -> "Non-Fatal"
-                  }
-                  showNotification(
-                      "New $typeLabel Detected",
-                      notification.title,
-                      NotificationType.WARNING,
-                  )
-              },
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-              streamingDataSource = streamingFailuresDataSource,
-          )
-        }
-      }
-    }
+  // Min/max widths for vertical panels
+  val minPanelWidthPx = with(density) { 225.dp.toPx() }  // 150dp * 1.5
+  val maxPanelWidthPx = with(density) { 500.dp.toPx() }
 
-    // Header + Tabs overlay (rendered on top with solid background)
+  Column(modifier = Modifier.fillMaxSize()) {
+    // Header (rendered on top with solid background)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -562,8 +625,6 @@ fun AutoMobileToolWindowContent() {
                   userNavigatedToDevices = false  // Reset when device selected
               }
           },
-          isLive = isLive,
-          onLiveToggle = { isLive = it },
           isDevicePanelExpanded = isDevicePanelExpanded,
           availableEmulators = availableEmulators,
           systemImages = systemImages,
@@ -579,9 +640,6 @@ fun AutoMobileToolWindowContent() {
           needsSetup = needsSetup,
           onSetupClick = {
               // TODO: Open setup wizard/dialog
-          },
-          onDoctorClick = {
-              // TODO: Run diagnostics
           },
           dataSourceMode = dataSourceMode,
           onDataSourceModeChanged = { mode ->
@@ -609,11 +667,17 @@ fun AutoMobileToolWindowContent() {
               println("Setting activeDeviceId to: $deviceId")
               println("Setting isDevicePanelExpanded to: false")
               LOG.info("MCP device selected: $deviceId")
-              // Store the real device info
+              // Store the real device info - detect type from device name
+              val name = deviceName ?: deviceId
+              val isIOS = name.contains("iPhone", ignoreCase = true) ||
+                          name.contains("iPad", ignoreCase = true) ||
+                          name.contains("iOS", ignoreCase = true) ||
+                          name.contains("Apple", ignoreCase = true)
+              val deviceType = if (isIOS) DeviceType.iOSSimulator else DeviceType.AndroidEmulator
               realDevice = BootedDevice(
                   id = deviceId,
-                  name = deviceName ?: deviceId,
-                  type = DeviceType.AndroidEmulator, // TODO: detect actual type
+                  name = name,
+                  type = deviceType,
                   status = "Connected",
                   foregroundApp = null,
                   connectedAt = System.currentTimeMillis()
@@ -628,7 +692,7 @@ fun AutoMobileToolWindowContent() {
               connectedMcpProcess = process
           },
           suppressAutoSelect = userNavigatedToDevices,
-          // App selector props
+          // App selector props (kept for backwards compatibility)
           installedApps = installedApps,
           selectedAppId = selectedAppId,
           isAppListLoading = isAppListLoading,
@@ -639,40 +703,211 @@ fun AutoMobileToolWindowContent() {
               appDropdownExpanded = false
               LOG.info("App selected: $appId")
           },
-          showAppSelector = activeDeviceId != null && !isDevicePanelExpanded,
       )
+    }
 
-      // Dashboard Tabs with drag-and-drop reordering - hidden when device panel is expanded
-      println("Tab visibility check: isDevicePanelExpanded=$isDevicePanelExpanded, activeDeviceId=$activeDeviceId")
-      if (!isDevicePanelExpanded && activeDeviceId != null) {
-        println("TABS VISIBLE: Showing DraggableTabs")
-        LOG.debug("Showing tabs: isDevicePanelExpanded=$isDevicePanelExpanded, activeDeviceId=$activeDeviceId")
+    // Main content area - only show when a device is selected
+    // Wrapped in a scrollable column so expanding horizontal tabs doesn't compress the layout
+    if (!isDevicePanelExpanded && activeDeviceId != null) {
+      BoxWithConstraints(
+          modifier = Modifier.weight(1f)
+      ) {
+        // Calculate height for main content so horizontal tabs are at bottom
+        // Subtract ~40dp for horizontal tab bar height
+        val horizontalTabBarHeight = 40.dp
+        val mainContentHeight = maxHeight - horizontalTabBarHeight
 
-        DraggableTabs(
-            tabs = dashboardOrder,
-            selectedIndex = selectedIndex,
-            onTabSelected = { index ->
-                LOG.info("Tab selected: $index (${dashboardOrder[index]})")
-                selectedIndex = index
-            },
-            onReorder = { fromIndex, toIndex ->
-                val item = dashboardOrder.removeAt(fromIndex)
-                dashboardOrder.add(toIndex, item)
-                // Adjust selected index if needed
-                when {
-                    fromIndex == selectedIndex -> selectedIndex = toIndex
-                    fromIndex < selectedIndex && toIndex >= selectedIndex -> selectedIndex--
-                    fromIndex > selectedIndex && toIndex <= selectedIndex -> selectedIndex++
-                }
-            },
-            draggedIndex = draggedIndex,
-            onDragStart = { draggedIndex = it },
-            onDragEnd = { draggedIndex = null; dropTargetIndex = null },
-            dropTargetIndex = dropTargetIndex,
-            onDropTargetChanged = { dropTargetIndex = it },
-        )
-      } else {
-        LOG.debug("Tabs hidden: isDevicePanelExpanded=$isDevicePanelExpanded, activeDeviceId=$activeDeviceId")
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+          // Main content: Layout Inspector (central) + Failures/Performance (right vertical panels)
+          Row(
+              modifier = Modifier
+                  .fillMaxWidth()
+                  .height(mainContentHeight)  // Dynamic height based on window size
+          ) {
+            // Central Layout Inspector (expands to fill available space)
+            LayoutInspectorDashboard(
+                modifier = Modifier.weight(1f),
+                dataSourceMode = dataSourceMode,
+                clientProvider = clientProvider,
+                observationStreamClient = observationStreamClient,
+                platform = platformString,
+            )
+
+            // Right vertical panels: Failures and Performance
+            FailuresVerticalPanel(
+                isCollapsed = isFailuresPanelCollapsed,
+                onToggle = { isFailuresPanelCollapsed = !isFailuresPanelCollapsed },
+                widthPx = failuresPanelWidthPx,
+                onWidthChange = { delta ->
+                    failuresPanelWidthPx = (failuresPanelWidthPx - delta).coerceIn(minPanelWidthPx, maxPanelWidthPx)
+                },
+                dateRangeLabel = failuresDateRange.label,
+                crashCount = crashCount,
+                anrCount = anrCount,
+                toolFailureCount = toolFailureCount,
+                nonFatalCount = nonFatalCount,
+                onNavigateToScreen = { screenName ->
+                    // Switch to Navigation and highlight the screen
+                    selectedHorizontalTabId = "navigation"
+                },
+                onNavigateToTest = { testName ->
+                    // Switch to Test Runs
+                    selectedHorizontalTabId = "test_runs"
+                },
+                onNavigateToSource = { fileName, lineNumber ->
+                    // TODO: Use OpenFileDescriptor to navigate to source
+                },
+                onNewFailureNotification = { notification ->
+                    // Track if it's critical
+                    if (notification.severity == FailureSeverity.Critical ||
+                        notification.severity == FailureSeverity.High) {
+                        hasNewCriticalFailure = true
+                    }
+                    // Only show notifications for crashes and ANRs
+                    val typeLabel = when (notification.type) {
+                        FailureType.Crash -> "Crash"
+                        FailureType.ANR -> "ANR"
+                        else -> null
+                    }
+                    if (typeLabel != null) {
+                        showNotification(
+                            title = "New $typeLabel Detected",
+                            content = notification.title,
+                            type = NotificationType.WARNING,
+                            actionText = "View",
+                            onAction = {
+                                // Expand failures panel and deep link
+                                isFailuresPanelCollapsed = false
+                                pendingFailureId = notification.groupId
+                            },
+                        )
+                    }
+                },
+                initialSelectedFailureId = pendingFailureId,
+                onFailureSelected = { pendingFailureId = null },
+                onDateRangeChanged = { newRange ->
+                    failuresDateRange = newRange
+                    // Persist to settings
+                    settings.failuresDateRange = newRange.label
+                },
+                onFailureCountsChanged = { newCrashCount, newAnrCount, newToolFailureCount, newNonFatalCount ->
+                    crashCount = newCrashCount
+                    anrCount = newAnrCount
+                    toolFailureCount = newToolFailureCount
+                    nonFatalCount = newNonFatalCount
+                },
+                initialDateRange = failuresDateRange,
+                dataSourceMode = dataSourceMode,
+                clientProvider = clientProvider,
+                streamingDataSource = streamingFailuresDataSource,
+                failuresPushClient = failuresPushClient,
+            )
+
+            PerformanceVerticalPanel(
+                isCollapsed = isPerformancePanelCollapsed,
+                onToggle = { isPerformancePanelCollapsed = !isPerformancePanelCollapsed },
+                widthPx = performancePanelWidthPx,
+                onWidthChange = { delta ->
+                    performancePanelWidthPx = (performancePanelWidthPx - delta).coerceIn(minPanelWidthPx, maxPanelWidthPx)
+                },
+                currentFps = currentFps,
+                currentFrameTimeMs = currentFrameTimeMs,
+                currentJankFrames = currentJankFrames,
+                currentMemoryMb = currentMemoryMb,
+                currentTouchLatencyMs = currentTouchLatencyMs,
+                updateCounter = perfUpdateCounter,
+                onNavigateToScreen = { screenName ->
+                    selectedHorizontalTabId = "navigation"
+                },
+                onNavigateToTest = { testName ->
+                    selectedHorizontalTabId = "test_runs"
+                },
+                dataSourceMode = dataSourceMode,
+                clientProvider = clientProvider,
+                observationStreamClient = observationStreamClient,
+            )
+          }
+
+          // Bottom horizontal tabs (Navigation, Test Runs, Storage)
+          HorizontalTabBar(
+              tabs = horizontalTabs,
+              selectedTabId = selectedHorizontalTabId,
+              onTabSelected = { tabId ->
+                  selectedHorizontalTabId = tabId
+              },
+          )
+
+          // Expanded horizontal tab content
+          if (selectedHorizontalTabId != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(350.dp)  // Fixed height for horizontal tab content
+            ) {
+              when (selectedHorizontalTabId) {
+                "navigation" -> NavigationDashboard(
+                    highlightedScreens = replayHighlightedScreens,
+                    onHighlightCleared = {
+                        testFlowScreens = emptyList()
+                        isReplaying = false
+                    },
+                    onFocusModeChanged = { focused ->
+                        isNavigationFocused = focused
+                    },
+                    headerHeightPx = headerHeight.toFloat(),
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    selectedAppId = selectedAppId,
+                    observationStreamClient = observationStreamClient,
+                )
+                "test_runs" -> TestDashboard(
+                    onOpenFile = { filePath ->
+                        // TODO: Open file in IDE editor
+                    },
+                    onNavigateToGraph = { screens ->
+                        // Set up test flow replay
+                        testFlowScreens = screens
+                        isReplaying = true
+                        currentReplayIndex = 0
+                        selectedHorizontalTabId = "navigation"  // Switch to Navigation tab
+                    },
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    observationStreamClient = observationStreamClient,
+                )
+                "storage" -> StorageDashboard(
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    deviceId = activeDeviceId,
+                    packageName = selectedAppId,
+                    platform = storagePlatform,
+                )
+                "diagnostics" -> DiagnosticsDashboard(
+                    connectedMcpProcess = connectedMcpProcess,
+                    dataSourceMode = dataSourceMode,
+                )
+              }
+            }
+          } else {
+            // Empty state when no tab is selected
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+              Text(
+                  "Select a tab above to view content",
+                  fontSize = 12.sp,
+                  color = colors.text.normal.copy(alpha = 0.4f),
+              )
+            }
+          }
+        } // end scrollable Column
       }
     }
   }
@@ -683,8 +918,6 @@ private fun GlobalShellHeader(
     devices: List<BootedDevice>,
     activeDeviceId: String?,
     onDeviceSelected: (String) -> Unit,
-    isLive: Boolean,
-    onLiveToggle: (Boolean) -> Unit,
     isDevicePanelExpanded: Boolean = false,
     availableEmulators: List<AvailableEmulator> = emptyList(),
     systemImages: List<SystemImage> = emptyList(),
@@ -693,20 +926,18 @@ private fun GlobalShellHeader(
     onCollapsePanel: () -> Unit = {},
     needsSetup: Boolean = false,
     onSetupClick: () -> Unit = {},
-    onDoctorClick: () -> Unit = {},
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     onDataSourceModeChanged: (DataSourceMode) -> Unit = {},
     onMcpDeviceSelected: (deviceId: String, deviceName: String?) -> Unit = { _, _ -> },
     onProcessConnected: (McpProcess?) -> Unit = {},
     suppressAutoSelect: Boolean = false,
-    // App selector props
+    // App selector props (kept for backwards compatibility, but FG toggle is preferred)
     installedApps: List<InstalledApp> = emptyList(),
     selectedAppId: String? = null,
     isAppListLoading: Boolean = false,
     appDropdownExpanded: Boolean = false,
     onAppDropdownExpandedChange: (Boolean) -> Unit = {},
     onAppSelected: (String?) -> Unit = {},
-    showAppSelector: Boolean = false,
 ) {
   val colors = JewelTheme.globalColors
 
@@ -715,193 +946,162 @@ private fun GlobalShellHeader(
           .fillMaxWidth()
           .background(JewelTheme.globalColors.panelBackground),
   ) {
-    BoxWithConstraints(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      val isCompact = maxWidth < 400.dp
-
-      Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-      ) {
-        // Left side: Device selection (only in Fake mode)
-        if (dataSourceMode == DataSourceMode.Fake) {
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            if (!isCompact) {
-              Text(
-                  "Devices:",
-                  fontSize = 11.sp,
-                  maxLines = 1,
-                  softWrap = false,
-                  color = colors.text.normal.copy(alpha = 0.5f),
-              )
-            }
-
-            // Device icons
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-              devices.forEach { device ->
-                DeviceIcon(
-                    device = device,
-                    isActive = device.id == activeDeviceId,
-                    isLive = isLive && device.id == activeDeviceId,
-                    onClick = { onDeviceSelected(device.id) },
-                )
-              }
-            }
-          }
-        } else {
-          // Real mode: show MCP server indicator or empty space
-          Row(
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            // Show "Devices:" when a device is selected, "MCP Servers" otherwise
-            if (activeDeviceId != null) {
-              Text(
-                  "Devices:",
-                  fontSize = 11.sp,
-                  maxLines = 1,
-                  softWrap = false,
-                  color = Color(0xFF2196F3),
-                  modifier = Modifier
-                      .clickable {
-                          // Clicking "Devices:" expands the device panel
-                          // We need to deselect the device and expand the panel
-                          onDeviceSelected("")
-                      }
-                      .pointerHoverIcon(PointerIcon.Hand),
-              )
-
-              // Show device buttons next to "Devices:"
-              devices.forEach { device ->
-                val isActive = device.id == activeDeviceId
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (isActive) Color(0xFF2196F3).copy(alpha = 0.15f)
-                            else colors.text.normal.copy(alpha = 0.08f),
-                            RoundedCornerShape(4.dp),
-                        )
-                        .clickable {
-                            if (device.id == activeDeviceId) {
-                                // Tapping active device expands panel to show more devices
-                                onDeviceSelected("")
-                            } else {
-                                onDeviceSelected(device.id)
-                            }
-                        }
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        device.name,
-                        fontSize = 11.sp,
-                        color = if (isActive) Color(0xFF2196F3) else colors.text.normal.copy(alpha = 0.7f),
-                    )
-                }
-              }
-            } else {
-              Text(
-                  "🔌",
-                  fontSize = 14.sp,
-              )
-              if (!isCompact) {
-                Text(
-                    "MCP Servers",
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    color = colors.text.normal.copy(alpha = 0.7f),
-                )
-              }
-            }
-          }
-        }
-
-        // App selector (shown when device selected and apps loaded)
-        if (showAppSelector && installedApps.isNotEmpty()) {
-          AppSelectorDropdown(
-              installedApps = installedApps,
-              selectedAppId = selectedAppId,
-              isLoading = isAppListLoading,
-              expanded = appDropdownExpanded,
-              onExpandedChange = onAppDropdownExpandedChange,
-              onAppSelected = onAppSelected,
-          )
-        }
-
-        // Right side: Setup button (conditional), Doctor button, Live toggle (hidden when panel expanded)
+      // Left side: Device selection
+      if (dataSourceMode == DataSourceMode.Fake) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-          // Setup AutoMobile button (shown when service not detected)
-          if (needsSetup) {
-            Box(
-                modifier = Modifier
-                    .background(Color(0xFF2196F3).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                    .clickable(onClick = onSetupClick)
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-              Text(
-                  "Setup",
-                  fontSize = 10.sp,
-                  maxLines = 1,
-                  softWrap = false,
-                  color = Color(0xFF64B5F6),
+          Text(
+              "Devices:",
+              fontSize = 11.sp,
+              maxLines = 1,
+              softWrap = false,
+              color = colors.text.normal.copy(alpha = 0.5f),
+          )
+
+          // Device icons
+          Row(
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            devices.forEach { device ->
+              DeviceIcon(
+                  device = device,
+                  isActive = device.id == activeDeviceId,
+                  onClick = { onDeviceSelected(device.id) },
               )
             }
           }
-
-          // Doctor button (always visible)
-          Tooltip(tooltip = { Text("Run diagnostics", fontSize = 11.sp) }) {
-            Box(
+        }
+      } else {
+        // Real mode: show MCP server indicator or empty space
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          // Show "Devices:" when a device is selected, "MCP Servers" otherwise
+          if (activeDeviceId != null) {
+            Text(
+                "Devices:",
+                fontSize = 11.sp,
+                maxLines = 1,
+                softWrap = false,
+                color = Color(0xFF2196F3),
                 modifier = Modifier
-                    .background(colors.text.normal.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
-                    .clickable(onClick = onDoctorClick)
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-              Text("🩺", fontSize = 12.sp)
-            }
-          }
+                    .clickable {
+                        // Clicking "Devices:" expands the device panel
+                        // We need to deselect the device and expand the panel
+                        onDeviceSelected("")
+                    }
+                    .pointerHoverIcon(PointerIcon.Hand),
+            )
 
-          // Data source toggle (Fake/Real)
-          DataSourceToggle(
-              currentMode = dataSourceMode,
-              onModeChanged = onDataSourceModeChanged,
-          )
-
-          // Live toggle (only in Fake mode when viewing a device)
-          if (dataSourceMode == DataSourceMode.Fake && !isDevicePanelExpanded) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-              if (!isCompact) {
-                Text(
-                    "Live",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    color = if (isLive) colors.text.normal else colors.text.normal.copy(alpha = 0.5f),
-                )
+            // Show device buttons next to "Devices:" using emojis with tooltips
+            devices.forEach { device ->
+              val isActive = device.id == activeDeviceId
+              val deviceEmoji = when (device.type) {
+                  DeviceType.AndroidEmulator, DeviceType.AndroidPhysical -> "\uD83E\uDD16"  // 🤖
+                  DeviceType.iOSSimulator, DeviceType.iOSPhysical -> "\uD83C\uDF4E"  // 🍎
               }
-              LiveToggle(isLive = isLive, onToggle = onLiveToggle)
+              Tooltip(
+                  tooltip = {
+                      Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                          Text(device.name, fontSize = 12.sp)
+                          Text(
+                              "Status: ${device.status}",
+                              fontSize = 10.sp,
+                              color = colors.text.normal.copy(alpha = 0.6f),
+                          )
+                          device.foregroundApp?.let { app ->
+                              Text(
+                                  "App: $app",
+                                  fontSize = 10.sp,
+                                  color = colors.text.normal.copy(alpha = 0.6f),
+                              )
+                          }
+                      }
+                  },
+              ) {
+                  Box(
+                      modifier = Modifier
+                          .background(
+                              if (isActive) Color(0xFF2196F3).copy(alpha = 0.15f)
+                              else colors.text.normal.copy(alpha = 0.08f),
+                              RoundedCornerShape(4.dp),
+                          )
+                          .clickable {
+                              if (device.id == activeDeviceId) {
+                                  // Tapping active device expands panel to show more devices
+                                  onDeviceSelected("")
+                              } else {
+                                  onDeviceSelected(device.id)
+                              }
+                          }
+                          .pointerHoverIcon(PointerIcon.Hand)
+                          .padding(horizontal = 8.dp, vertical = 4.dp),
+                  ) {
+                      Text(
+                          deviceEmoji,
+                          fontSize = 14.sp,
+                      )
+                  }
+              }
             }
+          } else {
+            Text(
+                "🔌",
+                fontSize = 14.sp,
+            )
+            Text(
+                "MCP Servers",
+                fontSize = 11.sp,
+                maxLines = 1,
+                softWrap = false,
+                color = colors.text.normal.copy(alpha = 0.7f),
+            )
           }
         }
+      }
+
+      // Right side: Setup button (conditional), Real Data toggle, Live toggle
+      Row(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        // Setup AutoMobile button (shown when service not detected)
+        if (needsSetup) {
+          Box(
+              modifier = Modifier
+                  .background(Color(0xFF2196F3).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                  .clickable(onClick = onSetupClick)
+                  .pointerHoverIcon(PointerIcon.Hand)
+                  .padding(horizontal = 8.dp, vertical = 4.dp),
+          ) {
+            Text(
+                "Setup",
+                fontSize = 10.sp,
+                maxLines = 1,
+                softWrap = false,
+                color = Color(0xFF64B5F6),
+            )
+          }
+        }
+
+        // Real Data switch
+        RealDataSwitch(
+            isRealData = dataSourceMode == DataSourceMode.Real,
+            onToggle = { isReal ->
+                onDataSourceModeChanged(if (isReal) DataSourceMode.Real else DataSourceMode.Fake)
+            },
+        )
       }
     }
 
@@ -930,7 +1130,6 @@ private fun GlobalShellHeader(
 private fun DeviceIcon(
     device: BootedDevice,
     isActive: Boolean,
-    isLive: Boolean,
     onClick: () -> Unit,
 ) {
   val colors = JewelTheme.globalColors
@@ -938,8 +1137,7 @@ private fun DeviceIcon(
       if (isActive) colors.text.normal.copy(alpha = 0.15f)
       else colors.text.normal.copy(alpha = 0.05f)
   val borderColor =
-      if (isActive && isLive) Color(0xFF4CAF50)
-      else if (isActive) colors.text.normal.copy(alpha = 0.4f)
+      if (isActive) colors.text.normal.copy(alpha = 0.4f)
       else Color.Transparent
   val iconColor =
       if (isActive) colors.text.normal
@@ -1019,84 +1217,46 @@ private fun AppleDeviceIcon(color: Color) {
 }
 
 @Composable
-private fun DataSourceToggle(
-    currentMode: DataSourceMode,
-    onModeChanged: (DataSourceMode) -> Unit,
+private fun RealDataSwitch(
+    isRealData: Boolean,
+    onToggle: (Boolean) -> Unit,
 ) {
     val colors = JewelTheme.globalColors
+    val trackColor = if (isRealData) Color(0xFF4CAF50) else colors.text.normal.copy(alpha = 0.3f)
+    val thumbColor = Color.White
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        DataSourceMode.entries.forEach { mode ->
-            val isSelected = mode == currentMode
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+        Text(
+            "Real Data",
+            fontSize = 11.sp,
+            maxLines = 1,
+            softWrap = false,
+            color = if (isRealData) colors.text.normal else colors.text.normal.copy(alpha = 0.5f),
+        )
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(18.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(trackColor)
+                .clickable { onToggle(!isRealData) }
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(2.dp),
+        ) {
+            Box(
                 modifier = Modifier
-                    .background(
-                        if (isSelected) colors.text.normal.copy(alpha = 0.15f) else Color.Transparent,
-                        RoundedCornerShape(4.dp),
-                    )
-                    .clickable { onModeChanged(mode) }
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                // Radio indicator
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(
-                            if (isSelected) Color(0xFF4CAF50) else Color.Transparent,
-                            CircleShape,
-                        )
-                        .border(
-                            1.dp,
-                            if (isSelected) Color(0xFF4CAF50)
-                            else colors.text.normal.copy(alpha = 0.4f),
-                            CircleShape,
-                        ),
-                )
-                androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
-                Text(
-                    mode.name,
-                    fontSize = 10.sp,
-                    color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
-                )
-            }
+                    .size(14.dp)
+                    .offset(x = if (isRealData) 14.dp else 0.dp)
+                    .clip(CircleShape)
+                    .background(thumbColor),
+            )
         }
     }
 }
 
-@Composable
-private fun LiveToggle(isLive: Boolean, onToggle: (Boolean) -> Unit) {
-  val colors = JewelTheme.globalColors
-  val trackColor =
-      if (isLive) Color(0xFF4CAF50).copy(alpha = 0.4f)
-      else colors.text.normal.copy(alpha = 0.2f)
-  val thumbColor =
-      if (isLive) Color(0xFF4CAF50)
-      else colors.text.normal.copy(alpha = 0.5f)
-
-  Box(
-      modifier =
-          Modifier.size(width = 32.dp, height = 18.dp)
-              .background(trackColor, shape = RoundedCornerShape(9.dp))
-              .clickable { onToggle(!isLive) }
-              .pointerHoverIcon(PointerIcon.Hand),
-  ) {
-    Box(
-        modifier =
-            Modifier.padding(2.dp)
-                .size(14.dp)
-                .align(if (isLive) Alignment.CenterEnd else Alignment.CenterStart)
-                .background(thumbColor, shape = CircleShape),
-    )
-  }
-}
 
 @Composable
 private fun DraggableTabs(

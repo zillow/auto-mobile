@@ -541,11 +541,6 @@ export class RealObserveScreen implements ObserveScreen {
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     signal?: AbortSignal
   ): Promise<void> {
-    if (this.device.platform === "ios") {
-      RealObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture not supported on iOS");
-      return;
-    }
-
     try {
       await perf.track("screenshot", async () => {
         const { promise } = this.screenshotUtil.startTrackedCapture(
@@ -585,11 +580,6 @@ export class RealObserveScreen implements ObserveScreen {
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     signal?: AbortSignal
   ): void {
-    if (this.device.platform === "ios") {
-      RealObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture not supported on iOS");
-      return;
-    }
-
     perf.startOperation("screenshot");
     const { promise } = this.screenshotUtil.startTrackedCapture(
       { format: "png" },
@@ -975,7 +965,7 @@ export class RealObserveScreen implements ObserveScreen {
 
         // Start continuous performance monitoring for this device/package
         const { getPerformanceMonitor } = await import("../performance/PerformanceMonitor");
-        getPerformanceMonitor().startMonitoring(this.device.deviceId, result.activeWindow!.appId);
+        getPerformanceMonitor().startMonitoring(this.device.deviceId, result.activeWindow!.appId, this.device.platform);
       });
     } catch (error) {
       logger.error(`[PerformanceAudit] Failed to run performance audit: ${error}`);

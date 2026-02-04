@@ -46,6 +46,9 @@ export interface XCTestServiceManager {
   start(): Promise<void>;
   stop(): Promise<void>;
   getServicePort(): number;
+  setAutoRestart(enabled: boolean): void;
+  isAutoRestartEnabled(): boolean;
+  forceRestart(): Promise<void>;
 }
 
 interface HostControlXCTestServiceRunner {
@@ -133,6 +136,14 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private processMonitorInterval: ReturnType<typeof setInterval> | null = null;
   private lastHealthCheckSuccess: boolean = false;
 
+  // Auto-restart state
+  private autoRestartEnabled: boolean = true;
+  private restartAttempts: number = 0;
+  private restartTimeout: ReturnType<Timer["setTimeout"]> | null = null;
+  private static readonly MAX_RESTART_ATTEMPTS = 5;
+  private static readonly RESTART_BASE_DELAY_MS = 2000;
+  private static readonly RESTART_MAX_DELAY_MS = 30000;
+
   // iproxy tunnel state (physical devices)
   private iproxyProcessId: number | null = null;
   private iproxyProcess: ChildProcess | null = null;
@@ -141,6 +152,9 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private iproxyHealthFailures: number = 0;
   private iproxyRestartAttempts: number = 0;
   private isStopping: boolean = false;
+
+  // Mutex to prevent concurrent start() calls from spawning multiple processes
+  private startPromise: Promise<void> | null = null;
 
   public static readonly DEFAULT_PORT = 8765;
   public static readonly BUNDLE_ID = "dev.jasonpearson.automobile.XCTestService";
@@ -369,6 +383,24 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
    * Start the XCTestService
    */
   public async start(): Promise<void> {
+    // Use mutex to prevent concurrent start() calls from spawning multiple processes
+    if (this.startPromise) {
+      logger.info("[XCTestServiceManager] Start already in progress, waiting for it to complete");
+      return this.startPromise;
+    }
+
+    this.startPromise = this.startInternal();
+    try {
+      await this.startPromise;
+    } finally {
+      this.startPromise = null;
+    }
+  }
+
+  /**
+   * Internal start implementation (called within mutex)
+   */
+  private async startInternal(): Promise<void> {
     logger.info("[XCTestServiceManager] Starting XCTestService");
     this.isStopping = false;
 
@@ -418,6 +450,13 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   public async stop(): Promise<void> {
     logger.info("[XCTestServiceManager] Stopping XCTestService");
     this.isStopping = true;
+
+    // Cancel any pending restart
+    if (this.restartTimeout) {
+      this.timer.clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+    this.restartAttempts = 0;
 
     if (this.useHostControl()) {
       try {
@@ -725,6 +764,89 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     this.xcTestProcess = null;
     this.stopProcessMonitoring();
     this.clearCaches();
+
+    // Schedule auto-restart if enabled and not stopping intentionally
+    if (this.autoRestartEnabled && !this.isStopping) {
+      this.scheduleAutoRestart();
+    }
+  }
+
+  /**
+   * Schedule automatic restart with exponential backoff
+   */
+  private scheduleAutoRestart(): void {
+    if (this.restartTimeout || this.isStopping) {
+      return;
+    }
+
+    if (this.restartAttempts >= IOSXCTestServiceManager.MAX_RESTART_ATTEMPTS) {
+      logger.warn(`[XCTestServiceManager] Max restart attempts (${IOSXCTestServiceManager.MAX_RESTART_ATTEMPTS}) reached, giving up`);
+      this.restartAttempts = 0;
+      return;
+    }
+
+    this.restartAttempts++;
+    const delay = Math.min(
+      IOSXCTestServiceManager.RESTART_BASE_DELAY_MS * Math.pow(2, this.restartAttempts - 1),
+      IOSXCTestServiceManager.RESTART_MAX_DELAY_MS
+    );
+
+    logger.info(`[XCTestServiceManager] Scheduling auto-restart in ${delay}ms (attempt ${this.restartAttempts}/${IOSXCTestServiceManager.MAX_RESTART_ATTEMPTS})`);
+
+    this.restartTimeout = this.timer.setTimeout(() => {
+      this.restartTimeout = null;
+
+      // Don't restart if we're stopping
+      if (this.isStopping) {
+        return;
+      }
+
+      logger.info("[XCTestServiceManager] Attempting automatic restart...");
+      void this.start().then(() => {
+        logger.info("[XCTestServiceManager] Auto-restart successful");
+        this.restartAttempts = 0; // Reset on success
+      }).catch(error => {
+        logger.warn(`[XCTestServiceManager] Auto-restart failed: ${error instanceof Error ? error.message : String(error)}`);
+        // handleProcessExit will be called again, triggering another restart attempt
+      });
+    }, delay);
+  }
+
+  /**
+   * Enable or disable auto-restart
+   */
+  public setAutoRestart(enabled: boolean): void {
+    this.autoRestartEnabled = enabled;
+    if (!enabled && this.restartTimeout) {
+      this.timer.clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+    logger.info(`[XCTestServiceManager] Auto-restart ${enabled ? "enabled" : "disabled"}`);
+  }
+
+  /**
+   * Check if auto-restart is enabled
+   */
+  public isAutoRestartEnabled(): boolean {
+    return this.autoRestartEnabled;
+  }
+
+  /**
+   * Force restart the service (useful when client detects issues)
+   */
+  public async forceRestart(): Promise<void> {
+    logger.info("[XCTestServiceManager] Force restart requested");
+
+    // Clear any pending restart
+    if (this.restartTimeout) {
+      this.timer.clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+
+    // Stop and restart
+    await this.stop();
+    this.restartAttempts = 0; // Reset attempts for forced restart
+    await this.start();
   }
 
   /**
