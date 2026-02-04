@@ -15,7 +15,7 @@ export type PlanExecutionLockScope = "session" | "global";
  */
 class ServerConfig {
   private static instance: ServerConfig;
-  private _uiPerfModeEnabled: boolean = false;
+  private _uiPerfModeEnabled: boolean = true;
   private _uiPerfDebugEnabled: boolean = false;
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
   private _memPerfAuditEnabled: boolean = false;

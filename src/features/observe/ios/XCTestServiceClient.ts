@@ -24,6 +24,7 @@ import { Timer, defaultTimer } from "../../../utils/SystemTimer";
 import { PortManager } from "../../../utils/PortManager";
 import { shouldUseHostControl, getHostControlHost } from "../../../utils/hostControlClient";
 import { isRunningInDocker } from "../../../utils/dockerEnv";
+import { IOSXCTestServiceManager } from "../../../utils/XCTestServiceManager";
 import { NavigationGraphManager } from "../../navigation/NavigationGraphManager";
 import {
   HierarchyNavigationDetector,
@@ -35,6 +36,13 @@ import {
   WebSocketFactory,
   defaultWebSocketFactory,
 } from "../DeviceServiceClient";
+import { getDeviceDataStreamServer, PerformanceStreamData } from "../../../daemon/deviceDataStreamSocketServer";
+import { getPerformanceMonitor } from "../../performance/PerformanceMonitor";
+import {
+  ScreenshotBackoffScheduler,
+  DefaultScreenshotBackoffScheduler,
+  ScreenshotCaptureResult,
+} from "../ScreenshotBackoffScheduler";
 
 // Import delegates
 import { XCTestServiceGestures } from "./XCTestServiceGestures";
@@ -61,6 +69,7 @@ import type {
   XCTestPressHomeResult,
   XCTestLaunchAppResult,
   XCTestPerfTiming,
+  XCTestPerformanceSnapshot,
   CachedHierarchy,
   WebSocketMessage,
 } from "./types";
@@ -197,6 +206,9 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
   // Push update callbacks
   private onPushUpdateCallbacks: Set<(hierarchy: XCTestHierarchy) => void> = new Set();
 
+  // Track last foreground bundle for performance monitoring
+  private lastForegroundBundleId: string | null = null;
+
   // Platform-specific dependencies
   private readonly device: BootedDevice;
   private readonly port: number;
@@ -210,6 +222,15 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
 
   // Logging tag for base class
   protected readonly logTag = "XCTestServiceClient";
+
+  // Screenshot backoff scheduler for real-time screenshot streaming
+  private screenshotBackoffScheduler: ScreenshotBackoffScheduler | null = null;
+  private cachedScreenDimensions: { width: number; height: number } | null = null;
+
+  // Connection failure tracking for auto-restart
+  private consecutiveConnectionFailures: number = 0;
+  private isRequestingServiceRestart: boolean = false;
+  private static readonly MAX_FAILURES_BEFORE_RESTART = 3;
 
   private constructor(
     device: BootedDevice,
@@ -341,7 +362,10 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
   }
 
   protected onConnectionEstablished(): void {
-    // No additional setup needed for iOS
+    // Reset failure counter on successful connection
+    this.consecutiveConnectionFailures = 0;
+    this.isRequestingServiceRestart = false;
+    logger.info(`[XCTestServiceClient] Connection established, reset failure counter`);
   }
 
   protected onConnectionClosed(): void {
@@ -351,6 +375,52 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
       this.hierarchyNavigationDetector.dispose();
       this.hierarchyNavigationDetector = null;
     }
+
+    // Track connection failure and potentially trigger service restart
+    this.consecutiveConnectionFailures++;
+    logger.info(`[XCTestServiceClient] Connection closed (failure count: ${this.consecutiveConnectionFailures})`);
+
+    if (this.consecutiveConnectionFailures >= XCTestServiceClient.MAX_FAILURES_BEFORE_RESTART &&
+        !this.isRequestingServiceRestart) {
+      this.triggerServiceRestart();
+    }
+  }
+
+  /**
+   * Trigger XCTestService restart through the manager.
+   * This is called when repeated WebSocket connection failures indicate
+   * that the XCTestService process may have crashed.
+   */
+  private triggerServiceRestart(): void {
+    if (this.isRequestingServiceRestart) {
+      return;
+    }
+
+    this.isRequestingServiceRestart = true;
+    logger.info(`[XCTestServiceClient] Triggering XCTestService restart after ${this.consecutiveConnectionFailures} connection failures`);
+
+    const manager = IOSXCTestServiceManager.getInstance(this.device);
+
+    // Check if service is actually not running before restarting
+    void manager.isRunning().then(running => {
+      if (!running) {
+        logger.info(`[XCTestServiceClient] XCTestService not running, requesting restart`);
+        void manager.forceRestart().then(() => {
+          logger.info(`[XCTestServiceClient] XCTestService restart completed`);
+          this.consecutiveConnectionFailures = 0;
+          this.isRequestingServiceRestart = false;
+        }).catch(error => {
+          logger.warn(`[XCTestServiceClient] XCTestService restart failed: ${error}`);
+          this.isRequestingServiceRestart = false;
+        });
+      } else {
+        logger.info(`[XCTestServiceClient] XCTestService is running, connection issue may be transient`);
+        this.isRequestingServiceRestart = false;
+      }
+    }).catch(error => {
+      logger.warn(`[XCTestServiceClient] Failed to check XCTestService status: ${error}`);
+      this.isRequestingServiceRestart = false;
+    });
   }
 
   protected async setupBeforeConnect(_perf: PerformanceTracker): Promise<void> {
@@ -460,9 +530,64 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
       };
       logger.info(`[XCTestServiceClient] Received hierarchy push update - UI changed`);
 
+      // Convert and push to observation stream for IDE plugins
+      const viewHierarchyResult = this.convertToViewHierarchyResult(message.data);
+      this.pushHierarchyToObservationStream(viewHierarchyResult);
+
+      // Start screenshot backoff sequence for real-time screenshot streaming
+      this.startScreenshotBackoff();
+
+      // Performance monitoring is handled in handleHierarchyUpdateForNavigation
+      // which runs for ALL hierarchy_update messages (both push and request-response)
+
       // Notify listeners (e.g., ObserveScreen to clear its cache)
       this.notifyPushUpdateListeners(message.data);
       return;
+    }
+
+    // Handle performance update push messages from CADisplayLink FPS monitoring
+    if (type === "performance_update") {
+      if (message.performanceData) {
+        this.handlePerformanceUpdate(message.performanceData);
+      } else {
+        logger.warn(`[XCTestServiceClient] Received performance_update but no performanceData field`);
+      }
+      return;
+    }
+  }
+
+  /**
+   * Handle performance update push messages from iOS XCTestService.
+   * Converts the iOS performance snapshot to PerformanceStreamData and pushes to IDE.
+   */
+  private handlePerformanceUpdate(snapshot: XCTestPerformanceSnapshot): void {
+    const server = getDeviceDataStreamServer();
+    if (!server) {
+      return;
+    }
+
+    // Convert iOS performance snapshot to PerformanceStreamData format
+    const streamData: PerformanceStreamData = {
+      fps: snapshot.fps ?? 0,
+      frameTimeMs: snapshot.frameTimeMs ?? 0,
+      jankFrames: snapshot.jankFrames ?? 0,
+      droppedFrames: 0, // iOS doesn't report this separately
+      memoryUsageMb: snapshot.memoryUsageMb ?? 0,
+      cpuUsagePercent: snapshot.cpuUsagePercent ?? 0,
+      touchLatencyMs: snapshot.touchLatencyMs ?? null,
+      timeToInteractiveMs: snapshot.ttiMs ?? null,
+      screenName: snapshot.screenName ?? null,
+      isResponsive: (snapshot.fps ?? 0) >= 50, // Consider responsive if FPS >= 50
+    };
+
+    try {
+      server.pushPerformanceUpdate(this.device.deviceId, streamData);
+      // Log occasionally to avoid spam
+      if (Date.now() % 5000 < 600) {
+        logger.info(`[XCTestServiceClient] iOS FPS: ${streamData.fps.toFixed(1)}, frameTime: ${streamData.frameTimeMs.toFixed(1)}ms, memory: ${streamData.memoryUsageMb.toFixed(1)}MB`);
+      }
+    } catch (error) {
+      logger.warn(`[XCTestServiceClient] Failed to push performance update: ${error}`);
     }
   }
 
@@ -649,6 +774,108 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     }
   }
 
+  /**
+   * Push hierarchy update to the device data stream for IDE plugins.
+   */
+  private pushHierarchyToObservationStream(hierarchy: ViewHierarchyResult): void {
+    const server = getDeviceDataStreamServer();
+    if (!server) {
+      return;
+    }
+
+    try {
+      server.pushHierarchyUpdate(this.device.deviceId, hierarchy);
+    } catch (error) {
+      logger.warn(`[XCTestServiceClient] Failed to push hierarchy to observation stream: ${error}`);
+    }
+  }
+
+  /**
+   * Push screenshot update to the device data stream for IDE plugins.
+   */
+  private pushScreenshotToObservationStream(screenshotBase64: string, screenWidth: number, screenHeight: number): void {
+    const server = getDeviceDataStreamServer();
+    if (!server) {
+      return;
+    }
+
+    try {
+      server.pushScreenshotUpdate(this.device.deviceId, screenshotBase64, screenWidth, screenHeight);
+    } catch (error) {
+      logger.debug(`[XCTestServiceClient] Failed to push screenshot to observation stream: ${error}`);
+    }
+  }
+
+  // ===========================================================================
+  // Screenshot Backoff for Real-time Streaming
+  // ===========================================================================
+
+  /**
+   * Start screenshot backoff sequence for real-time screenshot streaming to IDE.
+   * Called when a hierarchy push update is received to capture corresponding screenshots.
+   */
+  private startScreenshotBackoff(): void {
+    const server = getDeviceDataStreamServer();
+    if (!server || server.getSubscriberCount() === 0) {
+      return;
+    }
+
+    const scheduler = this.getScreenshotBackoffScheduler();
+    scheduler.startBackoffSequence();
+  }
+
+  private getScreenshotBackoffScheduler(): ScreenshotBackoffScheduler {
+    if (!this.screenshotBackoffScheduler) {
+      this.screenshotBackoffScheduler = new DefaultScreenshotBackoffScheduler(
+        async (): Promise<ScreenshotCaptureResult> => {
+          return this.captureScreenshotForBackoff();
+        },
+        (data: string) => {
+          // Get screen dimensions from cached hierarchy or use defaults
+          const screenWidth = this.cachedScreenDimensions?.width ?? 1170;
+          const screenHeight = this.cachedScreenDimensions?.height ?? 2532;
+          this.pushScreenshotToObservationStream(data, screenWidth, screenHeight);
+        },
+        undefined, // Use default config
+        this.timer
+      );
+    }
+    return this.screenshotBackoffScheduler;
+  }
+
+  private async captureScreenshotForBackoff(): Promise<ScreenshotCaptureResult> {
+    try {
+      const result = await this.requestScreenshot(5000);
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error || "No screenshot data" };
+      }
+
+      // Cache screen dimensions from hierarchy if available
+      if (this.cachedHierarchy?.hierarchy?.screenWidth && this.cachedHierarchy?.hierarchy?.screenHeight) {
+        this.cachedScreenDimensions = {
+          width: this.cachedHierarchy.hierarchy.screenWidth,
+          height: this.cachedHierarchy.hierarchy.screenHeight
+        };
+      }
+
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return { success: false, error: `${error}` };
+    }
+  }
+
+  /**
+   * Cancel any pending screenshot captures.
+   */
+  cancelScreenshotBackoff(): void {
+    if (this.screenshotBackoffScheduler) {
+      this.screenshotBackoffScheduler.cancelPendingCaptures();
+    }
+  }
+
   // ===========================================================================
   // Navigation Detector
   // ===========================================================================
@@ -681,6 +908,17 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     if (hierarchy.error) {
       logger.warn(`[XCTestServiceClient] Skipping navigation detection due to hierarchy error: ${hierarchy.error}`);
       return;
+    }
+
+    // Track foreground bundle and start performance monitoring when app changes
+    const bundleId = hierarchy.packageName;
+    logger.debug(`[XCTestServiceClient] Hierarchy update - bundleId: "${bundleId}", lastForeground: "${this.lastForegroundBundleId}"`);
+    if (bundleId && bundleId !== this.lastForegroundBundleId) {
+      this.lastForegroundBundleId = bundleId;
+      // Start performance monitoring for this device/bundle
+      const monitor = getPerformanceMonitor();
+      monitor.startMonitoring(this.device.deviceId, bundleId, "ios");
+      logger.info(`[XCTestServiceClient] Started performance monitoring for ${bundleId} on ${this.device.deviceId}`);
     }
 
     const conversionStart = this.timer.now();

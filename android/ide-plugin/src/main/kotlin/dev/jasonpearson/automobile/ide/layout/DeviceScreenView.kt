@@ -366,23 +366,25 @@ fun DeviceScreenView(
                                 .drawWithContent {
                                     drawContent()
 
-                                    // Scale factor: drawing context is in frame pixels, bounds are in device pixels
-                                    // Use actual image dimensions for accurate overlay positioning.
-                                    // This is critical because screenWidth/screenHeight from stream may not match
-                                    // the actual screenshot dimensions (e.g., if derived from app window bounds
-                                    // which exclude status bar, while screenshot includes full screen).
+                                    // Scale factor: drawing context is in frame pixels, bounds may be in:
+                                    // - iOS points (logical pixels, need scaling by screen scale factor)
+                                    // - Android pixels (device pixels, match screenshot directly)
+                                    //
+                                    // We use the root element bounds to calculate the correct scale.
+                                    // The root bounds represent the full screen in the hierarchy's coordinate system,
+                                    // so scaling from root bounds to frame width handles both iOS and Android.
                                     val imageWidth = imageBitmap.width
-                                    val imageHeight = imageBitmap.height
-                                    val deviceToFrameScale = if (imageWidth > 0) size.width / imageWidth.toFloat() else 1f
+                                    val rootBoundsWidth = hierarchy?.bounds?.width ?: imageWidth
+                                    val boundsToFrameScale = if (rootBoundsWidth > 0) size.width / rootBoundsWidth.toFloat() else 1f
 
                                     // Draw element overlays
                                     // Hovered element (gray)
                                     if (hoveredElement != null && hoveredElement.id != selectedElementId) {
                                         val bounds = hoveredElement.bounds
-                                        val scaledLeft = bounds.left * deviceToFrameScale
-                                        val scaledTop = bounds.top * deviceToFrameScale
-                                        val scaledWidth = bounds.width * deviceToFrameScale
-                                        val scaledHeight = bounds.height * deviceToFrameScale
+                                        val scaledLeft = bounds.left * boundsToFrameScale
+                                        val scaledTop = bounds.top * boundsToFrameScale
+                                        val scaledWidth = bounds.width * boundsToFrameScale
+                                        val scaledHeight = bounds.height * boundsToFrameScale
                                         drawRect(
                                             color = Color.Gray.copy(alpha = 0.5f),
                                             topLeft = Offset(scaledLeft, scaledTop),
@@ -394,10 +396,10 @@ fun DeviceScreenView(
                                     // Selected element (blue)
                                     if (selectedElement != null) {
                                         val bounds = selectedElement.bounds
-                                        val scaledLeft = bounds.left * deviceToFrameScale
-                                        val scaledTop = bounds.top * deviceToFrameScale
-                                        val scaledWidth = bounds.width * deviceToFrameScale
-                                        val scaledHeight = bounds.height * deviceToFrameScale
+                                        val scaledLeft = bounds.left * boundsToFrameScale
+                                        val scaledTop = bounds.top * boundsToFrameScale
+                                        val scaledWidth = bounds.width * boundsToFrameScale
+                                        val scaledHeight = bounds.height * boundsToFrameScale
                                         drawRect(
                                             color = Color(0xFF2196F3),
                                             topLeft = Offset(scaledLeft, scaledTop),
@@ -415,10 +417,10 @@ fun DeviceScreenView(
                                     // Flash element highlight (yellow/gold flash on double-click)
                                     if (flashElement != null && flashAlpha > 0f) {
                                         val bounds = flashElement.bounds
-                                        val scaledLeft = bounds.left * deviceToFrameScale
-                                        val scaledTop = bounds.top * deviceToFrameScale
-                                        val scaledWidth = bounds.width * deviceToFrameScale
-                                        val scaledHeight = bounds.height * deviceToFrameScale
+                                        val scaledLeft = bounds.left * boundsToFrameScale
+                                        val scaledTop = bounds.top * boundsToFrameScale
+                                        val scaledWidth = bounds.width * boundsToFrameScale
+                                        val scaledHeight = bounds.height * boundsToFrameScale
                                         // Draw bright yellow border
                                         drawRect(
                                             color = Color(0xFFFFD700).copy(alpha = flashAlpha),
@@ -438,10 +440,10 @@ fun DeviceScreenView(
                                     if (showTapTargetIssues) {
                                         for (element in nonCompliantElements) {
                                             val bounds = element.bounds
-                                            val scaledLeft = bounds.left * deviceToFrameScale
-                                            val scaledTop = bounds.top * deviceToFrameScale
-                                            val scaledWidth = bounds.width * deviceToFrameScale
-                                            val scaledHeight = bounds.height * deviceToFrameScale
+                                            val scaledLeft = bounds.left * boundsToFrameScale
+                                            val scaledTop = bounds.top * boundsToFrameScale
+                                            val scaledWidth = bounds.width * boundsToFrameScale
+                                            val scaledHeight = bounds.height * boundsToFrameScale
 
                                             // Draw orange border
                                             drawRect(

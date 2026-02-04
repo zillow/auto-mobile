@@ -189,7 +189,12 @@ export class XCTestServiceHierarchy {
       },
       packageName: hierarchy.packageName,
       updatedAt: hierarchy.updatedAt,
-      windows: hierarchy.windows
+      windows: hierarchy.windows,
+      // iOS screen scale factor (e.g., 2.0 for @2x, 3.0 for @3x retina)
+      screenScale: hierarchy.screenScale,
+      // Screen dimensions in iOS points (logical pixels)
+      screenWidth: hierarchy.screenWidth,
+      screenHeight: hierarchy.screenHeight,
     };
   }
 

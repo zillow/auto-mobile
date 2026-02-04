@@ -216,6 +216,26 @@ public class WebSocketServer: WebSocketServing {
         }
     }
 
+    /// Broadcast a performance update to all connected clients (push notification)
+    public func broadcastPerformanceUpdate(_ snapshot: PerformanceSnapshot) {
+        guard connections.count > 0 else { return }
+
+        let response = PerformanceUpdateResponse(data: snapshot)
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            let data = try encoder.encode(response)
+            broadcast(data)
+            // Only log occasionally to avoid spam (snapshot contains timestamp)
+            if Int(snapshot.timestamp) % 5000 < 500 {
+                print("[WebSocketServer] Broadcast performance update: fps=\(snapshot.fps ?? 0), frameTime=\(snapshot.frameTimeMs ?? 0)ms")
+            }
+        } catch {
+            print("[WebSocketServer] Failed to encode performance update: \(error)")
+        }
+    }
+
     /// Broadcast a message with perf timing data included.
     /// Flushes accumulated perf data and injects it into the message via the builder.
     /// - Parameter messageBuilder: Function that takes optional perfTiming and returns message data

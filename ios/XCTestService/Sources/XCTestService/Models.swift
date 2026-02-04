@@ -237,6 +237,9 @@ public struct ViewHierarchy: Codable {
     public let hierarchy: UIElementInfo?
     public let windowInfo: WindowInfo?
     public let windows: [WindowInfo]?
+    public let screenScale: Float?
+    public let screenWidth: Int?
+    public let screenHeight: Int?
     public let error: String?
 
     public init(
@@ -245,6 +248,9 @@ public struct ViewHierarchy: Codable {
         hierarchy: UIElementInfo? = nil,
         windowInfo: WindowInfo? = nil,
         windows: [WindowInfo]? = nil,
+        screenScale: Float? = nil,
+        screenWidth: Int? = nil,
+        screenHeight: Int? = nil,
         error: String? = nil
     ) {
         self.updatedAt = updatedAt
@@ -252,6 +258,9 @@ public struct ViewHierarchy: Codable {
         self.hierarchy = hierarchy
         self.windowInfo = windowInfo
         self.windows = windows
+        self.screenScale = screenScale
+        self.screenWidth = screenWidth
+        self.screenHeight = screenHeight
         self.error = error
     }
 }
@@ -504,6 +513,21 @@ public struct HighlightStyle: Codable {
         self.tension = tension
         self.capStyle = capStyle
         self.joinStyle = joinStyle
+    }
+}
+
+// MARK: - Performance Update Response
+
+/// Push notification for performance metrics (FPS, frame time, etc.)
+public struct PerformanceUpdateResponse: Codable {
+    public let type: String
+    public let timestamp: Int64
+    public let performanceData: PerformanceSnapshot
+
+    public init(data: PerformanceSnapshot) {
+        self.type = "performance_update"
+        self.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        self.performanceData = data
     }
 }
 

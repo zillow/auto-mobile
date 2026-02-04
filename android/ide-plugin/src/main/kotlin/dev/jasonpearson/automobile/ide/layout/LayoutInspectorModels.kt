@@ -89,8 +89,10 @@ const val MIN_TAP_TARGET_DP = 48
 
 /**
  * Standard phone screen width in dp (used as baseline for density estimation).
+ * Most modern phones (Pixel, Samsung Galaxy, etc.) report ~411-412dp width.
+ * Using 411dp gives accurate density estimates for xxhdpi (420dpi) devices.
  */
-private const val STANDARD_PHONE_WIDTH_DP = 360
+private const val STANDARD_PHONE_WIDTH_DP = 411
 
 /**
  * Calculate minimum tap target size in pixels based on screen dimensions.
@@ -98,9 +100,10 @@ private const val STANDARD_PHONE_WIDTH_DP = 360
  * Uses the shorter screen dimension to estimate density, which provides
  * more consistent results across orientation changes (portrait/landscape).
  *
- * Note: This is a heuristic that assumes typical phone layouts (~360dp width).
- * For more accurate results on tablets or unusual screen configurations,
- * actual device density metrics should be provided by the data source.
+ * Common device densities:
+ * - 720px width → ~1.75x density (hdpi/xhdpi)
+ * - 1080px width → ~2.63x density (xxhdpi/420dpi)
+ * - 1440px width → ~3.5x density (xxxhdpi)
  *
  * @param screenWidthPx The screen width in pixels
  * @param screenHeightPx The screen height in pixels
@@ -111,7 +114,7 @@ fun calculateMinTapTargetPx(screenWidthPx: Int, screenHeightPx: Int): Int {
     // A 1080x1920 screen in portrait and 1920x1080 in landscape both use 1080.
     val shorterDimension = minOf(screenWidthPx, screenHeightPx)
 
-    // Estimate density: most phones have ~360dp on the shorter edge
+    // Estimate density: most phones have ~411dp on the shorter edge
     val estimatedDensity = shorterDimension.toFloat() / STANDARD_PHONE_WIDTH_DP
     return (MIN_TAP_TARGET_DP * estimatedDensity).toInt()
 }
@@ -130,8 +133,24 @@ fun isNonCompliantTapTarget(element: UIElementInfo, minSizePx: Int): Boolean {
 }
 
 /**
+ * Check if an element has any clickable descendants.
+ * Used to filter out container elements that just pass through clicks.
+ */
+private fun hasClickableDescendant(element: UIElementInfo): Boolean {
+    for (child in element.children) {
+        if (child.isClickable) return true
+        if (hasClickableDescendant(child)) return true
+    }
+    return false
+}
+
+/**
  * Find all non-compliant tap targets in a hierarchy.
  * Returns elements that are clickable but smaller than 48x48dp.
+ *
+ * Filters out:
+ * - Elements with clickable descendants (these are likely container pass-throughs)
+ * - Elements that are likely decorative (no text, content description, or resource ID)
  *
  * @param root The root of the hierarchy to search
  * @param screenWidthPx The screen width in pixels
@@ -148,7 +167,17 @@ fun findNonCompliantTapTargets(
 
     fun traverse(element: UIElementInfo) {
         if (isNonCompliantTapTarget(element, minSizePx)) {
-            result.add(element)
+            // Skip elements that have clickable descendants - they're likely containers
+            // that delegate click handling to children
+            if (!hasClickableDescendant(element)) {
+                // Only flag elements that appear to be interactive (have identifying info)
+                val hasIdentifyingInfo = !element.resourceId.isNullOrEmpty() ||
+                    !element.text.isNullOrEmpty() ||
+                    !element.contentDescription.isNullOrEmpty()
+                if (hasIdentifyingInfo) {
+                    result.add(element)
+                }
+            }
         }
         element.children.forEach { traverse(it) }
     }

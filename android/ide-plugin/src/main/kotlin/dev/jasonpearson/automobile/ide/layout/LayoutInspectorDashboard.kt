@@ -36,6 +36,7 @@ fun LayoutInspectorDashboard(
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
     observationStreamClient: ObservationStreamClient? = null,  // Shared stream client (managed at app level)
+    platform: String = "android",  // Device platform ("android" or "ios")
 ) {
     val state = rememberLayoutInspectorState()
     val colors = JewelTheme.globalColors
@@ -105,7 +106,7 @@ fun LayoutInspectorDashboard(
     LaunchedEffect(dataSourceMode, clientProvider) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createLayoutDataSource(dataSourceMode, clientProvider)
+                val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createLayoutDataSource(dataSourceMode, clientProvider, platform)
                 when (val result = dataSource.getObservation()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
                         val observation = result.data

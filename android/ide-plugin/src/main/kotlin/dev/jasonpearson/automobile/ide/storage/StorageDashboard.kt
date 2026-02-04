@@ -50,6 +50,7 @@ fun StorageDashboard(
     clientProvider: (() -> AutoMobileClient)? = null,
     deviceId: String? = null,
     packageName: String? = null,
+    platform: StoragePlatform = StoragePlatform.Android,
 ) {
     val colors = JewelTheme.globalColors
     var selectedTab by remember { mutableStateOf(StorageTab.Database) }
@@ -70,7 +71,8 @@ fun StorageDashboard(
                     dataSourceMode,
                     clientProvider,
                     deviceId,
-                    packageName
+                    packageName,
+                    platform
                 )
                 LOG.info("StorageDashboard: Created data source: ${dataSource::class.simpleName}")
 

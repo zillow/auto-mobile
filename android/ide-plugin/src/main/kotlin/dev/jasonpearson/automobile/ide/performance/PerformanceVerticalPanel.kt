@@ -25,6 +25,7 @@ fun PerformanceVerticalPanel(
     currentJankFrames: Int?,
     currentMemoryMb: Float?,
     currentTouchLatencyMs: Float?,
+    updateCounter: Int = 0,
     onNavigateToScreen: (String) -> Unit = {},
     onNavigateToTest: (String) -> Unit = {},
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
@@ -46,6 +47,7 @@ fun PerformanceVerticalPanel(
                 currentJankFrames = currentJankFrames,
                 currentMemoryMb = currentMemoryMb,
                 currentTouchLatencyMs = currentTouchLatencyMs,
+                updateCounter = updateCounter,
             )
         },
     ) {

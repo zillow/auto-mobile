@@ -11,6 +11,8 @@ import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from 
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { getTempDir, TEMP_SUBDIRS, SECURE_DIR_MODE } from "../../utils/tempDir";
 import type { ScreenshotService } from "./interfaces/ScreenshotService";
+import { XCTestServiceClient } from "./ios/XCTestServiceClient";
+import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 
 export interface ScreenshotOptions {
   format?: "png" | "webp";
@@ -223,17 +225,88 @@ export class TakeScreenshot implements ScreenshotService {
   }
 
   /**
-   * Capture screenshot using screencap method with fallback
+   * Capture screenshot using XCTestService
    * @param finalPath - Path to save the screenshot
    * @returns ScreenshotResult with path to the saved screenshot or error
    */
   private async captureiOSScreenshot(
     finalPath: string,
   ): Promise<ScreenshotResult> {
-    return {
-      success: true,
-      path: finalPath,
-    } as ScreenshotResult;
+    const startTime = Date.now();
+
+    try {
+      const client = XCTestServiceClient.getInstance(this.device);
+
+      // Ensure connected before requesting screenshot
+      if (!await client.ensureConnected()) {
+        return {
+          success: false,
+          error: "Failed to connect to XCTestService",
+        };
+      }
+
+      // Request screenshot from XCTestService
+      const result = await client.requestScreenshot(10000); // 10 second timeout
+
+      if (!result.success || !result.data) {
+        return {
+          success: false,
+          error: result.error || "No screenshot data returned",
+        };
+      }
+
+      // Decode base64 and save to file
+      const imageBuffer = Buffer.from(result.data, "base64");
+      await fs.writeFile(finalPath, imageBuffer);
+
+      const durationMs = Date.now() - startTime;
+      logger.info(`[SCREENSHOT] iOS screenshot captured in ${durationMs}ms, saved to ${finalPath}`);
+
+      // Push to observation stream for IDE plugins
+      this.pushScreenshotToStream(result.data, imageBuffer);
+
+      return {
+        success: true,
+        path: finalPath,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`[SCREENSHOT] iOS screenshot capture failed: ${errorMessage}`);
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Push screenshot to the device data stream for IDE plugins.
+   */
+  private pushScreenshotToStream(base64Data: string, imageBuffer: Buffer): void {
+    const server = getDeviceDataStreamServer();
+    if (!server) {
+      return;
+    }
+
+    // Try to get dimensions from the image
+    let width = 1080;
+    let height = 2340;
+
+    try {
+      // PNG header contains dimensions at bytes 16-24
+      if (imageBuffer.length >= 24 && imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) {
+        width = imageBuffer.readUInt32BE(16);
+        height = imageBuffer.readUInt32BE(20);
+      }
+    } catch {
+      // Use defaults if we can't read dimensions
+    }
+
+    try {
+      server.pushScreenshotUpdate(this.device.deviceId, base64Data, width, height);
+    } catch (error) {
+      logger.debug(`[SCREENSHOT] Failed to push screenshot to observation stream: ${error}`);
+    }
   }
 
   /**

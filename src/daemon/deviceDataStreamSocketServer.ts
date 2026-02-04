@@ -57,6 +57,10 @@ export interface PerformanceStreamData {
   memoryUsageMb: number;
   /** CPU usage percentage (0-100) */
   cpuUsagePercent: number;
+  /** Touch latency in milliseconds (time from touch to frame response) */
+  touchLatencyMs: number | null;
+  /** Time to interactive in milliseconds (time until app is responsive after launch) */
+  timeToInteractiveMs: number | null;
   /** Current screen/activity name if available */
   screenName: string | null;
   /** Whether the app is considered responsive */

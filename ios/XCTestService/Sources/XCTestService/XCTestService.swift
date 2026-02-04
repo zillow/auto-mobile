@@ -13,6 +13,7 @@ public class XCTestService {
     private let gesturePerformer: GesturePerformer
     private let commandHandler: CommandHandler
     private let hierarchyDebouncer: HierarchyDebouncer
+    private let fpsMonitor: DisplayLinkFPSMonitor
 
     #if canImport(XCTest) && os(iOS)
         private var application: XCUIApplication?
@@ -28,6 +29,7 @@ public class XCTestService {
         )
         server = WebSocketServer(port: port, commandHandler: commandHandler)
         hierarchyDebouncer = HierarchyDebouncer(elementLocator: elementLocator, timer: timer)
+        fpsMonitor = DisplayLinkFPSMonitor()
     }
 
     #if canImport(XCTest) && os(iOS)
@@ -75,6 +77,11 @@ public class XCTestService {
             }
             hierarchyDebouncer.start()
 
+            // Start FPS monitoring and broadcast updates to connected clients
+            fpsMonitor.startMonitoring { [weak self] snapshot in
+                self?.server.broadcastPerformanceUpdate(snapshot)
+            }
+
             print("[XCTestService] Service started")
             print("[XCTestService] WebSocket server listening on port \(Self.defaultPort)")
             print("[XCTestService] Endpoint: ws://localhost:\(Self.defaultPort)/ws")
@@ -82,6 +89,7 @@ public class XCTestService {
             print(
                 "[XCTestService] Hierarchy debouncer active (polling every \(HierarchyDebouncer.defaultPollIntervalMs)ms)"
             )
+            print("[XCTestService] FPS monitor active (reporting every \(DisplayLinkFPSMonitor.defaultReportIntervalSeconds)s)")
             print("[XCTestService] Ready to accept connections")
         }
     #else
@@ -93,6 +101,7 @@ public class XCTestService {
 
     /// Stops the service
     public func stop() {
+        fpsMonitor.stopMonitoring()
         hierarchyDebouncer.stop()
         server.stop()
         print("[XCTestService] Service stopped")

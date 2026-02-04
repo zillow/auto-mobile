@@ -10,6 +10,7 @@ import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetricsCollector";
+import { setLastTtiMs } from "../performance/PerformanceMonitor";
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
@@ -477,6 +478,7 @@ export class LaunchApp extends BaseVisualChange {
     logger.info(`[LaunchApp] Proceeding with app launch`);
 
     const captureDisplayedMetrics = serverConfig.isUiPerfModeEnabled();
+    logger.info(`[LaunchApp] captureDisplayedMetrics=${captureDisplayedMetrics} (isUiPerfModeEnabled)`);
     const displayedMetricsCollector = captureDisplayedMetrics
       ? new DisplayedTimeMetricsCollector(this.device, this.adbFactory)
       : null;
@@ -515,11 +517,13 @@ export class LaunchApp extends BaseVisualChange {
       }
     );
 
+    logger.info(`[LaunchApp] TTI capture check: collector=${!!displayedMetricsCollector}, startMs=${displayedMetricsStartMs}, hasObservation=${!!launchResult?.observation}`);
     if (displayedMetricsCollector && displayedMetricsStartMs !== null && launchResult?.observation) {
       const displayedMetricsEndMs = await perf.track(
         "displayedLogcatEndTime",
         () => this.adb.getDeviceTimestampMs()
       );
+      logger.info(`[LaunchApp] Capturing displayed metrics: startMs=${displayedMetricsStartMs}, endMs=${displayedMetricsEndMs}`);
       const displayedTimeMetrics = await displayedMetricsCollector.captureDisplayedMetrics(
         {
           packageName,
@@ -528,7 +532,20 @@ export class LaunchApp extends BaseVisualChange {
         },
         perf
       );
+      logger.info(`[LaunchApp] Captured ${displayedTimeMetrics.length} displayed metrics`);
       launchResult.observation.displayedTimeMetrics = displayedTimeMetrics;
+
+      // Store TTI for the performance monitor to report
+      // Use the first displayed metric as the TTI (time to first frame / interactive)
+      if (displayedTimeMetrics.length > 0) {
+        const firstMetric = displayedTimeMetrics[0];
+        setLastTtiMs(packageName, firstMetric.displayedTimeMs);
+        logger.info(`[LaunchApp] Recorded TTI for ${packageName}: ${firstMetric.displayedTimeMs}ms`);
+      } else {
+        logger.info(`[LaunchApp] No displayed metrics found for ${packageName}`);
+      }
+    } else {
+      logger.info(`[LaunchApp] Skipping TTI capture - conditions not met`);
     }
 
     return launchResult;

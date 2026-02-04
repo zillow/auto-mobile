@@ -1035,8 +1035,16 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   // ===========================================================================
 
   private async setupPortForwarding(perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<void> {
+    // Verify port forwarding is still active even if we think it's set up
+    // Port forwarding can be lost if ADB server restarts or emulator restarts
     if (this.portForwardingSetup) {
-      return;
+      const isActive = await this.isPortForwardingActive();
+      if (isActive) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Port forwarding already active (localhost:${this.localPort})`);
+        return;
+      }
+      logger.info(`[ACCESSIBILITY_SERVICE] Port forwarding was lost, re-establishing...`);
+      this.portForwardingSetup = false;
     }
 
     try {
@@ -1055,6 +1063,26 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
       throw error;
+    }
+  }
+
+  /**
+   * Check if port forwarding is still active by querying adb forward --list
+   */
+  private async isPortForwardingActive(): Promise<boolean> {
+    try {
+      const result = await this.adb.executeCommand("forward --list");
+      const expectedForward = `tcp:${this.localPort} tcp:${PortManager.DEVICE_PORT}`;
+      // Check if our port forward entry exists in the list
+      // Format is: "serial tcp:localPort tcp:remotePort" per line
+      const isActive = result.stdout.includes(expectedForward);
+      if (!isActive) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Port forwarding not found in active forwards. Expected: ${expectedForward}`);
+      }
+      return isActive;
+    } catch (error) {
+      logger.debug(`[ACCESSIBILITY_SERVICE] Failed to check port forwarding status: ${error}`);
+      return false;
     }
   }
 

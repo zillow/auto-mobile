@@ -16,6 +16,7 @@ import java.util.Base64
  */
 class RealLayoutDataSource(
     private val clientProvider: (() -> AutoMobileClient)? = null,
+    private val platform: String = "android",
 ) : LayoutDataSource {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -36,7 +37,7 @@ class RealLayoutDataSource(
             val client = provider()
 
             // Call the observe tool to capture fresh screen state
-            val observeResult = client.observe(platform = "android")
+            val observeResult = client.observe(platform = platform)
 
             // Parse the view hierarchy from the observe result
             val hierarchy = observeResult.viewHierarchy?.let { viewHierarchyJson ->
@@ -45,9 +46,10 @@ class RealLayoutDataSource(
                         ViewHierarchyResultDto.serializer(),
                         viewHierarchyJson
                     )
-                    viewHierarchyResult.hierarchy?.node?.let { nodes ->
+                            viewHierarchyResult.hierarchy?.node?.let { nodes ->
                         if (nodes.isNotEmpty()) {
-                            parseHierarchy(nodes.first(), 0)
+                            val counter = intArrayOf(0)
+                            parseHierarchy(nodes.first(), 0, counter)
                         } else null
                     }
                 } catch (e: Exception) {
@@ -81,15 +83,17 @@ class RealLayoutDataSource(
         }
     }
 
-    private fun parseHierarchy(node: HierarchyNodeDto, depth: Int): UIElementInfo {
+    private fun parseHierarchy(node: HierarchyNodeDto, depth: Int, counter: IntArray): UIElementInfo {
         // Parse bounds from string format "[left,top][right,bottom]"
         val bounds = node.bounds?.let { parseBoundsString(it) } ?: ElementBounds(0, 0, 0, 0)
 
-        // Generate a unique ID from available properties
-        val id = node.resourceId
+        // Generate a unique ID using counter to ensure uniqueness across tree
+        val nodeIndex = counter[0]++
+        val baseId = node.resourceId
             ?: node.contentDesc?.let { "desc:$it" }
             ?: node.text?.let { "text:$it" }
             ?: "node-$depth-${bounds.hashCode()}"
+        val id = "$baseId#$nodeIndex"
 
         return UIElementInfo(
             id = id,
@@ -106,7 +110,7 @@ class RealLayoutDataSource(
             isCheckable = node.checkable == "true",
             isChecked = node.checked == "true",
             depth = depth,
-            children = node.children.map { parseHierarchy(it, depth + 1) },
+            children = node.children.map { parseHierarchy(it, depth + 1, counter) },
         )
     }
 

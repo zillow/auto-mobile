@@ -1,14 +1,19 @@
 package dev.jasonpearson.automobile.ide.performance
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,10 +30,18 @@ fun PerformanceSummary(
     currentJankFrames: Int?,
     currentMemoryMb: Float?,
     currentTouchLatencyMs: Float?,
+    updateCounter: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val hasAnyMetric = currentFps != null || currentFrameTimeMs != null ||
         currentJankFrames != null || currentMemoryMb != null || currentTouchLatencyMs != null
+
+    // Flashing indicator color alternates between green and blue on each update
+    val indicatorColor = if (updateCounter % 2 == 0) {
+        Color(0xFF4CAF50) // Green
+    } else {
+        Color(0xFF2196F3) // Blue
+    }
 
     Column(
         modifier = modifier
@@ -38,6 +51,16 @@ fun PerformanceSummary(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Update indicator - flashes green/blue on data updates
+        if (hasAnyMetric) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(indicatorColor)
+            )
+        }
+
         // FPS indicator
         if (currentFps != null) {
             val fpsColor = when {

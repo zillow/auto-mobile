@@ -136,8 +136,9 @@ function parseArgs(): {
   const debug =
     args.includes("--debug") || process.env.AUTOMOBILE_DEBUG === "1";
 
-  // Detect UI performance audit mode
-  const uiPerfMode = args.includes("--ui-perf-mode");
+  // UI performance mode is enabled by default (captures TTI, displayed metrics)
+  // Use --no-ui-perf-mode to disable
+  const uiPerfMode = !args.includes("--no-ui-perf-mode");
   const uiPerfDebug = args.includes("--ui-perf-debug");
 
   // Detect memory performance audit mode

@@ -26,6 +26,7 @@ class RealStorageDataSource(
     private val clientProvider: (() -> AutoMobileClient)? = null,
     private val deviceId: String? = null,
     private val packageName: String? = null,
+    private val platform: StoragePlatform = StoragePlatform.Android,
 ) : StorageDataSource {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -104,7 +105,7 @@ class RealStorageDataSource(
                 KeyValueFile(
                     name = file.name,
                     path = file.path,
-                    platform = StoragePlatform.Android,
+                    platform = platform,
                     entries = entries,
                 )
             }

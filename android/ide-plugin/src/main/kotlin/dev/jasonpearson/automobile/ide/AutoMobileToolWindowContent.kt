@@ -98,6 +98,7 @@ import dev.jasonpearson.automobile.ide.tabs.HorizontalTabBar
 import dev.jasonpearson.automobile.ide.navigation.NavigationDashboard
 import dev.jasonpearson.automobile.ide.performance.PerformanceDashboard
 import dev.jasonpearson.automobile.ide.storage.StorageDashboard
+import dev.jasonpearson.automobile.ide.storage.StoragePlatform
 import dev.jasonpearson.automobile.ide.test.TestDashboard
 
 private val LOG = Logger.getInstance("AutoMobileToolWindow")
@@ -227,6 +228,7 @@ fun AutoMobileToolWindowContent() {
   var currentJankFrames by remember { mutableStateOf<Int?>(null) }
   var currentMemoryMb by remember { mutableStateOf<Float?>(null) }
   var currentTouchLatencyMs by remember { mutableStateOf<Float?>(null) }
+  var perfUpdateCounter by remember { mutableIntStateOf(0) }
 
   // Track failure counts by type for collapsed Failures panel
   var crashCount by remember { mutableIntStateOf(0) }
@@ -442,6 +444,7 @@ fun AutoMobileToolWindowContent() {
           currentJankFrames = update.jankFrames
           currentMemoryMb = update.memoryUsageMb
           currentTouchLatencyMs = update.touchLatencyMs
+          perfUpdateCounter++
       }
   }
 
@@ -517,6 +520,12 @@ fun AutoMobileToolWindowContent() {
     // In Real mode, show connected MCP device if available
     listOfNotNull(realDevice)
   }
+
+  // Compute platform based on device type for iOS/Android-specific data flow
+  val isIOSDevice = realDevice?.type == DeviceType.iOSSimulator || realDevice?.type == DeviceType.iOSPhysical
+  val platformString = if (isIOSDevice) "ios" else "android"
+  val storagePlatform = if (isIOSDevice) StoragePlatform.iOS else StoragePlatform.Android
+
   val availableEmulators = remember {
     listOf(
         AvailableEmulator("pixel6", "Pixel 6 API 33", DeviceType.AndroidEmulator, "33"),
@@ -725,6 +734,7 @@ fun AutoMobileToolWindowContent() {
                 dataSourceMode = dataSourceMode,
                 clientProvider = clientProvider,
                 observationStreamClient = observationStreamClient,
+                platform = platformString,
             )
 
             // Right vertical panels: Failures and Performance
@@ -809,6 +819,7 @@ fun AutoMobileToolWindowContent() {
                 currentJankFrames = currentJankFrames,
                 currentMemoryMb = currentMemoryMb,
                 currentTouchLatencyMs = currentTouchLatencyMs,
+                updateCounter = perfUpdateCounter,
                 onNavigateToScreen = { screenName ->
                     selectedHorizontalTabId = "navigation"
                 },
@@ -873,6 +884,7 @@ fun AutoMobileToolWindowContent() {
                     clientProvider = clientProvider,
                     deviceId = activeDeviceId,
                     packageName = selectedAppId,
+                    platform = storagePlatform,
                 )
                 "diagnostics" -> DiagnosticsDashboard(
                     connectedMcpProcess = connectedMcpProcess,

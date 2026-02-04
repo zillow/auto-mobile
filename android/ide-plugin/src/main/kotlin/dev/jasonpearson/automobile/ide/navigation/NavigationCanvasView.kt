@@ -751,11 +751,12 @@ fun NavigationCanvasView(
                 }
             }
 
-            // Toggle controls at top of canvas
+            // Toggle controls inside canvas, below the header
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(12.dp)
+                    .offset(y = with(density) { headerHeightPx.toDp() } + 8.dp)
+                    .padding(start = 12.dp)
                     .background(colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                     .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
