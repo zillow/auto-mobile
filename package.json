@@ -86,7 +86,7 @@
     "ajv-formats": "^3.0.1",
     "async-mutex": "^0.5.0",
     "fs-extra": "^11.3.3",
-    "glob": "^13.0.0",
+    "glob": "^13.0.1",
     "hono": "4.11.7",
     "jimp": "^1.6.0",
     "js-tiktoken": "^1.0.21",
@@ -104,11 +104,11 @@
   },
   "//overrides": {
     "lodash": "CVE-2025-13465: prototype pollution in _.unset and _.omit",
-    "tar": "CVE-2026-23950: Race condition in path reservations via Unicode collisions on macOS APFS"
+    "tar": "CVE-2026-24842: Arbitrary file creation/overwrite via hardlink path traversal"
   },
   "overrides": {
     "lodash": "^4.17.23",
-    "tar": "7.5.4"
+    "tar": "7.5.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
