@@ -436,6 +436,13 @@ ensure_dependencies() {
     return 1
   fi
 
+  # Install npm dependencies after Node and Bun are confirmed
+  log_info "Installing npm dependencies..."
+  if ! (cd "${PROJECT_ROOT}" && npm install); then
+    log_error "Failed to install npm dependencies."
+    return 1
+  fi
+
   # Check/install auto-mobile globally
   if ! ensure_auto_mobile; then
     log_error "auto-mobile global installation failed."
