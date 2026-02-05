@@ -47,7 +47,7 @@ jobs:
           exit 0
 
       - name: "Upload Dead Code Report (JSON)"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: dead-code-report-json
@@ -55,7 +55,7 @@ jobs:
           retention-days: 90
 
       - name: "Upload Dead Code Report (Markdown)"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: dead-code-report-markdown
