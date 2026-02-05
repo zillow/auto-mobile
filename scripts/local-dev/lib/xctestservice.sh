@@ -230,7 +230,7 @@ stop_xctestservice() {
     local count=0
     while kill -0 "${XCODEBUILD_PID}" 2>/dev/null && [[ ${count} -lt 5 ]]; do
       sleep 1
-      ((count++))
+      count=$((count + 1))
     done
 
     # Force kill if still running

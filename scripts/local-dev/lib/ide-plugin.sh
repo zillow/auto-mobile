@@ -503,7 +503,7 @@ restart_ide() {
 
   while pgrep -f "${process_pattern}" >/dev/null 2>&1 && [[ ${count} -lt 10 ]]; do
     sleep 1
-    ((count++))
+    count=$((count + 1))
   done
 
   # Step 3: Force kill if still running

@@ -142,14 +142,15 @@ reload_mcp_daemon() {
   log_info "Restarting MCP daemon..."
   if command -v auto-mobile >/dev/null 2>&1; then
     # Run daemon restart in background with timeout to prevent hanging
-    auto-mobile --daemon restart --debug --debug-perf >/dev/null 2>&1 &
+    local daemon_log="${PROJECT_ROOT}/scratch/daemon-restart.log"
+    auto-mobile --daemon restart --debug --debug-perf > "${daemon_log}" 2>&1 &
     local daemon_pid=$!
 
     # Wait up to 30 seconds for daemon restart
     local count=0
     while kill -0 "${daemon_pid}" 2>/dev/null && [[ ${count} -lt 30 ]]; do
       sleep 1
-      ((count++))
+      count=$((count + 1))
     done
 
     if kill -0 "${daemon_pid}" 2>/dev/null; then
@@ -162,7 +163,14 @@ reload_mcp_daemon() {
         echo "${pids}" | xargs kill -9 2>/dev/null || true
       fi
     else
-      log_info "MCP daemon restarted."
+      # Check exit status of completed process
+      local exit_status=0
+      wait "${daemon_pid}" || exit_status=$?
+      if [[ ${exit_status} -eq 0 ]]; then
+        log_info "MCP daemon restarted."
+      else
+        log_warn "Daemon restart failed (exit ${exit_status}). See ${daemon_log}"
+      fi
     fi
   else
     local pids
@@ -317,7 +325,7 @@ restart_ide_full_path() {
 
   while pgrep -f "${process_pattern}" >/dev/null 2>&1 && [[ ${count} -lt 10 ]]; do
     sleep 1
-    ((count++))
+    count=$((count + 1))
   done
 
   # Step 3: Force kill if still running

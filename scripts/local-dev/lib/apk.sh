@@ -136,9 +136,9 @@ install_apk() {
   local fail=0
   while IFS= read -r device; do
     if install_apk_to_device "${device}"; then
-      ((success++))
+      success=$((success + 1))
     else
-      ((fail++))
+      fail=$((fail + 1))
     fi
   done <<< "${devices}"
 
