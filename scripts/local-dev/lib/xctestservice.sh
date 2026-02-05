@@ -225,7 +225,19 @@ stop_xctestservice() {
   if [[ -n "${XCODEBUILD_PID}" ]] && kill -0 "${XCODEBUILD_PID}" 2>/dev/null; then
     log_info "Stopping XCTestService (PID ${XCODEBUILD_PID})..."
     kill "${XCODEBUILD_PID}" 2>/dev/null || true
-    wait "${XCODEBUILD_PID}" 2>/dev/null || true
+
+    # Wait up to 5 seconds for graceful exit
+    local count=0
+    while kill -0 "${XCODEBUILD_PID}" 2>/dev/null && [[ ${count} -lt 5 ]]; do
+      sleep 1
+      ((count++))
+    done
+
+    # Force kill if still running
+    if kill -0 "${XCODEBUILD_PID}" 2>/dev/null; then
+      log_warn "Force killing XCTestService..."
+      kill -9 "${XCODEBUILD_PID}" 2>/dev/null || true
+    fi
   fi
   XCODEBUILD_PID=""
 }

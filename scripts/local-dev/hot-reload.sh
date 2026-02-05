@@ -127,6 +127,13 @@ kill_previous() {
   if [[ -n "${pids}" ]]; then
     log_info "Killing orphaned hot-reload processes..."
     echo "${pids}" | xargs kill 2>/dev/null || true
+    sleep 1
+    # Force kill if still running
+    pids=$(pgrep -f "hot-reload.sh" 2>/dev/null | grep -v "$$" || true)
+    if [[ -n "${pids}" ]]; then
+      log_warn "Force killing orphaned hot-reload processes..."
+      echo "${pids}" | xargs kill -9 2>/dev/null || true
+    fi
   fi
 }
 
@@ -134,15 +141,42 @@ kill_previous() {
 reload_mcp_daemon() {
   log_info "Restarting MCP daemon..."
   if command -v auto-mobile >/dev/null 2>&1; then
-    auto-mobile --daemon restart --debug --debug-perf 2>&1 | while read -r line; do
-      log_info "[daemon] ${line}"
+    # Run daemon restart in background with timeout to prevent hanging
+    auto-mobile --daemon restart --debug --debug-perf >/dev/null 2>&1 &
+    local daemon_pid=$!
+
+    # Wait up to 30 seconds for daemon restart
+    local count=0
+    while kill -0 "${daemon_pid}" 2>/dev/null && [[ ${count} -lt 30 ]]; do
+      sleep 1
+      ((count++))
     done
+
+    if kill -0 "${daemon_pid}" 2>/dev/null; then
+      log_warn "Daemon restart timed out, force killing..."
+      kill -9 "${daemon_pid}" 2>/dev/null || true
+      # Also kill any daemon processes
+      local pids
+      pids=$(pgrep -f "auto-mobile.*--daemon-mode" 2>/dev/null || true)
+      if [[ -n "${pids}" ]]; then
+        echo "${pids}" | xargs kill -9 2>/dev/null || true
+      fi
+    else
+      log_info "MCP daemon restarted."
+    fi
   else
     local pids
     pids=$(pgrep -f "auto-mobile.*--daemon-mode" 2>/dev/null || true)
     if [[ -n "${pids}" ]]; then
       log_info "Killing daemon processes: ${pids}"
       echo "${pids}" | xargs kill 2>/dev/null || true
+      sleep 1
+      # Force kill if still running
+      pids=$(pgrep -f "auto-mobile.*--daemon-mode" 2>/dev/null || true)
+      if [[ -n "${pids}" ]]; then
+        log_warn "Force killing daemon processes..."
+        echo "${pids}" | xargs kill -9 2>/dev/null || true
+      fi
     fi
   fi
 }
