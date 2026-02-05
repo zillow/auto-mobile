@@ -367,6 +367,9 @@ jobs:
       - name: "Install XcodeGen"
         run: brew install xcodegen
 
+      - name: "Setup iOS Simulator Runtime"
+        run: ./scripts/ios/setup-ios-simulator.sh --verbose
+
       - name: "Generate Xcode Projects"
         run: ./scripts/ios/xcodegen-generate.sh
 

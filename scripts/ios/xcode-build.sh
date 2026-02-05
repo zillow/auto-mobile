@@ -82,6 +82,14 @@ fi
 XCODE_VERSION=$(xcodebuild -version)
 XCODE_VERSION=${XCODE_VERSION%%$'\n'*}
 print_info "Xcode version: ${XCODE_VERSION}"
+
+# Load simulator destination from setup script if available
+DEST_FILE="${PROJECT_ROOT}/.ios-simulator-destination"
+if [ -f "$DEST_FILE" ]; then
+    # shellcheck source=/dev/null
+    source "$DEST_FILE"
+    print_info "Using iOS destination: ${IOS_SIMULATOR_DESTINATION:-generic}"
+fi
 echo ""
 
 # Ensure iOS Simulator SDK is installed
@@ -103,17 +111,19 @@ if ! has_simulator_sdk; then
     fi
 fi
 
-# Find all xcodeproj directories
+# Find all xcodeproj directories using glob (faster than find)
 echo -e "${BLUE}Searching for Xcode projects...${NC}"
-XCODEPROJ_DIRS=$(find "${IOS_DIR}" -name "*.xcodeproj" -type d 2>/dev/null || true)
+shopt -s nullglob
+XCODEPROJ_ARRAY=("${IOS_DIR}"/*/*.xcodeproj "${IOS_DIR}"/*.xcodeproj)
+shopt -u nullglob
 
-if [ -z "${XCODEPROJ_DIRS}" ]; then
+if [ ${#XCODEPROJ_ARRAY[@]} -eq 0 ]; then
     echo -e "${YELLOW}No Xcode projects found in ${IOS_DIR}${NC}"
     exit 0
 fi
 
 # Build each project
-for xcodeproj in ${XCODEPROJ_DIRS}; do
+for xcodeproj in "${XCODEPROJ_ARRAY[@]}"; do
     PROJECT_NAME=$(basename "${xcodeproj}" .xcodeproj)
 
     echo -e "  Building ${PROJECT_NAME}..."
@@ -131,10 +141,12 @@ for xcodeproj in ${XCODEPROJ_DIRS}; do
     while IFS= read -r scheme; do
         if [ -n "${scheme}" ]; then
             echo -e "    Building scheme: ${scheme}..."
+            # Use detected destination or fall back to generic
+            DESTINATION="${IOS_SIMULATOR_DESTINATION:-generic/platform=iOS Simulator}"
             if run_cmd xcodebuild \
                 -project "${xcodeproj}" \
                 -scheme "${scheme}" \
-                -destination 'generic/platform=iOS Simulator' \
+                -destination "${DESTINATION}" \
                 -configuration Debug \
                 -quiet \
                 build 2>&1; then
