@@ -8,6 +8,7 @@ enum Tab: Hashable {
 
 struct ContentView: View {
     @State private var selectedTab: Tab = .discover
+    @Environment(\.autoMobileTheme) private var theme
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -29,9 +30,11 @@ struct ContentView: View {
                 }
                 .tag(Tab.settings)
         }
+        .tint(.autoMobileRed)
     }
 }
 
 #Preview {
     ContentView()
+        .autoMobileTheme()
 }

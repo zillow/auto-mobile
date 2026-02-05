@@ -21,6 +21,7 @@ targets:
       - path: Sources
         excludes:
           - "*.xcassets"
+      - path: Sources/Theme
       - path: Sources/Assets.xcassets
         type: folder
     settings:

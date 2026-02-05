@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct DemosTab: View {
+    @Environment(\.autoMobileTheme) private var theme
+
     var body: some View {
         NavigationStack {
             List {
@@ -79,20 +81,22 @@ struct DemoRow: View {
     let title: String
     let description: String
     let icon: String
+    @Environment(\.autoMobileTheme) private var theme
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(.blue)
+                .foregroundStyle(theme.primary)
                 .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
+                    .foregroundStyle(theme.textPrimary)
                 Text(description)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
         .padding(.vertical, 4)
@@ -103,24 +107,28 @@ struct DemoRow: View {
 
 struct ScrollPerformanceDemo: View {
     private let items = (1...1000).map { "Item \($0)" }
+    @Environment(\.autoMobileTheme) private var theme
 
     var body: some View {
         List(items, id: \.self) { item in
             HStack {
                 Circle()
-                    .fill(Color.blue.gradient)
+                    .fill(theme.primary)
                     .frame(width: 40, height: 40)
 
                 VStack(alignment: .leading) {
                     Text(item)
                         .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
                     Text("Scroll quickly to test performance")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.textSecondary)
                 }
             }
             .padding(.vertical, 4)
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background)
         .navigationTitle("Scroll Performance")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -132,6 +140,7 @@ struct AnimationDemo: View {
     @State private var isAnimating = false
     @State private var rotation: Double = 0
     @State private var scale: CGFloat = 1.0
+    @Environment(\.autoMobileTheme) private var theme
 
     var body: some View {
         ScrollView {
@@ -140,10 +149,11 @@ struct AnimationDemo: View {
                 VStack(spacing: 8) {
                     Text("Continuous Rotation")
                         .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
 
                     Image(systemName: "gear")
                         .font(.system(size: 60))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(theme.primary)
                         .rotationEffect(.degrees(rotation))
                         .onAppear {
                             withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
@@ -156,9 +166,10 @@ struct AnimationDemo: View {
                 VStack(spacing: 8) {
                     Text("Tap to Scale")
                         .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
 
                     Circle()
-                        .fill(Color.purple.gradient)
+                        .fill(Color.autoMobileRed)
                         .frame(width: 80, height: 80)
                         .scaleEffect(scale)
                         .onTapGesture {
@@ -172,22 +183,25 @@ struct AnimationDemo: View {
                 VStack(spacing: 8) {
                     Text("Toggle Animation")
                         .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
 
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isAnimating ? Color.green.gradient : Color.orange.gradient)
+                        .fill(isAnimating ? theme.primary : Color.autoMobileDarkGrey)
                         .frame(width: isAnimating ? 200 : 100, height: 60)
                         .animation(.easeInOut(duration: 0.5), value: isAnimating)
 
                     Button(isAnimating ? "Reset" : "Animate") {
                         isAnimating.toggle()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .tint(theme.primary)
                 }
 
                 Spacer()
             }
             .padding()
         }
+        .background(theme.background)
         .navigationTitle("Animations")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -200,6 +214,7 @@ struct HeavyComputationDemo: View {
     @State private var isComputing = false
     @State private var progress: Double = 0
     @State private var selectedDuration: Double = 1.0
+    @Environment(\.autoMobileTheme) private var theme
 
     private let durations: [Double] = [0.5, 1.0, 2.0, 3.0, 5.0]
 
@@ -211,10 +226,11 @@ struct HeavyComputationDemo: View {
                     Text("Block Main Thread")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundStyle(theme.textPrimary)
 
                     Text("This will freeze the UI completely by sleeping on the main thread. Use this to test jank detection.")
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
@@ -222,7 +238,7 @@ struct HeavyComputationDemo: View {
                     VStack(spacing: 8) {
                         Text("Duration: \(String(format: "%.1f", selectedDuration))s")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.textSecondary)
 
                         Picker("Duration", selection: $selectedDuration) {
                             ForEach(durations, id: \.self) { duration in
@@ -239,10 +255,10 @@ struct HeavyComputationDemo: View {
                         Label("Block Main Thread", systemImage: "exclamationmark.triangle.fill")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                    .tint(.autoMobileRed)
                 }
                 .padding()
-                .background(Color.red.opacity(0.1))
+                .background(Color.autoMobileRed.opacity(0.1))
                 .cornerRadius(12)
 
                 Divider()
@@ -253,15 +269,17 @@ struct HeavyComputationDemo: View {
                     Text("Background Computation")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundStyle(theme.textPrimary)
 
                     Text("This runs intensive calculations in the background without blocking the UI.")
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
                     ProgressView(value: progress)
                         .padding(.horizontal, 40)
+                        .tint(theme.primary)
 
                     Button {
                         startComputation()
@@ -274,24 +292,27 @@ struct HeavyComputationDemo: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(theme.primary)
                     .disabled(isComputing)
                 }
                 .padding()
-                .background(Color.blue.opacity(0.1))
+                .background(theme.surfaceVariant)
                 .cornerRadius(12)
 
                 // Result display
                 Text(result)
                     .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(theme.textPrimary)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.secondary.opacity(0.1))
+                    .background(theme.surfaceVariant)
                     .cornerRadius(8)
 
                 Spacer()
             }
             .padding()
         }
+        .background(theme.background)
         .navigationTitle("Heavy Computation")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -455,29 +476,33 @@ struct SheetContent: View {
 
 struct AccessibilityDemo: View {
     @State private var dynamicTypeSize: DynamicTypeSize = .large
+    @Environment(\.autoMobileTheme) private var theme
 
     var body: some View {
         List {
             Section {
                 Text("Dynamic Type Preview")
                     .font(.headline)
+                    .foregroundStyle(theme.textPrimary)
 
                 Text("This text will scale with Dynamic Type settings. Try changing the text size in Settings > Accessibility > Display & Text Size.")
                     .dynamicTypeSize(dynamicTypeSize)
+                    .foregroundStyle(theme.textSecondary)
             }
 
             Section("VoiceOver Labels") {
                 HStack {
                     Image(systemName: "star.fill")
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(Color.autoMobileWarning)
                         .accessibilityLabel("Favorite")
 
                     Text("Favorite Item")
+                        .foregroundStyle(theme.textPrimary)
 
                     Spacer()
 
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.autoMobileSuccess)
                         .accessibilityLabel("Completed")
                 }
                 .accessibilityElement(children: .combine)
@@ -491,32 +516,45 @@ struct AccessibilityDemo: View {
                         Text("Add Item")
                     }
                 }
+                .tint(theme.primary)
                 .accessibilityHint("Double tap to add a new item")
             }
 
-            Section("Semantic Colors") {
+            Section("AutoMobile Colors") {
                 HStack {
                     Rectangle()
-                        .fill(.primary)
+                        .fill(Color.autoMobileLalala)
                         .frame(width: 40, height: 40)
-                    Text("Primary")
+                        .cornerRadius(4)
+                    Text("Primary (Lalala)")
+                        .foregroundStyle(theme.textPrimary)
                 }
 
                 HStack {
                     Rectangle()
-                        .fill(.secondary)
+                        .fill(Color.autoMobileRed)
                         .frame(width: 40, height: 40)
-                    Text("Secondary")
+                        .cornerRadius(4)
+                    Text("Secondary (Red)")
+                        .foregroundStyle(theme.textPrimary)
                 }
 
                 HStack {
                     Rectangle()
-                        .fill(Color.accentColor)
+                        .fill(Color.autoMobileEggshell)
                         .frame(width: 40, height: 40)
-                    Text("Accent")
+                        .cornerRadius(4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color.autoMobileLightGrey, lineWidth: 1)
+                        )
+                    Text("Background (Eggshell)")
+                        .foregroundStyle(theme.textPrimary)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.background)
         .navigationTitle("Accessibility")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -524,4 +562,5 @@ struct AccessibilityDemo: View {
 
 #Preview {
     DemosTab()
+        .autoMobileTheme()
 }
