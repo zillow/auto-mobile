@@ -62,39 +62,39 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 log_info() {
-    echo -e "${BLUE}ℹ${NC} $1"
+    echo -e "${BLUE}ℹ${NC} $1" >&2
 }
 
 log_success() {
-    echo -e "${GREEN}✓${NC} $1"
+    echo -e "${GREEN}✓${NC} $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}⚠${NC} $1"
+    echo -e "${YELLOW}⚠${NC} $1" >&2
 }
 
 log_error() {
-    echo -e "${RED}✗${NC} $1"
+    echo -e "${RED}✗${NC} $1" >&2
 }
 
 log_debug() {
     if [ "$VERBOSE" = true ]; then
-        echo -e "${CYAN}→${NC} $1"
+        echo -e "${CYAN}→${NC} $1" >&2
     fi
 }
 
 run_cmd() {
     if [ "$DRY_RUN" = true ]; then
-        echo -e "  ${YELLOW}↳${NC} (dry-run) $*"
+        echo -e "  ${YELLOW}↳${NC} (dry-run) $*" >&2
         return 0
     fi
     "$@"
 }
 
-echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  iOS Simulator Setup${NC}"
-echo -e "${CYAN}========================================${NC}"
-echo ""
+echo -e "${CYAN}========================================${NC}" >&2
+echo -e "${CYAN}  iOS Simulator Setup${NC}" >&2
+echo -e "${CYAN}========================================${NC}" >&2
+echo "" >&2
 
 # Check required tools
 if ! command -v rg &> /dev/null; then
@@ -115,7 +115,7 @@ XCODE_PATH=$(xcode-select -p)
 
 log_info "Xcode version: ${XCODE_VERSION} (${XCODE_BUILD})"
 log_info "Xcode path: ${XCODE_PATH}"
-echo ""
+echo "" >&2
 
 # Script directory for finding project files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -145,14 +145,14 @@ fi
 log_info "Minimum iOS deployment target: ${MIN_IOS_VERSION}"
 
 # List available simulator runtimes
-echo ""
-echo -e "${BLUE}Available Simulator Runtimes:${NC}"
+echo "" >&2
+echo -e "${BLUE}Available Simulator Runtimes:${NC}" >&2
 RUNTIMES_OUTPUT=$(xcrun simctl list runtimes 2>/dev/null || echo "")
 if [ -z "$RUNTIMES_OUTPUT" ]; then
     log_warn "No simulator runtimes found"
 else
     echo "$RUNTIMES_OUTPUT" | grep -E "iOS|watchOS|tvOS|visionOS" | head -10 | while read -r line; do
-        echo "  $line"
+        echo "  $line" >&2
     done
 fi
 
@@ -193,7 +193,7 @@ if [ -n "$BEST_IOS_VERSION" ]; then
 else
     log_warn "No compatible iOS runtime found (need >= ${MIN_IOS_VERSION})"
 fi
-echo ""
+echo "" >&2
 
 # Find available simulator devices for the best runtime
 find_simulator_device() {
@@ -266,10 +266,10 @@ if [ "$NEEDS_DOWNLOAD" = true ]; then
         exit 1
     fi
 
-    echo ""
+    echo "" >&2
     log_info "Downloading iOS platform for Xcode ${XCODE_VERSION}..."
     log_info "This may take several minutes..."
-    echo ""
+    echo "" >&2
 
     DOWNLOAD_START=$(date +%s)
 
@@ -280,16 +280,16 @@ if [ "$NEEDS_DOWNLOAD" = true ]; then
         set +e
         xcodebuild -downloadPlatform iOS 2>&1 | while IFS= read -r line; do
             if [ "$VERBOSE" = true ]; then
-                echo "  $line"
+                echo "  $line" >&2
             else
                 if echo "$line" | grep -qE "Downloading|Installing|Progress|%"; then
-                    printf "\r  %s" "$line"
+                    printf "\r  %s" "$line" >&2
                 fi
             fi
         done
         DOWNLOAD_EXIT_CODE=${PIPESTATUS[0]}
         set -e
-        echo ""
+        echo "" >&2
     fi
 
     DOWNLOAD_END=$(date +%s)
@@ -301,7 +301,7 @@ if [ "$NEEDS_DOWNLOAD" = true ]; then
     fi
 
     log_success "Download completed in ${DOWNLOAD_DURATION}s"
-    echo ""
+    echo "" >&2
 
     # Refresh runtime list
     sleep 2
@@ -342,23 +342,23 @@ EOF
 fi
 
 # Summary
-echo ""
-echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  Setup Complete${NC}"
-echo -e "${CYAN}========================================${NC}"
-echo ""
-echo "  Xcode version:     ${XCODE_VERSION}"
-echo "  Min iOS target:    ${MIN_IOS_VERSION}"
-echo "  iOS runtime:       ${BEST_IOS_VERSION:-none}"
-echo "  Simulator device:  ${SIMULATOR_DEVICE:-auto}"
-echo "  Destination:       ${DESTINATION}"
-echo ""
+echo "" >&2
+echo -e "${CYAN}========================================${NC}" >&2
+echo -e "${CYAN}  Setup Complete${NC}" >&2
+echo -e "${CYAN}========================================${NC}" >&2
+echo "" >&2
+echo "  Xcode version:     ${XCODE_VERSION}" >&2
+echo "  Min iOS target:    ${MIN_IOS_VERSION}" >&2
+echo "  iOS runtime:       ${BEST_IOS_VERSION:-none}" >&2
+echo "  Simulator device:  ${SIMULATOR_DEVICE:-auto}" >&2
+echo "  Destination:       ${DESTINATION}" >&2
+echo "" >&2
 
 if [ -n "$BEST_IOS_VERSION" ]; then
     log_success "iOS Simulator ready"
-    echo ""
-    echo -e "${BLUE}Use this destination in xcodebuild:${NC}"
-    echo "  -destination '${DESTINATION}'"
+    echo "" >&2
+    echo -e "${BLUE}Use this destination in xcodebuild:${NC}" >&2
+    echo "  -destination '${DESTINATION}'" >&2
     exit 0
 else
     log_error "No compatible iOS Simulator runtime available"
