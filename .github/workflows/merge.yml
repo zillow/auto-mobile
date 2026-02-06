@@ -219,6 +219,7 @@ jobs:
   mcp-build-and-test:
     name: "Node TypeScript Build and Test (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -244,6 +245,9 @@ jobs:
 
       - name: "Run Tests"
         shell: bash
+        env:
+          # Force AdbClient into test mode on Windows to prevent adb daemon startup
+          AUTOMOBILE_TEST_MODE: ${{ matrix.os == 'windows-latest' && 'true' || '' }}
         run: |
           set -euo pipefail
           mkdir -p ci-logs
