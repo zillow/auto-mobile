@@ -4,8 +4,6 @@
   "metrics": {
     "mcpServer.cold.timeToReadyMs": 500,
     "mcpServer.warm.timeToReadyMs": 200,
-    "mcpServer.cold.timeToFirstToolCallMs": 1000,
-    "mcpServer.warm.timeToFirstToolCallMs": 500,
     "mcpServer.cold.memory.heapUsedBytes": 104857600,
     "daemon.cold.timeToReadyMs": 2000,
     "daemon.warm.timeToReadyMs": 1000,

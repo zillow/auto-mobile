@@ -98,7 +98,8 @@ function parseArgs(): {
   daemonCommand?: string;
   daemonArgs: string[];
   skipAccessibilityDownload: boolean;
-  directMode: boolean;
+  noProxy: boolean;
+  noDaemon: boolean;
   testVideoRecording: boolean;
   } {
   const args = process.argv.slice(2);
@@ -117,9 +118,13 @@ function parseArgs(): {
   // Detect daemon mode (internal daemon process)
   const daemonMode = args.includes("--daemon-mode");
 
-  // Detect direct mode (skip daemon proxy, execute tools directly)
+  // Detect no-proxy mode (skip daemon proxy, execute tools directly)
   // By default, MCP server proxies to daemon for stable device management
-  const directMode = args.includes("--direct");
+  // --direct is kept as an undocumented alias for backwards compatibility
+  const noProxy = args.includes("--no-proxy") || args.includes("--direct");
+
+  // Detect no-daemon mode (keep proxy architecture but disable daemon auto-start)
+  const noDaemon = args.includes("--no-daemon");
 
   // Detect daemon management command
   const daemonCommandIndex = args.indexOf("--daemon");
@@ -356,7 +361,8 @@ function parseArgs(): {
     daemonCommand,
     daemonArgs,
     skipAccessibilityDownload,
-    directMode,
+    noProxy,
+    noDaemon,
     testVideoRecording,
   };
 }
@@ -839,7 +845,7 @@ async function startStreamableProxyServer(transport: TransportConfig, daemonOpti
         try {
           proxyResult = createProxyMcpServer({
             sessionContext,
-            proxyConfig: { daemonOptions }
+            proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions }
           });
         } catch (error) {
           logger.error("Failed to create proxy MCP server:", error);
@@ -963,7 +969,7 @@ async function startSSEProxyServer(transport: TransportConfig, daemonOptions: Da
       // Create proxy MCP server
       const { server: mcpServer, proxy: sseProxy } = createProxyMcpServer({
         sessionContext: { sessionId },
-        proxyConfig: { daemonOptions }
+        proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions }
       });
 
       sseTransport.onclose = async () => {
@@ -1110,7 +1116,8 @@ async function main() {
       daemonCommand,
       daemonArgs,
       skipAccessibilityDownload,
-      directMode,
+      noProxy,
+      noDaemon,
       testVideoRecording,
     } = parseArgs();
 
@@ -1198,8 +1205,8 @@ async function main() {
     } else {
       // In proxy mode (default), the MCP server proxies requests to the daemon
       // The daemon manages device state and tool execution
-      // In direct mode (--direct flag), the MCP server executes tools directly
-      const useProxyMode = !directMode;
+      // In no-proxy mode (--no-proxy flag), the MCP server executes tools directly
+      const useProxyMode = !noProxy;
 
       // Construct daemon options from CLI args to pass when auto-starting daemon
       const proxyDaemonOptions: DaemonOptions = {
@@ -1218,7 +1225,7 @@ async function main() {
       if (useProxyMode) {
         logger.info("Starting MCP server in proxy mode (connecting to daemon)");
       } else {
-        logger.info("Starting MCP server in direct mode (--direct flag)");
+        logger.info("Starting MCP server in direct mode (--no-proxy flag)");
         // Start auxiliary services only in direct mode
         await startHostEmulatorAutoConnect();
         await startVideoRecordingSocketServer();
@@ -1254,7 +1261,7 @@ async function main() {
         try {
           if (useProxyMode) {
             const result = createProxyMcpServer({
-              proxyConfig: { daemonOptions: proxyDaemonOptions }
+              proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions: proxyDaemonOptions }
             });
             server = result.server;
             stdioProxy = result.proxy;

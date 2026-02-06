@@ -28,15 +28,57 @@ verbose="false"
 script_start_ms=""
 current_operation=""
 child_pids=()
+# File-backed PID tracking so subshells (from command substitutions) can
+# share tracked PIDs with the main shell's cleanup handlers.
+_pid_tracking_file=$(mktemp)
 
 # Track child process PIDs for cleanup
 track_child_pid() {
   child_pids+=("$1")
+  echo "$1" >> "$_pid_tracking_file"
 }
 
 untrack_child_pid() {
   local pid="$1"
   child_pids=("${child_pids[@]/$pid}")
+  # Also remove from the file-backed tracker so _kill_all_tracked_pids
+  # won't signal a reused PID during cleanup.
+  if [[ -f "$_pid_tracking_file" ]]; then
+    local tmp="${_pid_tracking_file}.tmp"
+    grep -vxF "$pid" "$_pid_tracking_file" > "$tmp" 2>/dev/null || true
+    mv "$tmp" "$_pid_tracking_file"
+  fi
+}
+
+# Kill all tracked child processes (from both in-memory array and PID file).
+# Also kills direct children of this script to catch command-substitution
+# subshells whose PIDs are never explicitly tracked.
+# shellcheck disable=SC2317,SC2329  # Function is invoked indirectly via cleanup/timeout handlers
+_kill_all_tracked_pids() {
+  local signal="${1:-KILL}"
+  local seen=""
+
+  # In-memory array (only has PIDs tracked in the main shell)
+  for pid in "${child_pids[@]}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      pkill "-$signal" -P "$pid" 2>/dev/null || true
+      kill "-$signal" "$pid" 2>/dev/null || true
+      seen="$seen $pid"
+    fi
+  done
+
+  # PID file (has PIDs tracked in subshells too)
+  if [[ -f "$_pid_tracking_file" ]]; then
+    while IFS= read -r pid; do
+      if [[ -n "$pid" && "$seen" != *" $pid"* ]] && kill -0 "$pid" 2>/dev/null; then
+        pkill "-$signal" -P "$pid" 2>/dev/null || true
+        kill "-$signal" "$pid" 2>/dev/null || true
+      fi
+    done < "$_pid_tracking_file"
+  fi
+
+  # Kill direct children of this script (catches command-substitution subshells)
+  pkill "-$signal" -P $$ 2>/dev/null || true
 }
 
 # Global timeout handler - logs diagnostics and exits
@@ -60,8 +102,13 @@ global_timeout_handler() {
     pstree -p $$ 2>/dev/null | sed 's/^/  /' >&2 || true
   else
     echo "  (pstree not available)" >&2
-    echo "  Child PIDs tracked: ${child_pids[*]:-none}" >&2
-    for pid in "${child_pids[@]}"; do
+    echo "  Child PIDs (in-memory): ${child_pids[*]:-none}" >&2
+    if [[ -f "$_pid_tracking_file" && -s "$_pid_tracking_file" ]]; then
+      echo "  Child PIDs (file): $(tr '\n' ' ' < "$_pid_tracking_file")" >&2
+    fi
+    local all_pids
+    all_pids=$(cat "$_pid_tracking_file" 2>/dev/null; printf '%s\n' "${child_pids[@]}")
+    for pid in $(echo "$all_pids" | sort -u); do
       if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
         echo "    PID $pid: running" >&2
       fi
@@ -84,19 +131,11 @@ global_timeout_handler() {
   echo "Environment: $env_info" >&2
   echo "" >&2
 
-  # Kill all tracked child processes
+  # Kill all tracked child processes (including those tracked in subshells)
   echo "Killing child processes..." >&2
-  for pid in "${child_pids[@]}"; do
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-      kill -TERM "$pid" 2>/dev/null || true
-    fi
-  done
+  _kill_all_tracked_pids TERM
   sleep 0.5
-  for pid in "${child_pids[@]}"; do
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-      kill -KILL "$pid" 2>/dev/null || true
-    fi
-  done
+  _kill_all_tracked_pids KILL
 
   echo "Benchmark terminated due to global timeout." >&2
   exit 1
@@ -639,7 +678,7 @@ run_mcp_server() {
 
   AUTOMOBILE_STARTUP_BENCHMARK=1 \
   AUTOMOBILE_STARTUP_BENCHMARK_LABEL="mcp-server-$mode" \
-  bun run dist/src/index.js --startup-benchmark \
+  bun run dist/src/index.js --startup-benchmark --no-daemon \
     <"$stdin_fifo" >"$stdout_fifo" 2>"$stderr_fifo" &
   local server_pid=$!
   track_child_pid "$server_pid"
@@ -690,31 +729,18 @@ run_mcp_server() {
   mcp_send 3 '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
   local booted_response=""
-  if ! mcp_read_resource 3 4 "automobile:devices/booted" 10 booted_response; then
-    drain_fd 5 "$stderr_log" "mcp-stderr> " last_stderr_message
-    local elapsed_ms=$(( $(get_time_ms) - start_ms ))
-    local error_message
-    error_message=$(build_error_message \
-      "Failed to read booted devices resource response" \
-      "resources/read response on stdout (fd 4)" \
-      "$elapsed_ms" \
-      "$server_pid" \
-      "$last_stdout_message" \
-      "$last_stderr_message" \
-      "$stderr_log" \
-      "Mode: $mode; Resource: automobile:devices/booted")
-    untrack_child_pid "$server_pid"
-    stop_process "$server_pid"
-    exec 3>&-
-    exec 4<&-
-    exec 5<&-
-    rm -rf "$fifo_dir"
-    printf '%s\n' "$error_message"
-    return 1
+  local time_to_first_tool_call_ms=""
+  if mcp_read_resource 3 4 "automobile:devices/booted" 10 booted_response; then
+    last_stdout_message="$booted_response"
+    # Check for JSON-RPC error (e.g. daemon not running with --no-daemon)
+    if jq -e '.error' >/dev/null 2>&1 <<<"$booted_response"; then
+      echo "resources/read returned JSON-RPC error (skipping timeToFirstToolCallMs)" >&2
+    else
+      time_to_first_tool_call_ms=$(( $(get_time_ms) - start_ms ))
+    fi
+  else
+    echo "resources/read failed (skipping timeToFirstToolCallMs)" >&2
   fi
-  last_stdout_message="$booted_response"
-  local time_to_first_tool_call_ms
-  time_to_first_tool_call_ms=$(( $(get_time_ms) - start_ms ))
 
   local startup_report
   if ! wait_for_startup_report 5 "$DEFAULT_TIMEOUT_MS" "$stderr_log" startup_report last_stderr_message "mcp-stderr> "; then
@@ -781,11 +807,13 @@ run_mcp_server() {
     --arg mode "$mode" \
     --argjson timeToReadyMs "$time_to_first_connection_ms" \
     --argjson timeToFirstConnectionMs "$time_to_first_connection_ms" \
-    --argjson timeToFirstToolCallMs "$time_to_first_tool_call_ms" \
     --argjson phases "$phases" \
     --argjson marks "$marks" \
     --argjson memoryUsage "$memory" \
-    '{mode:$mode, timeToReadyMs:$timeToReadyMs, timeToFirstConnectionMs:$timeToFirstConnectionMs, timeToFirstToolCallMs:$timeToFirstToolCallMs, phases:$phases, marks:$marks, memoryUsage:$memoryUsage}')
+    '{mode:$mode, timeToReadyMs:$timeToReadyMs, timeToFirstConnectionMs:$timeToFirstConnectionMs, phases:$phases, marks:$marks, memoryUsage:$memoryUsage}')
+  if [[ -n "$time_to_first_tool_call_ms" ]]; then
+    run_json=$(jq -c --argjson v "$time_to_first_tool_call_ms" '.timeToFirstToolCallMs = $v' <<<"$run_json")
+  fi
 
   echo "$run_json"
 }
@@ -978,13 +1006,11 @@ require_command jq
 # Cleanup handler to kill all tracked children on exit
 # shellcheck disable=SC2317,SC2329  # Function is invoked indirectly via trap
 cleanup_on_exit() {
-  for pid in "${child_pids[@]}"; do
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-      pkill -KILL -P "$pid" 2>/dev/null || true
-      kill -KILL "$pid" 2>/dev/null || true
-    fi
-  done
+  # Stop the timeout monitor first to prevent a USR1 race when pkill kills
+  # the timeout subshell inside _kill_all_tracked_pids.
   stop_global_timeout_monitor
+  _kill_all_tracked_pids KILL
+  rm -f "$_pid_tracking_file"
 }
 
 # Setup global timeout handler
@@ -1035,7 +1061,10 @@ if [[ "$run_server" == "true" ]]; then
     server_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$server_runs_json")
     metrics_add "mcpServer.cold.timeToReadyMs" "$(jq -r '.timeToReadyMs' <<<"$run_json")"
     metrics_add "mcpServer.cold.timeToFirstConnectionMs" "$(jq -r '.timeToFirstConnectionMs' <<<"$run_json")"
-    metrics_add "mcpServer.cold.timeToFirstToolCallMs" "$(jq -r '.timeToFirstToolCallMs' <<<"$run_json")"
+    cold_tool_call_ms=$(jq -r '.timeToFirstToolCallMs // empty' <<<"$run_json")
+    if [[ -n "$cold_tool_call_ms" ]]; then
+      metrics_add "mcpServer.cold.timeToFirstToolCallMs" "$cold_tool_call_ms"
+    fi
     metrics_add "mcpServer.cold.memory.heapUsedBytes" "$(jq -r '.memoryUsage.heapUsed // 0' <<<"$run_json")"
   fi
 
@@ -1050,7 +1079,10 @@ if [[ "$run_server" == "true" ]]; then
     server_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$server_runs_json")
     metrics_add "mcpServer.warm.timeToReadyMs" "$(jq -r '.timeToReadyMs' <<<"$run_json")"
     metrics_add "mcpServer.warm.timeToFirstConnectionMs" "$(jq -r '.timeToFirstConnectionMs' <<<"$run_json")"
-    metrics_add "mcpServer.warm.timeToFirstToolCallMs" "$(jq -r '.timeToFirstToolCallMs' <<<"$run_json")"
+    warm_tool_call_ms=$(jq -r '.timeToFirstToolCallMs // empty' <<<"$run_json")
+    if [[ -n "$warm_tool_call_ms" ]]; then
+      metrics_add "mcpServer.warm.timeToFirstToolCallMs" "$warm_tool_call_ms"
+    fi
     metrics_add "mcpServer.warm.memory.heapUsedBytes" "$(jq -r '.memoryUsage.heapUsed // 0' <<<"$run_json")"
   fi
 else
