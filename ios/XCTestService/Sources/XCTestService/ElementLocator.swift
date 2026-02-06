@@ -470,36 +470,97 @@ public class ElementLocator: ElementLocating {
             )
         }
 
-        /// Get system alerts from springboard (permission dialogs, etc.)
-        /// These are presented by springboard, not the app, so we need to check separately
+        /// Get system alerts from springboard and foreground app (permission dialogs, etc.)
+        /// Checks two sources because system dialogs may appear via springboard or the foreground app
+        /// depending on iOS version. Deduplicates by alert label text.
         private func getSystemAlerts() -> [UIElementInfo] {
-            // Check if springboard has any alerts
-            let alertCount: Int = runOnMainThread {
-                self.springboard.alerts.count
+            let springboardAlerts = getAlertsFromSpringboard()
+            let foregroundAlerts = getAlertsFromForegroundApp()
+
+            // Deduplicate by alert label text
+            var seenLabels: Set<String> = []
+            var combined: [UIElementInfo] = []
+
+            for alert in springboardAlerts {
+                let label = alert.text ?? ""
+                seenLabels.insert(label)
+                combined.append(alert)
             }
 
-            guard alertCount > 0 else {
-                return []
-            }
-
-            // Get snapshots of all alerts
-            var alertElements: [UIElementInfo] = []
-
-            for i in 0 ..< alertCount {
-                if let alertSnapshot: XCUIElementSnapshot = runOnMainThread({
-                    let alert = self.springboard.alerts.element(boundBy: i)
-                    return try? alert.snapshot()
-                }) {
-                    let alertElement = buildElementInfoFromSnapshot(
-                        alertSnapshot,
-                        depth: 0,
-                        screenBounds: alertSnapshot.frame
-                    )
-                    alertElements.append(alertElement)
+            for alert in foregroundAlerts {
+                let label = alert.text ?? ""
+                if !seenLabels.contains(label) {
+                    seenLabels.insert(label)
+                    combined.append(alert)
                 }
             }
 
-            return alertElements
+            return combined
+        }
+
+        /// Get alerts from a fresh springboard instance.
+        /// IMPORTANT: Creates a new XCUIApplication each call to avoid stale cached state.
+        /// The lazy `self.springboard` property caches state and misses newly-presented alerts.
+        private func getAlertsFromSpringboard() -> [UIElementInfo] {
+            let alertSnapshots: [XCUIElementSnapshot] = runOnMainThread {
+                let freshSpringboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+                let alertCount = freshSpringboard.alerts.count
+                guard alertCount > 0 else { return [] }
+
+                var snapshots: [XCUIElementSnapshot] = []
+                for i in 0 ..< alertCount {
+                    let alert = freshSpringboard.alerts.element(boundBy: i)
+                    do {
+                        let snapshot = try alert.snapshot()
+                        snapshots.append(snapshot)
+                    } catch {
+                        print("[ElementLocator] Failed to snapshot springboard alert \(i): \(error)")
+                    }
+                }
+                return snapshots
+            }
+
+            return alertSnapshots.map { snapshot in
+                buildElementInfoFromSnapshot(
+                    snapshot,
+                    depth: 0,
+                    screenBounds: snapshot.frame
+                )
+            }
+        }
+
+        /// Get alerts from the foreground app.
+        /// Some iOS versions surface permission dialogs as alerts on the foreground app
+        /// rather than (or in addition to) springboard.
+        /// IMPORTANT: Creates a fresh XCUIApplication instance to avoid stale cached state.
+        private func getAlertsFromForegroundApp() -> [UIElementInfo] {
+            guard let bundleId = foregroundBundleId else { return [] }
+
+            let alertSnapshots: [XCUIElementSnapshot] = runOnMainThread {
+                let freshApp = XCUIApplication(bundleIdentifier: bundleId)
+                let alertCount = freshApp.alerts.count
+                guard alertCount > 0 else { return [] }
+
+                var snapshots: [XCUIElementSnapshot] = []
+                for i in 0 ..< alertCount {
+                    let alert = freshApp.alerts.element(boundBy: i)
+                    do {
+                        let snapshot = try alert.snapshot()
+                        snapshots.append(snapshot)
+                    } catch {
+                        print("[ElementLocator] Failed to snapshot foreground app alert \(i): \(error)")
+                    }
+                }
+                return snapshots
+            }
+
+            return alertSnapshots.map { snapshot in
+                buildElementInfoFromSnapshot(
+                    snapshot,
+                    depth: 0,
+                    screenBounds: snapshot.frame
+                )
+            }
         }
 
         /// Build element info from XCUIElementSnapshot - all data is already captured, no IPC calls
