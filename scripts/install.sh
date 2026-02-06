@@ -467,10 +467,18 @@ plain_error() {
     printf '[ERROR] %s\n' "$1" >&2
 }
 
+# Test whether we can actually open /dev/tty (controlling terminal).
+# The device node may exist even when no controlling terminal is attached
+# (CI, cron, detached shells), so we must try opening it.
+has_controlling_tty() {
+    : < /dev/tty 2>/dev/null
+}
+
 prompt_confirm_plain() {
     local prompt="$1"
     local reply=""
-    read -r -p "${prompt} [y/N] " reply
+    # Read from /dev/tty so prompts work even when stdin is a pipe (curl | bash)
+    read -r -p "${prompt} [y/N] " reply < /dev/tty
     case "${reply}" in
         y|Y|yes|YES)
             return 0
@@ -848,8 +856,8 @@ ensure_gum() {
     local arch
     arch=$(detect_arch)
 
-    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
-        # In non-interactive mode, just install bundled gum
+    if [[ "${NON_INTERACTIVE}" == "true" ]] || ! has_controlling_tty; then
+        # In non-interactive mode or when no controlling terminal is available, just install bundled gum
         plain_info "Installing bundled gum ${GUM_VERSION}..."
         if ! install_bundled_gum "${os}" "${arch}"; then
             plain_error "gum installation failed."
