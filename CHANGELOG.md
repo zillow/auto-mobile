@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.0.10] - 2026-02-06
+### Added
+- Support custom accessibility rules ([#104](https://github.com/kaeawc/auto-mobile/issues/104)) (devxp, a11y)
+### Other
+- chore: upgrade GitHub Actions upload-artifact and download-artifact to v4.6+ ([#1158](https://github.com/kaeawc/auto-mobile/issues/1158))
+- Publish AutoMobile Android SDK on Maven Central ([#122](https://github.com/kaeawc/auto-mobile/issues/122)) (android, ci, release engineering)
+- Publish AutoMobile JUnitRunner Library ([#121](https://github.com/kaeawc/auto-mobile/issues/121)) (android, ci, release engineering, testing)
+
 ## [v0.0.9] - 2026-02-04
 ### Added
 - Test Runners: Cascade MCP tool failures to JUnitRunner/XCTestRunner via executePlan response ([#1078](https://github.com/kaeawc/auto-mobile/issues/1078)) (android, ios, testing)
