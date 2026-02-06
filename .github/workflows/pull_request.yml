@@ -90,7 +90,8 @@ jobs:
             });
 
             // Check if title matches the automated SHA256 update pattern
-            const titleMatches = pr.title === 'chore: update accessibility service APK SHA256';
+            const titleMatches = pr.title === 'chore: update accessibility service APK SHA256' ||
+                                 pr.title === 'chore: update XCTestService IPA SHA256';
 
             // Get list of changed files
             const { data: files } = await github.rest.pulls.listFiles({
