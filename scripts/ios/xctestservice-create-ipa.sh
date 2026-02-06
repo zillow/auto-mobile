@@ -33,8 +33,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Resolve to absolute path
-OUTPUT_PATH="$(cd "$(dirname "$OUTPUT_PATH")" 2>/dev/null && pwd)/$(basename "$OUTPUT_PATH")"
+# Resolve to absolute path (create parent directory if needed)
+OUTPUT_DIR="$(dirname "$OUTPUT_PATH")"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_PATH="$(cd "$OUTPUT_DIR" && pwd)/$(basename "$OUTPUT_PATH")"
 
 # Colors for output
 RED='\033[0;31m'
