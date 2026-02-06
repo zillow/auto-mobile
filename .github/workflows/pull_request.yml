@@ -707,6 +707,9 @@ jobs:
         with:
           xcode-version: ${{ matrix.config.xcode }}
 
+      - name: "Install ripgrep"
+        uses: ./.github/actions/setup-ripgrep
+
       - name: "Setup iOS Simulator Runtime"
         run: ./scripts/ios/setup-ios-simulator.sh --verbose
 
