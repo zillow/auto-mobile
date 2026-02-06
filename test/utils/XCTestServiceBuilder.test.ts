@@ -321,6 +321,27 @@ describe("XCTestServiceBuilder", function() {
       expect(buildProducts).toBe(path.join(derivedDataPath, "Build", "Products", "Debug-iphonesimulator"));
     });
 
+    test("should reject build when checksum does not match", async function() {
+      const derivedDataPath = path.join(tempDir, "DerivedData");
+      const cacheDir = path.join(tempDir, "cache");
+      const downloader = new FakeXCTestServiceBundleDownloader();
+      downloader.checksum = "actual-checksum-from-download";
+
+      XCTestServiceBuilder.setExpectedChecksumForTesting("different-expected-checksum");
+      const builder = XCTestServiceBuilder.getInstance(
+        {
+          derivedDataPath,
+          bundleCacheDir: cacheDir
+        },
+        { downloader }
+      );
+
+      const result = await builder.build("simulator");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("checksum verification failed");
+    });
+
     test("should redownload when version changes without checksum", async function() {
       const derivedDataPath = path.join(tempDir, "DerivedData");
       const cacheDir = path.join(tempDir, "cache");
