@@ -1424,6 +1424,7 @@ jobs:
 
       - name: "Run Startup Benchmark"
         id: benchmark
+        timeout-minutes: 1
         run: |
           # Create reports directory
           mkdir -p reports

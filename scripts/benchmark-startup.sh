@@ -106,21 +106,30 @@ global_timeout_handler() {
 start_global_timeout_monitor() {
   script_start_ms=$(get_time_ms)
 
+  # Redirect stdout/stderr to /dev/null so the subshell and its sleep child
+  # do not inherit the parent's FDs (which on CI are the runner's pipes).
+  # Orphaned children holding runner FDs prevent the CI step from finishing.
   (
     sleep_seconds=$(( GLOBAL_TIMEOUT_MS / 1000 ))
     sleep "$sleep_seconds"
     # Signal parent to run timeout handler
     kill -USR1 $$ 2>/dev/null || true
-  ) &
+  ) >/dev/null 2>&1 &
   global_timeout_pid=$!
   disown "$global_timeout_pid" 2>/dev/null || true
 }
 
 # Stop global timeout monitor
 stop_global_timeout_monitor() {
+  # Ignore USR1 first to prevent a race: killing the sleep child causes the
+  # subshell's wait to return, which fires kill -USR1 before we can kill the
+  # subshell itself.
+  trap '' USR1
   if [[ -n "${global_timeout_pid:-}" ]]; then
     kill "$global_timeout_pid" 2>/dev/null || true
+    pkill -P "$global_timeout_pid" 2>/dev/null || true
     wait "$global_timeout_pid" 2>/dev/null || true
+    global_timeout_pid=""
   fi
 }
 
@@ -311,12 +320,15 @@ stop_process() {
     return
   fi
 
+  # Kill child processes first so they don't become orphans holding FDs open
+  pkill -TERM -P "$pid" 2>/dev/null || true
   kill -TERM "$pid" >/dev/null 2>&1 || true
   local start_ms
   start_ms=$(get_time_ms)
 
   while kill -0 "$pid" >/dev/null 2>&1; do
     if (( $(get_time_ms) - start_ms >= 5000 )); then
+      pkill -KILL -P "$pid" 2>/dev/null || true
       kill -KILL "$pid" >/dev/null 2>&1 || true
       break
     fi
@@ -963,8 +975,21 @@ fi
 require_command bun
 require_command jq
 
+# Cleanup handler to kill all tracked children on exit
+# shellcheck disable=SC2317,SC2329  # Function is invoked indirectly via trap
+cleanup_on_exit() {
+  for pid in "${child_pids[@]}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      pkill -KILL -P "$pid" 2>/dev/null || true
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  done
+  stop_global_timeout_monitor
+}
+
 # Setup global timeout handler
 trap 'global_timeout_handler' USR1
+trap 'cleanup_on_exit' EXIT
 start_global_timeout_monitor
 
 if [[ "$run_daemon" == "true" ]]; then
