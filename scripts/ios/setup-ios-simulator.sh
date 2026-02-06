@@ -116,15 +116,16 @@ XCODE_PATH=$(xcode-select -p)
 log_info "Xcode version: ${XCODE_VERSION} (${XCODE_BUILD})"
 log_info "Xcode path: ${XCODE_PATH}"
 
-# Detect the iOS Simulator SDK major version bundled with this Xcode.
+# Detect the iOS Simulator SDK version bundled with this Xcode.
 # On CI runners with multiple Xcode versions, runtimes from newer Xcode
-# installations are visible but unusable by older Xcode versions.
-# We compare by major version because Xcode can use any runtime within
-# its SDK generation (e.g. SDK 18.2 works with iOS 18.0-18.x, not 26.x).
+# installations are visible via simctl but unusable by older Xcode versions.
+# We use the SDK version as an upper bound for pre-installed runtimes, and
+# fall back to major version matching after downloading (since the download
+# may provide a slightly newer patch, e.g. 18.3.1 for SDK 18.2).
 IOS_SDK_VERSION=$(xcodebuild -showsdks 2>/dev/null | sed -n 's/.*-sdk iphonesimulator\([0-9.]*\)/\1/p' | sort -V | tail -1)
 if [ -n "$IOS_SDK_VERSION" ]; then
     IOS_SDK_MAJOR_VERSION=$(echo "$IOS_SDK_VERSION" | cut -d. -f1)
-    log_info "iOS Simulator SDK: ${IOS_SDK_VERSION} (major version ${IOS_SDK_MAJOR_VERSION})"
+    log_info "iOS Simulator SDK: ${IOS_SDK_VERSION} (major ${IOS_SDK_MAJOR_VERSION})"
 else
     log_error "Could not detect iOS Simulator SDK version (no iphonesimulator SDK found)"
     log_error "Ensure Xcode is installed with iOS Simulator support"
@@ -187,21 +188,15 @@ version_gte() {
     [ "$(printf '%s\n' "$min" "$version" | sort -V | head -1)" = "$min" ]
 }
 
-# Find the best available iOS runtime (highest version >= minimum, same major as SDK)
-find_best_ios_runtime() {
+# Find the best pre-installed iOS runtime (highest version where min <= v <= sdk_version).
+# This is strict: only runtimes guaranteed compatible with the current Xcode.
+find_compatible_ios_runtime() {
     local min_version=$1
-    local sdk_major=$2
+    local sdk_version=$2
     local best_version=""
 
     while IFS= read -r version; do
-        if [ -n "$version" ] && version_gte "$version" "$min_version"; then
-            # Skip runtimes from a newer SDK generation than this Xcode supports
-            local runtime_major
-            runtime_major=$(echo "$version" | cut -d. -f1)
-            if [ "$runtime_major" -gt "$sdk_major" ]; then
-                log_debug "Skipping iOS ${version} (major ${runtime_major} > SDK major ${sdk_major})"
-                continue
-            fi
+        if [ -n "$version" ] && version_gte "$version" "$min_version" && version_gte "$sdk_version" "$version"; then
             best_version="$version"
         fi
     done < <(get_available_ios_versions)
@@ -209,12 +204,35 @@ find_best_ios_runtime() {
     echo "$best_version"
 }
 
-BEST_IOS_VERSION=$(find_best_ios_runtime "$MIN_IOS_VERSION" "$IOS_SDK_MAJOR_VERSION")
+# After downloading, find the closest runtime above the SDK version within the
+# same major. Apple's -downloadPlatform may provide a slightly newer patch
+# (e.g. 18.3.1 for SDK 18.2). We pick the lowest such match to stay close to
+# what was downloaded rather than grabbing a much newer pre-installed runtime.
+find_downloaded_ios_runtime() {
+    local sdk_major=$1
+    local sdk_version=$2
+
+    while IFS= read -r version; do
+        if [ -z "$version" ]; then
+            continue
+        fi
+        local runtime_major
+        runtime_major=$(echo "$version" | cut -d. -f1)
+        # Same major version AND strictly greater than SDK version
+        if [ "$runtime_major" -eq "$sdk_major" ] && version_gte "$version" "$sdk_version" && [ "$version" != "$sdk_version" ]; then
+            # First (lowest) runtime above SDK version with same major
+            echo "$version"
+            return
+        fi
+    done < <(get_available_ios_versions)
+}
+
+BEST_IOS_VERSION=$(find_compatible_ios_runtime "$MIN_IOS_VERSION" "$IOS_SDK_VERSION")
 
 if [ -n "$BEST_IOS_VERSION" ]; then
     log_success "Found compatible iOS runtime: iOS ${BEST_IOS_VERSION}"
 else
-    log_warn "No compatible iOS runtime found (need >= ${MIN_IOS_VERSION}, major version <= ${IOS_SDK_MAJOR_VERSION})"
+    log_warn "No compatible iOS runtime found (need >= ${MIN_IOS_VERSION}, <= ${IOS_SDK_VERSION})"
 fi
 echo "" >&2
 
@@ -330,7 +348,15 @@ if [ "$NEEDS_DOWNLOAD" = true ]; then
     sleep 2
     RUNTIMES_OUTPUT=$(xcrun simctl list runtimes 2>/dev/null || echo "")
     IOS_RUNTIMES=$(echo "$RUNTIMES_OUTPUT" | grep "^iOS" || echo "")
-    BEST_IOS_VERSION=$(find_best_ios_runtime "$MIN_IOS_VERSION" "$IOS_SDK_MAJOR_VERSION")
+
+    # Try strict match first, then accept the downloaded runtime
+    BEST_IOS_VERSION=$(find_compatible_ios_runtime "$MIN_IOS_VERSION" "$IOS_SDK_VERSION")
+    if [ -z "$BEST_IOS_VERSION" ]; then
+        BEST_IOS_VERSION=$(find_downloaded_ios_runtime "$IOS_SDK_MAJOR_VERSION" "$IOS_SDK_VERSION")
+        if [ -n "$BEST_IOS_VERSION" ]; then
+            log_info "Using downloaded runtime: iOS ${BEST_IOS_VERSION}"
+        fi
+    fi
     SIMULATOR_DEVICE=$(find_simulator_device "$BEST_IOS_VERSION")
 fi
 
