@@ -219,6 +219,15 @@ class FailuresPushSocketClient {
 
     fun isConnected(): Boolean = connected.get()
 
+    /**
+     * Disconnect and cancel the internal coroutine scope.
+     * After calling dispose(), this client instance should not be reused.
+     */
+    fun dispose() {
+        disconnect()
+        scope.coroutineContext[Job]?.cancel()
+    }
+
     private fun subscribe(type: String?, severity: String?) {
         val request = FailuresPushRequest(
             id = UUID.randomUUID().toString(),

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -35,7 +34,7 @@ fun LayoutInspectorDashboard(
     modifier: Modifier = Modifier,
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
-    observationStreamClient: ObservationStreamClient? = null,  // Shared stream client (managed at app level)
+    observationStreamClient: ObservationStreamClient,  // Shared stream client (managed at app level)
     platform: String = "android",  // Device platform ("android" or "ios")
 ) {
     val state = rememberLayoutInspectorState()
@@ -44,24 +43,7 @@ fun LayoutInspectorDashboard(
     // Logger for dashboard - initialized early
     val dashboardLog = com.intellij.openapi.diagnostic.Logger.getInstance("LayoutInspectorDashboard")
 
-    // Use provided stream client, or create a local one for backwards compatibility
-    val streamClient = observationStreamClient ?: remember { ObservationStreamClient() }
-    val isLocalClient = observationStreamClient == null
-
-    // Log the client instance being used
-    dashboardLog.info("Dashboard using streamClient: ${streamClient.hashCode()}, isLocalClient=$isLocalClient, observationStreamClient=${observationStreamClient?.hashCode()}")
-
-    // Only manage connection if we created a local client
-    if (isLocalClient) {
-        DisposableEffect(Unit) {
-            dashboardLog.info("Local client created, connecting...")
-            streamClient.connect()
-            onDispose {
-                dashboardLog.info("Local client disposing, disconnecting...")
-                streamClient.disconnect()
-            }
-        }
-    }
+    val streamClient = observationStreamClient
 
     // Collect hierarchy updates from the stream
     LaunchedEffect(streamClient) {

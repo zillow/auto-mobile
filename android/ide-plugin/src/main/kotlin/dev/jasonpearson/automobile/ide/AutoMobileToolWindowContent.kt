@@ -316,21 +316,24 @@ fun AutoMobileToolWindowContent() {
   }
 
   // Observation stream client for real-time hierarchy/screenshot updates
-  // Created once and shared across the app lifecycle
-  val observationStreamClient = remember { ObservationStreamClient() }
+  // Only created when a device is connected; disposed when device disconnects
+  var observationStreamClient by remember { mutableStateOf<ObservationStreamClient?>(null) }
 
   // Push socket client for real-time failure notifications
-  // Created once and shared across the app lifecycle
-  val failuresPushClient = remember { FailuresPushSocketClient() }
+  // Only created when a device is connected in Real mode; disposed when device disconnects
+  var failuresPushClient by remember { mutableStateOf<FailuresPushSocketClient?>(null) }
 
   // Streaming failures data source for real-time failure notifications
-  // Only created in Real mode since Fake mode creates its own FakeFailuresDataSource
-  val streamingFailuresDataSource = remember(dataSourceMode) {
-      if (dataSourceMode == DataSourceMode.Real) StreamingFailuresDataSource() else null
+  // Only created in Real mode when the Failures panel is expanded
+  val streamingFailuresDataSource = remember(dataSourceMode, isFailuresPanelCollapsed) {
+      if (dataSourceMode == DataSourceMode.Real && !isFailuresPanelCollapsed)
+          StreamingFailuresDataSource() else null
   }
 
-  // Fetch initial failure counts on startup (before Failures panel is opened)
-  LaunchedEffect(dataSourceMode, failuresDateRange, clientProvider) {
+  // Fetch initial failure counts (deferred until a device is connected)
+  LaunchedEffect(dataSourceMode, failuresDateRange, clientProvider, activeDeviceId) {
+    if (dataSourceMode == DataSourceMode.Real && clientProvider == null) return@LaunchedEffect
+    if (dataSourceMode == DataSourceMode.Fake && activeDeviceId == null) return@LaunchedEffect
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
       try {
         val dataSource = when (dataSourceMode) {
@@ -365,62 +368,70 @@ fun AutoMobileToolWindowContent() {
     }
   }
 
-  // Connect/disconnect observation stream based on active device
-  // Include client in keys to ensure reconnection after hot-reload creates a new instance
-  DisposableEffect(activeDeviceId, observationStreamClient) {
-      val deviceId = activeDeviceId  // Capture the value at effect start
+  // Create, connect, and dispose socket clients based on active device and data source mode.
+  // Clients are only allocated when a device is connected, eliminating startup overhead.
+  DisposableEffect(activeDeviceId, dataSourceMode) {
+      val deviceId = activeDeviceId
+      var obsClient: ObservationStreamClient? = null
+      var failClient: FailuresPushSocketClient? = null
+
       if (deviceId != null) {
-          LOG.info("Connecting observation stream for device: $deviceId (client: ${observationStreamClient.hashCode()})")
-          observationStreamClient.connect(deviceId)
+          obsClient = ObservationStreamClient()
+          LOG.info("Connecting observation stream for device: $deviceId (client: ${obsClient.hashCode()})")
+          obsClient.connect(deviceId)
+          observationStreamClient = obsClient
+
+          if (dataSourceMode == DataSourceMode.Real) {
+              failClient = FailuresPushSocketClient()
+              LOG.info("Connecting failures push client")
+              failClient.connect()
+              failuresPushClient = failClient
+          }
       }
+
       onDispose {
-          // Always disconnect if we connected (deviceId was captured when effect started)
-          if (deviceId != null) {
-              LOG.info("Disconnecting observation stream (was connected to: $deviceId)")
-              observationStreamClient.disconnect()
+          if (obsClient != null) {
+              LOG.info("Disposing observation stream client (was connected to: $deviceId)")
+              observationStreamClient = null
+              obsClient.dispose()
+          }
+          if (failClient != null) {
+              LOG.info("Disposing failures push client")
+              failuresPushClient = null
+              failClient.dispose()
           }
       }
   }
 
   // Periodic connection health check - reconnect if connection dropped
-  LaunchedEffect(activeDeviceId, observationStreamClient) {
+  LaunchedEffect(observationStreamClient) {
+      val client = observationStreamClient ?: return@LaunchedEffect
       val deviceId = activeDeviceId ?: return@LaunchedEffect
       while (true) {
-          kotlinx.coroutines.delay(5000) // Check every 5 seconds
-          if (!observationStreamClient.isConnected()) {
+          kotlinx.coroutines.delay(5000)
+          if (!client.isConnected()) {
               LOG.info("Observation stream disconnected, attempting reconnect for device: $deviceId")
-              observationStreamClient.connect(deviceId)
+              client.connect(deviceId)
           }
       }
   }
 
-  // Connect/disconnect failures push client based on data source mode
-  DisposableEffect(dataSourceMode, failuresPushClient) {
-      if (dataSourceMode == DataSourceMode.Real) {
-          LOG.info("Connecting failures push client")
-          failuresPushClient.connect()
-      }
-      onDispose {
-          LOG.info("Disconnecting failures push client")
-          failuresPushClient.disconnect()
-      }
-  }
-
   // Periodic connection health check for failures push - reconnect if dropped
-  LaunchedEffect(dataSourceMode, failuresPushClient) {
-      if (dataSourceMode != DataSourceMode.Real) return@LaunchedEffect
+  LaunchedEffect(failuresPushClient) {
+      val client = failuresPushClient ?: return@LaunchedEffect
       while (true) {
-          kotlinx.coroutines.delay(5000) // Check every 5 seconds
-          if (!failuresPushClient.isConnected()) {
+          kotlinx.coroutines.delay(5000)
+          if (!client.isConnected()) {
               LOG.info("Failures push disconnected, attempting reconnect")
-              failuresPushClient.connect()
+              client.connect()
           }
       }
   }
 
   // Listen for hierarchy updates to update foreground app state in real-time
   LaunchedEffect(observationStreamClient) {
-      observationStreamClient.hierarchyUpdates.collect { update ->
+      val client = observationStreamClient ?: return@LaunchedEffect
+      client.hierarchyUpdates.collect { update ->
           val newForegroundApp = update.packageName
           if (newForegroundApp != null && installedApps.isNotEmpty()) {
               // Check if foreground app changed
@@ -438,7 +449,8 @@ fun AutoMobileToolWindowContent() {
 
   // Listen for performance updates to update collapsed Performance panel summary
   LaunchedEffect(observationStreamClient) {
-      observationStreamClient.performanceUpdates.collect { update ->
+      val client = observationStreamClient ?: return@LaunchedEffect
+      client.performanceUpdates.collect { update ->
           currentFps = update.fps
           currentFrameTimeMs = update.frameTimeMs
           currentJankFrames = update.jankFrames
@@ -663,10 +675,7 @@ fun AutoMobileToolWindowContent() {
               }
           },
           onMcpDeviceSelected = { deviceId, deviceName ->
-              println("=== MCP DEVICE SELECTED: $deviceId (name: $deviceName) ===")
-              println("Setting activeDeviceId to: $deviceId")
-              println("Setting isDevicePanelExpanded to: false")
-              LOG.info("MCP device selected: $deviceId")
+              LOG.info("MCP device selected: $deviceId (name: $deviceName)")
               // Store the real device info - detect type from device name
               val name = deviceName ?: deviceId
               val isIOS = name.contains("iPhone", ignoreCase = true) ||
@@ -729,11 +738,13 @@ fun AutoMobileToolWindowContent() {
                   .height(mainContentHeight)  // Dynamic height based on window size
           ) {
             // Central Layout Inspector (expands to fill available space)
+            // observationStreamClient is guaranteed non-null here because this block
+            // is only composed when activeDeviceId != null (see guard at line 711)
             LayoutInspectorDashboard(
                 modifier = Modifier.weight(1f),
                 dataSourceMode = dataSourceMode,
                 clientProvider = clientProvider,
-                observationStreamClient = observationStreamClient,
+                observationStreamClient = observationStreamClient!!,
                 platform = platformString,
             )
 
@@ -1270,7 +1281,7 @@ private fun DraggableTabs(
     dropTargetIndex: Int?,
     onDropTargetChanged: (Int?) -> Unit,
 ) {
-    println("DraggableTabs rendered with ${tabs.size} tabs, selectedIndex=$selectedIndex")
+    LOG.debug("DraggableTabs rendered with ${tabs.size} tabs, selectedIndex=$selectedIndex")
     val colors = JewelTheme.globalColors
     var tabPositions by remember { mutableStateOf<Map<Int, Float>>(emptyMap()) }
     var dragOffset by remember { mutableStateOf(0f) }
@@ -1314,8 +1325,7 @@ private fun DraggableTabs(
                             else Modifier
                         )
                         .clickable {
-                            LOG.info("Tab clicked via clickable: $index (${tabs[index]})")
-                            println("Tab clicked via clickable: $index (${tabs[index]})")
+                            LOG.debug("Tab clicked via clickable: $index (${tabs[index]})")
                             onTabSelected(index)
                         }
                         .pointerInput("drag-$index") {
@@ -1719,9 +1729,9 @@ private fun McpProcessesPanel(
         isLoading = true
         processes = detector.detectProcesses()
         isLoading = false
-        println("[McpProcessesPanel] Detected ${processes.size} MCP processes (useRealData=$useRealData)")
+        LOG.debug("[McpProcessesPanel] Detected ${processes.size} MCP processes (useRealData=$useRealData)")
         processes.forEach { p ->
-            println("[McpProcessesPanel]   - ${p.name} (PID ${p.pid}, ${p.connectionType}, socket=${p.socketPath}, port=${p.port})")
+            LOG.debug("[McpProcessesPanel]   - ${p.name} (PID ${p.pid}, ${p.connectionType}, socket=${p.socketPath}, port=${p.port})")
         }
     }
 
@@ -1730,7 +1740,7 @@ private fun McpProcessesPanel(
 
     // Notify parent when connected process changes
     LaunchedEffect(connectedProcess) {
-        println("[McpProcessesPanel] LaunchedEffect(connectedProcess) triggered, connectedProcess=${connectedProcess?.let { "${it.name} (PID ${it.pid})" } ?: "null"}")
+        LOG.debug("[McpProcessesPanel] LaunchedEffect(connectedProcess) triggered, connectedProcess=${connectedProcess?.let { "${it.name} (PID ${it.pid})" } ?: "null"}")
         onProcessConnected(connectedProcess)
     }
 
@@ -1739,7 +1749,7 @@ private fun McpProcessesPanel(
         val socketProcesses = processes.filter { it.connectionType == McpConnectionType.UnixSocket }
         if (socketProcesses.size == 1 && connectedProcess == null) {
             val autoConnectProcess = socketProcesses.first()
-            println("[McpProcessesPanel] Auto-connecting to ${autoConnectProcess.name} (PID ${autoConnectProcess.pid})")
+            LOG.debug("[McpProcessesPanel] Auto-connecting to ${autoConnectProcess.name} (PID ${autoConnectProcess.pid})")
             connectedProcess = autoConnectProcess
             // Call directly - don't rely on LaunchedEffect(connectedProcess) which may not
             // fire before component is removed from composition due to device auto-selection
@@ -1779,7 +1789,7 @@ private fun McpProcessesPanel(
             devicesLoading = true
             devicesError = null
             try {
-                println("[AutoMobile IDE] Creating MCP client for process: ${process.name}, type: ${process.connectionType}, socket: ${process.socketPath}, port: ${process.port}")
+                LOG.debug("[AutoMobile IDE] Creating MCP client for process: ${process.name}, type: ${process.connectionType}, socket: ${process.socketPath}, port: ${process.port}")
 
                 val client = if (useRealData) {
                     dev.jasonpearson.automobile.ide.mcp.McpResourceClientFactory.create(process)
@@ -1787,32 +1797,32 @@ private fun McpProcessesPanel(
                     dev.jasonpearson.automobile.ide.mcp.McpResourceClientFactory.createFake()
                 }
 
-                println("[AutoMobile IDE] Fetching booted devices from automobile:devices/booted")
+                LOG.debug("[AutoMobile IDE] Fetching booted devices from automobile:devices/booted")
                 // Fetch booted devices
                 when (val result = client.readResource("automobile:devices/booted")) {
                     is dev.jasonpearson.automobile.ide.mcp.ResourceReadResult.Success -> {
-                        println("[AutoMobile IDE] Successfully fetched booted devices: ${result.content.take(200)}...")
+                        LOG.debug("[AutoMobile IDE] Successfully fetched booted devices: ${result.content.take(200)}...")
                         val parsed = dev.jasonpearson.automobile.ide.mcp.DeviceResourceParser.parseBootedDevices(result.content)
                         bootedDevices = parsed?.devices ?: emptyList()
-                        println("[AutoMobile IDE] Parsed ${bootedDevices.size} booted devices")
+                        LOG.debug("[AutoMobile IDE] Parsed ${bootedDevices.size} booted devices")
                     }
                     is dev.jasonpearson.automobile.ide.mcp.ResourceReadResult.Error -> {
-                        println("[AutoMobile IDE] Error fetching booted devices: ${result.message}")
+                        LOG.debug("[AutoMobile IDE] Error fetching booted devices: ${result.message}")
                         devicesError = result.message
                     }
                 }
 
-                println("[AutoMobile IDE] Fetching device images from automobile:devices/images")
+                LOG.debug("[AutoMobile IDE] Fetching device images from automobile:devices/images")
                 // Fetch device images
                 when (val result = client.readResource("automobile:devices/images")) {
                     is dev.jasonpearson.automobile.ide.mcp.ResourceReadResult.Success -> {
-                        println("[AutoMobile IDE] Successfully fetched device images: ${result.content.take(200)}...")
+                        LOG.debug("[AutoMobile IDE] Successfully fetched device images: ${result.content.take(200)}...")
                         val parsed = dev.jasonpearson.automobile.ide.mcp.DeviceResourceParser.parseDeviceImages(result.content)
                         deviceImages = parsed?.images ?: emptyList()
-                        println("[AutoMobile IDE] Parsed ${deviceImages.size} device images")
+                        LOG.debug("[AutoMobile IDE] Parsed ${deviceImages.size} device images")
                     }
                     is dev.jasonpearson.automobile.ide.mcp.ResourceReadResult.Error -> {
-                        println("[AutoMobile IDE] Error fetching device images: ${result.message}")
+                        LOG.debug("[AutoMobile IDE] Error fetching device images: ${result.message}")
                         // Don't overwrite error from booted devices
                         if (devicesError == null) devicesError = result.message
                     }
@@ -1821,8 +1831,8 @@ private fun McpProcessesPanel(
                 client.close()
             } catch (e: Exception) {
                 val stackTrace = e.stackTraceToString()
-                println("[AutoMobile IDE] Exception fetching devices: ${e.javaClass.name}: ${e.message}")
-                println("[AutoMobile IDE] Stack trace:\n$stackTrace")
+                LOG.debug("[AutoMobile IDE] Exception fetching devices: ${e.javaClass.name}: ${e.message}")
+                LOG.debug("[AutoMobile IDE] Stack trace:\n$stackTrace")
                 devicesError = "${e.javaClass.simpleName}: ${e.message}\n\nStack trace:\n${stackTrace.lines().take(5).joinToString("\n")}"
             }
             devicesLoading = false
@@ -1838,7 +1848,7 @@ private fun McpProcessesPanel(
     LaunchedEffect(bootedDevices, suppressAutoSelect) {
         if (!suppressAutoSelect && bootedDevices.size == 1 && selectingDevice == null) {
             val autoSelectDevice = bootedDevices.first()
-            println("[McpProcessesPanel] Auto-selecting device: ${autoSelectDevice.name} (${autoSelectDevice.deviceId})")
+            LOG.debug("[McpProcessesPanel] Auto-selecting device: ${autoSelectDevice.name} (${autoSelectDevice.deviceId})")
             selectingDevice = autoSelectDevice
             onDeviceSelected(autoSelectDevice.deviceId, autoSelectDevice.name)
         }
@@ -1849,9 +1859,9 @@ private fun McpProcessesPanel(
         // Toggle: if already connected to this process, disconnect; otherwise connect
         val wasConnected = connectedProcess?.pid == process.pid
         connectedProcess = if (wasConnected) null else process
-        println("[McpProcessesPanel] Connect button clicked for ${process.name} (PID ${process.pid})")
-        println("[McpProcessesPanel] ${if (wasConnected) "Disconnecting from" else "Connecting to"} process")
-        println("[McpProcessesPanel] connectedProcess is now: ${connectedProcess?.name ?: "null"}")
+        LOG.debug("[McpProcessesPanel] Connect button clicked for ${process.name} (PID ${process.pid})")
+        LOG.debug("[McpProcessesPanel] ${if (wasConnected) "Disconnecting from" else "Connecting to"} process")
+        LOG.debug("[McpProcessesPanel] connectedProcess is now: ${connectedProcess?.name ?: "null"}")
     }
 
     val onDetails: (McpProcess) -> Unit = { process ->
@@ -1871,7 +1881,7 @@ private fun McpProcessesPanel(
     LaunchedEffect(isDaemonStarting) {
         if (isDaemonStarting) {
             try {
-                println("[AutoMobile IDE] Starting daemon...")
+                LOG.debug("[AutoMobile IDE] Starting daemon...")
                 val processBuilder = ProcessBuilder("auto-mobile", "--daemon", "start")
                 processBuilder.redirectErrorStream(true)
                 val process = processBuilder.start()
@@ -1881,16 +1891,16 @@ private fun McpProcessesPanel(
                 val exitCode = process.waitFor()
 
                 if (exitCode == 0) {
-                    println("[AutoMobile IDE] Daemon started successfully")
+                    LOG.debug("[AutoMobile IDE] Daemon started successfully")
                     // Wait a bit for daemon to initialize, then refresh
                     kotlinx.coroutines.delay(2000)
                     refreshCounter++
                 } else {
-                    println("[AutoMobile IDE] Daemon start failed with exit code $exitCode: $output")
+                    LOG.debug("[AutoMobile IDE] Daemon start failed with exit code $exitCode: $output")
                     daemonStartError = "Failed to start daemon (exit code $exitCode)"
                 }
             } catch (e: Exception) {
-                println("[AutoMobile IDE] Exception starting daemon: ${e.message}")
+                LOG.debug("[AutoMobile IDE] Exception starting daemon: ${e.message}")
                 e.printStackTrace()
                 daemonStartError = "Error starting daemon: ${e.message}"
             }
@@ -1908,7 +1918,7 @@ private fun McpProcessesPanel(
                     return@forEach
                 }
 
-                println("[AutoMobile IDE] Booting device: ${image.name}")
+                LOG.debug("[AutoMobile IDE] Booting device: ${image.name}")
                 val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
 
                 val result = client.startDevice(
@@ -1918,16 +1928,16 @@ private fun McpProcessesPanel(
                 )
 
                 if (result.success) {
-                    println("[AutoMobile IDE] Device booted successfully: ${image.name}")
+                    LOG.debug("[AutoMobile IDE] Device booted successfully: ${image.name}")
                     // Refresh device list after successful boot
                     kotlinx.coroutines.delay(3000)
                     refreshCounter++
                 } else {
-                    println("[AutoMobile IDE] Failed to boot device: ${result.message}")
+                    LOG.debug("[AutoMobile IDE] Failed to boot device: ${result.message}")
                     bootErrors = bootErrors + (deviceKey to (result.message ?: "Failed to boot"))
                 }
             } catch (e: Exception) {
-                println("[AutoMobile IDE] Exception booting device: ${e.message}")
+                LOG.debug("[AutoMobile IDE] Exception booting device: ${e.message}")
                 e.printStackTrace()
                 bootErrors = bootErrors + (deviceKey to (e.message ?: "Error booting device"))
             }
@@ -1937,33 +1947,33 @@ private fun McpProcessesPanel(
 
     // Select device when requested
     LaunchedEffect(selectingDevice) {
-        println("[AutoMobile IDE] LaunchedEffect triggered. selectingDevice: ${selectingDevice?.name}, connectedProcess: ${connectedProcess?.name}")
+        LOG.debug("[AutoMobile IDE] LaunchedEffect triggered. selectingDevice: ${selectingDevice?.name}, connectedProcess: ${connectedProcess?.name}")
         val device = selectingDevice
         if (device != null && connectedProcess != null) {
             try {
-                println("[AutoMobile IDE] Selecting device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
+                LOG.debug("[AutoMobile IDE] Selecting device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
                 val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
-                println("[AutoMobile IDE] Created client: $client")
+                LOG.debug("[AutoMobile IDE] Created client: $client")
 
                 val result = client.setActiveDevice(device.deviceId, device.platform)
-                println("[AutoMobile IDE] setActiveDevice result: success=${result.success}, message=${result.message}")
+                LOG.debug("[AutoMobile IDE] setActiveDevice result: success=${result.success}, message=${result.message}")
 
                 if (result.success) {
-                    println("[AutoMobile IDE] Device selected successfully: ${device.name}")
+                    LOG.debug("[AutoMobile IDE] Device selected successfully: ${device.name}")
                     selectError = null
                 } else {
-                    println("[AutoMobile IDE] Failed to select device: ${result.message}")
+                    LOG.debug("[AutoMobile IDE] Failed to select device: ${result.message}")
                     selectError = result.message
                 }
             } catch (e: Exception) {
-                println("[AutoMobile IDE] Exception selecting device: ${e.message}")
+                LOG.debug("[AutoMobile IDE] Exception selecting device: ${e.message}")
                 e.printStackTrace()
                 selectError = e.message ?: "Error selecting device"
             }
             selectingDevice = null
-            println("[AutoMobile IDE] Reset selectingDevice to null")
+            LOG.debug("[AutoMobile IDE] Reset selectingDevice to null")
         } else {
-            println("[AutoMobile IDE] Skipping selection - device: ${device?.name}, connectedProcess: ${connectedProcess?.name}")
+            LOG.debug("[AutoMobile IDE] Skipping selection - device: ${device?.name}, connectedProcess: ${connectedProcess?.name}")
         }
     }
 
@@ -1995,7 +2005,7 @@ private fun McpProcessesPanel(
     val socketProcesses = processes.filter { it.connectionType == McpConnectionType.UnixSocket }
     val stdioProcesses = processes.filter { it.connectionType == McpConnectionType.Stdio }
 
-    println("[McpProcessesPanel] Process breakdown: streamable=${streamableProcesses.size}, socket=${socketProcesses.size}, stdio=${stdioProcesses.size}")
+    LOG.debug("[McpProcessesPanel] Process breakdown: streamable=${streamableProcesses.size}, socket=${socketProcesses.size}, stdio=${stdioProcesses.size}")
 
     val scrollState = rememberScrollState()
 
@@ -2171,9 +2181,9 @@ private fun McpProcessesPanel(
             }
 
             // Devices section (when connected)
-            println("[McpProcessesPanel] connectedProcess=$connectedProcess, bootedDevices.size=${bootedDevices.size}")
+            LOG.debug("[McpProcessesPanel] connectedProcess=$connectedProcess, bootedDevices.size=${bootedDevices.size}")
             if (connectedProcess != null) {
-                println("[McpProcessesPanel] Showing DevicesSection")
+                LOG.debug("[McpProcessesPanel] Showing DevicesSection")
                 DevicesSection(
                     bootedDevices = bootedDevices,
                     deviceImages = deviceImages,
@@ -2182,10 +2192,10 @@ private fun McpProcessesPanel(
                     bootingDeviceIds = bootingDeviceIds,
                     bootErrors = bootErrors,
                     onSelectDevice = { device ->
-                        println("[AutoMobile IDE] Select clicked for device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
+                        LOG.debug("[AutoMobile IDE] Select clicked for device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
                         selectingDevice = device
                         selectError = null
-                        println("[AutoMobile IDE] Set selectingDevice to: ${device.name}")
+                        LOG.debug("[AutoMobile IDE] Set selectingDevice to: ${device.name}")
                         // Notify parent to transition to dashboard view
                         onDeviceSelected(device.deviceId, device.name)
                     },
@@ -2485,7 +2495,7 @@ private fun McpProcessItem(
                             RoundedCornerShape(4.dp),
                         )
                         .clickable {
-                            println("[McpProcessItem] Connect button clicked for ${process.name}")
+                            LOG.debug("[McpProcessItem] Connect button clicked for ${process.name}")
                             onConnect(process)
                         }
                         .pointerHoverIcon(PointerIcon.Hand)
@@ -2848,7 +2858,7 @@ private fun BootedDeviceRow(
             .fillMaxWidth()
             .background(Color(0xFF4CAF50).copy(alpha = 0.1f), RoundedCornerShape(4.dp))
             .clickable(onClick = {
-                println("[AutoMobile IDE] BootedDeviceRow clicked for: ${device.name}")
+                LOG.debug("[AutoMobile IDE] BootedDeviceRow clicked for: ${device.name}")
                 onSelect()
             })
             .pointerHoverIcon(PointerIcon.Hand)
