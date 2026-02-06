@@ -287,9 +287,10 @@ build_destination() {
 
     if [ -n "$device_name" ] && [ -n "$ios_version" ]; then
         echo "platform=iOS Simulator,name=${device_name},OS=${ios_version}"
-    elif [ -n "$ios_version" ]; then
-        echo "platform=iOS Simulator,OS=${ios_version}"
     else
+        # No specific device found — use the generic build destination.
+        # This lets xcodebuild resolve to any available simulator and works
+        # even when no devices exist for a freshly downloaded runtime.
         echo "generic/platform=iOS Simulator"
     fi
 }
