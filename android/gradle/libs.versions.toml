@@ -11,7 +11,7 @@ build-android-targetSdk = "36"             # Used in playground Android modules
 build-android-agp = "9.0.0"
 
 # Kotlin versions
-build-kotlin = "2.3.0"
+build-kotlin = "2.3.10"
 build-kotlin-language = "2.0"              # Used in all Kotlin modules
 build-kotlin-coroutines = "1.10.2"
 
