@@ -83,13 +83,8 @@ XCODE_VERSION=$(xcodebuild -version)
 XCODE_VERSION=${XCODE_VERSION%%$'\n'*}
 print_info "Xcode version: ${XCODE_VERSION}"
 
-# Load simulator destination from setup script if available
-DEST_FILE="${PROJECT_ROOT}/.ios-simulator-destination"
-if [ -f "$DEST_FILE" ]; then
-    # shellcheck source=/dev/null
-    source "$DEST_FILE"
-    print_info "Using iOS destination: ${IOS_SIMULATOR_DESTINATION:-generic}"
-fi
+DESTINATION="generic/platform=iOS Simulator"
+print_info "Using iOS destination: ${DESTINATION}"
 echo ""
 
 # Ensure iOS Simulator SDK is installed
@@ -141,8 +136,6 @@ for xcodeproj in "${XCODEPROJ_ARRAY[@]}"; do
     while IFS= read -r scheme; do
         if [ -n "${scheme}" ]; then
             echo -e "    Building scheme: ${scheme}..."
-            # Use detected destination or fall back to generic
-            DESTINATION="${IOS_SIMULATOR_DESTINATION:-generic/platform=iOS Simulator}"
             if run_cmd xcodebuild \
                 -project "${xcodeproj}" \
                 -scheme "${scheme}" \
