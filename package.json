@@ -77,7 +77,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.72.1",
     "@huggingface/transformers": "^3.8.1",
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@types/js-yaml": "^4.0.9",
     "@types/uuid": "^11.0.0",
     "@types/ws": "^8.18.1",
