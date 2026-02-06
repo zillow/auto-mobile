@@ -2,15 +2,18 @@
 #
 # Dependency detection and installation for local development.
 #
+# Delegates heavy lifting to scripts/install.sh (--preset local-dev),
+# then performs post-install validation and local-only steps (npm link).
+#
 # Required variables (must be set before sourcing):
 #   PROJECT_ROOT - Path to project root
 #
 # Functions:
 #   parse_required_versions()  - Extract required versions from package.json
-#   ensure_gum()               - Detect and install gum for interactive prompts
-#   ensure_node()              - Detect and install/update node (nvm preferred)
-#   ensure_bun()               - Detect and install/update bun
-#   ensure_dependencies()      - Run all dependency checks
+#   version_gte()              - Semver comparison (returns 0 if $1 >= $2)
+#   ensure_gum()               - Check gum availability (installed by install.sh)
+#   ensure_auto_mobile()       - Build and npm link auto-mobile CLI
+#   ensure_dependencies()      - Run all dependency checks via install.sh
 
 # Required versions (populated by parse_required_versions)
 REQUIRED_BUN_VERSION=""
@@ -111,284 +114,9 @@ run_with_spinner() {
   fi
 }
 
-# Ensure gum is installed for interactive prompts
+# Check gum availability (install.sh handles actual installation)
 ensure_gum() {
-  if command -v gum >/dev/null 2>&1; then
-    return 0
-  fi
-
-  log_info "gum not found. Installing for interactive prompts..."
-
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    if command -v brew >/dev/null 2>&1; then
-      log_info "Installing gum via Homebrew..."
-      if brew install gum >/dev/null 2>&1; then
-        log_info "gum installed successfully."
-        return 0
-      else
-        log_warn "Failed to install gum via Homebrew."
-        return 1
-      fi
-    fi
-  elif [[ "$(uname -s)" == "Linux" ]]; then
-    if command -v apt-get >/dev/null 2>&1; then
-      log_info "Installing gum via apt..."
-      if sudo mkdir -p /etc/apt/keyrings && \
-         curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg 2>/dev/null && \
-         echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list >/dev/null && \
-         sudo apt-get update -qq && sudo apt-get install -y -qq gum; then
-        log_info "gum installed successfully."
-        return 0
-      fi
-    elif command -v dnf >/dev/null 2>&1; then
-      log_info "Installing gum via dnf..."
-      if echo '[charm]
-name=Charm
-baseurl=https://repo.charm.sh/yum/
-enabled=1
-gpgcheck=1
-gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/yum.repos.d/charm.repo >/dev/null && \
-         sudo dnf install -y -q gum; then
-        log_info "gum installed successfully."
-        return 0
-      fi
-    elif command -v pacman >/dev/null 2>&1; then
-      log_info "Installing gum via pacman..."
-      if sudo pacman -S --noconfirm gum >/dev/null 2>&1; then
-        log_info "gum installed successfully."
-        return 0
-      fi
-    fi
-  fi
-
-  log_warn "Could not auto-install gum. Falling back to basic prompts."
-  log_warn "Install manually: https://github.com/charmbracelet/gum#installation"
-  return 1
-}
-
-# Check if nvm has a specific node version installed
-nvm_has_version() {
-  local version="$1"
-  # nvm ls returns installed versions; check if our major version is there
-  nvm ls "${version}" 2>/dev/null | grep -q "v${version}" 2>/dev/null
-}
-
-# Offer to create .nvmrc file for the project
-offer_nvmrc() {
-  local nvmrc_path="${PROJECT_ROOT}/.nvmrc"
-
-  if [[ -f "${nvmrc_path}" ]]; then
-    return 0
-  fi
-
-  if prompt_confirm "Create .nvmrc file to persist Node.js version for this project?"; then
-    echo "${REQUIRED_NODE_MAJOR}" > "${nvmrc_path}"
-    log_info "Created ${nvmrc_path} with Node.js ${REQUIRED_NODE_MAJOR}"
-  fi
-}
-
-# Ensure node is installed at the required version
-ensure_node() {
-  local current_version=""
-  local current_major=""
-  local nvmrc_path="${PROJECT_ROOT}/.nvmrc"
-
-  # Check if node is available
-  if command -v node >/dev/null 2>&1; then
-    current_version=$(node --version | sed 's/^v//')
-    current_major=$(echo "${current_version}" | cut -d. -f1)
-  fi
-
-  if [[ -n "${current_major}" && "${current_major}" -ge "${REQUIRED_NODE_MAJOR}" ]]; then
-    log_info "Node.js v${current_version} found (requires ${REQUIRED_NODE_MAJOR}.x)"
-    return 0
-  fi
-
-  if [[ -n "${current_version}" ]]; then
-    log_warn "Node.js v${current_version} found, but v${REQUIRED_NODE_MAJOR}.x required"
-  else
-    log_warn "Node.js not found"
-  fi
-
-  # Try nvm first
-  if [[ -n "${NVM_DIR:-}" ]] || [[ -d "${HOME}/.nvm" ]]; then
-    local nvm_dir="${NVM_DIR:-${HOME}/.nvm}"
-    if [[ -s "${nvm_dir}/nvm.sh" ]]; then
-      # Source nvm
-      # shellcheck disable=SC1091
-      source "${nvm_dir}/nvm.sh"
-
-      # Check if .nvmrc exists and use it
-      if [[ -f "${nvmrc_path}" ]]; then
-        log_info "Found .nvmrc, running nvm use..."
-        if nvm use 2>/dev/null; then
-          # Validate the activated version meets requirements
-          local nvmrc_version
-          nvmrc_version=$(node --version | sed 's/^v//')
-          local nvmrc_major
-          nvmrc_major=$(echo "${nvmrc_version}" | cut -d. -f1)
-          if [[ "${nvmrc_major}" -ge "${REQUIRED_NODE_MAJOR}" ]]; then
-            log_info "Node.js v${nvmrc_version} activated via .nvmrc"
-            return 0
-          else
-            log_warn ".nvmrc specifies Node.js ${nvmrc_major}.x but ${REQUIRED_NODE_MAJOR}.x required"
-            log_warn "Consider updating .nvmrc to ${REQUIRED_NODE_MAJOR}"
-          fi
-        fi
-      fi
-
-      # Check if required version is already installed
-      if nvm_has_version "${REQUIRED_NODE_MAJOR}"; then
-        log_info "Node.js ${REQUIRED_NODE_MAJOR} already installed via nvm. Switching..."
-        if nvm use "${REQUIRED_NODE_MAJOR}"; then
-          log_info "Node.js $(node --version) activated via nvm."
-          offer_nvmrc
-          return 0
-        fi
-      fi
-
-      # Version not installed, prompt to install
-      if prompt_confirm "Install Node.js ${REQUIRED_NODE_MAJOR} via nvm?"; then
-        # nvm is a shell function, not an executable, so we can't use run_with_spinner
-        # (gum spawns a subprocess that won't have the function loaded)
-        log_info "Installing Node.js ${REQUIRED_NODE_MAJOR} via nvm..."
-        if nvm install "${REQUIRED_NODE_MAJOR}"; then
-          nvm use "${REQUIRED_NODE_MAJOR}"
-          log_info "Node.js $(node --version) installed and activated via nvm."
-          offer_nvmrc
-          return 0
-        else
-          log_error "Failed to install Node.js via nvm."
-        fi
-      fi
-    fi
-  fi
-
-  # Fallback to Homebrew on macOS
-  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-    if prompt_confirm "Install Node.js ${REQUIRED_NODE_MAJOR} via Homebrew?"; then
-      log_info "Installing node@${REQUIRED_NODE_MAJOR} via Homebrew..."
-      if run_with_spinner "Installing Node.js ${REQUIRED_NODE_MAJOR}" brew install "node@${REQUIRED_NODE_MAJOR}"; then
-        # Link the specific version
-        brew link --overwrite "node@${REQUIRED_NODE_MAJOR}" 2>/dev/null || true
-
-        # Add to PATH if needed
-        local brew_prefix
-        brew_prefix=$(brew --prefix)
-        if [[ -d "${brew_prefix}/opt/node@${REQUIRED_NODE_MAJOR}/bin" ]]; then
-          export PATH="${brew_prefix}/opt/node@${REQUIRED_NODE_MAJOR}/bin:${PATH}"
-        fi
-
-        if command -v node >/dev/null 2>&1; then
-          log_info "Node.js $(node --version) installed via Homebrew."
-          return 0
-        fi
-      fi
-      log_error "Failed to install Node.js via Homebrew."
-    fi
-  fi
-
-  # Check again in case user installed manually
-  if command -v node >/dev/null 2>&1; then
-    current_version=$(node --version | sed 's/^v//')
-    current_major=$(echo "${current_version}" | cut -d. -f1)
-    if [[ "${current_major}" -ge "${REQUIRED_NODE_MAJOR}" ]]; then
-      return 0
-    fi
-  fi
-
-  log_error "Node.js ${REQUIRED_NODE_MAJOR}.x is required but not installed."
-  log_error "Install via nvm: nvm install ${REQUIRED_NODE_MAJOR}"
-  log_error "Or via Homebrew: brew install node@${REQUIRED_NODE_MAJOR}"
-  return 1
-}
-
-# Ensure bun is installed at the required version
-ensure_bun() {
-  local current_version=""
-
-  # Check if bun is available
-  if command -v bun >/dev/null 2>&1; then
-    current_version=$(bun --version 2>/dev/null || true)
-  fi
-
-  if [[ -n "${current_version}" ]] && version_gte "${current_version}" "${REQUIRED_BUN_VERSION}"; then
-    log_info "Bun v${current_version} found (requires >=${REQUIRED_BUN_VERSION})"
-    return 0
-  fi
-
-  if [[ -n "${current_version}" ]]; then
-    log_warn "Bun v${current_version} found, but v${REQUIRED_BUN_VERSION} required"
-
-    if prompt_confirm "Update Bun to v${REQUIRED_BUN_VERSION}?"; then
-      log_info "Updating Bun..."
-      if run_with_spinner "Updating Bun to v${REQUIRED_BUN_VERSION}" bun upgrade; then
-        current_version=$(bun --version 2>/dev/null || true)
-        if version_gte "${current_version}" "${REQUIRED_BUN_VERSION}"; then
-          log_info "Bun updated to v${current_version}."
-          return 0
-        fi
-      fi
-      log_warn "Bun upgrade didn't reach required version. Trying fresh install..."
-    fi
-  else
-    log_warn "Bun not found"
-  fi
-
-  # Install bun
-  if prompt_confirm "Install Bun v${REQUIRED_BUN_VERSION}?"; then
-    log_info "Installing Bun..."
-
-    # Try official installer
-    if run_with_spinner "Installing Bun" bash -c "curl -fsSL https://bun.sh/install | bash -s -- bun-v${REQUIRED_BUN_VERSION}"; then
-      # Source the updated profile
-      if [[ -f "${HOME}/.bashrc" ]]; then
-        # shellcheck disable=SC1091
-        source "${HOME}/.bashrc" 2>/dev/null || true
-      fi
-      if [[ -f "${HOME}/.zshrc" ]]; then
-        # shellcheck disable=SC1091
-        source "${HOME}/.zshrc" 2>/dev/null || true
-      fi
-
-      # Add bun to PATH for current session
-      if [[ -d "${HOME}/.bun/bin" ]]; then
-        export PATH="${HOME}/.bun/bin:${PATH}"
-      fi
-
-      if command -v bun >/dev/null 2>&1; then
-        current_version=$(bun --version 2>/dev/null || true)
-        log_info "Bun v${current_version} installed."
-        return 0
-      fi
-    fi
-
-    # Fallback to Homebrew on macOS
-    if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
-      log_info "Trying Homebrew installation..."
-      if run_with_spinner "Installing Bun via Homebrew" brew install oven-sh/bun/bun; then
-        if command -v bun >/dev/null 2>&1; then
-          current_version=$(bun --version 2>/dev/null || true)
-          log_info "Bun v${current_version} installed via Homebrew."
-          return 0
-        fi
-      fi
-    fi
-
-    log_error "Failed to install Bun."
-  fi
-
-  # Final check
-  if command -v bun >/dev/null 2>&1; then
-    current_version=$(bun --version 2>/dev/null || true)
-    if version_gte "${current_version}" "${REQUIRED_BUN_VERSION}"; then
-      return 0
-    fi
-  fi
-
-  log_error "Bun >=${REQUIRED_BUN_VERSION} is required but not installed."
-  log_error "Install via: curl -fsSL https://bun.sh/install | bash"
-  return 1
+  command -v gum >/dev/null 2>&1
 }
 
 # Build and install auto-mobile globally from local project
@@ -414,36 +142,63 @@ ensure_auto_mobile() {
   return 1
 }
 
-# Run all dependency checks
+# Run all dependency checks via install.sh
 ensure_dependencies() {
   log_info "Checking dependencies..."
 
-  # Parse required versions first
+  # Delegate to install.sh for gum, node, bun, and npm install
+  local env_file
+  env_file=$(mktemp)
+
+  log_info "Running install.sh --preset local-dev..."
+  if ! bash "${PROJECT_ROOT}/scripts/install.sh" \
+    --preset local-dev \
+    --non-interactive \
+    --env-file "${env_file}"; then
+    log_error "install.sh failed"
+    rm -f "${env_file}"
+    return 1
+  fi
+
+  # Source environment changes (PATH, NVM_DIR, ANDROID_HOME)
+  if [[ -f "${env_file}" ]]; then
+    # shellcheck disable=SC1090
+    source "${env_file}"
+    rm -f "${env_file}"
+  fi
+
+  # Post-install validation
   parse_required_versions
 
-  # Install gum first for better prompts during other installs
-  ensure_gum || true  # Don't fail if gum can't be installed
-
-  # Check/install node
-  if ! ensure_node; then
-    log_error "Node.js installation failed or was declined."
+  # Verify node meets requirements
+  if command -v node >/dev/null 2>&1; then
+    local node_major
+    node_major=$(node --version | sed 's/^v//' | cut -d. -f1)
+    if [[ "${node_major}" -lt "${REQUIRED_NODE_MAJOR}" ]]; then
+      log_error "Node.js v${node_major}.x found but v${REQUIRED_NODE_MAJOR}.x required after install"
+      return 1
+    fi
+    log_info "Node.js $(node --version) verified"
+  else
+    log_error "Node.js not found after install"
     return 1
   fi
 
-  # Check/install bun
-  if ! ensure_bun; then
-    log_error "Bun installation failed or was declined."
+  # Verify bun meets requirements
+  if command -v bun >/dev/null 2>&1; then
+    local bun_version
+    bun_version=$(bun --version 2>/dev/null || true)
+    if ! version_gte "${bun_version}" "${REQUIRED_BUN_VERSION}"; then
+      log_error "Bun v${bun_version} found but v${REQUIRED_BUN_VERSION} required after install"
+      return 1
+    fi
+    log_info "Bun v${bun_version} verified"
+  else
+    log_error "Bun not found after install"
     return 1
   fi
 
-  # Install npm dependencies after Node and Bun are confirmed
-  log_info "Installing npm dependencies..."
-  if ! (cd "${PROJECT_ROOT}" && npm install); then
-    log_error "Failed to install npm dependencies."
-    return 1
-  fi
-
-  # Check/install auto-mobile globally
+  # Build and npm link auto-mobile (local-dev specific)
   if ! ensure_auto_mobile; then
     log_error "auto-mobile global installation failed."
     return 1

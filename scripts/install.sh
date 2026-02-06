@@ -31,6 +31,8 @@ NON_INTERACTIVE=false
 RECORD_MODE=false
 PRESET=""
 CONFIGURE_MCP_CLIENTS=false
+RUN_NPM_INSTALL=false
+ENV_FILE=""
 
 # Gum bundling configuration
 GUM_VERSION="0.17.0"
@@ -84,6 +86,62 @@ fi
 
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Compare semver versions: returns 0 if $1 >= $2
+version_gte() {
+    local v1="$1"
+    local v2="$2"
+    local sorted
+    sorted=$(printf '%s\n%s\n' "$v1" "$v2" | sort -V | head -n1)
+    [[ "$sorted" == "$v2" ]]
+}
+
+# Required versions (populated by parse_required_versions)
+REQUIRED_BUN_VERSION=""
+REQUIRED_NODE_MAJOR=""
+
+# Parse required versions from package.json (only when IS_REPO=true)
+parse_required_versions() {
+    if [[ "${IS_REPO}" != "true" ]]; then
+        return 0
+    fi
+
+    local package_json="${PROJECT_ROOT}/package.json"
+    if [[ ! -f "${package_json}" ]]; then
+        return 0
+    fi
+
+    # Extract bun version from packageManager field (e.g., "bun@1.3.6")
+    REQUIRED_BUN_VERSION=$(grep -o '"packageManager":[[:space:]]*"bun@[^"]*"' "${package_json}" | \
+        sed 's/.*bun@\([^"]*\).*/\1/' || true)
+
+    if [[ -z "${REQUIRED_BUN_VERSION}" ]]; then
+        # Fallback to engines.bun field
+        REQUIRED_BUN_VERSION=$(grep -o '"bun":[[:space:]]*"[^"]*"' "${package_json}" | \
+            head -1 | sed 's/.*">=\{0,1\}\([0-9.]*\).*/\1/' || true)
+    fi
+
+    # Extract node major version from @types/node (e.g., "^25.0.9" -> 25)
+    REQUIRED_NODE_MAJOR=$(grep -o '"@types/node":[[:space:]]*"[^"]*"' "${package_json}" | \
+        sed 's/.*"\^\{0,1\}\([0-9]*\).*/\1/' || true)
+}
+
+# Write environment state to a file for the caller to source
+write_env_file() {
+    if [[ -z "${ENV_FILE}" ]]; then
+        return 0
+    fi
+
+    {
+        echo "export PATH=\"${PATH}\""
+        if [[ -n "${NVM_DIR:-}" ]]; then
+            echo "export NVM_DIR=\"${NVM_DIR}\""
+        fi
+        if [[ -n "${ANDROID_HOME:-}" ]]; then
+            echo "export ANDROID_HOME=\"${ANDROID_HOME}\""
+        fi
+    } > "${ENV_FILE}"
 }
 
 # Check if auto-mobile CLI is installed
@@ -140,19 +198,22 @@ Usage: ./scripts/install.sh [OPTIONS]
 Options:
   --dry-run           Show what would happen without making changes
   --record-mode       Auto-select defaults and run (for demo recording)
-  --preset NAME       Use preset configuration (minimal, development)
+  --preset NAME       Use preset configuration (minimal, development, local-dev)
   --non-interactive   Skip interactive prompts, use defaults
+  --env-file PATH     Write environment state (PATH, NVM_DIR, ANDROID_HOME) to file
   -h, --help          Show this help message
 
 Presets:
   minimal      - CLI + MCP client configuration only
   development  - Full setup with debug flags and IDE plugin (if available)
+  local-dev    - Dependencies for hot-reload development (bun, npm install)
 
 Examples:
   ./scripts/install.sh --dry-run
   ./scripts/install.sh --record-mode
   ./scripts/install.sh --preset development
   ./scripts/install.sh --preset development --non-interactive
+  ./scripts/install.sh --preset local-dev --non-interactive --env-file /tmp/env
 
 EOF
 }
@@ -180,6 +241,14 @@ parse_args() {
                 RECORD_MODE=true
                 shift
                 ;;
+            --env-file)
+                if [[ -z "${2:-}" ]]; then
+                    plain_error "Missing value for --env-file"
+                    exit 1
+                fi
+                ENV_FILE="$2"
+                shift 2
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -195,10 +264,10 @@ parse_args() {
     # Validate preset if provided
     if [[ -n "${PRESET}" ]]; then
         case "${PRESET}" in
-            minimal|development)
+            minimal|development|local-dev)
                 ;;
             *)
-                plain_error "Unknown preset: ${PRESET}. Valid options: minimal, development"
+                plain_error "Unknown preset: ${PRESET}. Valid options: minimal, development, local-dev"
                 exit 1
                 ;;
         esac
@@ -2490,6 +2559,16 @@ start_mcp_daemon() {
 }
 
 handle_bun_setup() {
+    # Enforce version requirement even if bun is already installed
+    if [[ "${BUN_INSTALLED}" == "true" ]] && [[ -n "${REQUIRED_BUN_VERSION}" ]]; then
+        local current_bun_version
+        current_bun_version=$(bun --version 2>/dev/null || true)
+        if [[ -n "${current_bun_version}" ]] && ! version_gte "${current_bun_version}" "${REQUIRED_BUN_VERSION}"; then
+            log_warn "Bun v${current_bun_version} found but v${REQUIRED_BUN_VERSION} required"
+            BUN_INSTALLED=false
+        fi
+    fi
+
     if [[ "${BUN_INSTALLED}" == "true" ]]; then
         return 0
     fi
@@ -3035,6 +3114,16 @@ apply_preset() {
             fi
             CONFIGURE_MCP_CLIENTS=true
             ;;
+        local-dev)
+            # Dependencies for hot-reload local development
+            INSTALL_BUN=true
+            RUN_NPM_INSTALL=true
+            INSTALL_IDE_PLUGIN=false
+            INSTALL_AUTOMOBILE_CLI=false
+            START_DAEMON=false
+            CONFIGURE_MCP_CLIENTS=false
+            INSTALL_CLAUDE_MARKETPLACE=false
+            ;;
         *)
             log_error "Unknown preset: ${preset_name}"
             return 1
@@ -3233,6 +3322,9 @@ main() {
 
     log_info "Starting setup from ${PROJECT_ROOT}"
 
+    # Parse required versions from package.json (when running from repo)
+    parse_required_versions
+
     # =========================================================================
     # Detect current setup BEFORE asking any questions
     # =========================================================================
@@ -3261,6 +3353,28 @@ main() {
             log_info "Node.js: ${node_version} (via nvm)"
         else
             log_info "Node.js: ${node_version}"
+        fi
+
+        # Enforce node version requirement
+        if [[ -n "${REQUIRED_NODE_MAJOR}" ]]; then
+            local current_node_major
+            current_node_major=$(node --version 2>/dev/null | sed 's/^v//' | cut -d. -f1)
+            if [[ -n "${current_node_major}" ]] && [[ "${current_node_major}" -lt "${REQUIRED_NODE_MAJOR}" ]]; then
+                log_warn "Node.js v${current_node_major}.x found but v${REQUIRED_NODE_MAJOR}.x required"
+                # Try nvm switch if available
+                if [[ -n "${NVM_DIR:-}" ]] && [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+                    # shellcheck source=/dev/null
+                    source "${NVM_DIR}/nvm.sh"
+                    if nvm ls "${REQUIRED_NODE_MAJOR}" >/dev/null 2>&1; then
+                        log_info "Switching to Node.js ${REQUIRED_NODE_MAJOR} via nvm..."
+                        nvm use "${REQUIRED_NODE_MAJOR}" >/dev/null 2>&1 || true
+                    elif [[ "${NON_INTERACTIVE}" == "true" ]]; then
+                        log_info "Installing Node.js ${REQUIRED_NODE_MAJOR} via nvm..."
+                        nvm install "${REQUIRED_NODE_MAJOR}" >/dev/null 2>&1 || true
+                        nvm use "${REQUIRED_NODE_MAJOR}" >/dev/null 2>&1 || true
+                    fi
+                fi
+            fi
         fi
     fi
 
@@ -3510,6 +3624,13 @@ main() {
     # Bun setup
     handle_bun_setup
 
+    # npm install (for local-dev preset)
+    if [[ "${RUN_NPM_INSTALL}" == "true" ]] && [[ "${IS_REPO}" == "true" ]]; then
+        if ! execute_spinner "Running npm install" bash -c "cd '${PROJECT_ROOT}' && npm install"; then
+            log_warn "npm install failed"
+        fi
+    fi
+
     # Platform-specific setup
     case "${platform_choice}" in
         Android)
@@ -3555,6 +3676,9 @@ main() {
     if [[ "${START_DAEMON}" == "true" ]]; then
         start_mcp_daemon
     fi
+
+    # Write environment state for callers (e.g., hot-reload.sh)
+    write_env_file
 
     # Print dry-run summary if applicable
     print_dry_run_summary
