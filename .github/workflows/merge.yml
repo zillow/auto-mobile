@@ -45,7 +45,7 @@ jobs:
           ./gradlew verifyPlugin --stacktrace --continue
 
       - name: "Upload IDE Plugin ZIP"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         if: success()
         with:
           name: ide-plugin-zip
@@ -72,7 +72,7 @@ jobs:
 
       - name: "Upload Test Results"
         if: failure()
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         with:
           name: ide-plugin-test-results
           path: android/ide-plugin/build/reports/tests/test/
@@ -194,7 +194,7 @@ jobs:
 
       - name: "Upload Installer Logs"
         if: env.INSTALL_EXIT_CODE != '0'
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         with:
           name: interactive-installer-${{ matrix.os }}-logs
           path: ci-logs/interactive-installer-${{ matrix.os }}.log
@@ -202,7 +202,7 @@ jobs:
 
       - name: "Upload Uninstaller Logs"
         if: env.UNINSTALL_EXIT_CODE != '0'
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         with:
           name: interactive-uninstaller-${{ matrix.os }}-logs
           path: ci-logs/interactive-uninstaller-${{ matrix.os }}.log
@@ -251,7 +251,7 @@ jobs:
 
       - name: "Upload Build/Test Logs"
         if: failure()
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         with:
           name: mcp-build-test-logs-${{ matrix.os }}
           path: ci-logs/*.log
@@ -398,7 +398,7 @@ jobs:
         run: ./scripts/ios/xctestservice-build-for-testing.sh
 
       - name: "Upload XCTestService Artifacts"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: xctestservice-simulator-xcode16
           path: /tmp/automobile-xctestservice/Build/Products
@@ -419,7 +419,7 @@ jobs:
           xcode-version: "16.2"
 
       - name: "Download XCTestService Artifacts"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: xctestservice-simulator-xcode16
           path: /tmp/automobile-xctestservice/Build/Products
@@ -495,7 +495,7 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Download Accessibility Service APK"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: accessibility-service-apk
           path: android/accessibility-service/build/outputs/apk/debug
@@ -514,7 +514,7 @@ jobs:
 
       - name: "Upload Test Results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: junit-runner-emulator-test-results
           path: android/junit-runner/build/reports/tests/test/
@@ -538,7 +538,7 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Download Accessibility Service APK"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: accessibility-service-apk
           path: android/accessibility-service/build/outputs/apk/debug
@@ -557,7 +557,7 @@ jobs:
 
       - name: "Upload Test Results"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playground-automobile-emulator-test-results
           path: android/playground/app/build/reports/tests/test/
@@ -616,7 +616,7 @@ jobs:
           release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Store AAR"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         with:
           name: aar
           path: core/build/outputs/aar/core-debug.aar
@@ -647,7 +647,7 @@ jobs:
           release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Store Accessibility Service APK"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         with:
           name: accessibility-service-apk
           path: android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
@@ -677,7 +677,7 @@ jobs:
           release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Store Sample APK"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         if: success()  # Only upload if build succeeded
         with:
           name: playground-app-apk
@@ -782,7 +782,7 @@ jobs:
 #
 #      - uses: ./.github/actions/setup-auto-mobile-npm-package
 #
-#      - uses: actions/download-artifact@v4.1.8
+#      - uses: actions/download-artifact@v7
 #        with:
 #          name: apk
 #
@@ -965,7 +965,7 @@ jobs:
           exit 0
 
       - name: "Upload Benchmark Report"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: context-benchmark-report
