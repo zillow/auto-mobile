@@ -172,14 +172,21 @@ else
     done
 fi
 
-# Parse available iOS runtimes and find the best one
-IOS_RUNTIMES=$(echo "$RUNTIMES_OUTPUT" | grep "^iOS" || echo "")
-log_debug "iOS runtimes: $IOS_RUNTIMES"
-
-# Extract version numbers from runtimes (e.g., "iOS 18.5" -> "18.5")
+# Extract exact iOS runtime versions from JSON (text output truncates patch versions,
+# e.g. "iOS 18.3" when the actual version is 18.3.1 — xcodebuild needs the exact version).
 get_available_ios_versions() {
-    echo "$IOS_RUNTIMES" | sed -n 's/^iOS \([0-9.]*\).*/\1/p' | sort -V
+    xcrun simctl list runtimes -j 2>/dev/null \
+        | python3 -c "
+import sys, json
+for r in json.load(sys.stdin).get('runtimes', []):
+    if r.get('isAvailable') and 'iOS' in r.get('identifier', ''):
+        print(r['version'])
+" | sort -V
 }
+
+# Log what we found
+IOS_VERSIONS_LIST=$(get_available_ios_versions)
+log_debug "iOS runtime versions: $(echo "$IOS_VERSIONS_LIST" | tr '\n' ' ')"
 
 # Check if a version meets the minimum requirement
 version_gte() {
@@ -344,10 +351,8 @@ if [ "$NEEDS_DOWNLOAD" = true ]; then
     log_success "Download completed in ${DOWNLOAD_DURATION}s"
     echo "" >&2
 
-    # Refresh runtime list
+    # Refresh runtime list (get_available_ios_versions re-queries simctl)
     sleep 2
-    RUNTIMES_OUTPUT=$(xcrun simctl list runtimes 2>/dev/null || echo "")
-    IOS_RUNTIMES=$(echo "$RUNTIMES_OUTPUT" | grep "^iOS" || echo "")
 
     # Try strict match first, then accept the downloaded runtime
     BEST_IOS_VERSION=$(find_compatible_ios_runtime "$MIN_IOS_VERSION" "$IOS_SDK_VERSION")
