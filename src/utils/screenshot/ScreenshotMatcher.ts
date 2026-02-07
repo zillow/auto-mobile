@@ -6,6 +6,7 @@ import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../constants";
 import { ScreenshotComparator } from "./ScreenshotComparator";
 import { PerceptualHasher } from "./PerceptualHasher";
 import { ScreenshotCache } from "./ScreenshotCache";
+import { Timer, defaultTimer } from "../SystemTimer";
 
 export interface SimilarScreenshotResult {
   filePath: string;
@@ -26,9 +27,10 @@ export class ScreenshotMatcher {
     targetBuffer: Buffer,
     screenshotPaths: string[],
     tolerancePercent: number = DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
-    fastMode: boolean = true
+    fastMode: boolean = true,
+    timer: Timer = defaultTimer
   ): Promise<Array<{ filePath: string; similarity: number; matchFound: boolean }>> {
-    const batchStart = Date.now();
+    const batchStart = timer.now();
     const minSimilarity = 100 - tolerancePercent;
 
     logger.info(`Starting batch comparison of ${screenshotPaths.length} screenshots (fast mode: ${fastMode})`);
@@ -55,14 +57,14 @@ export class ScreenshotMatcher {
       });
 
       const results = await Promise.all(comparisonPromises);
-      const batchTime = Date.now() - batchStart;
+      const batchTime = timer.now() - batchStart;
 
       const matches = results.filter(r => r.matchFound);
       logger.info(`Batch comparison completed in ${batchTime}ms: ${matches.length}/${results.length} matches found`);
 
       return results;
     } catch (error) {
-      const batchTime = Date.now() - batchStart;
+      const batchTime = timer.now() - batchStart;
       logger.warn(`Batch comparison failed after ${batchTime}ms: ${(error as Error).message}`);
       return [];
     }
@@ -80,9 +82,10 @@ export class ScreenshotMatcher {
     targetBuffer: Buffer,
     screenshotPaths: string[],
     tolerancePercent: number = DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
-    fastMode: boolean = true
+    fastMode: boolean = true,
+    timer: Timer = defaultTimer
   ): Promise<Array<{ filePath: string; similarity: number; matchFound: boolean }>> {
-    const batchStart = Date.now();
+    const batchStart = timer.now();
     const minSimilarity = 100 - tolerancePercent;
 
     logger.info(`Starting optimized two-stage batch comparison of ${screenshotPaths.length} screenshots`);
@@ -115,7 +118,7 @@ export class ScreenshotMatcher {
       const candidates = stage1Results
         .filter((result): result is NonNullable<typeof result> => result !== null && result.isCandidate);
 
-      const stage1Time = Date.now() - batchStart;
+      const stage1Time = timer.now() - batchStart;
       logger.info(`Stage 1 (perceptual hash) completed in ${stage1Time}ms: ${candidates.length}/${screenshotPaths.length} candidates selected`);
 
       if (candidates.length === 0) {
@@ -127,7 +130,7 @@ export class ScreenshotMatcher {
       }
 
       // Stage 2: Precise pixel comparison for candidates only
-      const stage2Start = Date.now();
+      const stage2Start = timer.now();
       const preciseResults = await Promise.all(
         candidates.map(async candidate => {
           try {
@@ -170,8 +173,8 @@ export class ScreenshotMatcher {
         };
       });
 
-      const stage2Time = Date.now() - stage2Start;
-      const totalTime = Date.now() - batchStart;
+      const stage2Time = timer.now() - stage2Start;
+      const totalTime = timer.now() - batchStart;
       const matches = finalResults.filter(r => r.matchFound);
 
       logger.info(`Stage 2 (pixel comparison) completed in ${stage2Time}ms for ${candidates.length} candidates`);
@@ -179,7 +182,7 @@ export class ScreenshotMatcher {
 
       return finalResults;
     } catch (error) {
-      const totalTime = Date.now() - batchStart;
+      const totalTime = timer.now() - batchStart;
       logger.warn(`Optimized batch comparison failed after ${totalTime}ms: ${(error as Error).message}`);
       return [];
     }
@@ -197,9 +200,10 @@ export class ScreenshotMatcher {
     targetBuffer: Buffer,
     cacheDir: string,
     tolerancePercent: number = DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
-    maxComparisons: number = 10
+    maxComparisons: number = 10,
+    timer: Timer = defaultTimer
   ): Promise<SimilarScreenshotResult> {
-    const searchStart = Date.now();
+    const searchStart = timer.now();
     const minSimilarity = 100 - tolerancePercent;
 
     logger.info(`Searching for screenshots with ≥${minSimilarity}% similarity (tolerance: ${tolerancePercent}%) in ${cacheDir}`);
@@ -262,7 +266,7 @@ export class ScreenshotMatcher {
         }
       }
 
-      const searchTime = Date.now() - searchStart;
+      const searchTime = timer.now() - searchStart;
 
       if (bestMatch.matchFound) {
         logger.info(`Screenshot search completed in ${searchTime}ms: Found match with ${bestMatch.similarity.toFixed(2)}% similarity`);
@@ -272,7 +276,7 @@ export class ScreenshotMatcher {
 
       return bestMatch;
     } catch (error) {
-      const searchTime = Date.now() - searchStart;
+      const searchTime = timer.now() - searchStart;
       logger.warn(`Screenshot search failed after ${searchTime}ms: ${(error as Error).message}`);
 
       return {

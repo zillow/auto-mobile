@@ -3,6 +3,8 @@ import { existsSync, promises as fs } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { logger } from "../utils/logger";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 
 const DISABLED_RECOVERY_VALUES = new Set(["0", "false", "no", "off"]);
 
@@ -60,7 +62,8 @@ async function ensureMigrationTableExists(db: Kysely<unknown>): Promise<void> {
 
 async function rebuildMigrationTable(
   db: Kysely<unknown>,
-  migrator: Migrator
+  migrator: Migrator,
+  timer: Timer = defaultTimer
 ): Promise<{ pruned: string[]; kept: string[] }> {
   const hasMigrationTable = await tableExists(db, DEFAULT_MIGRATION_TABLE);
   if (!hasMigrationTable) {
@@ -88,7 +91,7 @@ async function rebuildMigrationTable(
     await trx.deleteFrom(DEFAULT_MIGRATION_TABLE as any).execute();
 
     if (kept.length > 0) {
-      const baseTimestamp = Date.now();
+      const baseTimestamp = timer.now();
       await trx
         .insertInto(DEFAULT_MIGRATION_TABLE as any)
         .values(

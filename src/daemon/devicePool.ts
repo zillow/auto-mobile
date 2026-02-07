@@ -142,7 +142,7 @@ export class DevicePool {
    * Only adds new devices - does not remove existing devices that may be assigned.
    */
   async refreshDevices(): Promise<number> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     try {
       logger.info("Refreshing device pool - discovering connected devices...");
 
@@ -152,7 +152,7 @@ export class DevicePool {
       logger.info(`Environment: ANDROID_HOME=${androidHome}, ANDROID_SDK_ROOT=${androidSdkRoot}`);
 
       const bootedDevices = await this.deviceManager.getBootedDevices("either");
-      const discoveryTime = Date.now() - startTime;
+      const discoveryTime = this.timer.now() - startTime;
       logger.info(`Device discovery completed in ${discoveryTime}ms, found ${bootedDevices.length} devices`);
 
       const now = this.seedLastUsedAt(this.timer.now());
@@ -189,7 +189,7 @@ export class DevicePool {
 
       return addedCount;
     } catch (error) {
-      const elapsed = Date.now() - startTime;
+      const elapsed = this.timer.now() - startTime;
       logger.error(`Failed to refresh device pool after ${elapsed}ms: ${error}`);
       if (error instanceof Error) {
         logger.error(`Stack trace: ${error.stack}`);

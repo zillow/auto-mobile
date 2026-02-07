@@ -59,7 +59,7 @@ export class AccessibilityServiceFocus {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<CurrentFocusResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -68,7 +68,7 @@ export class AccessibilityServiceFocus {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for current focus");
         return {
           focusedElement: null,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -83,7 +83,7 @@ export class AccessibilityServiceFocus {
         timeoutMs,
         (_id, _type, timeout) => ({
           focusedElement: null,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Current focus timeout after ${timeout}ms`
         })
       );
@@ -102,7 +102,7 @@ export class AccessibilityServiceFocus {
       // Wait for response
       const result = await perf.track("waitForCurrentFocus", () => focusPromise);
 
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       if (result.error) {
         logger.warn(`[ACCESSIBILITY_SERVICE] Current focus failed after ${duration}ms: ${result.error}`);
       } else {
@@ -111,7 +111,7 @@ export class AccessibilityServiceFocus {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Current focus request failed after ${duration}ms: ${error}`);
       return {
         focusedElement: null,
@@ -131,7 +131,7 @@ export class AccessibilityServiceFocus {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<TraversalOrderResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -142,7 +142,7 @@ export class AccessibilityServiceFocus {
           elements: [],
           focusedIndex: null,
           totalCount: 0,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -159,7 +159,7 @@ export class AccessibilityServiceFocus {
           elements: [],
           focusedIndex: null,
           totalCount: 0,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Traversal order timeout after ${timeout}ms`
         })
       );
@@ -178,7 +178,7 @@ export class AccessibilityServiceFocus {
       // Wait for response
       const result = await perf.track("waitForTraversalOrder", () => traversalPromise);
 
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       if (result.error) {
         logger.warn(`[ACCESSIBILITY_SERVICE] Traversal order failed after ${duration}ms: ${result.error}`);
       } else {
@@ -187,7 +187,7 @@ export class AccessibilityServiceFocus {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Traversal order request failed after ${duration}ms: ${error}`);
       return {
         elements: [],

@@ -20,6 +20,7 @@ import { DefaultElementSelector } from "../features/utility/DefaultElementSelect
 import { ElementFinder } from "../features/utility/ElementFinder";
 import { ElementParser } from "../features/utility/ElementParser";
 import { NoOpPerformanceTracker } from "../utils/PerformanceTracker";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import {
   elementContainerSchema,
   elementIdTextFieldsSchema,
@@ -29,8 +30,8 @@ import {
 
 const UNSUPPORTED_MESSAGE = "Visual highlights are only supported on Android devices.";
 
-const generateHighlightId = (): string => {
-  const timestamp = Date.now();
+const generateHighlightId = (timer: Timer = defaultTimer): string => {
+  const timestamp = timer.now();
   const random = Math.random().toString(36).substring(2, 10);
   return `highlight_${timestamp}_${random}`;
 };

@@ -39,7 +39,7 @@ export class AccessibilityServiceText {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySetTextResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -51,7 +51,7 @@ export class AccessibilityServiceText {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for setText");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -66,7 +66,7 @@ export class AccessibilityServiceText {
         timeoutMs,
         (_id, _type, timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Set text timeout after ${timeout}ms`
         })
       );
@@ -90,7 +90,7 @@ export class AccessibilityServiceText {
       // Wait for response
       const result = await perf.track("waitForSetText", () => setTextPromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Set text completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
       } else {
@@ -99,7 +99,7 @@ export class AccessibilityServiceText {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Set text request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -146,7 +146,7 @@ export class AccessibilityServiceText {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yImeActionResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -159,7 +159,7 @@ export class AccessibilityServiceText {
         return {
           success: false,
           action,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -175,7 +175,7 @@ export class AccessibilityServiceText {
         (_id, _type, timeout) => ({
           success: false,
           action,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `IME action timeout after ${timeout}ms`
         })
       );
@@ -198,7 +198,7 @@ export class AccessibilityServiceText {
       // Wait for response
       const result = await perf.track("waitForImeAction", () => imeActionPromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] IME action completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, action=${result.action}`);
       } else {
@@ -207,7 +207,7 @@ export class AccessibilityServiceText {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] IME action request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -231,7 +231,7 @@ export class AccessibilityServiceText {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySelectAllResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -243,7 +243,7 @@ export class AccessibilityServiceText {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for select all");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -258,7 +258,7 @@ export class AccessibilityServiceText {
         timeoutMs,
         (_id, _type, timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Select all timeout after ${timeout}ms`
         })
       );
@@ -280,7 +280,7 @@ export class AccessibilityServiceText {
       // Wait for response
       const result = await perf.track("waitForSelectAll", () => selectAllPromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Select all completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
       } else {
@@ -289,7 +289,7 @@ export class AccessibilityServiceText {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Select all request failed after ${duration}ms: ${error}`);
       return {
         success: false,

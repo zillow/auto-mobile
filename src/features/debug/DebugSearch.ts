@@ -1,6 +1,7 @@
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { BootedDevice, Element, ViewHierarchyResult, DebugSearchResult, DebugSearchMatch } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { ElementUtils } from "../utility/ElementUtils";
@@ -56,15 +57,18 @@ export class DebugSearch {
   private readonly adb: AdbExecutor;
   private viewHierarchy: ViewHierarchy;
   private elementUtils: ElementUtils;
+  private timer: Timer;
 
   constructor(
     device: BootedDevice,
-    adbFactory: AdbClientFactory = defaultAdbClientFactory
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
     this.viewHierarchy = new ViewHierarchy(device, adbFactory);
     this.elementUtils = new ElementUtils();
+    this.timer = timer;
   }
 
   /**
@@ -73,7 +77,7 @@ export class DebugSearch {
    * @returns Debug search result with all matches and analysis
    */
   async execute(options: DebugSearchOptions): Promise<DebugSearchResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const fuzzyMatch = options.fuzzyMatch !== false;
     const caseSensitive = options.caseSensitive === true;
     const includeNearMisses = options.includeNearMisses !== false;

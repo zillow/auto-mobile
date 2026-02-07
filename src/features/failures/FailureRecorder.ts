@@ -6,6 +6,7 @@ import type {
   AggregatedToolCallInfo,
 } from "../../server/failuresResources";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import crypto from "node:crypto";
 import type { FailureRecorderService } from "./interfaces/FailureRecorderService";
 import { getFailuresPushServer, FailureNotificationPush } from "../../daemon/failuresPushSocketServer";
@@ -131,10 +132,12 @@ export interface RecordNonFatalInput {
  */
 export class FailureRecorder implements FailureRecorderService {
   private repository: FailureAnalyticsRepository;
+  private timer: Timer;
   private static instance: FailureRecorder | null = null;
 
-  constructor(repository?: FailureAnalyticsRepository) {
+  constructor(repository?: FailureAnalyticsRepository, timer: Timer = defaultTimer) {
     this.repository = repository ?? new FailureAnalyticsRepository();
+    this.timer = timer;
   }
 
   /**
@@ -402,7 +405,7 @@ export class FailureRecorder implements FailureRecorderService {
         severity,
         title,
         message,
-        timestamp: Date.now(),
+        timestamp: this.timer.now(),
       };
       logger.debug(`[FailureRecorder] Pushing failure notification: ${type} - ${title}`);
       server.pushFailure(notification);

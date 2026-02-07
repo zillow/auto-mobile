@@ -384,9 +384,9 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       let timeoutId: NodeJS.Timeout;
 
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = defaultTimer.setTimeout(() =>
+        timeoutId = this.timer.setTimeout(() =>
           reject(new ActionableError(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
-                                            timeoutMs
+                                          timeoutMs
         );
       });
 
@@ -743,7 +743,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       };
 
       // Set a timeout for startup validation (5 seconds should be enough to detect PANIC)
-      const startupTimeout = defaultTimer.setTimeout(() => {
+      const startupTimeout = this.timer.setTimeout(() => {
         if (!startupValidationComplete) {
           startupValidationComplete = true;
           // If no PANIC detected and no clear success indicators, assume success
@@ -832,7 +832,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    * @returns Promise that resolves with device ID when emulator is ready
    */
   async waitForEmulatorReady(avdName: string, timeoutMs: number = 120000): Promise<BootedDevice> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     // Read polling interval from environment variable (default: 500ms, minimum: 100ms)
     const pollingIntervalMs = Math.max(parseInt(process.env.EMULATOR_POLLING_INTERVAL_MS || "500", 10), 100);
@@ -926,7 +926,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
     const pollingPromise = backgroundPoller();
 
     // Main timeout loop
-    while (Date.now() - startTime < timeoutMs && pollingActive) {
+    while (this.timer.now() - startTime < timeoutMs) {
       if (foundDeviceId) {
         pollingActive = false;
         logger.info(`Emulator '${avdName}' is ready! Device ID: ${foundDeviceId}`);

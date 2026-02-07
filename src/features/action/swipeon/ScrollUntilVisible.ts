@@ -16,7 +16,7 @@ import { ElementUtils } from "../../utility/ElementUtils";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
 import { serverConfig } from "../../../utils/ServerConfig";
-import { defaultTimer } from "../../../utils/SystemTimer";
+import { Timer } from "../../../utils/SystemTimer";
 import { SwipeOnResolvedOptions, BoomerangConfig } from "./types";
 import { OverlayDetector } from "./OverlayDetector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
@@ -29,6 +29,7 @@ export interface ScrollUntilVisibleDependencies {
   accessibilityDetector: AccessibilityDetector;
   overlayDetector: OverlayDetector;
   talkBackExecutor: TalkBackSwipeExecutor;
+  timer: Timer;
   getDuration: (options: SwipeOnResolvedOptions) => number;
   resolveBoomerangConfig: (options: SwipeOnResolvedOptions) => BoomerangConfig | undefined;
   buildPredictionArgs: (options: SwipeOnOptions) => Record<string, unknown>;
@@ -101,7 +102,7 @@ export class ScrollUntilVisible {
     const lookForOptions = { ...options, speed: effectiveSpeed };
 
     const maxTime = options.lookFor!.maxTime ?? 15000;
-    const startTime = Date.now();
+    const startTime = this.deps.timer.now();
     let foundElement: Element | null = null;
     let scrollIteration = 0;
     let lastFingerprint = this.computeHierarchyFingerprint(lastObservation.viewHierarchy!);
@@ -145,7 +146,7 @@ export class ScrollUntilVisible {
         element: foundElement,
         found: true,
         scrollIterations: 0,
-        elapsedMs: Date.now() - startTime,
+        elapsedMs: this.deps.timer.now() - startTime,
         x1: 0,
         y1: 0,
         x2: 0,
@@ -177,9 +178,9 @@ export class ScrollUntilVisible {
     const swipeWarning = swipeCoordinates.warning;
 
     // Scroll until element is found
-    while (Date.now() - startTime < maxTime) {
+    while (this.deps.timer.now() - startTime < maxTime) {
       scrollIteration++;
-      logger.info(`[SwipeOn] Iteration ${scrollIteration}: elapsed=${Date.now() - startTime}ms`);
+      logger.info(`[SwipeOn] Iteration ${scrollIteration}: elapsed=${this.deps.timer.now() - startTime}ms`);
 
       // Perform scroll
       const swipeDuration = this.deps.getDuration(lookForOptions);
@@ -235,7 +236,7 @@ export class ScrollUntilVisible {
 
         if (unchangedScrollCount >= maxUnchangedScrolls) {
           perf.end();
-          const elapsed = Date.now() - startTime;
+          const elapsed = this.deps.timer.now() - startTime;
           throw new ActionableError(
             `Scroll reached end of container (no change after ${maxUnchangedScrolls} scrolls). ` +
             `${target} not found after ${scrollIteration} iterations (${elapsed}ms).`
@@ -254,7 +255,7 @@ export class ScrollUntilVisible {
       );
 
       if (foundElement) {
-        const elapsed = Date.now() - startTime;
+        const elapsed = this.deps.timer.now() - startTime;
         logger.info(`[SwipeOn] Found ${target} after ${scrollIteration} iterations (${elapsed}ms)`);
         break;
       }
@@ -262,7 +263,7 @@ export class ScrollUntilVisible {
 
     if (!foundElement) {
       perf.end();
-      const elapsed = Date.now() - startTime;
+      const elapsed = this.deps.timer.now() - startTime;
       throw new ActionableError(
         `${target} not found after scrolling for ${elapsed}ms (${scrollIteration} iterations, timeout=${maxTime}ms).`
       );
@@ -280,7 +281,7 @@ export class ScrollUntilVisible {
       element: foundElement,
       found: true,
       scrollIterations: scrollIteration,
-      elapsedMs: Date.now() - startTime,
+      elapsedMs: this.deps.timer.now() - startTime,
       observation: lastObservation,
       x1: 0,
       y1: 0,
@@ -323,7 +324,7 @@ export class ScrollUntilVisible {
     // Retry logic similar to TapOnElement
     if (!element && attempt < ScrollUntilVisible.MAX_ATTEMPTS) {
       const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
-      await defaultTimer.sleep(delayNextAttempt);
+      await this.deps.timer.sleep(delayNextAttempt);
 
       let latestViewHierarchy: ViewHierarchyResult | null = null;
 

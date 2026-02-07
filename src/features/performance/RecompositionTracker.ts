@@ -11,6 +11,7 @@ import {
   ViewHierarchyResult
 } from "../../models";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { serverConfig } from "../../utils/ServerConfig";
 import { ElementParser } from "../utility/ElementParser";
 
@@ -46,6 +47,11 @@ export class RecompositionTracker {
   private lastObservationAt: number | null = null;
   private lastInteractionAt: number | null = null;
   private readonly parser = new ElementParser();
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
 
   static getInstance(): RecompositionTracker {
     if (!RecompositionTracker.instance) {
@@ -59,7 +65,7 @@ export class RecompositionTracker {
       return;
     }
     this.lastInteractionTotals = new Map(this.latestTotals);
-    this.lastInteractionAt = Date.now();
+    this.lastInteractionAt = this.timer.now();
   }
 
   async processObservation(result: ObserveResult, device: BootedDevice): Promise<void> {
@@ -101,7 +107,7 @@ export class RecompositionTracker {
         return parsed;
       }
     }
-    return Date.now();
+    return this.timer.now();
   }
 
   private collectEntries(viewHierarchy: ViewHierarchyResult): RecompositionEntryInput[] {

@@ -9,6 +9,8 @@ import type {
 } from "./types";
 import type { CrashEvent, AnrEvent } from "../utils/interfaces/CrashMonitor";
 import { logger } from "../utils/logger";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 
 /**
  * Query options for fetching failures
@@ -65,6 +67,12 @@ export interface FailureRecord {
  * Repository for failure data (crashes, ANRs, tool call failures)
  */
 export class FailureEventRepository {
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
   /**
    * Save a crash event to the database
    */
@@ -416,7 +424,7 @@ export class FailureEventRepository {
    */
   async deleteOldFailures(olderThanDays: number): Promise<void> {
     const db = getDatabase();
-    const cutoffTimestamp = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+    const cutoffTimestamp = this.timer.now() - olderThanDays * 24 * 60 * 60 * 1000;
     const cutoffDate = new Date(cutoffTimestamp).toISOString();
 
     await db

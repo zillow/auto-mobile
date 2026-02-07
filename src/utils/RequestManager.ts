@@ -45,7 +45,7 @@ export class RequestManager {
    */
   generateId(type: string): string {
     this.requestCounter++;
-    return `${type}_${Date.now()}_${this.requestCounter}`;
+    return `${type}_${this.timer.now()}_${this.requestCounter}`;
   }
 
   /**
@@ -80,7 +80,7 @@ export class RequestManager {
         resolve: resolve as (result: unknown) => void,
         reject,
         timeoutId,
-        createdAt: Date.now()
+        createdAt: this.timer.now()
       });
 
       logger.debug(`[RequestManager] Registered request: ${type} (id: ${id}, timeout: ${timeoutMs}ms)`);
@@ -107,7 +107,7 @@ export class RequestManager {
     this.pending.delete(id);
 
     // Resolve the promise
-    const duration = Date.now() - request.createdAt;
+    const duration = this.timer.now() - request.createdAt;
     logger.debug(`[RequestManager] Resolved request: ${request.type} (id: ${id}, duration: ${duration}ms)`);
     request.resolve(result);
 

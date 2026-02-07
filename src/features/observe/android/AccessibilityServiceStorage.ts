@@ -50,7 +50,7 @@ export class AccessibilityServiceStorage {
     packageName: string,
     timeoutMs: number = 5000
   ): Promise<PreferenceFile[]> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -60,7 +60,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `list_preference_files_${Date.now()}_${generateSecureId()}`;
+      const requestId = `list_preference_files_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<ListPreferenceFilesResult>(
@@ -69,7 +69,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `List preference files timeout after ${timeoutMs}ms`
         })
       );
@@ -97,7 +97,7 @@ export class AccessibilityServiceStorage {
 
       return result.files || [];
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] listPreferenceFiles failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -116,7 +116,7 @@ export class AccessibilityServiceStorage {
     fileName: string,
     timeoutMs: number = 5000
   ): Promise<KeyValueEntry[]> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -126,7 +126,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `get_preferences_${Date.now()}_${generateSecureId()}`;
+      const requestId = `get_preferences_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<GetPreferencesResult>(
@@ -135,7 +135,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Get preferences timeout after ${timeoutMs}ms`
         })
       );
@@ -163,7 +163,7 @@ export class AccessibilityServiceStorage {
 
       return result.entries || [];
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] getPreferenceEntries failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -183,7 +183,7 @@ export class AccessibilityServiceStorage {
     fileName: string,
     timeoutMs: number = 5000
   ): Promise<StorageSubscription> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -193,7 +193,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `subscribe_storage_${Date.now()}_${generateSecureId()}`;
+      const requestId = `subscribe_storage_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<SubscribeStorageResult>(
@@ -202,7 +202,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Subscribe storage timeout after ${timeoutMs}ms`
         })
       );
@@ -231,7 +231,7 @@ export class AccessibilityServiceStorage {
       logger.info(`[ACCESSIBILITY_SERVICE] Subscribed to storage changes: ${packageName}/${fileName} (subscriptionId: ${result.subscription.subscriptionId})`);
       return result.subscription;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] subscribeStorage failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -247,7 +247,7 @@ export class AccessibilityServiceStorage {
     subscriptionId: string,
     timeoutMs: number = 5000
   ): Promise<void> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -257,7 +257,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `unsubscribe_storage_${Date.now()}_${generateSecureId()}`;
+      const requestId = `unsubscribe_storage_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<UnsubscribeStorageResult>(
@@ -266,7 +266,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Unsubscribe storage timeout after ${timeoutMs}ms`
         })
       );
@@ -293,7 +293,7 @@ export class AccessibilityServiceStorage {
 
       logger.info(`[ACCESSIBILITY_SERVICE] Unsubscribed from storage changes (subscriptionId: ${subscriptionId})`);
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] unsubscribeStorage failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -342,7 +342,7 @@ export class AccessibilityServiceStorage {
     key: string,
     timeoutMs: number = 5000
   ): Promise<KeyValueEntry | null> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -352,7 +352,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `get_preference_${Date.now()}_${generateSecureId()}`;
+      const requestId = `get_preference_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<GetPreferenceResult>(
@@ -362,7 +362,7 @@ export class AccessibilityServiceStorage {
         (_id, _type, _timeout) => ({
           success: false,
           found: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Get preference timeout after ${timeoutMs}ms`
         })
       );
@@ -391,7 +391,7 @@ export class AccessibilityServiceStorage {
 
       return result.found && result.entry ? result.entry : null;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] getPreference failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -415,7 +415,7 @@ export class AccessibilityServiceStorage {
     type: KeyValueType,
     timeoutMs: number = 5000
   ): Promise<void> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -425,7 +425,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `set_preference_${Date.now()}_${generateSecureId()}`;
+      const requestId = `set_preference_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<SetPreferenceResult>(
@@ -434,7 +434,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Set preference timeout after ${timeoutMs}ms`
         })
       );
@@ -465,7 +465,7 @@ export class AccessibilityServiceStorage {
 
       logger.info(`[ACCESSIBILITY_SERVICE] Set preference: ${packageName}/${fileName}/${key}`);
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] setPreference failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -485,7 +485,7 @@ export class AccessibilityServiceStorage {
     key: string,
     timeoutMs: number = 5000
   ): Promise<void> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -495,7 +495,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `remove_preference_${Date.now()}_${generateSecureId()}`;
+      const requestId = `remove_preference_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<RemovePreferenceResult>(
@@ -504,7 +504,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Remove preference timeout after ${timeoutMs}ms`
         })
       );
@@ -533,7 +533,7 @@ export class AccessibilityServiceStorage {
 
       logger.info(`[ACCESSIBILITY_SERVICE] Removed preference: ${packageName}/${fileName}/${key}`);
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] removePreference failed after ${duration}ms: ${error}`);
       throw error;
     }
@@ -551,7 +551,7 @@ export class AccessibilityServiceStorage {
     fileName: string,
     timeoutMs: number = 5000
   ): Promise<void> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       // Ensure WebSocket connection is established
@@ -561,7 +561,7 @@ export class AccessibilityServiceStorage {
         throw new Error("Failed to connect to accessibility service");
       }
 
-      const requestId = `clear_preferences_${Date.now()}_${generateSecureId()}`;
+      const requestId = `clear_preferences_${this.context.timer.now()}_${generateSecureId()}`;
 
       // Create promise that will be resolved when we receive the result
       const resultPromise = this.context.requestManager.register<ClearPreferencesResult>(
@@ -570,7 +570,7 @@ export class AccessibilityServiceStorage {
         timeoutMs,
         (_id, _type, _timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Clear preferences timeout after ${timeoutMs}ms`
         })
       );
@@ -598,7 +598,7 @@ export class AccessibilityServiceStorage {
 
       logger.info(`[ACCESSIBILITY_SERVICE] Cleared preferences: ${packageName}/${fileName}`);
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] clearPreferenceStore failed after ${duration}ms: ${error}`);
       throw error;
     }

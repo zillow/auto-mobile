@@ -1,4 +1,5 @@
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { BackStackInfo } from "../../models";
 import { NavigationRepository } from "../../db/navigationRepository";
 import { TestCoverageRepository } from "../../db/testCoverageRepository";
@@ -128,6 +129,7 @@ export class NavigationGraphManager implements NavigationGraphService {
 
   private repository: NavigationRepository;
   private testCoverageRepository: TestCoverageRepository;
+  private timer: Timer;
   private currentAppId: string | null = null;
   private currentScreen: string | null = null;
   private graphUpdateListeners: Array<() => void | Promise<void>> = [];
@@ -158,10 +160,12 @@ export class NavigationGraphManager implements NavigationGraphService {
 
   constructor(
     repository?: NavigationRepository,
-    testCoverageRepository?: TestCoverageRepository
+    testCoverageRepository?: TestCoverageRepository,
+    timer: Timer = defaultTimer
   ) {
     this.repository = repository ?? new NavigationRepository();
     this.testCoverageRepository = testCoverageRepository ?? new TestCoverageRepository();
+    this.timer = timer;
   }
 
   /**
@@ -579,7 +583,7 @@ export class NavigationGraphManager implements NavigationGraphService {
    * Record a tool call for correlation with future navigation events.
    */
   public recordToolCall(toolName: string, args: Record<string, any>, uiState?: UIState): void {
-    const timestamp = Date.now();
+    const timestamp = this.timer.now();
 
     this.toolCallHistory.push({
       toolName,
@@ -641,7 +645,7 @@ export class NavigationGraphManager implements NavigationGraphService {
    * Remove tool calls older than TTL.
    */
   private cleanupToolCallHistory(): void {
-    const cutoff = Date.now() - this.TOOL_CALL_HISTORY_TTL_MS;
+    const cutoff = this.timer.now() - this.TOOL_CALL_HISTORY_TTL_MS;
     const before = this.toolCallHistory.length;
     this.toolCallHistory = this.toolCallHistory.filter(tc => tc.timestamp >= cutoff);
     const removed = before - this.toolCallHistory.length;
@@ -1289,7 +1293,7 @@ export class NavigationGraphManager implements NavigationGraphService {
       throw new Error("No current app set");
     }
 
-    const timestamp = Date.now();
+    const timestamp = this.timer.now();
 
     // Get or create the named node
     const node = await this.repository.getOrCreateNode(

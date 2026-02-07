@@ -7,6 +7,7 @@ import type {
   PerformanceStreamData,
 } from "../../deviceDataStreamSocketServer";
 import type { StorageChangedEvent } from "../../../features/storage/storageTypes";
+import { Timer, defaultTimer } from "../../../utils/SystemTimer";
 
 /**
  * Observation subscription filter
@@ -76,6 +77,12 @@ export interface StorageUpdateEvent {
  */
 export class ObservationDomainHandler extends BaseDomainHandler {
   readonly domain = "observation" as const;
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    super();
+    this.timer = timer;
+  }
 
   async handleRequest(
     method: string,
@@ -124,7 +131,7 @@ export class ObservationDomainHandler extends BaseDomainHandler {
   pushHierarchyUpdate(deviceId: string, hierarchy: ViewHierarchyResult): void {
     const event: HierarchyUpdateEvent = {
       deviceId,
-      timestamp: hierarchy.updatedAt ?? Date.now(),
+      timestamp: hierarchy.updatedAt ?? this.timer.now(),
       data: hierarchy,
     };
     this.push("hierarchy_update", event);
@@ -141,7 +148,7 @@ export class ObservationDomainHandler extends BaseDomainHandler {
   ): void {
     const event: ScreenshotUpdateEvent = {
       deviceId,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       screenshotBase64,
       screenWidth,
       screenHeight,
@@ -154,7 +161,7 @@ export class ObservationDomainHandler extends BaseDomainHandler {
    */
   pushNavigationGraphUpdate(navigationGraph: NavigationGraphStreamData): void {
     const event: NavigationUpdateEvent = {
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       navigationGraph,
     };
     this.push("navigation_update", event);
@@ -166,7 +173,7 @@ export class ObservationDomainHandler extends BaseDomainHandler {
   pushPerformanceUpdate(deviceId: string, performanceData: PerformanceStreamData): void {
     const event: PerformanceUpdateEvent = {
       deviceId,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       performanceData,
     };
     this.push("performance_update", event);
@@ -178,7 +185,7 @@ export class ObservationDomainHandler extends BaseDomainHandler {
   pushStorageUpdate(deviceId: string, storageEvent: StorageChangedEvent): void {
     const event: StorageUpdateEvent = {
       deviceId,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       storageEvent,
     };
     this.push("storage_update", event);

@@ -47,7 +47,7 @@ export class AccessibilityServiceHighlights {
     timeoutMs: number,
     perf: PerformanceTracker
   ): Promise<HighlightOperationResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       const connected = await perf.track("ensureConnection", () => this.context.ensureConnected(perf));
@@ -95,7 +95,7 @@ export class AccessibilityServiceHighlights {
       });
 
       const result = await perf.track("waitForHighlight", () => highlightPromise);
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Highlight ${type} completed in ${duration}ms`);
@@ -105,7 +105,7 @@ export class AccessibilityServiceHighlights {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Highlight ${type} request failed after ${duration}ms: ${error}`);
       return {
         success: false,

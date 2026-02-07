@@ -10,14 +10,18 @@ import type {
   ElementSearchCriteria,
 } from "./VisionTypes";
 import type { ViewHierarchyNode } from "../models/ViewHierarchyResult";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 
 export class VisionFallback {
   private config: VisionFallbackConfig;
   private claudeClient: ClaudeVisionClient | null = null;
   private resultCache: Map<string, { result: VisionFallbackResult; timestamp: number }>;
+  private timer: Timer;
 
-  constructor(config: VisionFallbackConfig) {
+  constructor(config: VisionFallbackConfig, timer: Timer = defaultTimer) {
     this.config = config;
+    this.timer = timer;
     this.resultCache = new Map();
 
     // Initialize Claude client if provider is 'claude'
@@ -87,7 +91,7 @@ export class VisionFallback {
     }
 
     // Check if cache is still valid
-    const now = Date.now();
+    const now = this.timer.now();
     const ageMinutes = (now - cached.timestamp) / (1000 * 60);
 
     if (ageMinutes > this.config.cacheTtlMinutes) {
@@ -106,7 +110,7 @@ export class VisionFallback {
     const cacheKey = this.generateCacheKey(screenshotPath, searchCriteria);
     this.resultCache.set(cacheKey, {
       result,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
     });
   }
 

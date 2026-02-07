@@ -1,30 +1,43 @@
 import type { Kysely } from "kysely";
+import { sql } from "kysely";
+
+async function columnExists(
+  db: Kysely<unknown>,
+  tableName: string,
+  columnName: string
+): Promise<boolean> {
+  const result = await sql<{ name: string }>`
+    SELECT name FROM pragma_table_info(${tableName}) WHERE name = ${columnName}
+  `.execute(db);
+  return result.rows.length > 0;
+}
+
+async function addColumnIfNotExists(
+  db: Kysely<unknown>,
+  tableName: string,
+  columnName: string,
+  columnType: string
+): Promise<void> {
+  if (await columnExists(db, tableName, columnName)) {
+    return;
+  }
+  await db.schema
+    .alterTable(tableName)
+    .addColumn(columnName, columnType)
+    .execute();
+}
 
 export async function up(db: Kysely<unknown>): Promise<void> {
   // Add new columns to performance_audit_results table for live metrics
-  await db.schema
-    .alterTable("performance_audit_results")
-    .addColumn("time_to_first_frame_ms", "real")
-    .execute();
-
-  await db.schema
-    .alterTable("performance_audit_results")
-    .addColumn("time_to_interactive_ms", "real")
-    .execute();
-
-  await db.schema
-    .alterTable("performance_audit_results")
-    .addColumn("frame_rate_fps", "real")
-    .execute();
-
-  await db.schema
-    .alterTable("performance_audit_results")
-    .addColumn("node_id", "integer")
-    .execute();
+  await addColumnIfNotExists(db, "performance_audit_results", "time_to_first_frame_ms", "real");
+  await addColumnIfNotExists(db, "performance_audit_results", "time_to_interactive_ms", "real");
+  await addColumnIfNotExists(db, "performance_audit_results", "frame_rate_fps", "real");
+  await addColumnIfNotExists(db, "performance_audit_results", "node_id", "integer");
 
   // Create index on node_id for navigation node lookups
   await db.schema
     .createIndex("idx_performance_audit_results_node_id")
+    .ifNotExists()
     .on("performance_audit_results")
     .column("node_id")
     .execute();
@@ -32,6 +45,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   // Create composite index on (package_name, timestamp) for efficient pruning
   await db.schema
     .createIndex("idx_performance_audit_results_package_timestamp")
+    .ifNotExists()
     .on("performance_audit_results")
     .columns(["package_name", "timestamp"])
     .execute();

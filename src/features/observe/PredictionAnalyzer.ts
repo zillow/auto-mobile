@@ -5,6 +5,7 @@ import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
 import { NodeCryptoService } from "../../utils/crypto";
 import { normalizeIdentifier, normalizeToolArgs } from "../../utils/predictionUtils";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface PredictionActionContext {
   appId: string;
@@ -25,13 +26,16 @@ export class PredictionAnalyzer {
   private elementParser = new ElementParser();
   private historyRepository: PredictionHistoryStore;
   private navigationGraph: NavigationGraphLike;
+  private timer: Timer;
 
   constructor(
     historyRepository: PredictionHistoryStore = new PredictionHistoryRepository(),
-    navigationGraph: NavigationGraphLike = NavigationGraphManager.getInstance()
+    navigationGraph: NavigationGraphLike = NavigationGraphManager.getInstance(),
+    timer: Timer = defaultTimer
   ) {
     this.historyRepository = historyRepository;
     this.navigationGraph = navigationGraph;
+    this.timer = timer;
   }
 
   async recordOutcomeForAction(
@@ -70,14 +74,14 @@ export class PredictionAnalyzer {
       predictedScreen: prediction.predictedScreen,
       toolName: context.toolName,
       toolArgs: normalizeToolArgs(context.toolArgs),
-      timestamp: Date.now()
+      timestamp: this.timer.now()
     }));
 
     try {
       await this.historyRepository.recordOutcome({
         appId: context.appId,
         predictionId,
-        timestamp: Date.now(),
+        timestamp: this.timer.now(),
         fromScreen: context.fromScreen,
         predictedScreen: prediction.predictedScreen,
         actualScreen,

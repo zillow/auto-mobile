@@ -13,6 +13,7 @@ import { ExecutePlanStepDebugInfo } from "../../models/ExecutePlanResult";
 import { throwIfAborted } from "../toolUtils";
 import { PlanPartitioner, TrackedStep } from "./PlanPartitioner";
 import { DaemonState } from "../../daemon/daemonState";
+import { Timer, defaultTimer } from "../SystemTimer";
 
 /**
  * Interface for plan execution
@@ -46,6 +47,12 @@ export interface PlanExecutor {
  * Executes plan steps sequentially or in parallel (multi-device)
  */
 export class DefaultPlanExecutor implements PlanExecutor {
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
   /**
    * Execute a plan step by step
    * @param plan Plan to execute
@@ -107,7 +114,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
   ): Promise<PlanExecutionResult> {
     let executedSteps = 0;
     const debugMode = isDebugModeEnabled();
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     // Always capture step data for test recording, not just in debug mode
     const debugSteps: ExecutePlanStepDebugInfo[] = [];
 
@@ -134,7 +141,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
       for (let i = startStep; i < plan.steps.length; i++) {
         throwIfAborted(signal);
         const step = plan.steps[i];
-        const stepStartTime = debugMode ? Date.now() : 0;
+        const stepStartTime = debugMode ? this.timer.now() : 0;
         const stepLabel = step.label || step.params?.label || JSON.stringify(step.params).substring(0, 50);
         logger.info(`[PLAN_STEP_${i + 1}/${plan.steps.length}] Tool: ${step.tool}, Label: ${stepLabel}`);
 
@@ -146,7 +153,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           debugSteps.push({
             step: `Execute step ${i + 1}: ${step.tool}`,
             status: "failed",
-            durationMs: Date.now() - stepStartTime,
+            durationMs: this.timer.now() - stepStartTime,
             details: {
               error: `Unknown tool: ${step.tool}`
             }
@@ -162,7 +169,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
               error: `Unknown tool: ${step.tool}`
             },
             debug: {
-              executionTimeMs: Date.now() - startTime,
+              executionTimeMs: this.timer.now() - startTime,
               steps: debugSteps
             }
           };
@@ -211,7 +218,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
             debugSteps.push({
               step: `Execute step ${i + 1}: ${step.tool}`,
               status: "failed",
-              durationMs: Date.now() - stepStartTime,
+              durationMs: this.timer.now() - stepStartTime,
               details: {
                 params: step.params,
                 error: "error" in response ? String(response.error) : "Tool execution failed",
@@ -230,7 +237,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
                 error: "error" in response ? String(response.error) : "Tool execution failed"
               },
               debug: {
-                executionTimeMs: Date.now() - startTime,
+                executionTimeMs: this.timer.now() - startTime,
                 steps: debugSteps
               }
             };
@@ -239,7 +246,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           debugSteps.push({
             step: `Execute step ${i + 1}: ${step.tool}`,
             status: "completed",
-            durationMs: Date.now() - stepStartTime,
+            durationMs: this.timer.now() - stepStartTime,
             details: {
               params: step.params
             }
@@ -252,7 +259,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           debugSteps.push({
             step: `Execute step ${i + 1}: ${step.tool}`,
             status: "failed",
-            durationMs: Date.now() - stepStartTime,
+            durationMs: this.timer.now() - stepStartTime,
             details: {
               params: step.params,
               error: `${error}`
@@ -269,7 +276,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
               error: `${error}`
             },
             debug: {
-              executionTimeMs: Date.now() - startTime,
+              executionTimeMs: this.timer.now() - startTime,
               steps: debugSteps
             }
           };
@@ -282,7 +289,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
         executedSteps,
         totalSteps: plan.steps.length,
         debug: {
-          executionTimeMs: Date.now() - startTime,
+          executionTimeMs: this.timer.now() - startTime,
           steps: debugSteps
         }
       };
@@ -293,7 +300,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
       debugSteps.push({
         step: "Plan execution error",
         status: "failed",
-        durationMs: Date.now() - startTime,
+        durationMs: this.timer.now() - startTime,
         details: {
           error: `${error}`
         }
@@ -309,7 +316,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           error: `${error}`
         },
         debug: {
-          executionTimeMs: Date.now() - startTime,
+          executionTimeMs: this.timer.now() - startTime,
           steps: debugSteps
         }
       };
@@ -354,7 +361,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
 
     // Execute each device track in parallel
     const devicePromises = partitionedPlan.devices.map(async device => {
-      const deviceStartTime = debugMode ? Date.now() : 0;
+      const deviceStartTime = debugMode ? this.timer.now() : 0;
       const track = partitionedPlan.deviceTracks.get(device)!;
 
       logger.info(
@@ -377,7 +384,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           success: result.success,
           executedSteps: result.executedSteps,
           totalSteps: track.length,
-          executionTimeMs: debugMode ? Date.now() - deviceStartTime : undefined,
+          executionTimeMs: debugMode ? this.timer.now() - deviceStartTime : undefined,
           failedStep: result.failedStep
             ? {
               stepIndex: result.failedStep.stepIndex,
@@ -425,7 +432,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
           success: false,
           executedSteps: 0,
           totalSteps: track.length,
-          executionTimeMs: debugMode ? Date.now() - deviceStartTime : undefined,
+          executionTimeMs: debugMode ? this.timer.now() - deviceStartTime : undefined,
           failedStep: {
             stepIndex: -1,
             trackIndex: -1,

@@ -1,8 +1,8 @@
 import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import {
   NavigationScreenshotManager,
-  FileSystem,
 } from "../../../src/features/navigation/NavigationScreenshotManager";
+import { FileSystem } from "../../../src/utils/filesystem/DefaultFileSystem";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
 /**
@@ -13,7 +13,7 @@ function normalizePath(p: string): string {
 }
 
 /**
- * Fake file system implementation for testing.
+ * Fake file system implementation for testing NavigationScreenshotManager.
  * Uses normalized paths (forward slashes) internally for cross-platform compatibility.
  */
 class FakeFileSystem implements FileSystem {
@@ -56,7 +56,16 @@ class FakeFileSystem implements FileSystem {
     return { size: file.data.length, mtimeMs: file.mtimeMs };
   }
 
-  async readFile(p: string): Promise<Buffer> {
+  async readFile(p: string): Promise<string> {
+    const normalized = this.normalize(p);
+    const file = this.files.get(normalized);
+    if (!file) {
+      throw new Error(`File not found: ${p}`);
+    }
+    return file.data.toString("utf8");
+  }
+
+  async readFileBuffer(p: string): Promise<Buffer> {
     const normalized = this.normalize(p);
     const file = this.files.get(normalized);
     if (!file) {
@@ -65,7 +74,16 @@ class FakeFileSystem implements FileSystem {
     return file.data;
   }
 
-  async writeFile(p: string, data: Buffer): Promise<void> {
+  existsSync(p: string): boolean {
+    const normalized = this.normalize(p);
+    return this.files.has(normalized) || this.directories.has(normalized);
+  }
+
+  async writeFile(p: string, content: string): Promise<void> {
+    this.files.set(this.normalize(p), { data: Buffer.from(content), mtimeMs: Date.now() });
+  }
+
+  async writeFileBuffer(p: string, data: Buffer): Promise<void> {
     this.files.set(this.normalize(p), { data, mtimeMs: Date.now() });
   }
 
@@ -75,6 +93,16 @@ class FakeFileSystem implements FileSystem {
 
   async remove(p: string): Promise<void> {
     this.files.delete(this.normalize(p));
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const normalizedOld = this.normalize(oldPath);
+    const normalizedNew = this.normalize(newPath);
+    const file = this.files.get(normalizedOld);
+    if (file) {
+      this.files.set(normalizedNew, file);
+      this.files.delete(normalizedOld);
+    }
   }
 
   // Test helpers

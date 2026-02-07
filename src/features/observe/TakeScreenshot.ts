@@ -13,6 +13,7 @@ import { ensureSecureTempDirSync, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ScreenshotService } from "./interfaces/ScreenshotService";
 import { XCTestServiceClient } from "./ios/XCTestServiceClient";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /** Secure file mode: owner read/write only */
 const SECURE_FILE_MODE = 0o600;
@@ -42,6 +43,7 @@ export class TakeScreenshot implements ScreenshotService {
   private adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
   private window: Window;
+  private timer: Timer;
   private static cacheDir: string | null = null;
   private static readonly MAX_CACHE_SIZE_BYTES = 128 * 1024 * 1024; // 128MB
 
@@ -64,6 +66,7 @@ export class TakeScreenshot implements ScreenshotService {
   constructor(
     device: BootedDevice,
     adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
+    timer: Timer = defaultTimer,
   ) {
     this.device = device;
     // Detect if the argument is a factory (has create method) or an executor
@@ -80,6 +83,7 @@ export class TakeScreenshot implements ScreenshotService {
       this.adb = this.adbFactory.create(device);
     }
     this.window = new Window(device, this.adbFactory);
+    this.timer = timer;
 
     // Manage cache size (getCacheDir ensures directory exists with secure permissions)
     this.cleanupCache();
@@ -153,7 +157,7 @@ export class TakeScreenshot implements ScreenshotService {
     options: ScreenshotOptions = { format: "png" },
     signal?: AbortSignal
   ): Promise<ScreenshotResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     logger.info(`[SCREENSHOT] *** Starting screenshot capture with startTime: ${startTime}, format: ${options.format} ***`);
 
     try {
@@ -165,12 +169,12 @@ export class TakeScreenshot implements ScreenshotService {
 
       // Capture screenshot with fallback
       const captureResult = await this.captureScreenshot(finalPath, options, signal);
-      const totalDuration = Date.now() - startTime;
+      const totalDuration = this.timer.now() - startTime;
 
       logger.info(`[SCREENSHOT] *** Screenshot capture completed: success=${captureResult.success}, total execute time: ${totalDuration}ms ***`);
       return captureResult;
     } catch (err) {
-      const totalDuration = Date.now() - startTime;
+      const totalDuration = this.timer.now() - startTime;
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.warn(`[SCREENSHOT] Execute failed after ${totalDuration}ms: ${errorMessage}`);
       return {
@@ -255,7 +259,7 @@ export class TakeScreenshot implements ScreenshotService {
   private async captureiOSScreenshot(
     finalPath: string,
   ): Promise<ScreenshotResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       const client = XCTestServiceClient.getInstance(this.device);
@@ -282,7 +286,7 @@ export class TakeScreenshot implements ScreenshotService {
       const imageBuffer = Buffer.from(result.data, "base64");
       await writeFileSecure(finalPath, imageBuffer);
 
-      const durationMs = Date.now() - startTime;
+      const durationMs = this.timer.now() - startTime;
       logger.info(`[SCREENSHOT] iOS screenshot captured in ${durationMs}ms, saved to ${finalPath}`);
 
       // Push to observation stream for IDE plugins
@@ -343,10 +347,10 @@ export class TakeScreenshot implements ScreenshotService {
     options: ScreenshotOptions = { format: "png" },
     signal?: AbortSignal
   ): Promise<ScreenshotResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     logger.info(`[SCREENSHOT] Trying base64 approach`);
 
-    const cmdStartTime = Date.now();
+    const cmdStartTime = this.timer.now();
     const tempFile = "/sdcard/screenshot.png";
 
     // Single command: screencap -> base64 encode -> remove temp file
@@ -354,7 +358,7 @@ export class TakeScreenshot implements ScreenshotService {
     // Use larger maxBuffer (50MB) to handle high-resolution screenshots
     const maxBuffer = 50 * 1024 * 1024; // 50MB
     const result = await this.adb.executeCommand(command, undefined, maxBuffer, undefined, signal);
-    const cmdDuration = Date.now() - cmdStartTime;
+    const cmdDuration = this.timer.now() - cmdStartTime;
     logger.info(`[SCREENSHOT] Combined ADB command took ${cmdDuration}ms`);
 
     if (!result.stdout || result.stdout.trim().length === 0) {
@@ -362,39 +366,39 @@ export class TakeScreenshot implements ScreenshotService {
     }
 
     // Decode base64 data to buffer
-    const decodeStartTime = Date.now();
+    const decodeStartTime = this.timer.now();
     const cleanedOutput = result.stdout.replace(/[\r\n]/g, "");
     const imageBuffer = Buffer.from(cleanedOutput, "base64");
-    const decodeDuration = Date.now() - decodeStartTime;
+    const decodeDuration = this.timer.now() - decodeStartTime;
     logger.info(`[SCREENSHOT] Base64 decode took ${decodeDuration}ms, buffer size: ${imageBuffer.length} bytes`);
 
     // Handle format conversion and save securely
     if (options.format !== "webp") {
       // For PNG, save directly
-      const saveStartTime = Date.now();
+      const saveStartTime = this.timer.now();
       await writeFileSecure(finalPath, imageBuffer);
-      const saveDuration = Date.now() - saveStartTime;
+      const saveDuration = this.timer.now() - saveStartTime;
       logger.info(`[SCREENSHOT] PNG file save took ${saveDuration}ms`);
     } else {
       // Convert to WebP
-      const convertStartTime = Date.now();
+      const convertStartTime = this.timer.now();
       const image = Image.fromBuffer(imageBuffer);
       const transformer = image.webp({
         quality: options.quality || 75,
         lossless: options.lossless
       });
       const convertedImage = await transformer.toBuffer();
-      const convertDuration = Date.now() - convertStartTime;
+      const convertDuration = this.timer.now() - convertStartTime;
       logger.info(`[SCREENSHOT] WebP conversion took ${convertDuration}ms`);
 
       // Save the webp file securely
-      const saveStartTime = Date.now();
+      const saveStartTime = this.timer.now();
       await writeFileSecure(finalPath, convertedImage);
-      const saveDuration = Date.now() - saveStartTime;
+      const saveDuration = this.timer.now() - saveStartTime;
       logger.info(`[SCREENSHOT] WebP file save took ${saveDuration}ms`);
     }
 
-    const totalDuration = Date.now() - startTime;
+    const totalDuration = this.timer.now() - startTime;
     logger.info(`[SCREENSHOT] Base64 screenshot capture completed in ${totalDuration}ms`);
 
     return {
@@ -414,12 +418,12 @@ export class TakeScreenshot implements ScreenshotService {
     options: ScreenshotOptions = { format: "png" },
     signal?: AbortSignal
   ): Promise<ScreenshotResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     logger.info(`[SCREENSHOT] Using file pull approach`);
 
     try {
       // Use file pull approach instead of base64 to avoid stdout buffer issues
-      const cmdStartTime = Date.now();
+      const cmdStartTime = this.timer.now();
       const tempFile = "/sdcard/screenshot.png";
       const tempLocalFile = `${finalPath}.temp`;
 
@@ -438,43 +442,43 @@ export class TakeScreenshot implements ScreenshotService {
       // Step 3: Clean up temp file on device
       await this.adb.executeCommand(`shell rm ${tempFile}`, undefined, undefined, undefined, signal);
 
-      const cmdDuration = Date.now() - cmdStartTime;
+      const cmdDuration = this.timer.now() - cmdStartTime;
       logger.info(`[SCREENSHOT] Screenshot capture and pull took ${cmdDuration}ms`);
 
       // Step 4: Read the pulled file into buffer
-      const readStartTime = Date.now();
+      const readStartTime = this.timer.now();
       const imageBuffer = await fs.readFile(tempLocalFile);
-      const readDuration = Date.now() - readStartTime;
+      const readDuration = this.timer.now() - readStartTime;
       logger.info(`[SCREENSHOT] File read took ${readDuration}ms, buffer size: ${imageBuffer.length} bytes`);
 
       // Step 5: Handle format conversion and save to final path
       if (options.format !== "webp") {
         // For PNG, move the temp file to final path
-        const saveStartTime = Date.now();
+        const saveStartTime = this.timer.now();
         await fs.move(tempLocalFile, finalPath);
-        const saveDuration = Date.now() - saveStartTime;
+        const saveDuration = this.timer.now() - saveStartTime;
         logger.info(`[SCREENSHOT] PNG file move took ${saveDuration}ms`);
       } else {
         // Convert to WebP
-        const convertStartTime = Date.now();
+        const convertStartTime = this.timer.now();
         const image = Image.fromBuffer(imageBuffer);
         const transformer = image.webp({
           quality: options.quality || 75,
           lossless: options.lossless
         });
         const convertedImage = await transformer.toBuffer();
-        const convertDuration = Date.now() - convertStartTime;
+        const convertDuration = this.timer.now() - convertStartTime;
         logger.info(`[SCREENSHOT] WebP conversion took ${convertDuration}ms`);
 
         // Save the webp file securely and remove temp file
-        const saveStartTime = Date.now();
+        const saveStartTime = this.timer.now();
         await writeFileSecure(finalPath, convertedImage);
         await fs.remove(tempLocalFile);
-        const saveDuration = Date.now() - saveStartTime;
+        const saveDuration = this.timer.now() - saveStartTime;
         logger.info(`[SCREENSHOT] WebP file save took ${saveDuration}ms`);
       }
 
-      const totalDuration = Date.now() - startTime;
+      const totalDuration = this.timer.now() - startTime;
       logger.info(`[SCREENSHOT] File pull screenshot capture completed in ${totalDuration}ms`);
 
       return {
@@ -482,7 +486,7 @@ export class TakeScreenshot implements ScreenshotService {
         path: finalPath
       };
     } catch (err) {
-      const totalDuration = Date.now() - startTime;
+      const totalDuration = this.timer.now() - startTime;
       const errorMessage = err instanceof Error ? err.message : String(err);
       logger.warn(`[SCREENSHOT] File pull screenshot capture failed after ${totalDuration}ms: ${errorMessage}`);
 

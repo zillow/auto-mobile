@@ -17,6 +17,7 @@ import os from "os";
 import { accessibilityDetector } from "./AccessibilityDetector";
 import type { AccessibilityDetector } from "./interfaces/AccessibilityDetector";
 import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
+import { Timer, defaultTimer } from "./SystemTimer";
 
 const execAsync = promisify(exec);
 
@@ -110,7 +111,9 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   // Static factory for creating ADB clients
   private static adbFactory: AdbClientFactory = defaultAdbClientFactory;
 
-  private constructor(device: BootedDevice, adb: AdbExecutor) {
+  private timer: Timer;
+
+  private constructor(device: BootedDevice, adb: AdbExecutor, timer: Timer = defaultTimer) {
     // home should either be process.env.HOME or bash resolution of home for current user
     const homeDir = process.env.HOME || require("os").homedir();
     if (!homeDir) {
@@ -118,6 +121,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     }
     this.device = device;
     this.adb = adb;
+    this.timer = timer;
   }
 
   public static getInstance(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory): AndroidAccessibilityServiceManager {
@@ -173,11 +177,11 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     }
 
     logger.info("[ACCESSIBILITY_SERVICE] Starting APK prefetch");
-    const startTime = Date.now();
+    const startTime = defaultTimer.now();
 
     AndroidAccessibilityServiceManager.prefetchPromise = AndroidAccessibilityServiceManager.doPrefetch()
       .then(apkPath => {
-        const duration = Date.now() - startTime;
+        const duration = defaultTimer.now() - startTime;
         if (apkPath) {
           AndroidAccessibilityServiceManager.prefetchedApkPath = apkPath;
           logger.info(`[ACCESSIBILITY_SERVICE] APK prefetch completed in ${duration}ms`, { path: apkPath });
@@ -185,7 +189,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         return apkPath;
       })
       .catch(error => {
-        const duration = Date.now() - startTime;
+        const duration = defaultTimer.now() - startTime;
         AndroidAccessibilityServiceManager.prefetchError = error instanceof Error ? error : new Error(String(error));
         logger.warn(`[ACCESSIBILITY_SERVICE] APK prefetch failed after ${duration}ms`, {
           error: AndroidAccessibilityServiceManager.prefetchError.message
@@ -494,7 +498,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   async isInstalled(): Promise<boolean> {
     // Check cache first
     if (this.cachedInstallation && this.cachedInstallation.isInstalled) {
-      const cacheAge = Date.now() - this.cachedInstallation.timestamp;
+      const cacheAge = this.timer.now() - this.cachedInstallation.timestamp;
       if (cacheAge < AndroidAccessibilityServiceManager.STATUS_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached installation status (age: ${cacheAge}ms): ${this.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
         return this.cachedInstallation.isInstalled;
@@ -511,7 +515,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       // Cache the result
       this.cachedInstallation = {
         isInstalled,
-        timestamp: Date.now()
+        timestamp: this.timer.now()
       };
 
       logger.info(`[ACCESSIBILITY_SERVICE] Service installation status: ${isInstalled ? "installed" : "not installed"} (cached for ${AndroidAccessibilityServiceManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
@@ -528,7 +532,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   async isEnabled(): Promise<boolean> {
     // Check cache first
     if (this.cachedEnabled && this.cachedEnabled.isEnabled) {
-      const cacheAge = Date.now() - this.cachedEnabled.timestamp;
+      const cacheAge = this.timer.now() - this.cachedEnabled.timestamp;
       if (cacheAge < AndroidAccessibilityServiceManager.STATUS_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached enabled status (age: ${cacheAge}ms): ${this.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
         return this.cachedEnabled.isEnabled;
@@ -545,7 +549,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       // Cache the result
       this.cachedEnabled = {
         isEnabled,
-        timestamp: Date.now()
+        timestamp: this.timer.now()
       };
 
       logger.info(`[ACCESSIBILITY_SERVICE] Service enabled status: ${isEnabled ? "enabled" : "disabled"} (cached for ${AndroidAccessibilityServiceManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
@@ -578,11 +582,11 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    * @returns Promise<boolean> - True if available for use, false otherwise
    */
   async isAvailable(): Promise<boolean> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     // Check cache first
     if (this.cachedAvailability && this.cachedAvailability.isAvailable) {
-      const cacheAge = Date.now() - this.cachedAvailability.timestamp;
+      const cacheAge = this.timer.now() - this.cachedAvailability.timestamp;
       if (cacheAge < AndroidAccessibilityServiceManager.AVAILABILITY_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached overall availability (age: ${cacheAge}ms): ${this.cachedAvailability.isAvailable}`);
         return this.cachedAvailability.isAvailable;
@@ -601,18 +605,18 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       ]);
 
       const available = installed && enabled;
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
 
       // Cache the result
       this.cachedAvailability = {
         isAvailable: available,
-        timestamp: Date.now()
+        timestamp: this.timer.now()
       };
 
       logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available} (cached for ${AndroidAccessibilityServiceManager.AVAILABILITY_CACHE_TTL / 1000 / 60} minutes)`);
       return available;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
 
       // Clear cache on error

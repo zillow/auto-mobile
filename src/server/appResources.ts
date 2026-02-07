@@ -4,6 +4,7 @@ import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { SimCtlClient } from "../utils/ios-cmdline-tools/SimCtlClient";
 import { BootedDevice, InstalledApp, InstalledAppsByProfile, Platform, SystemInstalledApp } from "../models";
 import { logger } from "../utils/logger";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
 // Resource URI templates
 export const APP_RESOURCE_TEMPLATES = {
@@ -225,8 +226,8 @@ function toQueryIosApp(app: IosInstalledAppInfo): AppsQueryAppInfo {
   };
 }
 
-function recordAppsQueryUri(deviceId: string, uri: string): void {
-  const now = Date.now();
+function recordAppsQueryUri(deviceId: string, uri: string, timer: Timer = defaultTimer): void {
+  const now = timer.now();
   let entries = appsQueryUrisByDeviceId.get(deviceId);
   if (!entries) {
     entries = new Map();
@@ -245,13 +246,13 @@ function recordAppsQueryUri(deviceId: string, uri: string): void {
   }
 }
 
-function getAppsQueryUrisForDevice(deviceId: string): string[] {
+function getAppsQueryUrisForDevice(deviceId: string, timer: Timer = defaultTimer): string[] {
   const entries = appsQueryUrisByDeviceId.get(deviceId);
   if (!entries) {
     return [];
   }
 
-  const now = Date.now();
+  const now = timer.now();
   const uris: string[] = [];
   for (const [uri, lastSeen] of entries) {
     if (now - lastSeen > APPS_QUERY_URI_TTL_MS) {
@@ -322,7 +323,7 @@ async function findBootedDevice(deviceId: string): Promise<BootedDevice | null> 
   }
 }
 
-async function fetchAppsForDevice(device: BootedDevice): Promise<AppsCacheEntry> {
+async function fetchAppsForDevice(device: BootedDevice, timer: Timer = defaultTimer): Promise<AppsCacheEntry> {
   const listInstalledApps = new ListInstalledApps(device);
   const lastUpdated = new Date().toISOString();
 
@@ -333,7 +334,7 @@ async function fetchAppsForDevice(device: BootedDevice): Promise<AppsCacheEntry>
     const message = getAndroidAppsMessage(device.deviceId);
 
     return {
-      expiresAt: Date.now() + APPS_CACHE_TTL_MS,
+      expiresAt: timer.now() + APPS_CACHE_TTL_MS,
       content: createAppsResourceContent(device, userApps, foregroundApp, lastUpdated, message),
       appsByPackage: buildAppsByPackage(userApps),
       queryApps
@@ -366,16 +367,16 @@ async function fetchAppsForDevice(device: BootedDevice): Promise<AppsCacheEntry>
   }
 
   return {
-    expiresAt: Date.now() + APPS_CACHE_TTL_MS,
+    expiresAt: timer.now() + APPS_CACHE_TTL_MS,
     content: createAppsResourceContent(device, apps, null, lastUpdated),
     appsByPackage: buildAppsByPackage(apps),
     queryApps
   };
 }
 
-async function ensureAppsCacheEntry(deviceId: string): Promise<AppsCacheEntry | null> {
+async function ensureAppsCacheEntry(deviceId: string, timer: Timer = defaultTimer): Promise<AppsCacheEntry | null> {
   const cached = appCacheByDeviceId.get(deviceId);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.expiresAt > timer.now()) {
     return cached;
   }
 
@@ -384,7 +385,7 @@ async function ensureAppsCacheEntry(deviceId: string): Promise<AppsCacheEntry | 
     return null;
   }
 
-  const entry = await fetchAppsForDevice(device);
+  const entry = await fetchAppsForDevice(device, timer);
   appCacheByDeviceId.set(deviceId, entry);
   return entry;
 }

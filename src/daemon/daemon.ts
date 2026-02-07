@@ -39,7 +39,7 @@ import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../utils/appearance/AppearanceSyncScheduler";
 import { startPerformanceMonitor, stopPerformanceMonitor, getPerformanceMonitor } from "../features/performance/PerformanceMonitor";
 import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
-import { defaultTimer } from "../utils/SystemTimer";
+import { Timer, defaultTimer } from "../utils/SystemTimer";
 
 const DEVICE_DISCONNECT_POLL_INTERVAL_MS = 5000;
 const DEVICE_DISCONNECT_MISS_THRESHOLD = 2;
@@ -69,12 +69,14 @@ export class Daemon {
   private devicePool: DevicePool;
   private daemonSessionId: string;
   private installedAppsRepository: InstalledAppsStore;
+  private timer: Timer;
 
-  constructor(options: DaemonOptions = {}, installedAppsRepository?: InstalledAppsStore) {
+  constructor(options: DaemonOptions = {}, installedAppsRepository?: InstalledAppsStore, timer: Timer = defaultTimer) {
     this.port = options.port || DEFAULT_DAEMON_PORT;
     this.host = options.host || "localhost";
     this.debug = options.debug || false;
     this.daemonSessionId = randomUUID();
+    this.timer = timer;
     this.sessionManager = new SessionManager();
     this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
     this.devicePool = new DevicePool(
@@ -463,7 +465,7 @@ export class Daemon {
       pid: process.pid,
       socketPath: SOCKET_PATH,
       port: this.port,
-      startedAt: Date.now(),
+      startedAt: this.timer.now(),
       version: DAEMON_VERSION,
     };
 
@@ -648,7 +650,7 @@ export class Daemon {
     const INITIAL_HEARTBEAT_GRACE_MS = 20_000;
 
     this.heartbeatMonitorTimer = defaultTimer.setInterval(async () => {
-      const now = Date.now();
+      const now = this.timer.now();
       const sessions = this.sessionManager.getAllSessions();
 
       for (const session of sessions) {

@@ -15,14 +15,17 @@ import {
 } from "../../models/AccessibilityAudit";
 import { ContrastChecker } from "./ContrastChecker";
 import { BaselineManager } from "./BaselineManager";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export class WcagAudit {
   private contrastChecker: ContrastChecker;
   private baselineManager: BaselineManager;
+  private timer: Timer;
 
-  constructor() {
-    this.contrastChecker = new ContrastChecker();
+  constructor(timer: Timer = defaultTimer) {
+    this.contrastChecker = new ContrastChecker({}, timer);
     this.baselineManager = new BaselineManager();
+    this.timer = timer;
   }
 
   /**
@@ -88,7 +91,7 @@ export class WcagAudit {
       config,
       summary,
       violations: filteredViolations,
-      timestamp: Date.now(),
+      timestamp: this.timer.now(),
       screenId,
     };
   }
@@ -157,7 +160,7 @@ export class WcagAudit {
     const textElements = elements.filter(e => e.text && e.text.trim().length > 0);
 
     // Use batch processing for optimal performance
-    const checker = contrastConfig ? new ContrastChecker(contrastConfig) : this.contrastChecker;
+    const checker = contrastConfig ? new ContrastChecker(contrastConfig, this.timer) : this.contrastChecker;
     const results = await checker.checkContrastBatch(
       screenshotPath,
       textElements,

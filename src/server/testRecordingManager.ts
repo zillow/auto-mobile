@@ -5,6 +5,7 @@ import { AccessibilityServiceClient, InteractionEvent } from "../features/observ
 import { logger } from "../utils/logger";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 import { PlanValidator } from "../utils/plan/PlanValidator";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
 export interface TestRecordingStartResult {
   recordingId: string;
@@ -54,12 +55,12 @@ const SWIPE_COALESCE_WINDOW_MS = 600;
 
 let activeRecording: RecordingSession | null = null;
 
-export function getTestRecordingStatus(): TestRecordingStatus | null {
+export function getTestRecordingStatus(timer: Timer = defaultTimer): TestRecordingStatus | null {
   if (!activeRecording) {
     return null;
   }
 
-  const durationMs = Date.now() - activeRecording.startedAt;
+  const durationMs = timer.now() - activeRecording.startedAt;
 
   return {
     recordingId: activeRecording.recordingId,
@@ -85,9 +86,9 @@ const buildElementKey = (event: InteractionEvent): string | null => {
   return `${resourceId}|${contentDesc}|${className}`;
 };
 
-const recordInteraction = (session: RecordingSession, event: InteractionEvent): void => {
+const recordInteraction = (session: RecordingSession, event: InteractionEvent, timer: Timer = defaultTimer): void => {
   const elementKey = buildElementKey(event);
-  const timestamp = event.timestamp ?? Date.now();
+  const timestamp = event.timestamp ?? timer.now();
 
   if (event.type === "inputText" && elementKey) {
     const lastTimestamp = session.lastInputTimestamp ?? 0;
@@ -310,7 +311,7 @@ const formatPlanName = (planName?: string): string => {
   return `recorded-plan-${timestamp}`;
 };
 
-export async function startTestRecording(device: BootedDevice): Promise<TestRecordingStartResult> {
+export async function startTestRecording(device: BootedDevice, timer: Timer = defaultTimer): Promise<TestRecordingStartResult> {
   if (activeRecording) {
     if (activeRecording.deviceId !== device.deviceId) {
       throw new Error(
@@ -338,7 +339,7 @@ export async function startTestRecording(device: BootedDevice): Promise<TestReco
   }
 
   const recordingId = randomUUID();
-  const startedAt = Date.now();
+  const startedAt = timer.now();
 
   const session: RecordingSession = {
     recordingId,
@@ -366,7 +367,8 @@ export async function startTestRecording(device: BootedDevice): Promise<TestReco
 
 export async function stopTestRecording(
   recordingId?: string,
-  planName?: string
+  planName?: string,
+  timer: Timer = defaultTimer
 ): Promise<TestRecordingStopResult> {
   const session = activeRecording;
   if (!session) {
@@ -390,7 +392,7 @@ export async function stopTestRecording(
     noRefs: true,
   });
 
-  const stoppedAt = Date.now();
+  const stoppedAt = timer.now();
   const durationMs = stoppedAt - session.startedAt;
 
   logger.info(`[TestRecording] Stopped recording ${session.recordingId} with ${stepCount} steps`);

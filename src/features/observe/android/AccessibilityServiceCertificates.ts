@@ -46,14 +46,14 @@ export class AccessibilityServiceCertificates {
     timeoutMs: number = 10000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yCaCertResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const trimmed = certificate.trim();
 
     if (!trimmed) {
       return {
         success: false,
         action: "install",
-        totalTimeMs: Date.now() - startTime,
+        totalTimeMs: this.context.timer.now() - startTime,
         error: "Certificate payload is required"
       };
     }
@@ -65,7 +65,7 @@ export class AccessibilityServiceCertificates {
         return {
           success: false,
           action: "install",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -80,7 +80,7 @@ export class AccessibilityServiceCertificates {
         (_id, _type, timeout) => ({
           success: false,
           action: "install",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `CA cert install timeout after ${timeout}ms`
         })
       );
@@ -100,7 +100,7 @@ export class AccessibilityServiceCertificates {
       });
 
       const result = await perf.track("waitForCaCertInstall", () => caCertPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] CA cert install completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, alias=${result.alias ?? "unknown"}`);
@@ -110,7 +110,7 @@ export class AccessibilityServiceCertificates {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] CA cert install request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -130,14 +130,14 @@ export class AccessibilityServiceCertificates {
     timeoutMs: number = 10000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yCaCertResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const resolvedPath = this.resolveCertificatePath(certificatePath);
 
     if (!resolvedPath) {
       return {
         success: false,
         action: "install",
-        totalTimeMs: Date.now() - startTime,
+        totalTimeMs: this.context.timer.now() - startTime,
         error: "certificatePath must be a valid host file path"
       };
     }
@@ -148,7 +148,7 @@ export class AccessibilityServiceCertificates {
         return {
           success: false,
           action: "install",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Certificate path is not a file: ${resolvedPath}`
         };
       }
@@ -157,7 +157,7 @@ export class AccessibilityServiceCertificates {
         return {
           success: false,
           action: "install",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Certificate file is empty: ${resolvedPath}`
         };
       }
@@ -172,7 +172,7 @@ export class AccessibilityServiceCertificates {
         return {
           success: false,
           action: "install",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -187,7 +187,7 @@ export class AccessibilityServiceCertificates {
         (_id, _type, timeout) => ({
           success: false,
           action: "install",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `CA cert install timeout after ${timeout}ms`
         })
       );
@@ -207,7 +207,7 @@ export class AccessibilityServiceCertificates {
       });
 
       const result = await perf.track("waitForCaCertInstall", () => caCertPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] CA cert install completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, alias=${result.alias ?? "unknown"}`);
@@ -220,7 +220,7 @@ export class AccessibilityServiceCertificates {
       return {
         success: false,
         action: "install",
-        totalTimeMs: Date.now() - startTime,
+        totalTimeMs: this.context.timer.now() - startTime,
         error: error instanceof Error ? error.message : String(error)
       };
     }
@@ -235,14 +235,14 @@ export class AccessibilityServiceCertificates {
     timeoutMs: number = 10000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yCaCertResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const trimmedAlias = alias.trim();
 
     if (!trimmedAlias) {
       return {
         success: false,
         action: "remove",
-        totalTimeMs: Date.now() - startTime,
+        totalTimeMs: this.context.timer.now() - startTime,
         error: "Certificate alias is required"
       };
     }
@@ -254,12 +254,12 @@ export class AccessibilityServiceCertificates {
         return {
           success: false,
           action: "remove",
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
 
-      const requestId = `ca_cert_remove_${Date.now()}_${generateSecureId()}`;
+      const requestId = `ca_cert_remove_${this.context.timer.now()}_${generateSecureId()}`;
       this.pendingCaCertRequestId = requestId;
 
       const caCertPromise = new Promise<A11yCaCertResult>(resolve => {
@@ -272,7 +272,7 @@ export class AccessibilityServiceCertificates {
             resolve({
               success: false,
               action: "remove",
-              totalTimeMs: Date.now() - startTime,
+              totalTimeMs: this.context.timer.now() - startTime,
               error: `CA cert removal timeout after ${timeoutMs}ms`
             });
           }
@@ -294,7 +294,7 @@ export class AccessibilityServiceCertificates {
       });
 
       const result = await perf.track("waitForCaCertRemoval", () => caCertPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] CA cert removal completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, alias=${result.alias ?? trimmedAlias}`);
@@ -304,7 +304,7 @@ export class AccessibilityServiceCertificates {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] CA cert removal request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -322,7 +322,7 @@ export class AccessibilityServiceCertificates {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yDeviceOwnerStatusResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     try {
       const connected = await perf.track("ensureConnection", () => this.context.ensureConnected(perf));
@@ -332,7 +332,7 @@ export class AccessibilityServiceCertificates {
           success: false,
           isDeviceOwner: false,
           isAdminActive: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -348,7 +348,7 @@ export class AccessibilityServiceCertificates {
           success: false,
           isDeviceOwner: false,
           isAdminActive: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Device owner status timeout after ${timeout}ms`
         })
       );
@@ -367,7 +367,7 @@ export class AccessibilityServiceCertificates {
       });
 
       const result = await perf.track("waitForDeviceOwnerStatus", () => statusPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Device owner status received: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, owner=${result.isDeviceOwner}, admin=${result.isAdminActive}`);
@@ -377,7 +377,7 @@ export class AccessibilityServiceCertificates {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Device owner status request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -398,7 +398,7 @@ export class AccessibilityServiceCertificates {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yPermissionResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
     const trimmedPermission = permission.trim();
 
     if (!trimmedPermission) {
@@ -406,7 +406,7 @@ export class AccessibilityServiceCertificates {
         success: false,
         permission: "unknown",
         granted: false,
-        totalTimeMs: Date.now() - startTime,
+        totalTimeMs: this.context.timer.now() - startTime,
         requestLaunched: false,
         canRequest: false,
         requiresSettings: false,
@@ -422,7 +422,7 @@ export class AccessibilityServiceCertificates {
           success: false,
           permission: trimmedPermission,
           granted: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           requestLaunched: false,
           canRequest: false,
           requiresSettings: false,
@@ -441,7 +441,7 @@ export class AccessibilityServiceCertificates {
           success: false,
           permission: trimmedPermission,
           granted: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           requestLaunched: false,
           canRequest: false,
           requiresSettings: false,
@@ -465,7 +465,7 @@ export class AccessibilityServiceCertificates {
       });
 
       const result = await perf.track("waitForPermission", () => permissionPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Permission status received: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, permission=${result.permission}, granted=${result.granted}`);
@@ -475,7 +475,7 @@ export class AccessibilityServiceCertificates {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Permission request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -553,7 +553,7 @@ export class AccessibilityServiceCertificates {
   private buildDeviceCertificatePath(sourcePath: string): string {
     const ext = path.extname(sourcePath) || ".crt";
     const base = path.basename(sourcePath, ext);
-    const fileName = `${base}_${Date.now()}_${generateSecureId()}${ext}`;
+    const fileName = `${base}_${this.context.timer.now()}_${generateSecureId()}${ext}`;
     return `${DEVICE_CERT_DIR}/${fileName}`;
   }
 }

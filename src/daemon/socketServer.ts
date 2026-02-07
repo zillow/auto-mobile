@@ -13,6 +13,7 @@ import {
 import { SOCKET_PATH } from "./constants";
 import { DaemonState } from "./daemonState";
 import { DaemonStateAccess, handleDaemonRequest } from "./daemonRequestHandlers";
+import { Timer, defaultTimer } from "../utils/SystemTimer";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server
@@ -32,15 +33,18 @@ export class UnixSocketServer {
   private daemonState: DaemonStateAccess;
   private mcpClient: Client | null = null;
   private mcpClientPromise: Promise<Client> | null = null;
+  private timer: Timer;
 
   constructor(
     socketPath: string = SOCKET_PATH,
     mcpEndpoint: string,
-    daemonState: DaemonStateAccess = DaemonState.getInstance()
+    daemonState: DaemonStateAccess = DaemonState.getInstance(),
+    timer: Timer = defaultTimer
   ) {
     this.socketPath = socketPath;
     this.mcpEndpoint = mcpEndpoint;
     this.daemonState = daemonState;
+    this.timer = timer;
     logger.info(`UnixSocketServer initialized with endpoint: "${mcpEndpoint}"`);
     if (!mcpEndpoint) {
       logger.error("ERROR: mcpEndpoint is empty or undefined!");
@@ -80,7 +84,7 @@ export class UnixSocketServer {
     const sessionId = randomUUID();
     const session: SessionContext = {
       sessionId,
-      createdAt: Date.now(),
+      createdAt: this.timer.now(),
       requestQueue: [],
       processing: false,
     };
@@ -220,7 +224,7 @@ export class UnixSocketServer {
         return await mcpClient.callTool({ name: "getNavigationGraph", arguments: args }, undefined, requestOptions);
       }
       case "ide/ping": {
-        return { ok: true, timestamp: Date.now() };
+        return { ok: true, timestamp: this.timer.now() };
       }
       default:
         throw new Error(`Unsupported daemon method: ${request.method}`);

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { logger } from "../utils/logger";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
 export interface ActiveExecution {
   id: string;
@@ -22,6 +23,11 @@ export class ExecutionTracker {
   private executions = new Map<string, ActiveExecution>();
   private sessionExecutions = new Map<string, Set<string>>();
   private sessionUuidExecutions = new Map<string, Set<string>>();
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
 
   startExecution(
     toolName: string,
@@ -34,7 +40,7 @@ export class ExecutionTracker {
       toolName,
       sessionId,
       sessionUuid,
-      startTime: Date.now(),
+      startTime: this.timer.now(),
       abortController: new AbortController()
     };
 

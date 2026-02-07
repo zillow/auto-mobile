@@ -4,14 +4,16 @@ import { BackStackInfo, ActivityInfo, TaskInfo, BootedDevice } from "../../model
 import { logger } from "../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import type { BackStack } from "./interfaces/BackStack";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Extracts back stack information from Android device using dumpsys activity
  */
 export class GetBackStack implements BackStack {
   private adb: AdbExecutor;
+  private timer: Timer;
 
-  constructor(adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, device?: BootedDevice) {
+  constructor(adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, device?: BootedDevice, timer: Timer = defaultTimer) {
     // Detect if the argument is a factory (has create method) or an executor
     if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
       this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
@@ -20,6 +22,7 @@ export class GetBackStack implements BackStack {
     } else {
       this.adb = defaultAdbClientFactory.create(device);
     }
+    this.timer = timer;
   }
 
   /**
@@ -194,7 +197,7 @@ export class GetBackStack implements BackStack {
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     signal?: AbortSignal
   ): Promise<BackStackInfo> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       logger.info("[BACK_STACK] Fetching back stack information via dumpsys");
@@ -229,11 +232,11 @@ export class GetBackStack implements BackStack {
         tasks,
         currentActivity,
         currentTaskId,
-        capturedAt: Date.now(),
+        capturedAt: this.timer.now(),
         source: "adb"
       };
 
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.info(
         `[BACK_STACK] Back stack retrieved in ${duration}ms: ` +
         `depth=${depth}, activities=${activities.length}, tasks=${tasks.length}, ` +
@@ -242,7 +245,7 @@ export class GetBackStack implements BackStack {
 
       return backStackInfo;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[BACK_STACK] Failed to get back stack after ${duration}ms: ${error}`);
 
       // Return minimal back stack info on error
@@ -250,7 +253,7 @@ export class GetBackStack implements BackStack {
         depth: 0,
         activities: [],
         tasks: [],
-        capturedAt: Date.now(),
+        capturedAt: this.timer.now(),
         partial: true,
         source: "adb"
       };

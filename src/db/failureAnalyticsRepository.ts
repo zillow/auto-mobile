@@ -8,6 +8,8 @@ import type {
   FailureGroupUpdate,
 } from "./types";
 import { logger } from "../utils/logger";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 import type {
   FailureType,
   FailureSeverity,
@@ -104,12 +106,18 @@ export interface FailuresStreamResponse {
 const STREAM_LIMIT_MAX = 500;
 
 export class FailureAnalyticsRepository {
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
   /**
    * Record a new failure occurrence, creating or updating the group as needed
    */
   async recordFailure(input: RecordFailureInput): Promise<string> {
     const db = getDatabase();
-    const now = Date.now();
+    const now = this.timer.now();
     const occurrenceId = crypto.randomUUID();
 
     try {

@@ -1,31 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { RequestManager } from "../../src/utils/RequestManager";
-import { Timer } from "../../src/utils/SystemTimer";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("RequestManager", () => {
   let manager: RequestManager;
-  let mockTimer: Timer;
-  let timeoutCallbacks: Map<number, () => void>;
-  let nextTimeoutId: number;
+  let fakeTimer: FakeTimer;
 
   beforeEach(() => {
-    timeoutCallbacks = new Map();
-    nextTimeoutId = 1;
-
-    mockTimer = {
-      setTimeout: (callback: () => void, _ms: number) => {
-        const id = nextTimeoutId++;
-        timeoutCallbacks.set(id, callback);
-        return id as any;
-      },
-      clearTimeout: (id: any) => {
-        timeoutCallbacks.delete(id as number);
-      },
-      setInterval: () => 0 as any,
-      clearInterval: () => {},
-    };
-
-    manager = new RequestManager(mockTimer);
+    fakeTimer = new FakeTimer();
+    manager = new RequestManager(fakeTimer);
   });
 
   afterEach(() => {
@@ -77,9 +60,8 @@ describe("RequestManager", () => {
 
     expect(manager.isPending(id)).toBe(true);
 
-    // Trigger the timeout callback
-    const timeoutCallback = Array.from(timeoutCallbacks.values())[0];
-    timeoutCallback();
+    // Advance time past the timeout
+    fakeTimer.advanceTime(1000);
 
     const result = await promise;
     expect(result.success).toBe(false);
@@ -97,13 +79,13 @@ describe("RequestManager", () => {
       () => ({ success: false })
     );
 
-    expect(timeoutCallbacks.size).toBe(1);
+    expect(fakeTimer.getPendingTimeoutCount()).toBe(1);
 
     // Resolve the request
     manager.resolve(id, { success: true });
 
     // Timeout should be cancelled
-    expect(timeoutCallbacks.size).toBe(0);
+    expect(fakeTimer.getPendingTimeoutCount()).toBe(0);
 
     const result = await promise;
     expect(result.success).toBe(true);

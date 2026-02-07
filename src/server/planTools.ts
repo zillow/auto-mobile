@@ -15,6 +15,7 @@ import { ExecutePlanStepDebugInfo } from "../models/ExecutePlanResult";
 import { serverConfig } from "../utils/ServerConfig";
 import { startVideoRecording, stopVideoRecording } from "./videoRecordingManager";
 import { startTestRecording, stopTestRecording, getTestRecordingStatus } from "./testRecordingManager";
+import { defaultTimer } from "../utils/SystemTimer";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -146,7 +147,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   cleanupAppId?: string;
   cleanupClearAppData?: boolean;
 }, _progress?: unknown, signal?: AbortSignal): Promise<any> => {
-  const startTime = Date.now();
+  const startTime = defaultTimer.now();
   const recordTestExecution = async (
     status: TestExecutionStatus,
     durationMs: number,
@@ -165,7 +166,7 @@ const executePlanTool = async (device: BootedDevice, params: {
         testMethod: params.testMetadata.testMethod,
         durationMs,
         status,
-        timestamp: Date.now(),
+        timestamp: defaultTimer.now(),
         deviceId: device.deviceId,
         deviceName: device.name,
         devicePlatform: device.platform,
@@ -188,7 +189,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   };
 
   try {
-    const perfStart = Date.now();
+    const perfStart = defaultTimer.now();
     logger.info("=== Starting executePlanTool ===");
     logger.info(`[PERF +0ms] Device: ${device.platform} (${device.deviceId}), Start Step: ${params.startStep}, SessionUUID: ${params.sessionUuid}`);
 
@@ -197,14 +198,14 @@ const executePlanTool = async (device: BootedDevice, params: {
 
     // Decode base64 if content is base64-encoded
     if (yamlContent.startsWith("base64:")) {
-      logger.info(`[PERF +${Date.now() - perfStart}ms] Decoding base64 plan content`);
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Decoding base64 plan content`);
       const base64Content = yamlContent.substring(7); // Remove "base64:" prefix
       yamlContent = Buffer.from(base64Content, "base64").toString("utf-8");
-      logger.info(`[PERF +${Date.now() - perfStart}ms] Base64 content decoded (${yamlContent.length} bytes)`);
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Base64 content decoded (${yamlContent.length} bytes)`);
     }
 
     // Validate YAML schema before parsing
-    logger.info(`[PERF +${Date.now() - perfStart}ms] Validating plan YAML schema`);
+    logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Validating plan YAML schema`);
     const validator = new PlanSchemaValidator();
     await validator.loadSchema();
     const validationResult = validator.validateYaml(yamlContent);
@@ -220,12 +221,12 @@ const executePlanTool = async (device: BootedDevice, params: {
         "Check the schema at schemas/test-plan.schema.json for details."
       );
     }
-    logger.info(`[PERF +${Date.now() - perfStart}ms] Plan YAML schema validation passed`);
+    logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Plan YAML schema validation passed`);
 
     // Parse the plan
-    logger.info(`[PERF +${Date.now() - perfStart}ms] Parsing plan from YAML`);
+    logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Parsing plan from YAML`);
     const plan = importPlanFromYaml(yamlContent);
-    logger.info(`[PERF +${Date.now() - perfStart}ms] Plan parsed: '${plan.name}' with ${plan.steps.length} steps`);
+    logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Plan parsed: '${plan.name}' with ${plan.steps.length} steps`);
 
     const normalizedPlanDevices = normalizePlanDevices(plan.devices);
     const planDeviceLabels = normalizedPlanDevices.labels;
@@ -260,7 +261,7 @@ const executePlanTool = async (device: BootedDevice, params: {
       }
 
       // Upfront device allocation for fail-fast behavior
-      logger.info(`[PERF +${Date.now() - perfStart}ms] Allocating devices upfront`);
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Allocating devices upfront`);
 
       if (!DaemonState.getInstance().isInitialized()) {
         throw new ActionableError("Multi-device plans require an active daemon session.");
@@ -338,10 +339,10 @@ const executePlanTool = async (device: BootedDevice, params: {
       }
 
       // Log the allocation result
-      logger.info(`[PERF +${Date.now() - perfStart}ms] Device allocation complete`);
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Device allocation complete`);
       for (const [label, deviceId] of Object.entries(deviceMapping)) {
         const sessionUuid = labelToSessionMap[label];
-        logger.info(`[PERF +${Date.now() - perfStart}ms]   ${label} → ${deviceId} (session: ${sessionUuid})`);
+        logger.info(`[PERF +${defaultTimer.now() - perfStart}ms]   ${label} → ${deviceId} (session: ${sessionUuid})`);
       }
 
       // Register the device label map (sessions are already created, this just caches the mapping)
@@ -360,16 +361,16 @@ const executePlanTool = async (device: BootedDevice, params: {
     let videoRecordingId: string | undefined;
     if (testVideoRecordingEnabled) {
       try {
-        logger.info(`[PERF +${Date.now() - perfStart}ms] Starting automatic video recording for test`);
+        logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Starting automatic video recording for test`);
         const recording = await startVideoRecording({
           device,
-          outputName: `test-${plan.name}-${Date.now()}`,
+          outputName: `test-${plan.name}-${defaultTimer.now()}`,
           maxDurationSeconds: 300, // 5 minutes max
         });
         videoRecordingId = recording.recordingId;
-        logger.info(`[PERF +${Date.now() - perfStart}ms] Video recording started: ${videoRecordingId}`);
+        logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Video recording started: ${videoRecordingId}`);
       } catch (videoError) {
-        logger.warn(`[PERF +${Date.now() - perfStart}ms] Failed to start automatic video recording: ${videoError}`);
+        logger.warn(`[PERF +${defaultTimer.now() - perfStart}ms] Failed to start automatic video recording: ${videoError}`);
         // Continue with plan execution even if video recording fails to start
       }
     }
@@ -378,20 +379,20 @@ const executePlanTool = async (device: BootedDevice, params: {
     let result;
     let videoFilePath: string | undefined;
     try {
-      logger.info(`[PERF +${Date.now() - perfStart}ms] Starting plan execution on device ${device.deviceId} (${device.platform})`);
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Starting plan execution on device ${device.deviceId} (${device.platform})`);
       result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal, params.abortStrategy);
-      const execDuration = Date.now() - perfStart;
+      const execDuration = defaultTimer.now() - perfStart;
       logger.info(`[PERF +${execDuration}ms] Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
     } finally {
       // Stop video recording regardless of plan execution outcome
       if (videoRecordingId) {
         try {
-          logger.info(`[PERF +${Date.now() - perfStart}ms] Stopping automatic video recording: ${videoRecordingId}`);
+          logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Stopping automatic video recording: ${videoRecordingId}`);
           const stopResult = await stopVideoRecording(videoRecordingId);
           videoFilePath = stopResult.metadata.filePath;
-          logger.info(`[PERF +${Date.now() - perfStart}ms] Video recording stopped successfully: ${videoFilePath}`);
+          logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Video recording stopped successfully: ${videoFilePath}`);
         } catch (videoError) {
-          logger.warn(`[PERF +${Date.now() - perfStart}ms] Failed to stop automatic video recording: ${videoError}`);
+          logger.warn(`[PERF +${defaultTimer.now() - perfStart}ms] Failed to stop automatic video recording: ${videoError}`);
           // Don't throw - let the original result/error propagate
         }
       }
@@ -401,7 +402,7 @@ const executePlanTool = async (device: BootedDevice, params: {
     const steps = convertDebugStepsToRecords(result.debug?.steps);
     const errorMessage = result.failedStep?.error ?? undefined;
 
-    await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime, {
+    await recordTestExecution(result.success ? "passed" : "failed", defaultTimer.now() - startTime, {
       steps,
       errorMessage,
       videoPath: videoFilePath,
@@ -418,12 +419,12 @@ const executePlanTool = async (device: BootedDevice, params: {
       deviceMapping
     };
 
-    logger.info(`[PERF +${Date.now() - perfStart}ms] Returning from executePlanTool (deviceId=${device.deviceId})`);
+    logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Returning from executePlanTool (deviceId=${device.deviceId})`);
     return createStructuredToolResponse(response);
   } catch (error) {
     logger.error(`[PERF] Failed to execute plan: ${error}`);
 
-    await recordTestExecution("failed", Date.now() - startTime, {
+    await recordTestExecution("failed", defaultTimer.now() - startTime, {
       errorMessage: String(error),
     });
 

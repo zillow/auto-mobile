@@ -2,7 +2,7 @@ import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "./logger";
 import { ExecResult } from "../models";
-import { defaultTimer } from "./SystemTimer";
+import { defaultTimer, Timer } from "./SystemTimer";
 
 /**
  * Interface for iOS simulator utilities
@@ -107,18 +107,22 @@ const execAsync = async (command: string): Promise<ExecResult> => {
 export class SimCtlSimulatorManager implements AppleSimulatorManager {
   private execAsync: (command: string) => Promise<ExecResult>;
   private spawnFn: typeof spawn;
+  private timer: Timer;
 
   /**
    * Create an AppleSimulatorManager instance
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
+   * @param timer - Timer for delays and time tracking
    */
   constructor(
     execAsyncFn: ((command: string) => Promise<ExecResult>) | null = null,
-    spawnFn: typeof spawn | null = null
+    spawnFn: typeof spawn | null = null,
+    timer: Timer = defaultTimer
   ) {
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
+    this.timer = timer;
   }
 
   /**
@@ -314,9 +318,9 @@ export class SimCtlSimulatorManager implements AppleSimulatorManager {
    * @returns Promise with boolean indicating success
    */
   private async waitForSimulatorBoot(udid: string, timeoutMs: number): Promise<boolean> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
-    while (Date.now() - startTime < timeoutMs) {
+    while (this.timer.now() - startTime < timeoutMs) {
       try {
         const result = await this.execAsync(`xcrun simctl list devices --json`);
         const data = JSON.parse(result.stdout);
@@ -331,7 +335,7 @@ export class SimCtlSimulatorManager implements AppleSimulatorManager {
         }
 
         // Wait before checking again
-        await defaultTimer.sleep(2000);
+        await this.timer.sleep(2000);
       } catch (error) {
         logger.warn(`Error checking simulator boot status: ${error}`);
       }

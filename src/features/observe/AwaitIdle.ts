@@ -6,12 +6,13 @@ import { BootedDevice, GfxMetrics } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import type { AwaitIdle as AwaitIdleInterface, UiStabilityState } from "./interfaces/AwaitIdle";
-import { defaultTimer } from "../../utils/SystemTimer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export class AwaitIdle implements AwaitIdleInterface {
   private adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
   private idle: Idle;
+  private timer: Timer;
 
   private stabilityThresholdMs = 60;
   private pollIntervalMs = 17;
@@ -21,7 +22,7 @@ export class AwaitIdle implements AwaitIdleInterface {
    * @param device - Optional device
    * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, timer: Timer = defaultTimer) {
     // Detect if the argument is a factory (has create method) or an executor
     if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
       this.adbFactory = adbFactoryOrExecutor as AdbClientFactory;
@@ -36,6 +37,7 @@ export class AwaitIdle implements AwaitIdleInterface {
       this.adb = this.adbFactory.create(device);
     }
     this.idle = new Idle(device, this.adbFactory);
+    this.timer = timer;
   }
 
   /**
@@ -45,7 +47,7 @@ export class AwaitIdle implements AwaitIdleInterface {
    * @returns Promise that resolves when rotation completes or rejects on timeout
    */
   async waitForRotation(targetRotation: number, timeoutMs: number = 500): Promise<void> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     while (true) {
       const rotationResult = await this.idle.getRotationStatus(targetRotation, startTime, timeoutMs);
@@ -71,7 +73,7 @@ export class AwaitIdle implements AwaitIdleInterface {
    * @returns Promise with initialized state
    */
   public async initializeUiStabilityTracking(packageName: string, timeoutMs: number): Promise<UiStabilityState> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const lastNonIdleTime = startTime;
 
     // Reset the gfxinfo stats for the package
@@ -110,8 +112,8 @@ export class AwaitIdle implements AwaitIdleInterface {
     startTime: number,
     timeoutMs: number
   ): { isStable: boolean; shouldContinue: boolean; stableTime: number; elapsedTime: number } {
-    const elapsedTime = Date.now() - startTime;
-    const stableTime = Date.now() - lastNonIdleTime;
+    const elapsedTime = this.timer.now() - startTime;
+    const stableTime = this.timer.now() - lastNonIdleTime;
     const isStable = stableTime >= this.stabilityThresholdMs;
     const shouldContinue = elapsedTime < timeoutMs;
 
@@ -153,7 +155,7 @@ export class AwaitIdle implements AwaitIdleInterface {
       prevFrameDeadlineMissed: stabilityResult.updatedPrevFrameDeadlineMissed,
       prevTotalFrames: stabilityResult.updatedPrevTotalFrames,
       firstGfxInfoLog: stabilityResult.updatedFirstGfxInfoLog,
-      lastNonIdleTime: stabilityResult.shouldUpdateLastNonIdleTime ? Date.now() : state.lastNonIdleTime
+      lastNonIdleTime: stabilityResult.shouldUpdateLastNonIdleTime ? this.timer.now() : state.lastNonIdleTime
     };
 
     return {
@@ -212,7 +214,7 @@ export class AwaitIdle implements AwaitIdleInterface {
     try {
       while (true) {
         // Check for overall timeout before polling
-        const elapsedTime = Date.now() - initState.startTime;
+        const elapsedTime = this.timer.now() - initState.startTime;
         throwIfAborted(signal);
         if (elapsedTime >= timeoutMs) {
           logger.info(`[AwaitIdle] Timeout waiting for UI stability after ${timeoutMs}ms`);
@@ -270,7 +272,7 @@ export class AwaitIdle implements AwaitIdleInterface {
       logger.info(`[AwaitIdle] Failed to get final gfxinfo: ${err}`);
     }
 
-    const stabilityWaitMs = Date.now() - initState.startTime;
+    const stabilityWaitMs = this.timer.now() - initState.startTime;
 
     return {
       packageName,

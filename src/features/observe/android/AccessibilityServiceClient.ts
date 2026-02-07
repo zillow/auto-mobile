@@ -780,7 +780,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   async requestAction(
     action: string, resourceId?: string, timeoutMs: number = 5000, perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yActionResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     this.cancelScreenshotBackoff();
 
@@ -788,7 +788,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
       if (!connected) {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for action");
-        return { success: false, action, totalTimeMs: Date.now() - startTime, error: "Failed to connect to accessibility service" };
+        return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: "Failed to connect to accessibility service" };
       }
 
       const requestId = this.requestManager.generateId("action");
@@ -796,7 +796,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
       const actionPromise = this.requestManager.register<A11yActionResult>(
         requestId, "action", timeoutMs,
-        (_id, _type, timeout) => ({ success: false, action, totalTimeMs: Date.now() - startTime, error: `Action timeout after ${timeout}ms` })
+        (_id, _type, timeout) => ({ success: false, action, totalTimeMs: this.timer.now() - startTime, error: `Action timeout after ${timeout}ms` })
       );
 
       await perf.track("sendRequest", async () => {
@@ -809,7 +809,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       });
 
       const result = await perf.track("waitForAction", () => actionPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Action completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, action=${result.action}`);
@@ -819,7 +819,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Action request failed after ${duration}ms: ${error}`);
       return { success: false, action, totalTimeMs: duration, error: `${error}` };
     }
@@ -828,24 +828,24 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   async requestClipboard(
     action: "copy" | "paste" | "clear" | "get", text?: string, timeoutMs: number = 5000, perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yClipboardResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       if (action === "copy" && !text) {
-        return { success: false, action, totalTimeMs: Date.now() - startTime, error: "Text is required for copy action" };
+        return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: "Text is required for copy action" };
       }
 
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
       if (!connected) {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for clipboard");
-        return { success: false, action, totalTimeMs: Date.now() - startTime, error: "Failed to connect to accessibility service" };
+        return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: "Failed to connect to accessibility service" };
       }
 
       const requestId = this.requestManager.generateId("clipboard");
 
       const clipboardPromise = this.requestManager.register<A11yClipboardResult>(
         requestId, "clipboard", timeoutMs,
-        (_id, _type, timeout) => ({ success: false, action, totalTimeMs: Date.now() - startTime, error: `Clipboard ${action} timeout after ${timeout}ms` })
+        (_id, _type, timeout) => ({ success: false, action, totalTimeMs: this.timer.now() - startTime, error: `Clipboard ${action} timeout after ${timeout}ms` })
       );
 
       await perf.track("sendRequest", async () => {
@@ -858,7 +858,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       });
 
       const result = await perf.track("waitForClipboard", () => clipboardPromise);
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.timer.now() - startTime;
 
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Clipboard ${action} completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
@@ -868,14 +868,14 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Clipboard request failed after ${duration}ms: ${error}`);
       return { success: false, action, totalTimeMs: duration, error: `${error}` };
     }
   }
 
   async requestScreenshot(timeoutMs: number = 5000, perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<ScreenshotResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
@@ -901,7 +901,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       });
 
       const result = await perf.track("waitForScreenshot", () => screenshotPromise);
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
 
       if (result.success) {
         const dataSize = result.data ? result.data.length : 0;
@@ -912,7 +912,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot request failed after ${duration}ms: ${error}`);
       return { success: false, error: `${error}` };
     }
@@ -1436,7 +1436,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         const event: StorageChangedEvent = {
           packageName: storageMessage.packageName, fileName: storageMessage.fileName,
           key: storageMessage.key ?? null, value: storageMessage.value ?? null,
-          valueType: storageMessage.valueType ?? "STRING", timestamp: storageMessage.timestamp ?? Date.now(),
+          valueType: storageMessage.valueType ?? "STRING", timestamp: storageMessage.timestamp ?? this.timer.now(),
           sequenceNumber: storageMessage.sequenceNumber ?? 0,
         };
         logger.debug(`[ACCESSIBILITY_SERVICE] Storage changed: ${event.packageName}/${event.fileName} key=${event.key}`);
@@ -1454,7 +1454,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   }
 
   private handleHierarchyUpdate(data: AccessibilityHierarchy, perfTiming?: AndroidPerfTiming[]): void {
-    const now = Date.now();
+    const now = this.timer.now();
     logger.debug(`[ACCESSIBILITY_SERVICE] Received hierarchy update (updatedAt: ${data.updatedAt})`);
 
     // Mark previous cache as stale
@@ -1682,7 +1682,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     }
 
     const deviceId = this.device.deviceId;
-    const eventTimestamp = typeof timestamp === "number" ? timestamp : Date.now();
+    const eventTimestamp = typeof timestamp === "number" ? timestamp : this.timer.now();
     const repo = this.getInstalledAppsRepository();
 
     try {
@@ -1733,7 +1733,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         deviceModel: event.deviceInfo.model,
         os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
         appVersion: event.appVersion ?? "unknown",
-        sessionId: `handled-${event.packageName}-${Date.now()}`,
+        sessionId: `handled-${event.packageName}-${this.timer.now()}`,
         currentScreen,
       };
 
@@ -1770,7 +1770,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         deviceModel: event.deviceInfo.model,
         os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
         appVersion: event.appVersion ?? "unknown",
-        sessionId: `crash-${event.packageName}-${Date.now()}`,
+        sessionId: `crash-${event.packageName}-${this.timer.now()}`,
         currentScreen,
       };
 
@@ -1808,7 +1808,7 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         deviceModel: event.deviceInfo.model,
         os: `Android ${event.deviceInfo.osVersion} (API ${event.deviceInfo.sdkInt})`,
         appVersion: event.appVersion ?? "unknown",
-        sessionId: `anr-${packageName}-${Date.now()}`,
+        sessionId: `anr-${packageName}-${this.timer.now()}`,
         currentScreen,
       };
 

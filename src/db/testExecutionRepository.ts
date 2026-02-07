@@ -2,6 +2,8 @@ import { sql } from "kysely";
 import { getDatabase } from "./database";
 import type { NewTestExecution, NewTestExecutionStep, NewTestExecutionScreen } from "./types";
 import { logger } from "../utils/logger";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 
 export const TEST_EXECUTION_RETENTION_MAX_ROWS = 10_000;
 export const TEST_EXECUTION_RETENTION_MAX_DAYS = 90;
@@ -120,6 +122,12 @@ export interface TestRunQueryOptions {
 }
 
 export class TestExecutionRepository {
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
   async recordExecution(record: TestExecutionRecord): Promise<number> {
     const db = getDatabase();
 
@@ -204,7 +212,7 @@ export class TestExecutionRepository {
       ]);
 
     if (options.lookbackDays && options.lookbackDays > 0) {
-      const cutoff = Date.now() - options.lookbackDays * MS_PER_DAY;
+      const cutoff = this.timer.now() - options.lookbackDays * MS_PER_DAY;
       query = query.where("timestamp", ">=", cutoff);
     }
 
@@ -291,7 +299,7 @@ export class TestExecutionRepository {
     cleanupInProgress = true;
     try {
       const db = getDatabase();
-      const cutoff = Date.now() - TEST_EXECUTION_RETENTION_MAX_DAYS * MS_PER_DAY;
+      const cutoff = this.timer.now() - TEST_EXECUTION_RETENTION_MAX_DAYS * MS_PER_DAY;
 
       await db
         .deleteFrom("test_executions")
@@ -347,7 +355,7 @@ export class TestExecutionRepository {
       .groupBy(["test_class", "test_method"]);
 
     if (options.lookbackDays && options.lookbackDays > 0) {
-      const cutoff = Date.now() - options.lookbackDays * MS_PER_DAY;
+      const cutoff = this.timer.now() - options.lookbackDays * MS_PER_DAY;
       query = query.where("timestamp", ">=", cutoff);
     }
 

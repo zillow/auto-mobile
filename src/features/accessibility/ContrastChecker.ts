@@ -9,6 +9,7 @@ import fs from "fs/promises";
 import { Element } from "../../models/Element";
 import { WcagLevel } from "../../models/AccessibilityAudit";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 interface RGB {
   r: number;
@@ -142,6 +143,7 @@ interface ElementCacheEntry {
 
 export class ContrastChecker {
   private config: Required<ContrastCheckConfig>;
+  private timer: Timer;
 
   // Phase 1: Screenshot cache
   private screenshotCache = new Map<string, ScreenshotCacheEntry>();
@@ -163,7 +165,8 @@ export class ContrastChecker {
   private bgColorHits = 0;
   private bgColorMisses = 0;
 
-  constructor(config: ContrastCheckConfig = {}) {
+  constructor(config: ContrastCheckConfig = {}, timer: Timer = defaultTimer) {
+    this.timer = timer;
     this.config = {
       useMultiPointSampling: config.useMultiPointSampling ?? true,
       detectGradients: config.detectGradients ?? true,
@@ -232,7 +235,7 @@ export class ContrastChecker {
 
         this.elementCache.set(elementKey, {
           result,
-          timestamp: Date.now(),
+          timestamp: this.timer.now(),
           screenshotFingerprint,
         });
 
@@ -290,7 +293,7 @@ export class ContrastChecker {
             const elementKey = this.elementCacheKey(element, wcagLevel);
             this.elementCache.set(elementKey, {
               result,
-              timestamp: Date.now(),
+              timestamp: this.timer.now(),
               screenshotFingerprint,
             });
           }
@@ -441,7 +444,7 @@ export class ContrastChecker {
     }
 
     const cached = this.screenshotCache.get(path);
-    const now = Date.now();
+    const now = this.timer.now();
 
     // Check if cache is valid (not expired)
     if (cached && (now - cached.timestamp) < this.config.screenshotCacheTTL) {
@@ -479,7 +482,7 @@ export class ContrastChecker {
       return `${path}:${stat.mtime.getTime()}:${stat.size}`;
     } catch (error) {
       // If file doesn't exist or can't be stat'd, use timestamp
-      return `${path}:${Date.now()}`;
+      return `${path}:${this.timer.now()}`;
     }
   }
 

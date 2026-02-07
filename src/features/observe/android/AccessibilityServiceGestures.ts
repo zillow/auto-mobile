@@ -53,7 +53,7 @@ export class AccessibilityServiceGestures {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySwipeResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -65,7 +65,7 @@ export class AccessibilityServiceGestures {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for swipe");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -80,7 +80,7 @@ export class AccessibilityServiceGestures {
         timeoutMs,
         (_id, _type, timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Swipe timeout after ${timeout}ms`
         })
       );
@@ -107,7 +107,7 @@ export class AccessibilityServiceGestures {
       // Wait for response
       const result = await perf.track("waitForSwipe", () => swipePromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Swipe completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
       } else {
@@ -116,7 +116,7 @@ export class AccessibilityServiceGestures {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Swipe request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -144,7 +144,7 @@ export class AccessibilityServiceGestures {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yTapCoordinatesResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -156,7 +156,7 @@ export class AccessibilityServiceGestures {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for tap coordinates");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -171,7 +171,7 @@ export class AccessibilityServiceGestures {
         timeoutMs,
         (_id, _type, timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Tap coordinates timeout after ${timeout}ms`
         })
       );
@@ -196,7 +196,7 @@ export class AccessibilityServiceGestures {
       // Wait for response
       const result = await perf.track("waitForTap", () => tapPromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Tap coordinates completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
       } else {
@@ -205,7 +205,7 @@ export class AccessibilityServiceGestures {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Tap coordinates request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -239,7 +239,7 @@ export class AccessibilityServiceGestures {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySwipeResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -251,13 +251,13 @@ export class AccessibilityServiceGestures {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for two-finger swipe");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
 
       // Send two-finger swipe request (uses legacy promise pattern)
-      const requestId = `two_finger_swipe_${Date.now()}_${generateSecureId()}`;
+      const requestId = `two_finger_swipe_${this.context.timer.now()}_${generateSecureId()}`;
       this.pendingSwipeRequestId = requestId;
 
       // Create promise that will be resolved when we receive the swipe result
@@ -271,7 +271,7 @@ export class AccessibilityServiceGestures {
             this.pendingSwipeRequestId = null;
             resolve({
               success: false,
-              totalTimeMs: Date.now() - startTime,
+              totalTimeMs: this.context.timer.now() - startTime,
               error: `Two-finger swipe timeout after ${timeoutMs}ms`
             });
           }
@@ -301,7 +301,7 @@ export class AccessibilityServiceGestures {
       // Wait for response
       const result = await perf.track("waitForSwipe", () => swipePromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Two-finger swipe completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
       } else {
@@ -310,7 +310,7 @@ export class AccessibilityServiceGestures {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Two-finger swipe request failed after ${duration}ms: ${error}`);
       return {
         success: false,
@@ -342,7 +342,7 @@ export class AccessibilityServiceGestures {
     holdDurationMs: number,
     timeoutMs: number
   ): Promise<A11yDragResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -353,7 +353,7 @@ export class AccessibilityServiceGestures {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for drag");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -367,7 +367,7 @@ export class AccessibilityServiceGestures {
         timeoutMs,
         (_id, _type, timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Drag timeout after ${timeout}ms`
         })
       );
@@ -391,7 +391,7 @@ export class AccessibilityServiceGestures {
       logger.debug(`[ACCESSIBILITY_SERVICE] Sent drag request (requestId: ${requestId}, ${x1},${y1} -> ${x2},${y2}, press: ${pressDurationMs}ms, drag: ${dragDurationMs}ms, hold: ${holdDurationMs}ms)`);
 
       const result = await dragPromise;
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Drag completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
       } else {
@@ -400,7 +400,7 @@ export class AccessibilityServiceGestures {
 
       return result;
     } catch (error) {
-      const durationMs = Date.now() - startTime;
+      const durationMs = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Drag request failed after ${durationMs}ms: ${error}`);
       return {
         success: false,
@@ -423,7 +423,7 @@ export class AccessibilityServiceGestures {
     timeoutMs: number = 5000,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yPinchResult> {
-    const startTime = Date.now();
+    const startTime = this.context.timer.now();
 
     // Cancel any pending screenshot backoff - new action will change the screen
     this.context.cancelScreenshotBackoff();
@@ -434,7 +434,7 @@ export class AccessibilityServiceGestures {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for pinch");
         return {
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: "Failed to connect to accessibility service"
         };
       }
@@ -448,7 +448,7 @@ export class AccessibilityServiceGestures {
         timeoutMs,
         (_id, _type, timeout) => ({
           success: false,
-          totalTimeMs: Date.now() - startTime,
+          totalTimeMs: this.context.timer.now() - startTime,
           error: `Pinch timeout after ${timeout}ms`
         })
       );
@@ -474,7 +474,7 @@ export class AccessibilityServiceGestures {
 
       const result = await perf.track("waitForPinch", () => pinchPromise);
 
-      const clientDuration = Date.now() - startTime;
+      const clientDuration = this.context.timer.now() - startTime;
       if (result.success) {
         logger.info(`[ACCESSIBILITY_SERVICE] Pinch completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
       } else {
@@ -483,7 +483,7 @@ export class AccessibilityServiceGestures {
 
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.context.timer.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Pinch request failed after ${duration}ms: ${error}`);
       return {
         success: false,

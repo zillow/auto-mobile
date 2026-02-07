@@ -29,6 +29,7 @@ import { accessibilityDetector } from "../../utils/AccessibilityDetector";
 import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { ElementUtils } from "../utility/ElementUtils";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
@@ -66,6 +67,7 @@ export class RealObserveScreen implements ObserveScreen {
   private adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
   private predictiveUIState: PredictiveUIStateInterface;
+  private timer: Timer;
 
   // Static cache for observe results
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
@@ -84,7 +86,7 @@ export class RealObserveScreen implements ObserveScreen {
       return undefined;
     }
 
-    const now = Date.now();
+    const now = defaultTimer.now();
     let mostRecentEntry: ObserveResultCache | undefined;
     let mostRecentTimestamp = 0;
 
@@ -129,7 +131,8 @@ export class RealObserveScreen implements ObserveScreen {
   constructor(
     device: BootedDevice,
     adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
-    dependencies?: ObserveScreenDependencies
+    dependencies?: ObserveScreenDependencies,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     // Detect if the argument is a factory (has create method) or an executor
@@ -155,6 +158,7 @@ export class RealObserveScreen implements ObserveScreen {
     this.dumpsysWindow = dependencies?.dumpsysWindow ?? new GetDumpsysWindow(device, this.adbFactory);
     this.backStack = dependencies?.backStack ?? new GetBackStack(this.adbFactory, device);
     this.predictiveUIState = dependencies?.predictiveUIState ?? new PredictiveUIState();
+    this.timer = timer;
 
     // Ensure observe result cache directory exists
     if (!fs.existsSync(RealObserveScreen.observeResultCacheDir)) {
@@ -168,7 +172,7 @@ export class RealObserveScreen implements ObserveScreen {
       return null;
     }
 
-    const age = Date.now() - timestamp;
+    const age = defaultTimer.now() - timestamp;
     if (age > RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS) {
       RealObserveScreen.latestScreenshotPath = null;
       RealObserveScreen.latestScreenshotError = null;
@@ -185,7 +189,7 @@ export class RealObserveScreen implements ObserveScreen {
   private static updateLatestScreenshotCache(path?: string, error?: string): void {
     RealObserveScreen.latestScreenshotPath = path ?? null;
     RealObserveScreen.latestScreenshotError = error ?? null;
-    RealObserveScreen.latestScreenshotTimestamp = Date.now();
+    RealObserveScreen.latestScreenshotTimestamp = defaultTimer.now();
   }
 
   private async handleScreenshotResult(
@@ -226,9 +230,9 @@ export class RealObserveScreen implements ObserveScreen {
    */
   public async collectScreenSize(dumpsysWindow: ExecResult, result: ObserveResult): Promise<void> {
     try {
-      const screenSizeStart = Date.now();
+      const screenSizeStart = this.timer.now();
       result.screenSize = await this.screenSize.execute(dumpsysWindow);
-      logger.debug(`Screen size retrieval took ${Date.now() - screenSizeStart}ms`);
+      logger.debug(`Screen size retrieval took ${this.timer.now() - screenSizeStart}ms`);
     } catch (error) {
       logger.warn("Failed to get screen size:", error);
       this.appendError(result, "Failed to retrieve screen dimensions");
@@ -242,10 +246,10 @@ export class RealObserveScreen implements ObserveScreen {
    */
   public async collectSystemInsets(dumpsysWindow: ExecResult, result: ObserveResult): Promise<void> {
     try {
-      const insetsStart = Date.now();
+      const insetsStart = this.timer.now();
       // Pass cached dumpsys window output to avoid duplicate call
       result.systemInsets = await this.systemInsets.execute(dumpsysWindow);
-      logger.debug(`System insets retrieval took ${Date.now() - insetsStart}ms`);
+      logger.debug(`System insets retrieval took ${this.timer.now() - insetsStart}ms`);
     } catch (error) {
       logger.warn("Failed to get system insets:", error);
       this.appendError(result, "Failed to retrieve system insets");
@@ -259,12 +263,12 @@ export class RealObserveScreen implements ObserveScreen {
    */
   public async collectRotationInfo(dumpsysWindow: ExecResult, result: ObserveResult): Promise<void> {
     try {
-      const rotationStart = Date.now();
+      const rotationStart = this.timer.now();
       const rotationMatch = dumpsysWindow.stdout.match(/mRotation=(\d)/);
       if (rotationMatch) {
         result.rotation = parseInt(rotationMatch[1], 10);
       }
-      logger.debug(`Rotation info retrieval took ${Date.now() - rotationStart}ms`);
+      logger.debug(`Rotation info retrieval took ${this.timer.now() - rotationStart}ms`);
     } catch (error) {
       logger.warn("Failed to get rotation info:", error);
     }
@@ -296,10 +300,10 @@ export class RealObserveScreen implements ObserveScreen {
     signal?: AbortSignal
   ): Promise<void> {
     try {
-      const backStackStart = Date.now();
+      const backStackStart = this.timer.now();
       const backStackInfo = await this.backStack.execute(perf, signal);
       result.backStack = backStackInfo;
-      logger.debug(`Back stack retrieval took ${Date.now() - backStackStart}ms`);
+      logger.debug(`Back stack retrieval took ${this.timer.now() - backStackStart}ms`);
     } catch (error) {
       logger.warn("Failed to get back stack:", error);
       this.appendError(result, "Failed to retrieve back stack information");
@@ -327,7 +331,7 @@ export class RealObserveScreen implements ObserveScreen {
         await this.viewHierarchy.configureRecompositionTracking(serverConfig.isUiPerfDebugModeEnabled(), perf);
       }
 
-      const viewHierarchyStart = Date.now();
+      const viewHierarchyStart = this.timer.now();
       const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
       logger.debug("Accessibility service availability cached as: true");
 
@@ -361,7 +365,7 @@ export class RealObserveScreen implements ObserveScreen {
         }
       }
 
-      logger.debug(`View hierarchy retrieval took ${Date.now() - viewHierarchyStart}ms`);
+      logger.debug(`View hierarchy retrieval took ${this.timer.now() - viewHierarchyStart}ms`);
     } catch (error) {
       logger.warn("Failed to get view hierarchy:", error);
 
@@ -415,11 +419,11 @@ export class RealObserveScreen implements ObserveScreen {
   public async collectActiveWindow(result: ObserveResult): Promise<void> {
     try {
       logger.info("[OBSERVER] collectActiveWindow");
-      const windowStart = Date.now();
+      const windowStart = this.timer.now();
 
       const activeWindow = await this.window.getActive();
 
-      logger.info(`Active window retrieval took ${Date.now() - windowStart}ms`);
+      logger.info(`Active window retrieval took ${this.timer.now() - windowStart}ms`);
       if (activeWindow) {
         result.activeWindow = activeWindow;
       }
@@ -689,7 +693,7 @@ export class RealObserveScreen implements ObserveScreen {
    * @returns Promise<ObserveResult> - The most recent cached observe result
    */
   async getMostRecentCachedObserveResult(): Promise<ObserveResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       logger.info("[OBSERVE_CACHE] Getting most recent cached observe result");
@@ -697,7 +701,7 @@ export class RealObserveScreen implements ObserveScreen {
       // Check in-memory cache first
       const memoryResult = await this.checkInMemoryObserveCache();
       if (memoryResult) {
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.info(`[OBSERVE_CACHE] Found recent result in memory cache (${duration}ms)`);
         return memoryResult;
       }
@@ -705,13 +709,13 @@ export class RealObserveScreen implements ObserveScreen {
       // Check disk cache
       const diskResult = await this.checkDiskObserveCache();
       if (diskResult) {
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.info(`[OBSERVE_CACHE] Found recent result in disk cache (${duration}ms)`);
         return diskResult;
       }
 
       // No cached result available
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.info(`[OBSERVE_CACHE] No cached observe result available (${duration}ms)`);
 
       return {
@@ -721,7 +725,7 @@ export class RealObserveScreen implements ObserveScreen {
         error: "No cached observe result available"
       };
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[OBSERVE_CACHE] Error getting cached observe result after ${duration}ms: ${error}`);
 
       return {
@@ -746,7 +750,7 @@ export class RealObserveScreen implements ObserveScreen {
       return null;
     }
 
-    const now = Date.now();
+    const now = this.timer.now();
     const ttl = RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS;
 
     // Remove expired entries and find most recent
@@ -799,7 +803,7 @@ export class RealObserveScreen implements ObserveScreen {
         return null;
       }
 
-      const now = Date.now();
+      const now = this.timer.now();
       const ttl = RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS;
       let mostRecentFile: { path: string, mtime: number } | null = null;
 
@@ -850,7 +854,7 @@ export class RealObserveScreen implements ObserveScreen {
    * @param observeResult - The observe result to cache
    */
   async cacheObserveResult(observeResult: ObserveResult): Promise<void> {
-    const timestamp = Date.now();
+    const timestamp = this.timer.now();
     const timestampKey = timestamp.toString();
 
     try {
@@ -1163,7 +1167,7 @@ export class RealObserveScreen implements ObserveScreen {
   ): Promise<ObserveResult> {
     try {
       logger.debug(`Executing observe command (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
-      const startTime = Date.now();
+      const startTime = this.timer.now();
       throwIfAborted(signal);
 
       // Create base result object with timestamp
@@ -1237,7 +1241,7 @@ export class RealObserveScreen implements ObserveScreen {
       }
 
       logger.debug("Observe command completed");
-      logger.debug(`Total observe command execution took ${Date.now() - startTime}ms`);
+      logger.debug(`Total observe command execution took ${this.timer.now() - startTime}ms`);
       return result;
     } catch (err) {
       logger.error("Critical error in observe command:", err);

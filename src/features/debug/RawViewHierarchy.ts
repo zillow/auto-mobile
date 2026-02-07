@@ -1,6 +1,7 @@
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { BootedDevice, RawViewHierarchyResult } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
@@ -26,15 +27,18 @@ export class RawViewHierarchy {
   private readonly adb: AdbExecutor;
   private viewHierarchy: ViewHierarchy;
   private accessibilityServiceClient: AccessibilityServiceClient;
+  private timer: Timer;
 
   constructor(
     device: BootedDevice,
-    adbFactory: AdbClientFactory = defaultAdbClientFactory
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
     this.viewHierarchy = new ViewHierarchy(device, adbFactory);
     this.accessibilityServiceClient = AccessibilityServiceClient.getInstance(device, adbFactory);
+    this.timer = timer;
   }
 
   /**
@@ -43,7 +47,7 @@ export class RawViewHierarchy {
    * @returns Raw hierarchy data
    */
   async execute(options: RawViewHierarchyOptions = {}): Promise<RawViewHierarchyResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     const result: RawViewHierarchyResult = {
       source: this.device.platform === "ios" ? "xcuitest" : (options.source || "both"),
@@ -134,7 +138,7 @@ export class RawViewHierarchy {
         result.error = errors.join("; ");
       }
 
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.info(`[RawViewHierarchy] Completed in ${duration}ms`);
 
       return result;

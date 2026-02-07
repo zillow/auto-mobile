@@ -3,6 +3,7 @@ import { SOCKET_PATH, PID_FILE_PATH } from "./constants";
 import { DaemonClient } from "./client";
 import { readFile } from "node:fs/promises";
 import { PidFileData } from "./types";
+import { Timer, defaultTimer } from "../utils/SystemTimer";
 
 /**
  * Daemon Debug Tools
@@ -28,7 +29,7 @@ export interface DaemonHealthReport {
 /**
  * Get comprehensive daemon health report
  */
-export async function getDaemonHealthReport(): Promise<DaemonHealthReport> {
+export async function getDaemonHealthReport(timer: Timer = defaultTimer): Promise<DaemonHealthReport> {
   const report: DaemonHealthReport = {
     timestamp: new Date().toISOString(),
     daemonRunning: false,
@@ -69,7 +70,7 @@ export async function getDaemonHealthReport(): Promise<DaemonHealthReport> {
 
         // Calculate uptime
         if (pidData.startedAt) {
-          report.daemonUptime = Date.now() - new Date(pidData.startedAt).getTime();
+          report.daemonUptime = timer.now() - new Date(pidData.startedAt).getTime();
         }
       } catch (error) {
         report.recommendations.push(
@@ -198,7 +199,7 @@ export interface SocketDiagnostics {
 /**
  * Run socket diagnostics
  */
-export async function runSocketDiagnostics(): Promise<SocketDiagnostics> {
+export async function runSocketDiagnostics(timer: Timer = defaultTimer): Promise<SocketDiagnostics> {
   const diagnostics: SocketDiagnostics = {
     socketExists: existsSync(SOCKET_PATH),
     socketReadable: false,
@@ -225,9 +226,9 @@ export async function runSocketDiagnostics(): Promise<SocketDiagnostics> {
 
   // Try to connect
   try {
-    const startTime = Date.now();
+    const startTime = timer.now();
     const available = await DaemonClient.isAvailable(SOCKET_PATH);
-    const latency = Date.now() - startTime;
+    const latency = timer.now() - startTime;
 
     if (available) {
       diagnostics.socketConnectable = true;

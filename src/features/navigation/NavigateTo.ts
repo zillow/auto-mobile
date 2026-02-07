@@ -15,7 +15,7 @@ import { UIStateSetup } from "./interfaces/UIStateSetup";
 import { DefaultUIStateSetup } from "./DefaultUIStateSetup";
 import { ScreenTransitionWaiter } from "./interfaces/ScreenTransitionWaiter";
 import { DefaultScreenTransitionWaiter } from "./DefaultScreenTransitionWaiter";
-import { defaultTimer } from "../../utils/SystemTimer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Options for the navigateTo tool.
@@ -37,6 +37,7 @@ export class NavigateTo {
   private navigationManager: NavigationGraphService;
   private uiStateSetup: UIStateSetup;
   private screenWaiter: ScreenTransitionWaiter;
+  private timer: Timer;
 
   private static readonly MAX_TIMEOUT_MS = 30000; // 30 seconds
   private static readonly STEP_TIMEOUT_MS = 5000; // 5 seconds per step
@@ -47,11 +48,13 @@ export class NavigateTo {
     adbFactory: AdbClientFactory = defaultAdbClientFactory,
     uiStateSetup: UIStateSetup | null = null,
     screenWaiter: ScreenTransitionWaiter | null = null,
-    navigationManager?: NavigationGraphService
+    navigationManager?: NavigationGraphService,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
     this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
+    this.timer = timer;
 
     // Use injected dependencies or create defaults
     this.uiStateSetup = uiStateSetup || new DefaultUIStateSetup(this.device, this.adb);
@@ -71,7 +74,7 @@ export class NavigateTo {
     const perf = createGlobalPerformanceTracker();
     perf.serial("navigateTo");
 
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const { targetScreen } = options;
 
     try {
@@ -98,7 +101,7 @@ export class NavigateTo {
           currentScreen,
           targetScreen,
           stepsExecuted: 0,
-          durationMs: Date.now() - startTime
+          durationMs: this.timer.now() - startTime
         };
       }
 
@@ -135,7 +138,7 @@ export class NavigateTo {
             executedPath.push("pressButton(back)");
 
             // Small delay between presses to allow screen transitions
-            await defaultTimer.sleep(300);
+            await this.timer.sleep(300);
           }
 
           // Wait for target screen
@@ -159,7 +162,7 @@ export class NavigateTo {
             targetScreen,
             stepsExecuted: executedPath.length,
             path: executedPath,
-            durationMs: Date.now() - startTime
+            durationMs: this.timer.now() - startTime
           };
         } else {
           logger.debug(
@@ -181,7 +184,7 @@ export class NavigateTo {
           currentScreen,
           targetScreen,
           stepsExecuted: 0,
-          durationMs: Date.now() - startTime
+          durationMs: this.timer.now() - startTime
         };
       }
 
@@ -192,7 +195,7 @@ export class NavigateTo {
         const edge = pathResult.path[i];
 
         // Check timeout
-        if (Date.now() - startTime > NavigateTo.MAX_TIMEOUT_MS) {
+        if (this.timer.now() - startTime > NavigateTo.MAX_TIMEOUT_MS) {
           perf.end();
           return {
             success: false,
@@ -201,7 +204,7 @@ export class NavigateTo {
             targetScreen,
             stepsExecuted: executedPath.length,
             partialPath: executedPath,
-            durationMs: Date.now() - startTime
+            durationMs: this.timer.now() - startTime
           };
         }
 
@@ -252,7 +255,7 @@ export class NavigateTo {
             targetScreen,
             stepsExecuted: executedPath.length,
             partialPath: executedPath,
-            durationMs: Date.now() - startTime
+            durationMs: this.timer.now() - startTime
           };
         }
 
@@ -281,7 +284,7 @@ export class NavigateTo {
         targetScreen,
         stepsExecuted: executedPath.length,
         path: executedPath,
-        durationMs: Date.now() - startTime
+        durationMs: this.timer.now() - startTime
       };
     } catch (error) {
       perf.end();
@@ -291,7 +294,7 @@ export class NavigateTo {
         currentScreen: this.navigationManager.getCurrentScreen(),
         targetScreen,
         stepsExecuted: 0,
-        durationMs: Date.now() - startTime
+        durationMs: this.timer.now() - startTime
       };
     }
   }
@@ -324,6 +327,6 @@ export class NavigateTo {
    * Sleep for the specified duration.
    */
   private sleep(ms: number): Promise<void> {
-    return defaultTimer.sleep(ms);
+    return this.timer.sleep(ms);
   }
 }

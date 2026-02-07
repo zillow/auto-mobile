@@ -2,6 +2,7 @@ import { AccessibilityServiceClient } from "../features/observe/AccessibilitySer
 import { Element, CurrentFocusResult, TraversalOrderResult } from "../models/index";
 import { PerformanceTracker, NoOpPerformanceTracker } from "./PerformanceTracker";
 import { logger } from "./logger";
+import { Timer, defaultTimer } from "./SystemTimer";
 
 /**
  * Interface for accessibility focus tracking operations.
@@ -134,7 +135,11 @@ export class AccessibilityFocusTracker implements AccessibilityFocusService {
   /** Singleton instance */
   private static instance: AccessibilityFocusTracker | null = null;
 
-  constructor() {}
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
 
   /**
    * Get the singleton instance
@@ -196,7 +201,7 @@ export class AccessibilityFocusTracker implements AccessibilityFocusService {
       // Cache the result
       this.focusCache.set(deviceId, {
         focusedElement: result.focusedElement,
-        timestamp: Date.now(),
+        timestamp: this.timer.now(),
         deviceId
       });
 
@@ -249,7 +254,7 @@ export class AccessibilityFocusTracker implements AccessibilityFocusService {
       this.traversalOrderCache.set(deviceId, {
         elements: result.elements,
         focusedIndex: result.focusedIndex,
-        timestamp: Date.now(),
+        timestamp: this.timer.now(),
         deviceId
       });
 
@@ -358,7 +363,7 @@ export class AccessibilityFocusTracker implements AccessibilityFocusService {
    * Check if a cached timestamp is still valid
    */
   private isCacheValid(timestamp: number): boolean {
-    return Date.now() - timestamp < AccessibilityFocusTracker.CACHE_TTL_MS;
+    return this.timer.now() - timestamp < AccessibilityFocusTracker.CACHE_TTL_MS;
   }
 
   /**

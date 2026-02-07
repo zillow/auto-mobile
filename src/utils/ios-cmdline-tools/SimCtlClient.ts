@@ -5,7 +5,7 @@ import { createExecResult } from "../execResult";
 import { isRunningInDocker } from "../dockerEnv";
 import { isHostControlAvailable, runSimctlExec, shouldUseHostControl } from "../hostControlClient";
 import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
-import { defaultTimer } from "../SystemTimer";
+import { defaultTimer, Timer } from "../SystemTimer";
 
 export interface AppleDevice {
   udid: string;
@@ -311,6 +311,7 @@ export class SimCtlClient implements SimCtl {
   execAsync: (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
   private hostControl: SimctlHostControlRunner;
   private hostControlAvailability: Promise<boolean> | null = null;
+  private timer: Timer;
 
   // Static cache for device list
   private static deviceListCache: { devices: DeviceInfo[], timestamp: number } | null = null;
@@ -320,14 +321,18 @@ export class SimCtlClient implements SimCtl {
    * Create an IosUtils instance
    * @param device - Optional device
    * @param execAsyncFn - promisified exec function (for testing)
+   * @param hostControlRunner - host control runner (for testing)
+   * @param timer - Timer for delays and time tracking
    */
   constructor(
     device: BootedDevice | null = null,
     execAsyncFn: ((file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>) | null = null,
-    hostControlRunner: SimctlHostControlRunner | null = null
+    hostControlRunner: SimctlHostControlRunner | null = null,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
+    this.timer = timer;
     this.hostControl = hostControlRunner || {
       isAvailable: () => isHostControlAvailable(),
       isRunningInDocker,
@@ -363,7 +368,7 @@ export class SimCtlClient implements SimCtl {
     const hostControlAvailable = wantsHostControl ? await this.isHostControlAvailable() : false;
     const useHostControl = wantsHostControl && hostControlAvailable;
     const fullCommand = useHostControl ? `host-control simctl ${command}` : `xcrun simctl ${command}`;
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
 
@@ -389,7 +394,7 @@ export class SimCtlClient implements SimCtl {
       let timeoutId: NodeJS.Timeout;
 
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = defaultTimer.setTimeout(
+        timeoutId = this.timer.setTimeout(
           () => reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
           timeoutMs
         );
@@ -397,11 +402,11 @@ export class SimCtlClient implements SimCtl {
 
       try {
         const result = await Promise.race([runCommand(), timeoutPromise]);
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
         return result;
       } catch (error) {
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.warn(`[iOS] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
         throw error;
       } finally {
@@ -412,11 +417,11 @@ export class SimCtlClient implements SimCtl {
     // No timeout specified
     try {
       const result = await runCommand();
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[iOS] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
       throw error;
     }
@@ -492,7 +497,7 @@ export class SimCtlClient implements SimCtl {
 
     // simctl boot is synchronous, so we return a mock ChildProcess
     const mockProcess = {
-      pid: Date.now(), // Use timestamp as mock PID
+      pid: this.timer.now(), // Use timestamp as mock PID
       kill: () => false,
       killed: false,
       connected: false,
@@ -534,7 +539,7 @@ export class SimCtlClient implements SimCtl {
   async listSimulatorImages(): Promise<DeviceInfo[]> {
     // Check cache first
     if (SimCtlClient.deviceListCache) {
-      const cacheAge = Date.now() - SimCtlClient.deviceListCache.timestamp;
+      const cacheAge = this.timer.now() - SimCtlClient.deviceListCache.timestamp;
       if (cacheAge < SimCtlClient.DEVICE_LIST_CACHE_TTL) {
         logger.info(`Getting list of iOS simulators (cached, age: ${cacheAge}ms)`);
         return SimCtlClient.deviceListCache.devices;
@@ -571,7 +576,7 @@ export class SimCtlClient implements SimCtl {
       // Cache the result
       SimCtlClient.deviceListCache = {
         devices,
-        timestamp: Date.now()
+        timestamp: this.timer.now()
       };
 
       devices.sort((a, b) => (a.deviceId || "").localeCompare(b.deviceId || ""));
@@ -648,7 +653,7 @@ export class SimCtlClient implements SimCtl {
     await this.executeCommand(`boot ${udid}`);
 
     // Wait a moment for the simulator to register as booted
-    await defaultTimer.sleep(1000);
+    await this.timer.sleep(1000);
 
     const bootedSimulators = await this.getBootedSimulators();
     const bootedSimulator = bootedSimulators.find(device => device.deviceId === udid);

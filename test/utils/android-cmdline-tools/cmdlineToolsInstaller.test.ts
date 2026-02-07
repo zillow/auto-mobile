@@ -3,13 +3,13 @@ import { describe, expect, test } from "bun:test";
 import {
   CmdlineToolsChecksumVerifier,
   CmdlineToolsDownloader,
-  CmdlineToolsFileSystem,
   CmdlineToolsTempDirProvider,
   CmdlineToolsZipExtractor,
   DefaultCmdlineToolsInstaller
 } from "../../../src/utils/android-cmdline-tools/cmdlineToolsInstaller";
+import { FileSystem } from "../../../src/utils/filesystem/DefaultFileSystem";
 
-class FakeCmdlineToolsFileSystem implements CmdlineToolsFileSystem {
+class FakeCmdlineToolsFileSystem implements FileSystem {
   private existingPaths = new Set<string>();
   ensuredDirs: string[] = [];
   removedPaths: string[] = [];
@@ -21,6 +21,34 @@ class FakeCmdlineToolsFileSystem implements CmdlineToolsFileSystem {
 
   existsSync(filePath: string): boolean {
     return this.existingPaths.has(filePath);
+  }
+
+  async pathExists(filePath: string): Promise<boolean> {
+    return this.existingPaths.has(filePath);
+  }
+
+  async stat(_filePath: string): Promise<{ size: number; mtimeMs: number }> {
+    return { size: 0, mtimeMs: 0 };
+  }
+
+  async readFile(_filePath: string): Promise<string> {
+    return "";
+  }
+
+  async readFileBuffer(_filePath: string): Promise<Buffer> {
+    return Buffer.alloc(0);
+  }
+
+  async readdir(_dirPath: string): Promise<string[]> {
+    return [];
+  }
+
+  async writeFile(_filePath: string, _content: string): Promise<void> {}
+
+  async writeFileBuffer(_filePath: string, _data: Buffer): Promise<void> {}
+
+  async unlink(filePath: string): Promise<void> {
+    this.existingPaths.delete(filePath);
   }
 
   async ensureDir(dirPath: string): Promise<void> {
@@ -46,7 +74,7 @@ class FakeCmdlineToolsFileSystem implements CmdlineToolsFileSystem {
     this.existingPaths = updated;
   }
 
-  async rm(pathToRemove: string): Promise<void> {
+  async remove(pathToRemove: string): Promise<void> {
     this.removedPaths.push(pathToRemove);
     const updated = new Set<string>();
     const prefix = pathToRemove.endsWith(path.sep) ? pathToRemove : `${pathToRemove}${path.sep}`;

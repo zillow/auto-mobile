@@ -1,6 +1,7 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { logger } from "../utils/logger";
 import { FailureAnalyticsRepository } from "../db/failureAnalyticsRepository";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
 export const FAILURES_RESOURCE_URIS = {
   BASE: "automobile:failures",
@@ -170,12 +171,12 @@ function getDateRangeDuration(preset: string): number {
   }
 }
 
-async function getTimelineResource(params: Record<string, string>): Promise<ResourceContent> {
+async function getTimelineResource(params: Record<string, string>, timer: Timer = defaultTimer): Promise<ResourceContent> {
   try {
     const dateRange = params.dateRange || "24h";
     const aggregation = (params.aggregation || "hour") as "minute" | "hour" | "day" | "week";
 
-    const now = Date.now();
+    const now = timer.now();
     const duration = getDateRangeDuration(dateRange);
     const startTime = now - duration;
     const endTime = now;

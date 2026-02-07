@@ -12,16 +12,20 @@ import type {
   AlternativeSelector,
 } from "./VisionTypes";
 import type { ViewHierarchyNode } from "../models/ViewHierarchyResult";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 
 export class ClaudeVisionClient {
   private client: Anthropic;
   private model: string;
+  private timer: Timer;
 
-  constructor(apiKey?: string, model: string = "claude-sonnet-4-5") {
+  constructor(apiKey?: string, model: string = "claude-sonnet-4-5", timer: Timer = defaultTimer) {
     this.client = new Anthropic({
       apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
     });
     this.model = model;
+    this.timer = timer;
   }
 
   async analyzeUIElement(
@@ -29,7 +33,7 @@ export class ClaudeVisionClient {
     searchCriteria: ElementSearchCriteria,
     viewHierarchy?: ViewHierarchyNode
   ): Promise<VisionFallbackResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       // Build the analysis prompt
@@ -72,7 +76,7 @@ export class ClaudeVisionClient {
       const outputTokens = response.usage.output_tokens;
       const costUsd = this.calculateCost(inputTokens, outputTokens);
 
-      const durationMs = Date.now() - startTime;
+      const durationMs = this.timer.now() - startTime;
 
       // Convert analysis to VisionFallbackResult
       return this.convertToFallbackResult(

@@ -309,8 +309,8 @@ function recordHighlightAdded(
   });
 }
 
-function generateHighlightId(): string {
-  const timestamp = Date.now();
+function generateHighlightId(timer: Timer = defaultTimer): string {
+  const timestamp = timer.now();
   const random = Math.random().toString(36).substring(2, 10);
   return `highlight_${timestamp}_${random}`;
 }
@@ -352,7 +352,7 @@ function createHighlightSession(
     recordingId,
     deviceId: device.deviceId,
     platform: device.platform,
-    startedAtMs: Number.isNaN(startedAtMs) ? Date.now() : startedAtMs,
+    startedAtMs: Number.isNaN(startedAtMs) ? timer.now() : startedAtMs,
     highlights: [],
     timer,
     timers: new Set(),

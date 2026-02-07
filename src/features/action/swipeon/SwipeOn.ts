@@ -79,6 +79,7 @@ export class SwipeOn extends BaseVisualChange {
       accessibilityDetector: this.accessibilityDetector,
       overlayDetector: this.overlayDetector,
       talkBackExecutor: this.talkBackExecutor,
+      timer: this.timer,
       getDuration: this.getDuration.bind(this),
       resolveBoomerangConfig: this.resolveBoomerangConfig.bind(this),
       buildPredictionArgs: this.buildPredictionArgs.bind(this),

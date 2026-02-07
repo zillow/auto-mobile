@@ -3,17 +3,18 @@ import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/A
 import { logger } from "../../utils/logger";
 import { UiStabilityResult, TouchIdleResult, RotationCheckResult, BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { defaultTimer } from "../../utils/SystemTimer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export class Idle {
   private adb: AdbExecutor;
+  private timer: Timer;
 
   /**
    * Create an Idle instance
    * @param device - Optional device ID
    * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, timer: Timer = defaultTimer) {
     // Detect if the argument is a factory (has create method) or an executor
     if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
       this.adb = (adbFactoryOrExecutor as AdbClientFactory).create(device);
@@ -22,6 +23,7 @@ export class Idle {
     } else {
       this.adb = defaultAdbClientFactory.create(device);
     }
+    this.timer = timer;
   }
 
   /**
@@ -67,8 +69,8 @@ export class Idle {
     timeoutMs: number,
     hardLimitMs: number
   ): TouchIdleResult {
-    const currentElapsed = Date.now() - startTime;
-    const idleTime = Date.now() - lastEventTime;
+    const currentElapsed = this.timer.now() - startTime;
+    const idleTime = this.timer.now() - lastEventTime;
     const isIdle = idleTime >= timeoutMs;
     const shouldContinue = !isIdle && currentElapsed < hardLimitMs;
 
@@ -94,7 +96,7 @@ export class Idle {
     timeoutMs: number,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<RotationCheckResult> {
-    const currentElapsed = Date.now() - startTime;
+    const currentElapsed = this.timer.now() - startTime;
     const shouldContinue = currentElapsed < timeoutMs;
 
     try {

@@ -94,6 +94,7 @@ export class AdbClient implements AdbExecutor {
    */
   private apiLevelCache: number | null | undefined;
   private readonly retryExecutor: RetryExecutor;
+  private readonly timer: Timer;
 
   private static readonly DEVICE_LIST_TIMEOUT_MS = 5000;
   private static readonly MAX_ADB_RETRIES = 3;
@@ -104,12 +105,14 @@ export class AdbClient implements AdbExecutor {
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
    * @param retryExecutor - retry executor for command retries (for testing)
+   * @param timer - Timer for delays and time tracking
    */
   constructor(
     device: BootedDevice | null = null,
     execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | ExecFileAsync | null = null,
     spawnFn: typeof spawn | null = null,
-    retryExecutor: RetryExecutor = defaultRetryExecutor
+    retryExecutor: RetryExecutor = defaultRetryExecutor,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     // Test mode if: custom execAsync provided OR global test mode flag is set
@@ -134,6 +137,7 @@ export class AdbClient implements AdbExecutor {
     }
     this.spawnFn = spawnFn || spawn;
     this.retryExecutor = retryExecutor;
+    this.timer = timer;
     // Initialize with fallback, will be updated lazily
     this.adbPath = this.getFallbackAdbPath();
 
@@ -308,9 +312,9 @@ export class AdbClient implements AdbExecutor {
     noRetry?: boolean,
     signal?: AbortSignal
   ): Promise<ExecResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const result = await this.executeCommandImpl(command, timeoutMs, maxBuffer, 0, noRetry, signal);
-    const duration = Date.now() - startTime;
+    const duration = this.timer.now() - startTime;
 
     // Only log longer commands or ones that take significant time
     if (duration > 10 || command.includes("screencap") || command.includes("uiautomator") || command.includes("getevent")) {
@@ -349,7 +353,7 @@ export class AdbClient implements AdbExecutor {
     }
 
     logger.debug("[ADB] Falling back to host time for device timestamp");
-    return Date.now();
+    return this.timer.now();
   }
 
   /**
@@ -417,7 +421,7 @@ export class AdbClient implements AdbExecutor {
     const { adbPath, baseArgs } = await this.getBaseCommandParts();
     const commandArgs = this.parseCommandArgs(command);
     const fullArgs = [...baseArgs, ...commandArgs];
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const resolvedSignal = signal ?? getAbortSignal();
 
     // Log which device is receiving this command for parallel execution debugging
@@ -428,14 +432,14 @@ export class AdbClient implements AdbExecutor {
       // No retry - just execute once
       try {
         const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
         return result;
       } catch (error) {
         if (resolvedSignal?.aborted) {
           throw new Error(OPERATION_CANCELLED_MESSAGE);
         }
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.warn(`[ADB] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
         throw error;
       }
@@ -448,7 +452,7 @@ export class AdbClient implements AdbExecutor {
           throw new Error(OPERATION_CANCELLED_MESSAGE);
         }
         const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
         return result;
       },
@@ -535,7 +539,7 @@ export class AdbClient implements AdbExecutor {
 
       let timeoutId: NodeJS.Timeout | undefined;
       if (timeoutMs) {
-        timeoutId = defaultTimer.setTimeout(() => {
+        timeoutId = this.timer.setTimeout(() => {
           if (settled) {
             return;
           }

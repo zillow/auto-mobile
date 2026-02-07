@@ -283,7 +283,7 @@ export abstract class DeviceServiceClient {
 
     // Check cooldown after max attempts
     if (this.connectionAttempts >= this.config.maxConnectionAttempts) {
-      const timeSinceLastAttempt = Date.now() - this.lastConnectionAttempt;
+      const timeSinceLastAttempt = this.timer.now() - this.lastConnectionAttempt;
       if (timeSinceLastAttempt >= this.config.connectionResetMs) {
         logger.info(`[${this.logTag}] Resetting connection attempts after ${timeSinceLastAttempt}ms cooldown`);
         this.connectionAttempts = 0;
@@ -296,7 +296,7 @@ export abstract class DeviceServiceClient {
 
     this.isConnecting = true;
     this.connectionAttempts++;
-    this.lastConnectionAttempt = Date.now();
+    this.lastConnectionAttempt = this.timer.now();
 
     try {
       // Platform-specific setup (e.g., port forwarding)
@@ -394,10 +394,10 @@ export abstract class DeviceServiceClient {
     this.stopHealthCheck();
 
     logger.debug(`[${this.logTag}] Starting health check (interval: ${this.config.healthCheckIntervalMs}ms)`);
-    this.lastHealthCheckTime = Date.now();
+    this.lastHealthCheckTime = this.timer.now();
 
     this.healthCheckIntervalId = this.timer.setInterval(() => {
-      const now = Date.now();
+      const now = this.timer.now();
       const timeSinceLastCheck = now - this.lastHealthCheckTime;
       this.lastHealthCheckTime = now;
 

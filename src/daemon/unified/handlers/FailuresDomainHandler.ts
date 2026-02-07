@@ -7,6 +7,7 @@ import {
   getFailuresPushServer,
   type FailureNotificationPush,
 } from "../../failuresPushSocketServer";
+import { Timer, defaultTimer } from "../../../utils/SystemTimer";
 
 type DateRangePreset = "1h" | "24h" | "3d" | "7d" | "30d";
 type TimeAggregation = "minute" | "hour" | "day" | "week";
@@ -149,10 +150,12 @@ export class FailuresDomainHandler extends BaseDomainHandler {
   readonly domain = "failures" as const;
   private readonly repository: FailureAnalyticsRepository;
   private legacyPushCallback: ((data: FailureNotificationPush) => void) | null = null;
+  private timer: Timer;
 
-  constructor(repository: FailureAnalyticsRepository = new FailureAnalyticsRepository()) {
+  constructor(repository: FailureAnalyticsRepository = new FailureAnalyticsRepository(), timer: Timer = defaultTimer) {
     super();
     this.repository = repository;
+    this.timer = timer;
   }
 
   async handleRequest(
@@ -227,7 +230,7 @@ export class FailuresDomainHandler extends BaseDomainHandler {
 
       const dateRange = normalizeDateRange(params.dateRange);
       if (dateRange && !startTime) {
-        const now = Date.now();
+        const now = this.timer.now();
         endTime = endTime ?? now;
         startTime = endTime - getDateRangeDuration(dateRange);
       }
@@ -266,7 +269,7 @@ export class FailuresDomainHandler extends BaseDomainHandler {
 
       const dateRange = normalizeDateRange(params.dateRange);
       if (dateRange && !startTime) {
-        const now = Date.now();
+        const now = this.timer.now();
         endTime = endTime ?? now;
         startTime = endTime - getDateRangeDuration(dateRange);
       }
@@ -302,7 +305,7 @@ export class FailuresDomainHandler extends BaseDomainHandler {
       let endTime = normalizeTimestamp(params.endTime, "endTime");
 
       const dateRange = normalizeDateRange(params.dateRange);
-      const now = Date.now();
+      const now = this.timer.now();
 
       if (dateRange) {
         endTime = endTime ?? now;

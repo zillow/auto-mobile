@@ -18,6 +18,7 @@ import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./daemo
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "./utils/appearance/AppearanceSyncScheduler";
 import { startHostEmulatorAutoConnect, stopHostEmulatorAutoConnect } from "./utils/hostEmulatorAutoConnect";
 import { execSync } from "node:child_process";
+import { defaultTimer } from "./utils/SystemTimer";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
 import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefinitions";
@@ -388,7 +389,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
 
   // Server instance tracking for health checks and restart detection
   const serverInstanceId = randomUUID();
-  const serverStartTime = Date.now();
+  const serverStartTime = defaultTimer.now();
 
   server.on("request", async (req, res) => {
     // CORS headers for development
@@ -406,7 +407,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
 
     // Health check endpoint for connection status and restart detection
     if (url.pathname === "/health" || url.pathname === "/auto-mobile/health") {
-      const uptimeMs = Date.now() - serverStartTime;
+      const uptimeMs = defaultTimer.now() - serverStartTime;
       let branch: string | undefined;
       try {
         branch = execSync("git rev-parse --abbrev-ref HEAD", {
@@ -746,7 +747,7 @@ async function startStreamableProxyServer(transport: TransportConfig, daemonOpti
 
   // Server instance tracking for health checks
   const serverInstanceId = randomUUID();
-  const serverStartTime = Date.now();
+  const serverStartTime = defaultTimer.now();
 
   server.on("request", async (req, res) => {
     // CORS headers for development
@@ -764,7 +765,7 @@ async function startStreamableProxyServer(transport: TransportConfig, daemonOpti
 
     // Health check endpoint
     if (url.pathname === "/health" || url.pathname === "/auto-mobile/health") {
-      const uptimeMs = Date.now() - serverStartTime;
+      const uptimeMs = defaultTimer.now() - serverStartTime;
       const health = {
         status: "ok",
         server: "AutoMobile",

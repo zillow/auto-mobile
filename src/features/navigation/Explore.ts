@@ -119,7 +119,7 @@ export class Explore extends BaseVisualChange {
   ): Promise<ExploreExecutionResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("explore");
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
     try {
       if (options.dryRun) {
@@ -388,7 +388,7 @@ export class Explore extends BaseVisualChange {
         },
         warnings,
         observation,
-        durationMs: Date.now() - startTime
+        durationMs: this.timer.now() - startTime
       };
     }
 
@@ -460,7 +460,7 @@ export class Explore extends BaseVisualChange {
       },
       warnings,
       observation,
-      durationMs: Date.now() - startTime
+      durationMs: this.timer.now() - startTime
     };
   }
 
@@ -472,7 +472,7 @@ export class Explore extends BaseVisualChange {
     timeoutMs: number,
     startTime: number
   ): boolean {
-    const elapsed = Date.now() - startTime;
+    const elapsed = this.timer.now() - startTime;
 
     if (this.interactionCount >= maxInteractions) {
       this.stopReason = `Reached max interactions limit (${maxInteractions})`;
@@ -770,7 +770,7 @@ export class Explore extends BaseVisualChange {
       this.consecutiveBackCount++;
 
       // Wait briefly for navigation
-      await defaultTimer.sleep(1000);
+      await this.timer.sleep(1000);
     } catch (error) {
       logger.warn(`[Explore] Failed to navigate back: ${error}`);
     }
@@ -793,7 +793,7 @@ export class Explore extends BaseVisualChange {
       await this.adb.executeCommand("shell input keyevent KEYCODE_HOME");
 
       // Wait for home screen
-      await defaultTimer.sleep(2000);
+      await this.timer.sleep(2000);
 
       // Reset consecutive back count
       this.consecutiveBackCount = 0;
@@ -854,7 +854,7 @@ export class Explore extends BaseVisualChange {
         percentage: Math.round(coveragePercentage * 100) / 100
       },
       elementSelections: this.elementSelections,
-      durationMs: Date.now() - startTime,
+      durationMs: this.timer.now() - startTime,
       stopReason: this.stopReason || "Exploration completed successfully",
       graphTraversal
     };

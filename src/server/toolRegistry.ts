@@ -16,6 +16,7 @@ import { AppCleanupService, DefaultAppCleanupService } from "./AppCleanupService
 import { ToolCallRepository } from "../db/toolCallRepository";
 import { getDeviceLabelMap, releaseDeviceLabelSessions } from "./deviceLabelMapping";
 import { isDebugModeEnabled } from "../utils/debug";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -57,11 +58,13 @@ class ToolRegistryClass {
   private deviceSessionManager: DeviceSessionManager;
   private cleanupService: AppCleanupService;
   private toolCallRepository: ToolCallRepository;
+  private timer: Timer;
 
-  constructor() {
+  constructor(timer: Timer = defaultTimer) {
     this.deviceSessionManager = DeviceSessionManager.getInstance();
     this.cleanupService = new DefaultAppCleanupService();
     this.toolCallRepository = new ToolCallRepository();
+    this.timer = timer;
   }
 
   private isToolAvailable(tool: RegisteredTool): boolean {
@@ -310,7 +313,7 @@ class ToolRegistryClass {
 
           // Update last action timestamp for interaction tools
           if (["tapOn", "swipeOn", "pinchOn", "dragAndDrop", "scroll", "inputText", "clearText", "pressButton"].includes(name)) {
-            await updateSessionCache(context, "lastActionTime", Date.now());
+            await updateSessionCache(context, "lastActionTime", this.timer.now());
           }
         }
 

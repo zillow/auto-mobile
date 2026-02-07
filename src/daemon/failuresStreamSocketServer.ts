@@ -180,7 +180,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
 
     const dateRange = normalizeDateRange(request.dateRange);
     if (dateRange && !startTime) {
-      const now = Date.now();
+      const now = this.timer.now();
       endTime = endTime ?? now;
       startTime = endTime - getDateRangeDuration(dateRange);
     }
@@ -212,7 +212,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
 
     const dateRange = normalizeDateRange(request.dateRange);
     if (dateRange && !startTime) {
-      const now = Date.now();
+      const now = this.timer.now();
       endTime = endTime ?? now;
       startTime = endTime - getDateRangeDuration(dateRange);
     }
@@ -241,7 +241,7 @@ export class FailuresStreamSocketServer extends RequestResponseSocketServer<
     let endTime = normalizeTimestamp(request.endTime, "endTime");
 
     const dateRange = normalizeDateRange(request.dateRange);
-    const now = Date.now();
+    const now = this.timer.now();
 
     if (dateRange) {
       endTime = endTime ?? now;

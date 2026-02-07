@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
-import { defaultTimer } from "../../utils/SystemTimer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import {
   BootedDevice,
   BugReportHighlightEntry,
@@ -25,8 +25,8 @@ import { ElementUtils } from "../utility/ElementUtils";
 const HIGHLIGHT_RENDER_DELAY_MS = 250;
 const HIGHLIGHT_NEARBY_ELEMENT_LIMIT = 5;
 
-const generateHighlightId = (): string => (
-  `highlight-${Date.now()}-${randomBytes(4).toString("hex")}`
+const generateHighlightId = (timer: Timer = defaultTimer): string => (
+  `highlight-${timer.now()}-${randomBytes(4).toString("hex")}`
 );
 
 export interface BugReportHighlightRequest {
@@ -91,10 +91,12 @@ export class BugReport {
   private takeScreenshot: TakeScreenshot;
   private visualHighlight: VisualHighlight;
   private elementUtils: ElementUtils;
+  private timer: Timer;
 
   constructor(
     device: BootedDevice,
-    adbFactory: AdbClientFactory = defaultAdbClientFactory
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
@@ -102,6 +104,7 @@ export class BugReport {
     this.takeScreenshot = new TakeScreenshot(device, adbFactory);
     this.visualHighlight = new VisualHighlight(device, adbFactory);
     this.elementUtils = new ElementUtils();
+    this.timer = timer;
   }
 
   /**
@@ -110,8 +113,8 @@ export class BugReport {
    * @returns Bug report result
    */
   async execute(options: BugReportOptions = {}): Promise<BugReportResult> {
-    const startTime = Date.now();
-    const reportId = `bug-${Date.now()}-${randomBytes(4).toString("hex")}`;
+    const startTime = this.timer.now();
+    const reportId = `bug-${this.timer.now()}-${randomBytes(4).toString("hex")}`;
 
     const includeScreenshot = options.includeScreenshot !== false;
     const includeRawHierarchy = options.includeRawHierarchy !== false;
@@ -193,7 +196,7 @@ export class BugReport {
       await this.saveReport(result, saveDir);
     }
 
-    const duration = Date.now() - startTime;
+    const duration = this.timer.now() - startTime;
     logger.info(`[BugReport] Report ${reportId} generated in ${duration}ms`);
 
     return result;
@@ -479,7 +482,7 @@ export class BugReport {
 
       for (const highlight of highlightRequests) {
         try {
-          const highlightId = generateHighlightId();
+          const highlightId = generateHighlightId(this.timer);
           await this.visualHighlight.addHighlight(highlightId, highlight.shape);
           addedHighlights.push(highlight);
         } catch (error) {
@@ -508,7 +511,7 @@ export class BugReport {
     if (HIGHLIGHT_RENDER_DELAY_MS <= 0) {
       return;
     }
-    await defaultTimer.sleep(HIGHLIGHT_RENDER_DELAY_MS);
+    await this.timer.sleep(HIGHLIGHT_RENDER_DELAY_MS);
   }
 
   private buildHighlightEntries(

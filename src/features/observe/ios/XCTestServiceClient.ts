@@ -583,7 +583,7 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     try {
       server.pushPerformanceUpdate(this.device.deviceId, streamData);
       // Log occasionally to avoid spam
-      if (Date.now() % 5000 < 600) {
+      if (this.timer.now() % 5000 < 600) {
         logger.info(`[XCTestServiceClient] iOS FPS: ${streamData.fps.toFixed(1)}, frameTime: ${streamData.frameTimeMs.toFixed(1)}ms, memory: ${streamData.memoryUsageMb.toFixed(1)}MB`);
       }
     } catch (error) {

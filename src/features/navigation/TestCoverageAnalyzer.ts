@@ -2,6 +2,7 @@ import { testCoverageRepository } from "../../db/testCoverageRepository";
 import { NavigationRepository } from "../../db/navigationRepository";
 import type { NavigationNode, NavigationEdge } from "../../db/types";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface CoverageGap {
   type: "node" | "edge";
@@ -53,9 +54,11 @@ export interface TestScenario {
  */
 export class TestCoverageAnalyzer {
   private navigationRepository: NavigationRepository;
+  private timer: Timer;
 
-  constructor() {
+  constructor(timer: Timer = defaultTimer) {
     this.navigationRepository = new NavigationRepository();
+    this.timer = timer;
   }
 
   /**
@@ -90,7 +93,7 @@ export class TestCoverageAnalyzer {
 
     const report: TestCoverageReport = {
       appId,
-      generatedAt: Date.now(),
+      generatedAt: this.timer.now(),
       totalNodes: coverageData.totalNodes,
       coveredNodes: coverageData.coveredNodes,
       uncoveredNodes: coverageData.uncoveredNodes.length,

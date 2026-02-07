@@ -10,6 +10,8 @@ import type {
   NavigationEdge,
 } from "./types";
 import { logger } from "../utils/logger";
+import type { Timer } from "../utils/SystemTimer";
+import { defaultTimer } from "../utils/SystemTimer";
 import { sql } from "kysely";
 
 /**
@@ -17,12 +19,18 @@ import { sql } from "kysely";
  * Provides type-safe access to test coverage data.
  */
 export class TestCoverageRepository {
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
   /**
    * Start a new test coverage session for an app.
    */
   async startSession(sessionUuid: string, appId: string): Promise<TestCoverageSession> {
     const db = getDatabase();
-    const now = Date.now();
+    const now = this.timer.now();
 
     const newSession: NewTestCoverageSession = {
       session_uuid: sessionUuid,
@@ -70,7 +78,7 @@ export class TestCoverageRepository {
    */
   async endSession(sessionUuid: string): Promise<void> {
     const db = getDatabase();
-    const now = Date.now();
+    const now = this.timer.now();
 
     await db
       .updateTable("test_coverage_sessions")

@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { logger } from "../logger";
 import { NodeCryptoService } from "../crypto";
 import { ImageCache } from "./ImageCache";
+import { defaultTimer, type Timer } from "../SystemTimer";
 
 const DEFAULT_JPEG_QUALITY = 75;
 
@@ -42,9 +43,11 @@ export class SharpImageTransformer {
   private options: ImageOptions = {};
   private cacheKey: string | null = null;
   private useCache: boolean = true;
+  private timer: Timer;
 
-  constructor(private buffer: Buffer) {
+  constructor(private buffer: Buffer, timer: Timer = defaultTimer) {
     this.sharpInstance = sharp(buffer);
+    this.timer = timer;
   }
 
   private generateCacheKey(): string {
@@ -184,19 +187,19 @@ export class SharpImageTransformer {
   }
 
   public async toBuffer(): Promise<Buffer> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const formatInfo = this.options.format || "unknown";
     logger.debug(`[IMAGE] Starting image processing (format: ${formatInfo})`);
 
     // Check cache first if cache is enabled
     if (this.useCache) {
-      const cacheStartTime = Date.now();
+      const cacheStartTime = this.timer.now();
       this.cacheKey = this.generateCacheKey();
       const cachedBuffer = ImageCache.getInstance().get(this.cacheKey);
-      const cacheDuration = Date.now() - cacheStartTime;
+      const cacheDuration = this.timer.now() - cacheStartTime;
 
       if (cachedBuffer) {
-        const totalDuration = Date.now() - startTime;
+        const totalDuration = this.timer.now() - startTime;
         logger.info(`[IMAGE] Cache hit in ${cacheDuration}ms, total: ${totalDuration}ms (${cachedBuffer.length} bytes)`);
         return cachedBuffer;
       }
@@ -205,23 +208,23 @@ export class SharpImageTransformer {
     }
 
     try {
-      const processStartTime = Date.now();
+      const processStartTime = this.timer.now();
       const resultBuffer = await this.sharpInstance.toBuffer();
-      const processDuration = Date.now() - processStartTime;
+      const processDuration = this.timer.now() - processStartTime;
 
       // Store result in cache if caching is enabled
       if (this.useCache && this.cacheKey) {
-        const cacheStoreStartTime = Date.now();
+        const cacheStoreStartTime = this.timer.now();
         ImageCache.getInstance().set(this.cacheKey, resultBuffer);
-        const cacheStoreDuration = Date.now() - cacheStoreStartTime;
+        const cacheStoreDuration = this.timer.now() - cacheStoreStartTime;
         logger.debug(`[IMAGE] Cache store took ${cacheStoreDuration}ms`);
       }
 
-      const totalDuration = Date.now() - startTime;
+      const totalDuration = this.timer.now() - startTime;
       logger.info(`[IMAGE] Processing completed in ${processDuration}ms, total: ${totalDuration}ms (${this.buffer.length} -> ${resultBuffer.length} bytes)`);
       return resultBuffer;
     } catch (error) {
-      const totalDuration = Date.now() - startTime;
+      const totalDuration = this.timer.now() - startTime;
       logger.warn(`[IMAGE] Processing failed after ${totalDuration}ms: ${(error as Error).message}`);
       throw new Error(`Sharp image processing error: ${(error as Error).message}`);
     }
@@ -229,13 +232,17 @@ export class SharpImageTransformer {
 }
 
 export class Image {
-  constructor(private buffer: Buffer) {}
+  private timer: Timer;
 
-  public static fromBuffer(buffer: Buffer): Image {
+  constructor(private buffer: Buffer, timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
+  public static fromBuffer(buffer: Buffer, timer: Timer = defaultTimer): Image {
     if (!Buffer.isBuffer(buffer)) {
       throw new Error("Input must be a Buffer");
     }
-    return new Image(buffer);
+    return new Image(buffer, timer);
   }
 
   public getOriginalBuffer(): Buffer {
@@ -243,42 +250,42 @@ export class Image {
   }
 
   public resize(width: number, height?: number, maintainAspectRatio = true): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).resize(width, height, maintainAspectRatio);
+    return new SharpImageTransformer(this.buffer, this.timer).resize(width, height, maintainAspectRatio);
   }
 
   public crop(width: number, height: number, x = 0, y = 0): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).crop(width, height, x, y);
+    return new SharpImageTransformer(this.buffer, this.timer).crop(width, height, x, y);
   }
 
   public rotate(degrees: number): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).rotate(degrees);
+    return new SharpImageTransformer(this.buffer, this.timer).rotate(degrees);
   }
 
   public flip(direction: "horizontal" | "vertical" | "both"): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).flip(direction);
+    return new SharpImageTransformer(this.buffer, this.timer).flip(direction);
   }
 
   public blur(radius: number): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).blur(radius);
+    return new SharpImageTransformer(this.buffer, this.timer).blur(radius);
   }
 
   public jpeg(options?: { quality: number }): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).jpeg(options);
+    return new SharpImageTransformer(this.buffer, this.timer).jpeg(options);
   }
 
   public png(): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).png();
+    return new SharpImageTransformer(this.buffer, this.timer).png();
   }
 
   /**
    * Convert the image to WebP format
    */
   public webp(options?: { quality?: number; lossless?: boolean; nearLossless?: boolean }): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer).webp(options);
+    return new SharpImageTransformer(this.buffer, this.timer).webp(options);
   }
 
   public transform(): SharpImageTransformer {
-    return new SharpImageTransformer(this.buffer);
+    return new SharpImageTransformer(this.buffer, this.timer);
   }
 
   /**
@@ -332,9 +339,11 @@ export class Image {
  */
 export class ImageBatch {
   private buffers: Buffer[] = [];
+  private timer: Timer;
 
-  constructor(buffers: Buffer[] = []) {
+  constructor(buffers: Buffer[] = [], timer: Timer = defaultTimer) {
     this.buffers = buffers;
+    this.timer = timer;
   }
 
   public add(buffer: Buffer): ImageBatch {
@@ -344,7 +353,7 @@ export class ImageBatch {
 
   public async process(transform: (image: Image) => SharpImageTransformer): Promise<Buffer[]> {
     const tasks = this.buffers.map(async buffer => {
-      const image = new Image(buffer);
+      const image = new Image(buffer, this.timer);
       const transformer = transform(image);
       return transformer.toBuffer();
     });

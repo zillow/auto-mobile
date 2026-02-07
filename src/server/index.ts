@@ -6,6 +6,7 @@ import {
 import { ZodError, type ZodIssue } from "zod";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
+import { defaultTimer } from "../utils/SystemTimer";
 import { executionTracker } from "./executionTracker";
 import { runWithAbortSignal } from "../utils/AbortContext";
 import { createDefaultPlanExecutionLock, type PlanExecutionLock } from "./PlanExecutionLock";
@@ -268,7 +269,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
           await server.server.notification({
             method: "notifications/progress",
             params: {
-              progressToken: `${name}-${Date.now()}`,
+              progressToken: `${name}-${defaultTimer.now()}`,
               progress,
               total,
               ...(message && { message })

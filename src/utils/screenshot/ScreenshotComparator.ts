@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { PNG } from "pngjs";
 import { logger } from "../logger";
+import { Timer, defaultTimer } from "../SystemTimer";
 
 // Add dynamic import function for pixelmatch
 async function getPixelmatch() {
@@ -105,9 +106,10 @@ export class ScreenshotComparator {
     buffer1: Buffer,
     buffer2: Buffer,
     threshold: number = 0.1,
-    fastMode: boolean = false
+    fastMode: boolean = false,
+    timer: Timer = defaultTimer
   ): Promise<ScreenshotComparisonResult> {
-    const comparisonStart = Date.now();
+    const comparisonStart = timer.now();
     logger.debug(`Starting image comparison with threshold ${threshold}${fastMode ? " (fast mode)" : ""}`);
 
     try {
@@ -163,7 +165,7 @@ export class ScreenshotComparator {
       );
 
       const similarity = ((totalPixels - pixelDifference) / totalPixels) * 100;
-      const comparisonTime = Date.now() - comparisonStart;
+      const comparisonTime = timer.now() - comparisonStart;
 
       logger.debug(`Image comparison completed in ${comparisonTime}ms: ${pixelDifference}/${totalPixels} different pixels (${similarity.toFixed(2)}% similar)`);
 
@@ -173,7 +175,7 @@ export class ScreenshotComparator {
         totalPixels
       };
     } catch (error) {
-      const comparisonTime = Date.now() - comparisonStart;
+      const comparisonTime = timer.now() - comparisonStart;
       logger.warn(`Image comparison failed after ${comparisonTime}ms: ${(error as Error).message}`);
 
       return {

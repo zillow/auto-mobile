@@ -1,6 +1,7 @@
 import { getDatabase } from "./database";
 import type { NewPerformanceAuditResult } from "./types";
 import { logger } from "../utils/logger";
+import type { Timer } from "../utils/SystemTimer";
 import { defaultTimer } from "../utils/SystemTimer";
 
 const RETENTION_MAX_ROWS = 10_000;
@@ -77,6 +78,12 @@ export interface PerformanceAuditStreamQuery {
 const STREAM_LIMIT_MAX = 500;
 
 export class PerformanceAuditRepository {
+  private timer: Timer;
+
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+  }
+
   async recordAudit(record: PerformanceAuditRecord): Promise<void> {
     try {
       const db = getDatabase();
@@ -330,7 +337,7 @@ export class PerformanceAuditRepository {
   async pruneOldRecords(): Promise<number> {
     try {
       const db = getDatabase();
-      const cutoffDate = new Date(Date.now() - RETENTION_MAX_AGE_HOURS * 60 * 60 * 1000);
+      const cutoffDate = new Date(this.timer.now() - RETENTION_MAX_AGE_HOURS * 60 * 60 * 1000);
       const cutoffTimestamp = cutoffDate.toISOString();
 
       const result = await db

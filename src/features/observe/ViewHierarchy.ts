@@ -12,6 +12,7 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import type { ViewHierarchy as ViewHierarchyInterface } from "./interfaces/ViewHierarchy";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Interface for element bounds
@@ -27,6 +28,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
   private device: BootedDevice;
   private elementUtils: ElementUtils;
   private accessibilityServiceClient: AccessibilityServiceClient;
+  private timer: Timer;
 
   /**
    * Create a ViewHierarchy instance
@@ -38,6 +40,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     device: BootedDevice,
     adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
+    timer: Timer = defaultTimer,
   ) {
     this.device = device;
     this.elementUtils = new ElementUtils();
@@ -55,6 +58,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     }
 
     this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, adbFactory);
+    this.timer = timer;
   }
 
   async configureRecompositionTracking(
@@ -105,7 +109,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
 
     perf.serial("ios_viewHierarchy");
@@ -135,7 +139,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
     perf.end();
 
-    const duration = Date.now() - startTime;
+    const duration = this.timer.now() - startTime;
     logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from XCTestService in ${duration}ms`);
     return viewHierarchy;
   }
@@ -146,7 +150,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
   private convertXCTestHierarchy(hierarchy: any, updatedAt?: number): ViewHierarchyResult {
     return {
       ...hierarchy,
-      updatedAt: updatedAt ?? hierarchy.updatedAt ?? Date.now()
+      updatedAt: updatedAt ?? hierarchy.updatedAt ?? this.timer.now()
     };
   }
 
@@ -165,7 +169,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     minTimestamp: number = 0,
     signal?: AbortSignal
   ): Promise<ViewHierarchyResult> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
 
     perf.serial("android_viewHierarchy");
@@ -183,7 +187,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
       if (accessibilityHierarchy) {
         perf.end();
-        const duration = Date.now() - startTime;
+        const duration = this.timer.now() - startTime;
         logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${duration}ms`);
         return this.prepareHierarchyForResponse(accessibilityHierarchy);
       }
@@ -198,7 +202,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
       } as unknown as ViewHierarchyResult;
     } catch (err) {
       perf.end();
-      const duration = Date.now() - startTime;
+      const duration = this.timer.now() - startTime;
       logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service after ${duration}ms:`, err);
       return {
         hierarchy: {

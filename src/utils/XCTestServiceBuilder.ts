@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
 import { logger } from "./logger";
+import { defaultTimer, type Timer } from "./SystemTimer";
 import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
 import {
   XCTESTSERVICE_APP_HASH,
@@ -69,6 +70,7 @@ export class XCTestServiceBuilder {
   private static prefetchResult: XCTestServiceBuildResult | null = null;
   private static prefetchError: Error | null = null;
   private static expectedChecksumOverride: string | null = null;
+  private static timer: Timer = defaultTimer;
 
   // Singleton instances per configuration
   private static instances: Map<string, XCTestServiceBuilder> = new Map();
@@ -131,6 +133,14 @@ export class XCTestServiceBuilder {
     XCTestServiceBuilder.prefetchResult = null;
     XCTestServiceBuilder.prefetchError = null;
     XCTestServiceBuilder.expectedChecksumOverride = null;
+    XCTestServiceBuilder.timer = defaultTimer;
+  }
+
+  /**
+   * Override the timer for testing
+   */
+  public static setTimerForTesting(timer: Timer): void {
+    XCTestServiceBuilder.timer = timer;
   }
 
   /**
@@ -342,11 +352,11 @@ export class XCTestServiceBuilder {
     }
 
     logger.info("[XCTestServiceBuilder] Starting download prefetch");
-    const startTime = Date.now();
+    const startTime = XCTestServiceBuilder.timer.now();
 
     XCTestServiceBuilder.prefetchPromise = XCTestServiceBuilder.doPrefetch()
       .then(result => {
-        const duration = Date.now() - startTime;
+        const duration = XCTestServiceBuilder.timer.now() - startTime;
         if (result && result.success) {
           XCTestServiceBuilder.prefetchResult = result;
           logger.info(`[XCTestServiceBuilder] Prefetch completed in ${duration}ms`, {
@@ -360,7 +370,7 @@ export class XCTestServiceBuilder {
         return result;
       })
       .catch(error => {
-        const duration = Date.now() - startTime;
+        const duration = XCTestServiceBuilder.timer.now() - startTime;
         XCTestServiceBuilder.prefetchError = error instanceof Error ? error : new Error(String(error));
         logger.warn(`[XCTestServiceBuilder] Prefetch failed after ${duration}ms`, {
           error: XCTestServiceBuilder.prefetchError.message,

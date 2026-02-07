@@ -129,12 +129,12 @@ export class BaseVisualChange {
     // Record the action start time (device time if available) to ensure fresh data
     const actionStartTime = await perf.track("getActionStartTime", async () => {
       if (this.device.platform !== "android") {
-        return Date.now();
+        return this.timer.now();
       }
       if (typeof this.adb.getDeviceTimestampMs === "function") {
         return this.adb.getDeviceTimestampMs();
       }
-      return Date.now();
+      return this.timer.now();
     });
 
     const blockResult = await perf.track("executeBlock", async () => {

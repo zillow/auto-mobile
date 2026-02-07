@@ -5,7 +5,7 @@ import { logger } from "../../utils/logger";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import type { MemoryMetricsProvider } from "./interfaces/MemoryMetricsProvider";
-import { defaultTimer } from "../../utils/SystemTimer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Memory snapshot from dumpsys meminfo
@@ -58,12 +58,15 @@ export interface MemoryMetrics {
 export class MemoryMetricsCollector implements MemoryMetricsProvider {
   private adb: AdbExecutor;
   private device: BootedDevice;
+  private timer: Timer;
 
   constructor(
     device: BootedDevice,
-    adbOrFactory: AdbExecutor | AdbClientFactory | null = null
+    adbOrFactory: AdbExecutor | AdbClientFactory | null = null,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
+    this.timer = timer;
     // Support both direct AdbExecutor injection and factory injection
     if (adbOrFactory && "create" in adbOrFactory) {
       // It's a factory
@@ -95,7 +98,7 @@ export class MemoryMetricsCollector implements MemoryMetricsProvider {
         javaHeapMb: metrics.javaHeapMb,
         nativeHeapMb: metrics.nativeHeapMb,
         totalPssMb: metrics.totalPssMb,
-        timestamp: Date.now(),
+        timestamp: this.timer.now(),
         raw: stdout,
       };
     } catch (error) {
@@ -161,7 +164,7 @@ export class MemoryMetricsCollector implements MemoryMetricsProvider {
       );
 
       // Wait for GC to complete (small delay)
-      await defaultTimer.sleep(500);
+      await this.timer.sleep(500);
 
       logger.info(`[MemoryMetricsCollector] GC triggered for ${packageName}`);
     } catch (error) {
@@ -216,7 +219,7 @@ export class MemoryMetricsCollector implements MemoryMetricsProvider {
           type,
           freedKb,
           durationMs,
-          timestamp: Date.now(), // Approximate - logcat would give us real timestamp with -v time
+          timestamp: this.timer.now(), // Approximate - logcat would give us real timestamp with -v time
         });
       }
     }
@@ -302,12 +305,12 @@ export class MemoryMetricsCollector implements MemoryMetricsProvider {
 
     // Take pre-action snapshot
     const preSnapshot = await this.takeSnapshot(packageName, perf);
-    const startTimestamp = Date.now();
+    const startTimestamp = this.timer.now();
 
     // Execute the action
     await beforeAction();
 
-    const endTimestamp = Date.now();
+    const endTimestamp = this.timer.now();
 
     // Trigger explicit GC to ensure we get post-GC measurements
     await this.triggerGC(packageName, perf);

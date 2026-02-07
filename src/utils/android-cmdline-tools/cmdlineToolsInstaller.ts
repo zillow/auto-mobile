@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import AdmZip from "adm-zip";
 import { logger } from "../logger";
 import { CMDLINE_TOOLS_DOWNLOAD } from "./install";
+import { FileSystem, DefaultFileSystem } from "../filesystem/DefaultFileSystem";
 
 export interface CmdlineToolsInstaller {
   install(
@@ -42,12 +43,10 @@ export interface CmdlineToolsTempDirProvider {
   createTempDir(prefix: string): Promise<string>;
 }
 
-export interface CmdlineToolsFileSystem {
-  existsSync(filePath: string): boolean;
-  ensureDir(dirPath: string): Promise<void>;
-  rename(oldPath: string, newPath: string): Promise<void>;
-  rm(pathToRemove: string): Promise<void>;
-}
+/**
+ * @deprecated Use FileSystem from utils/filesystem/DefaultFileSystem instead
+ */
+export type CmdlineToolsFileSystem = FileSystem;
 
 export interface CmdlineToolsDownloadSpec {
   version: string;
@@ -56,7 +55,7 @@ export interface CmdlineToolsDownloadSpec {
 }
 
 export interface CmdlineToolsInstallerDependencies {
-  fileSystem?: CmdlineToolsFileSystem;
+  fileSystem?: FileSystem;
   downloader?: CmdlineToolsDownloader;
   zipExtractor?: CmdlineToolsZipExtractor;
   checksumVerifier?: CmdlineToolsChecksumVerifier;
@@ -67,23 +66,7 @@ export interface CmdlineToolsInstallerDependencies {
 
 const REQUIRED_TOOLS = ["sdkmanager", "avdmanager"];
 
-class NodeCmdlineToolsFileSystem implements CmdlineToolsFileSystem {
-  existsSync(filePath: string): boolean {
-    return fs.existsSync(filePath);
-  }
-
-  async ensureDir(dirPath: string): Promise<void> {
-    await fsPromises.mkdir(dirPath, { recursive: true });
-  }
-
-  async rename(oldPath: string, newPath: string): Promise<void> {
-    await fsPromises.rename(oldPath, newPath);
-  }
-
-  async rm(pathToRemove: string): Promise<void> {
-    await fsPromises.rm(pathToRemove, { force: true, recursive: true });
-  }
-}
+// Uses canonical DefaultFileSystem from utils/filesystem/DefaultFileSystem
 
 class HttpsCmdlineToolsDownloader implements CmdlineToolsDownloader {
   async download(url: string, destination: string): Promise<void> {
@@ -178,7 +161,7 @@ class NodeTempDirProvider implements CmdlineToolsTempDirProvider {
 }
 
 export class DefaultCmdlineToolsInstaller implements CmdlineToolsInstaller {
-  private fileSystem: CmdlineToolsFileSystem;
+  private fileSystem: FileSystem;
   private downloader: CmdlineToolsDownloader;
   private zipExtractor: CmdlineToolsZipExtractor;
   private checksumVerifier: CmdlineToolsChecksumVerifier;
@@ -187,7 +170,7 @@ export class DefaultCmdlineToolsInstaller implements CmdlineToolsInstaller {
   private downloadSpec: CmdlineToolsDownloadSpec;
 
   constructor(dependencies: CmdlineToolsInstallerDependencies = {}) {
-    this.fileSystem = dependencies.fileSystem ?? new NodeCmdlineToolsFileSystem();
+    this.fileSystem = dependencies.fileSystem ?? new DefaultFileSystem();
     this.downloader = dependencies.downloader ?? new HttpsCmdlineToolsDownloader();
     this.zipExtractor = dependencies.zipExtractor ?? new AdmZipCmdlineToolsExtractor();
     this.checksumVerifier = dependencies.checksumVerifier ?? new Sha256ChecksumVerifier();
@@ -227,10 +210,10 @@ export class DefaultCmdlineToolsInstaller implements CmdlineToolsInstaller {
 
     try {
       if (this.fileSystem.existsSync(targetPath)) {
-        await this.fileSystem.rm(targetPath);
+        await this.fileSystem.remove(targetPath);
       }
       if (this.fileSystem.existsSync(extractedPath)) {
-        await this.fileSystem.rm(extractedPath);
+        await this.fileSystem.remove(extractedPath);
       }
 
       await this.downloader.download(downloadUrl, zipPath);
@@ -250,11 +233,11 @@ export class DefaultCmdlineToolsInstaller implements CmdlineToolsInstaller {
       };
     } catch (error) {
       if (this.fileSystem.existsSync(targetPath)) {
-        await this.fileSystem.rm(targetPath);
+        await this.fileSystem.remove(targetPath);
       }
       throw error;
     } finally {
-      await this.fileSystem.rm(tempDir);
+      await this.fileSystem.remove(tempDir);
     }
   }
 

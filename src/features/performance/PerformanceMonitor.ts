@@ -721,7 +721,7 @@ const ttiStore = new Map<string, { ttiMs: number; timestamp: number }>();
  * Called by LaunchApp after measuring displayed time.
  */
 export function setLastTtiMs(packageName: string, ttiMs: number): void {
-  ttiStore.set(packageName, { ttiMs, timestamp: Date.now() });
+  ttiStore.set(packageName, { ttiMs, timestamp: defaultTimer.now() });
   logger.debug(`[PerformanceMonitor] Stored TTI for ${packageName}: ${ttiMs}ms`);
 }
 
@@ -736,7 +736,7 @@ function getLastTtiMs(packageName: string): number | null {
   }
   // TTI is only relevant for recent launches (within 5 minutes)
   const MAX_AGE_MS = 5 * 60 * 1000;
-  if (Date.now() - entry.timestamp > MAX_AGE_MS) {
+  if (defaultTimer.now() - entry.timestamp > MAX_AGE_MS) {
     ttiStore.delete(packageName);
     return null;
   }

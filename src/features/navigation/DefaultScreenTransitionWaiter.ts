@@ -1,7 +1,7 @@
 import { logger } from "../../utils/logger";
 import { NavigationGraphManager } from "./NavigationGraphManager";
 import { ScreenTransitionWaiter } from "./interfaces/ScreenTransitionWaiter";
-import { defaultTimer } from "../../utils/SystemTimer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Default implementation of ScreenTransitionWaiter that polls the navigation graph
@@ -10,6 +10,7 @@ import { defaultTimer } from "../../utils/SystemTimer";
 export class DefaultScreenTransitionWaiter implements ScreenTransitionWaiter {
   private navigationManager: NavigationGraphManager;
   private pollIntervalMs: number;
+  private timer: Timer;
 
   /**
    * @param navigationManager - Navigation graph manager to query for current screen
@@ -17,19 +18,21 @@ export class DefaultScreenTransitionWaiter implements ScreenTransitionWaiter {
    */
   constructor(
     navigationManager: NavigationGraphManager,
-    pollIntervalMs: number = 500
+    pollIntervalMs: number = 500,
+    timer: Timer = defaultTimer
   ) {
     this.navigationManager = navigationManager;
     this.pollIntervalMs = pollIntervalMs;
+    this.timer = timer;
   }
 
   /**
    * Wait for the navigation graph to report we're on the expected screen.
    */
   async waitForScreen(screenName: string, timeoutMs: number): Promise<boolean> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
 
-    while (Date.now() - startTime < timeoutMs) {
+    while (this.timer.now() - startTime < timeoutMs) {
       const currentScreen = this.navigationManager.getCurrentScreen();
       if (currentScreen === screenName) {
         logger.debug(`[SCREEN_TRANSITION_WAITER] Reached screen: ${screenName}`);
@@ -46,6 +49,6 @@ export class DefaultScreenTransitionWaiter implements ScreenTransitionWaiter {
    * Sleep for the specified duration.
    */
   private sleep(ms: number): Promise<void> {
-    return defaultTimer.sleep(ms);
+    return this.timer.sleep(ms);
   }
 }

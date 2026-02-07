@@ -6,10 +6,12 @@ import * as path from "path";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { DumpsysWindow } from "./interfaces/DumpsysWindow";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export class GetDumpsysWindow implements DumpsysWindow {
   private adb: AdbExecutor;
   private readonly device: BootedDevice;
+  private timer: Timer;
   private static memoryCache = new Map<string, { data: ExecResult; timestamp: number }>();
   private static readonly CACHE_TTL_MS = 30000; // 30 seconds
   private readonly cacheDir: string;
@@ -20,7 +22,7 @@ export class GetDumpsysWindow implements DumpsysWindow {
    * @param device - Optional device
    * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
    */
-  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
+  constructor(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory, timer: Timer = defaultTimer) {
     this.device = device;
     // Detect if the argument is a factory (has create method) or an executor
     if (adbFactoryOrExecutor && typeof (adbFactoryOrExecutor as AdbClientFactory).create === "function") {
@@ -32,6 +34,7 @@ export class GetDumpsysWindow implements DumpsysWindow {
     }
     this.cacheDir = getTempDir(TEMP_SUBDIRS.CACHE);
     this.cacheFilePath = path.join(this.cacheDir, `dumpsys-window-${device.deviceId}.json`);
+    this.timer = timer;
   }
 
   /**
@@ -77,7 +80,7 @@ export class GetDumpsysWindow implements DumpsysWindow {
     const result = await perf.track("adbDumpsysWindow", () =>
       this.adb.executeCommand("shell dumpsys window", undefined, undefined, undefined, signal)
     );
-    const timestamp = Date.now();
+    const timestamp = this.timer.now();
     const cacheEntry = { data: result, timestamp };
 
     // Update memory cache
@@ -95,7 +98,7 @@ export class GetDumpsysWindow implements DumpsysWindow {
   }
 
   private isCacheValid(timestamp: number): boolean {
-    return Date.now() - timestamp < GetDumpsysWindow.CACHE_TTL_MS;
+    return this.timer.now() - timestamp < GetDumpsysWindow.CACHE_TTL_MS;
   }
 
   private async loadFromDiskCache(): Promise<{ data: ExecResult; timestamp: number } | null> {
