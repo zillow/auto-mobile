@@ -58,7 +58,7 @@ export class SelectionStateDetector implements SelectionStateDetectorLike {
       return [];
     }
 
-    const accessibilityState = UIStateExtractor.extract(currentObservation.viewHierarchy);
+    const accessibilityState = new UIStateExtractor().extract(currentObservation.viewHierarchy);
     if (accessibilityState?.selectedElements?.length) {
       const selectedElements = this.applySelectedState(accessibilityState.selectedElements, {
         method: "accessibility",

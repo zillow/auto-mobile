@@ -80,7 +80,7 @@ export class SelectionStateTracker {
       return null;
     }
 
-    const accessibilityState = UIStateExtractor.extract(observation.viewHierarchy);
+    const accessibilityState = new UIStateExtractor().extract(observation.viewHierarchy);
     if (accessibilityState?.selectedElements?.length) {
       logger.info(`[SELECTION_STATE] Skip visual capture (${action}): accessibility selected state available`);
       return null;

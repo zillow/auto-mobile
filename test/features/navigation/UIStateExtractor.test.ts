@@ -30,7 +30,7 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
       }
     };
 
-    const state = UIStateExtractor.extract(viewHierarchy);
+    const state = new UIStateExtractor().extract(viewHierarchy);
 
     expect(state).toBeDefined();
     expect(state?.selectedElements).toHaveLength(1);
@@ -55,7 +55,7 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
       }
     };
 
-    const state = UIStateExtractor.extract(viewHierarchy);
+    const state = new UIStateExtractor().extract(viewHierarchy);
 
     expect(state?.modalStack).toHaveLength(1);
     expect(state?.modalStack?.[0]).toMatchObject({
@@ -95,7 +95,7 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
       viewHierarchy
     };
 
-    const state = UIStateExtractor.extractFromObservation(observation);
+    const state = new UIStateExtractor().extractFromObservation(observation);
 
     expect(state?.modalStack).toHaveLength(1);
     expect(state?.modalStack?.[0]).toMatchObject({

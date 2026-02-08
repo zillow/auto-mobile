@@ -2,16 +2,24 @@ import { UIState, SelectedElement, SelectedElementDetection, ScrollPosition, Mod
 import { ObserveResult, ViewHierarchyResult } from "../../models";
 import { SwipeOnOptions } from "../../models";
 import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
 
 /**
  * Extracts UI state from a view hierarchy.
  * Captures selected elements (tabs, menu items) and destination IDs.
  */
 export class UIStateExtractor {
+  private readonly parser: ElementParser;
+
+  constructor(parser: ElementParser = new DefaultElementParser()) {
+    this.parser = parser;
+  }
+
   /**
    * Extract UI state from a view hierarchy result.
    */
-  static extract(viewHierarchy: ViewHierarchyResult | undefined): UIState | undefined {
+  extract(viewHierarchy: ViewHierarchyResult | undefined): UIState | undefined {
     if (!viewHierarchy?.hierarchy) {
       return undefined;
     }
@@ -22,8 +30,8 @@ export class UIStateExtractor {
     const windowsWithHierarchy = viewHierarchy.windows?.filter(window => window.hierarchy) ?? [];
 
     // Traverse the hierarchy to find selected elements and destination
-    this.traverseHierarchy(viewHierarchy.hierarchy, (node, depth) => {
-      const attrs = this.getNodeAttributes(node);
+    this.parser.traverseNode(viewHierarchy.hierarchy, (node, depth) => {
+      const attrs = this.parser.extractNodeProperties(node);
 
       // Check for destination ID (resource-id like "navigation.HomeDestination")
       const resourceId = this.getAttribute(attrs, ["resource-id", "resourceId"]);
@@ -72,8 +80,8 @@ export class UIStateExtractor {
         const windowId = window.id ?? undefined;
         const windowType = window.type !== undefined ? String(window.type) : undefined;
         const windowLayer = window.windowLayer ?? index;
-        this.traverseHierarchy(window.hierarchy as Record<string, any>, (node, depth) => {
-          const attrs = this.getNodeAttributes(node);
+        this.parser.traverseNode(window.hierarchy as Record<string, any>, (node, depth) => {
+          const attrs = this.parser.extractNodeProperties(node);
           this.collectModalStack(modalStack, attrs, windowLayer + depth, { windowId, windowType });
         });
       }
@@ -96,7 +104,7 @@ export class UIStateExtractor {
   /**
    * Extract UI state from an observation, using visual fallback selections if accessibility data is missing.
    */
-  static extractFromObservation(observation?: ObserveResult): UIState | undefined {
+  extractFromObservation(observation?: ObserveResult): UIState | undefined {
     if (!observation?.viewHierarchy) {
       return undefined;
     }
@@ -133,28 +141,7 @@ export class UIStateExtractor {
     return baseState;
   }
 
-  /**
-   * Traverse the view hierarchy and call visitor for each node.
-   */
-  private static traverseHierarchy(
-    node: Record<string, any>,
-    visitor: (node: Record<string, any>, depth: number) => void,
-    depth: number = 0
-  ): void {
-    visitor(node, depth);
-
-    // Handle array of child nodes
-    if (Array.isArray(node.node)) {
-      for (const child of node.node) {
-        this.traverseHierarchy(child, visitor, depth + 1);
-      }
-    } else if (node.node && typeof node.node === "object") {
-      // Handle single child node
-      this.traverseHierarchy(node.node, visitor, depth + 1);
-    }
-  }
-
-  private static applySelectedState(
+  private applySelectedState(
     selectedElements: SelectedElement[],
     selectedState: SelectedElementDetection
   ): SelectedElement[] {
@@ -167,10 +154,10 @@ export class UIStateExtractor {
   /**
    * Find text in child nodes (for Compose layouts where text is nested).
    */
-  private static findTextInChildren(node: Record<string, any> | Record<string, any>[]): string | undefined {
+  private findTextInChildren(node: Record<string, any> | Record<string, any>[]): string | undefined {
     if (Array.isArray(node)) {
       for (const child of node) {
-        const attrs = this.getNodeAttributes(child);
+        const attrs = this.parser.extractNodeProperties(child);
         const text = this.getAttribute(attrs, ["text"]);
         if (text) {
           return text;
@@ -183,7 +170,7 @@ export class UIStateExtractor {
         }
       }
     } else if (node && typeof node === "object") {
-      const attrs = this.getNodeAttributes(node);
+      const attrs = this.parser.extractNodeProperties(node);
       const text = this.getAttribute(attrs, ["text"]);
       if (text) {
         return text;
@@ -195,11 +182,7 @@ export class UIStateExtractor {
     return undefined;
   }
 
-  private static getNodeAttributes(node: Record<string, any>): Record<string, any> {
-    return node.$ && typeof node.$ === "object" ? node.$ : node;
-  }
-
-  private static getAttribute(
+  private getAttribute(
     attrs: Record<string, any>,
     keys: string[]
   ): string | undefined {
@@ -212,7 +195,7 @@ export class UIStateExtractor {
     return undefined;
   }
 
-  private static collectModalStack(
+  private collectModalStack(
     modalStack: ModalState[],
     attrs: Record<string, any>,
     depth: number,
@@ -241,7 +224,7 @@ export class UIStateExtractor {
     });
   }
 
-  private static getWindowId(
+  private getWindowId(
     attrs: Record<string, any>,
     contextWindowId: number | undefined,
     modalType: ModalState["type"],
@@ -262,14 +245,14 @@ export class UIStateExtractor {
     return this.hashToId(stableKey);
   }
 
-  private static getWindowType(
+  private getWindowType(
     attrs: Record<string, any>,
     contextWindowType: string | undefined
   ): string | undefined {
     return this.getAttribute(attrs, ["window-type", "windowType", "window_type"]) ?? contextWindowType;
   }
 
-  private static classifyModalType(className: string): ModalState["type"] | null {
+  private classifyModalType(className: string): ModalState["type"] | null {
     const normalized = className.toLowerCase();
     if (normalized.includes("alert") || normalized.includes("dialog")) {
       return "dialog";
@@ -289,11 +272,11 @@ export class UIStateExtractor {
     return null;
   }
 
-  private static getModalIdentifier(attrs: Record<string, any>, className: string): string | undefined {
+  private getModalIdentifier(attrs: Record<string, any>, className: string): string | undefined {
     return this.getAttribute(attrs, ["resource-id", "resourceId", "content-desc", "contentDesc", "text"]) ?? className;
   }
 
-  private static hashToId(input: string): number {
+  private hashToId(input: string): number {
     let hash = 0;
     for (let i = 0; i < input.length; i += 1) {
       hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
@@ -301,7 +284,7 @@ export class UIStateExtractor {
     return hash;
   }
 
-  private static normalizeModalStack(modals: ModalState[]): ModalState[] {
+  private normalizeModalStack(modals: ModalState[]): ModalState[] {
     if (modals.length === 0) {
       return [];
     }
