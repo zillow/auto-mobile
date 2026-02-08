@@ -19,6 +19,7 @@ import { DefaultElementGeometry } from "../features/utility/ElementGeometry";
 import { DefaultElementParser } from "../features/utility/ElementParser";
 import type { ProgressCallback } from "./toolRegistry";
 import type { SystemTrayNotificationArgs } from "./interactionToolTypes";
+import { boundsArea } from "../utils/bounds";
 
 // ============================================================================
 // Interfaces
@@ -783,7 +784,7 @@ const getCandidateArea = (candidate: SystemTrayNotificationCandidate): number =>
   if (!bounds) {
     return 0;
   }
-  return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
+  return boundsArea(bounds);
 };
 
 const selectBestNotificationMatch = (

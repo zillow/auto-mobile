@@ -10,6 +10,7 @@ import { Element } from "../../models/Element";
 import { WcagLevel } from "../../models/AccessibilityAudit";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
+import { clamp } from "../../utils/bounds";
 
 interface RGB {
   r: number;
@@ -670,8 +671,8 @@ export class ContrastChecker {
       const colors: RGB[] = [];
       for (let dx = -radius; dx <= radius; dx++) {
         for (let dy = -radius; dy <= radius; dy++) {
-          const sampleX = this.clamp(x + dx, bounds.left, bounds.right - 1);
-          const sampleY = this.clamp(y + dy, bounds.top, bounds.bottom - 1);
+          const sampleX = clamp(x + dx, bounds.left, bounds.right - 1);
+          const sampleY = clamp(y + dy, bounds.top, bounds.bottom - 1);
           const color = this.resolvePixelColor(image, sampleX, sampleY);
           if (!this.isSimilarColor(color, textColor)) {
             colors.push(color);
@@ -797,8 +798,8 @@ export class ContrastChecker {
     for (let radius = 1; radius <= 12; radius++) {
       for (let dx = -radius; dx <= radius; dx++) {
         for (let dy = -radius; dy <= radius; dy++) {
-          const sampleX = this.clamp(x + dx, 0, image.bitmap.width - 1);
-          const sampleY = this.clamp(y + dy, 0, image.bitmap.height - 1);
+          const sampleX = clamp(x + dx, 0, image.bitmap.width - 1);
+          const sampleY = clamp(y + dy, 0, image.bitmap.height - 1);
           const pixel = intToRGBA(image.getPixelColor(sampleX, sampleY)) as RGBA;
           if (pixel.a === 255) {
             return { r: pixel.r, g: pixel.g, b: pixel.b };
@@ -1078,10 +1079,6 @@ export class ContrastChecker {
     const dg = a.g - b.g;
     const db = a.b - b.b;
     return Math.sqrt(dr * dr + dg * dg + db * db);
-  }
-
-  private clamp(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value));
   }
 
   /**

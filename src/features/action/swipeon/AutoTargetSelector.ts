@@ -4,6 +4,8 @@ import {
   SwipeDirection,
   SwipeOnOptions
 } from "../../../models";
+import { boundsArea, boundsEqual } from "../../../utils/bounds";
+import { getScreenBounds as getScreenBoundsFromSize } from "../../../utils/screenBounds";
 
 export class AutoTargetSelector {
   selectAutoTargetScrollable(
@@ -20,7 +22,7 @@ export class AutoTargetSelector {
     }
 
     const nonScreenScrollables = screenBounds
-      ? scrollables.filter(scrollable => !this.boundsEqual(scrollable.bounds, screenBounds))
+      ? scrollables.filter(scrollable => !boundsEqual(scrollable.bounds, screenBounds))
       : scrollables.slice();
 
     const candidates = nonScreenScrollables.length > 0 ? nonScreenScrollables : scrollables;
@@ -33,8 +35,8 @@ export class AutoTargetSelector {
     }
 
     return scrollables.reduce((largest, current) => {
-      const largestArea = this.boundsArea(largest.bounds);
-      const currentArea = this.boundsArea(current.bounds);
+      const largestArea = boundsArea(largest.bounds);
+      const currentArea = boundsArea(current.bounds);
       return currentArea > largestArea ? current : largest;
     });
   }
@@ -50,42 +52,12 @@ export class AutoTargetSelector {
     return width >= height;
   }
 
-  buildContainerFromElement(element: Element): SwipeOnOptions["container"] | null {
-    if (element["resource-id"]) {
-      return { elementId: element["resource-id"] };
-    }
-    if (element.text) {
-      return { text: element.text };
-    }
-    if (element["content-desc"]) {
-      return { text: element["content-desc"] };
-    }
-    if (element["ios-accessibility-label"]) {
-      return { text: element["ios-accessibility-label"] };
-    }
-    return null;
-  }
-
   getScreenBounds(observeResult: ObserveResult): Element["bounds"] | null {
     if (!observeResult.screenSize) {
       return null;
     }
 
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
-    return {
-      left: insets.left,
-      top: insets.top,
-      right: observeResult.screenSize.width - insets.right,
-      bottom: observeResult.screenSize.height - insets.bottom
-    };
-  }
-
-  boundsArea(bounds: Element["bounds"]): number {
-    return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
-  }
-
-  boundsEqual(a: Element["bounds"], b: Element["bounds"]): boolean {
-    return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
+    return getScreenBoundsFromSize(observeResult.screenSize, observeResult.systemInsets);
   }
 
   describeContainer(container: SwipeOnOptions["container"]): string {

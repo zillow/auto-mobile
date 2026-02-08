@@ -37,6 +37,8 @@ import { OverlayDetector } from "./OverlayDetector";
 import { AutoTargetSelector } from "./AutoTargetSelector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
 import { ScrollUntilVisible } from "./ScrollUntilVisible";
+import { buildContainerFromElement } from "../../../utils/elementProperties";
+import { getScreenBounds } from "../../../utils/screenBounds";
 import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
 
 export class SwipeOn extends BaseVisualChange {
@@ -216,7 +218,7 @@ export class SwipeOn extends BaseVisualChange {
           };
         }
 
-        const autoTargetContainer = this.autoTargetSelector.buildContainerFromElement(autoTargetElement);
+        const autoTargetContainer = buildContainerFromElement(autoTargetElement);
         if (!autoTargetContainer) {
           const result = await this.executeScreenSwipe(normalizedOptions, progress, perf);
           return {
@@ -342,19 +344,7 @@ export class SwipeOn extends BaseVisualChange {
           throw new ActionableError("Could not determine screen size");
         }
 
-        const screenWidth = observeResult.screenSize.width;
-        const screenHeight = observeResult.screenSize.height;
-        const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
-
-        // Calculate bounds based on system insets
-        const bounds = (options.includeSystemInsets === true)
-          ? { left: 0, top: 0, right: screenWidth, bottom: screenHeight }
-          : {
-            left: insets.left,
-            top: insets.top,
-            right: screenWidth - insets.right,
-            bottom: screenHeight - insets.bottom
-          };
+        const bounds = getScreenBounds(observeResult.screenSize, observeResult.systemInsets, options.includeSystemInsets === true);
 
         const { startX, startY, endX, endY } = this.geometry.getSwipeWithinBounds(
           options.direction,

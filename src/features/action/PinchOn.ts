@@ -16,6 +16,9 @@ import { DefaultElementParser } from "../utility/ElementParser";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { boundsArea, clamp } from "../../utils/bounds";
+import { buildContainerFromElement } from "../../utils/elementProperties";
+import { getScreenBounds as getScreenBoundsFromSize } from "../../utils/screenBounds";
 
 type PinchTarget = {
   bounds: Element["bounds"];
@@ -224,7 +227,7 @@ export class PinchOn extends BaseVisualChange {
     if (options.autoTarget !== false) {
       const autoTarget = this.selectAutoTargetElement(observeResult.viewHierarchy, screenBounds);
       if (autoTarget) {
-        const container = this.buildContainerFromElement(autoTarget);
+        const container = buildContainerFromElement(autoTarget);
         return {
           bounds: autoTarget.bounds,
           targetType: "container",
@@ -277,7 +280,7 @@ export class PinchOn extends BaseVisualChange {
       if (!element.bounds) {
         return;
       }
-      const area = this.boundsArea(element.bounds);
+      const area = boundsArea(element.bounds);
       if (area <= 0) {
         return;
       }
@@ -298,7 +301,7 @@ export class PinchOn extends BaseVisualChange {
       addCandidate(element);
     }
     for (const element of flattened) {
-      const area = this.boundsArea(element.bounds);
+      const area = boundsArea(element.bounds);
       if (area / screenArea >= 0.15) {
         addCandidate(element);
       }
@@ -309,7 +312,7 @@ export class PinchOn extends BaseVisualChange {
       if (!this.boundsWithinScreen(element.bounds, screenBounds)) {
         continue;
       }
-      const area = this.boundsArea(element.bounds);
+      const area = boundsArea(element.bounds);
       if (area <= 0) {
         continue;
       }
@@ -378,8 +381,8 @@ export class PinchOn extends BaseVisualChange {
       distanceStart = Math.min(maxDistance, distanceEnd * 1.5);
     }
 
-    distanceStart = this.clamp(distanceStart, minDistance, maxDistance);
-    distanceEnd = this.clamp(distanceEnd, minDistance, maxDistance);
+    distanceStart = clamp(distanceStart, minDistance, maxDistance);
+    distanceEnd = clamp(distanceEnd, minDistance, maxDistance);
 
     const scale = distanceStart > 0 ? distanceEnd / distanceStart : undefined;
     return { distanceStart, distanceEnd, scale };
@@ -390,32 +393,13 @@ export class PinchOn extends BaseVisualChange {
       throw new ActionableError("Could not determine screen size");
     }
 
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
-    if (includeSystemInsets) {
-      return {
-        left: 0,
-        top: 0,
-        right: observeResult.screenSize.width,
-        bottom: observeResult.screenSize.height
-      };
-    }
-
-    return {
-      left: insets.left,
-      top: insets.top,
-      right: observeResult.screenSize.width - insets.right,
-      bottom: observeResult.screenSize.height - insets.bottom
-    };
+    return getScreenBoundsFromSize(observeResult.screenSize, observeResult.systemInsets, includeSystemInsets);
   }
 
   private getCenter(bounds: Element["bounds"]): { centerX: number; centerY: number } {
     const centerX = Math.round((bounds.left + bounds.right) / 2);
     const centerY = Math.round((bounds.top + bounds.bottom) / 2);
     return { centerX, centerY };
-  }
-
-  private boundsArea(bounds: Element["bounds"]): number {
-    return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
   }
 
   private boundsWithinScreen(bounds: Element["bounds"], screenBounds: Element["bounds"]): boolean {
@@ -439,26 +423,4 @@ export class PinchOn extends BaseVisualChange {
     return (scrollable && bottomAligned && shorterThanScreen) || (classSuggestsSheet && bottomAligned);
   }
 
-  private buildContainerFromElement(element: Element): PinchOnOptions["container"] | null {
-    if (element["resource-id"]) {
-      return { elementId: element["resource-id"] };
-    }
-    if (element.text) {
-      return { text: element.text };
-    }
-    if (element["content-desc"]) {
-      return { text: element["content-desc"] };
-    }
-    if (element["ios-accessibility-label"]) {
-      return { text: element["ios-accessibility-label"] };
-    }
-    return null;
-  }
-
-  private clamp(value: number, min: number, max: number): number {
-    if (Number.isNaN(value)) {
-      return min;
-    }
-    return Math.min(Math.max(value, min), max);
-  }
 }
