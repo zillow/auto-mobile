@@ -5,11 +5,18 @@
  * shared state and functionality from the main XCTestServiceClient.
  */
 
-import type WebSocket from "ws";
-import type { RequestManager } from "../../../utils/RequestManager";
-import type { Timer } from "../../../utils/SystemTimer";
-import type { PerformanceTracker } from "../../../utils/PerformanceTracker";
 import type { ViewHierarchyWindowInfo } from "../../../models";
+import type {
+  PerfTiming,
+  BaseResult,
+  GestureTimingResult,
+  ActionTimingResult,
+  DelegateContext,
+} from "../shared/types";
+
+// Re-export shared types so existing imports from "./types" continue to work
+export type { DelegateContext } from "../shared/types";
+export type { PerfTiming, BaseResult, GestureTimingResult, ActionTimingResult } from "../shared/types";
 
 /**
  * Interface for iOS accessibility node format (matching Android format)
@@ -64,13 +71,10 @@ export interface XCTestHierarchy {
 }
 
 /**
- * Interface for iOS-side performance timing data - hierarchical format matching Android
+ * iOS-side performance timing data.
+ * Alias for shared PerfTiming type.
  */
-export interface XCTestPerfTiming {
-  name: string;
-  durationMs: number;
-  children?: XCTestPerfTiming[];
-}
+export type XCTestPerfTiming = PerfTiming;
 
 /**
  * Interface for iOS performance snapshot from CADisplayLink FPS monitoring
@@ -115,110 +119,35 @@ export interface XCTestScreenshotResult {
   error?: string;
 }
 
-/**
- * Interface for swipe result from XCTestService
- */
-export interface XCTestSwipeResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Swipe result from XCTestService */
+export type XCTestSwipeResult = GestureTimingResult;
 
-/**
- * Interface for tap coordinates result
- */
-export interface XCTestTapResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Tap coordinates result */
+export type XCTestTapResult = BaseResult;
 
-/**
- * Interface for drag result from XCTestService
- */
-export interface XCTestDragResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Drag result from XCTestService */
+export type XCTestDragResult = GestureTimingResult;
 
-/**
- * Interface for pinch result from XCTestService
- */
-export interface XCTestPinchResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Pinch result from XCTestService */
+export type XCTestPinchResult = GestureTimingResult;
 
-/**
- * Interface for set text result from XCTestService
- */
-export interface XCTestSetTextResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Set text result from XCTestService */
+export type XCTestSetTextResult = BaseResult;
 
-/**
- * Interface for IME action result from XCTestService
- */
-export interface XCTestImeActionResult {
-  success: boolean;
-  action: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** IME action result from XCTestService */
+export type XCTestImeActionResult = ActionTimingResult;
 
-/**
- * Interface for select all result from XCTestService
- */
-export interface XCTestSelectAllResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Select all result from XCTestService */
+export type XCTestSelectAllResult = BaseResult;
 
-/**
- * Interface for press home result from XCTestService
- */
-export interface XCTestPressHomeResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Press home result from XCTestService */
+export type XCTestPressHomeResult = BaseResult;
 
-/**
- * Interface for launch app result from XCTestService
- */
-export interface XCTestLaunchAppResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Launch app result from XCTestService */
+export type XCTestLaunchAppResult = BaseResult;
 
-/**
- * Interface for action result from XCTestService
- */
-export interface XCTestActionResult {
-  success: boolean;
-  action: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: XCTestPerfTiming;
-}
+/** Action result from XCTestService */
+export type XCTestActionResult = ActionTimingResult;
 
 /**
  * Interface for cached hierarchy with metadata
@@ -238,21 +167,6 @@ export interface XCTestHierarchyResponse {
   fresh: boolean;
   updatedAt?: number;
   perfTiming?: XCTestPerfTiming;
-}
-
-/**
- * Base context interface that all delegates receive.
- * Provides access to shared state and functionality from the main client.
- */
-export interface DelegateContext {
-  /** Get the current WebSocket connection (may be null if not connected) */
-  getWebSocket(): WebSocket | null;
-  /** RequestManager for correlating requests and responses */
-  requestManager: RequestManager;
-  /** Timer for setTimeout/setInterval operations */
-  timer: Timer;
-  /** Ensure the WebSocket connection is established */
-  ensureConnected(perf?: PerformanceTracker): Promise<boolean>;
 }
 
 /**

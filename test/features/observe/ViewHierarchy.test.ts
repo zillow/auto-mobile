@@ -3,7 +3,7 @@ import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
 import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
-import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../../src/features/observe/android";
 import fs from "fs-extra";
 import { promisify } from "util";
 

@@ -5,7 +5,7 @@ import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
 import { FakeDeviceClientProvider } from "../fakes/FakeDeviceClientProvider";
 import { FakeAccessibilityServiceManager } from "../fakes/FakeAccessibilityServiceManager";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
-import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../src/features/observe/android";
 import { Window } from "../../src/features/observe/Window";
 import { BootedDevice, AppearanceConfigInput } from "../../src/models";
 import { serverConfig } from "../../src/utils/ServerConfig";

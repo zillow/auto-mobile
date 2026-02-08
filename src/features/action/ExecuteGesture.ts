@@ -5,8 +5,8 @@ import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
+import { XCTestServiceClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 
 /**

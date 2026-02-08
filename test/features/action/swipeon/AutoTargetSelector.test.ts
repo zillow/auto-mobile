@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { SwipeOn } from "../../../../src/features/action/swipeon";
 import { ObserveResult } from "../../../../src/models";
-import { AccessibilityServiceClient } from "../../../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../../../src/features/observe/android";
 import { FakeAwaitIdle } from "../../../fakes/FakeAwaitIdle";
 import { FakeAccessibilityDetector } from "../../../fakes/FakeAccessibilityDetector";
 import { FakeObserveScreen } from "../../../fakes/FakeObserveScreen";

@@ -10,7 +10,7 @@ import {
   AccessibilityHierarchyResponse,
   AndroidPerfTiming,
   AccessibilityHierarchy
-} from "../../src/features/observe/AccessibilityServiceClient";
+} from "../../src/features/observe/android";
 import { HighlightOperationResult, HighlightShape, ViewHierarchyResult } from "../../src/models";
 import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
 import { PerformanceTracker } from "../../src/utils/PerformanceTracker";

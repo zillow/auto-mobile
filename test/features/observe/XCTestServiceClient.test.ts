@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { XCTestServiceClient, XCTestHierarchy } from "../../../src/features/observe/XCTestServiceClient";
+import { XCTestServiceClient, XCTestHierarchy } from "../../../src/features/observe/ios";
 import { BootedDevice } from "../../../src/models";
 import {
   FakeWebSocket,

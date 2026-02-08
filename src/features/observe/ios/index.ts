@@ -43,3 +43,11 @@ export type {
   DelegateContext,
   HierarchyDelegateContext,
 } from "./types";
+
+// Shared types
+export type {
+  PerfTiming,
+  BaseResult,
+  GestureTimingResult,
+  ActionTimingResult,
+} from "../shared/types";

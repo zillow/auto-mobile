@@ -1,6 +1,6 @@
 import type { BootedDevice } from "../../models";
 import type { A11yActionResult, A11yTapCoordinatesResult } from "../observe/accessibility/types";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
 import { GetScreenSize } from "../observe/GetScreenSize";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { FocusNavigationDriver } from "./FocusNavigationExecutor";

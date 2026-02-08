@@ -12,8 +12,8 @@
 
 import { describe, expect, test } from "bun:test";
 import type { DeviceService, AndroidDeviceService } from "../../../src/features/observe/DeviceService";
-import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../../../src/features/observe/android";
+import { XCTestServiceClient } from "../../../src/features/observe/ios";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice } from "../../../src/models";
 import {

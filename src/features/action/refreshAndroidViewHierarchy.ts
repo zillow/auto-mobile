@@ -1,5 +1,5 @@
 import type { ViewHierarchyResult } from "../../models";
-import type { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import type { AccessibilityServiceClient } from "../observe/android";
 import type { ViewHierarchy } from "../observe/ViewHierarchy";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { serverConfig } from "../../utils/ServerConfig";

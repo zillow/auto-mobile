@@ -13,7 +13,7 @@ import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
 import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { DefaultElementFinder } from "../utility/ElementFinder";
 import { DefaultElementParser } from "../utility/ElementParser";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { boundsArea, clamp } from "../../utils/bounds";

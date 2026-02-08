@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../../src/features/observe/android";
 import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";

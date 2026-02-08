@@ -3,8 +3,8 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, SendTextResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
+import { XCTestServiceClient } from "../observe/ios";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class InputText extends BaseVisualChange {

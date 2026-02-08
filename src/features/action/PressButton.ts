@@ -2,7 +2,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { XCTestServiceClient } from "../observe/ios";
 
 export class PressButton extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbClient | null = null) {

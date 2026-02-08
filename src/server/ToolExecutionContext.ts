@@ -6,7 +6,7 @@ import { NavigationGraphManager } from "../features/navigation/NavigationGraphMa
 import { ActionableError, BootedDevice, Platform } from "../models";
 import { logger } from "../utils/logger";
 import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
-import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../features/observe/android";
 import { createPerformanceTracker, type TimingData } from "../utils/PerformanceTracker";
 
 /**

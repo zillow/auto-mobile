@@ -2,8 +2,8 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, SelectAllTextResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
+import { XCTestServiceClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 
 export class SelectAllText extends BaseVisualChange {

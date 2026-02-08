@@ -8,7 +8,7 @@ import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ActionableError, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { XCTestServiceClient } from "../observe/ios";
 import { getScreenBounds } from "../../utils/screenBounds";
 
 /**

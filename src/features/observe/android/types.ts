@@ -5,12 +5,19 @@
  * shared state and functionality from the main AccessibilityServiceClient.
  */
 
-import type WebSocket from "ws";
-import type { RequestManager } from "../../../utils/RequestManager";
-import type { Timer } from "../../../utils/SystemTimer";
-import type { PerformanceTracker } from "../../../utils/PerformanceTracker";
 import type { BootedDevice, RecompositionNodeInfo, ViewHierarchyWindowInfo } from "../../../models";
 import type { AdbExecutor } from "../../../utils/android-cmdline-tools/interfaces/AdbExecutor";
+import type {
+  PerfTiming,
+  BaseResult,
+  GestureTimingResult,
+  ActionTimingResult,
+  DelegateContext,
+} from "../shared/types";
+
+// Re-export shared types so existing imports from "./types" continue to work
+export type { DelegateContext } from "../shared/types";
+export type { PerfTiming, BaseResult, GestureTimingResult, ActionTimingResult } from "../shared/types";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -98,13 +105,10 @@ export interface AccessibilityHierarchy {
 }
 
 /**
- * Interface for Android-side performance timing data
+ * Android-side performance timing data.
+ * Alias for shared PerfTiming type.
  */
-export interface AndroidPerfTiming {
-  name: string;
-  durationMs: number;
-  children?: AndroidPerfTiming[];
-}
+export type AndroidPerfTiming = PerfTiming;
 
 /**
  * Interface for cached hierarchy with metadata
@@ -137,160 +141,58 @@ export interface ScreenshotResult {
   error?: string;
 }
 
-/**
- * Interface for swipe result from accessibility service
- */
-export interface A11ySwipeResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Swipe result from accessibility service */
+export type A11ySwipeResult = GestureTimingResult;
 
-/**
- * Interface for tap coordinates result from accessibility service
- */
-export interface A11yTapCoordinatesResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Tap coordinates result from accessibility service */
+export type A11yTapCoordinatesResult = BaseResult;
 
-/**
- * Interface for drag result from accessibility service
- */
-export interface A11yDragResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Drag result from accessibility service */
+export type A11yDragResult = GestureTimingResult;
 
-/**
- * Interface for pinch result from accessibility service
- */
-export interface A11yPinchResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Pinch result from accessibility service */
+export type A11yPinchResult = GestureTimingResult;
 
-/**
- * Interface for set text result from accessibility service
- */
-export interface A11ySetTextResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Set text result from accessibility service */
+export type A11ySetTextResult = BaseResult;
 
-/**
- * Interface for IME action result from accessibility service
- */
-export interface A11yImeActionResult {
-  success: boolean;
-  action: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** IME action result from accessibility service */
+export type A11yImeActionResult = ActionTimingResult;
 
-/**
- * Interface for select all result from accessibility service
- */
-export interface A11ySelectAllResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Select all result from accessibility service */
+export type A11ySelectAllResult = BaseResult;
 
-/**
- * Interface for accessibility action result
- */
-export interface A11yActionResult {
-  success: boolean;
-  action: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
+/** Accessibility action result */
+export type A11yActionResult = ActionTimingResult;
 
-/**
- * Interface for clipboard operation result from accessibility service
- */
-export interface A11yClipboardResult {
-  success: boolean;
+/** Clipboard operation result from accessibility service */
+export interface A11yClipboardResult extends BaseResult {
   action: "copy" | "paste" | "clear" | "get";
   text?: string; // For 'get' action, the clipboard content
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
 }
 
-/**
- * Interface for CA certificate result from accessibility service
- */
-export interface A11yCaCertResult {
-  success: boolean;
+/** CA certificate result from accessibility service */
+export interface A11yCaCertResult extends BaseResult {
   action: "install" | "remove";
   alias?: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
 }
 
-/**
- * Interface for device owner status result from accessibility service
- */
-export interface A11yDeviceOwnerStatusResult {
-  success: boolean;
+/** Device owner status result from accessibility service */
+export interface A11yDeviceOwnerStatusResult extends BaseResult {
   isDeviceOwner: boolean;
   isAdminActive: boolean;
   packageName?: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
 }
 
-/**
- * Interface for permission status result from accessibility service
- */
-export interface A11yPermissionResult {
-  success: boolean;
+/** Permission status result from accessibility service */
+export interface A11yPermissionResult extends BaseResult {
   permission: string;
   granted: boolean;
-  totalTimeMs: number;
   requestLaunched: boolean;
   canRequest: boolean;
   requiresSettings: boolean;
   instructions?: string;
   adbCommand?: string;
-  error?: string;
-  perfTiming?: AndroidPerfTiming[];
-}
-
-/**
- * Base context interface that all delegates receive.
- * Provides access to shared state and functionality from the main client.
- */
-export interface DelegateContext {
-  /** Get the current WebSocket connection (may be null if not connected) */
-  getWebSocket(): WebSocket | null;
-  /** RequestManager for correlating requests and responses */
-  requestManager: RequestManager;
-  /** Timer for setTimeout/setInterval operations */
-  timer: Timer;
-  /** Ensure the WebSocket connection is established */
-  ensureConnected(perf?: PerformanceTracker): Promise<boolean>;
-  /** Cancel any pending screenshot backoff captures */
-  cancelScreenshotBackoff(): void;
 }
 
 /**

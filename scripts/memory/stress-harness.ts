@@ -8,7 +8,7 @@ import { TapOnElement } from "../../src/features/action/TapOnElement";
 import { SwipeOn } from "../../src/features/action/swipeon";
 import { InputText } from "../../src/features/action/InputText";
 import { ViewHierarchy } from "../../src/features/observe/ViewHierarchy";
-import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../src/features/observe/android";
 import { SharpImageUtils } from "../../src/utils/image-utils";
 import type { BootedDevice } from "../../src/models";
 import type { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";

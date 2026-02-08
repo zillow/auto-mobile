@@ -1,4 +1,4 @@
-import { XCTestService } from "../../src/features/observe/XCTestServiceClient";
+import { XCTestService } from "../../src/features/observe/ios";
 import {
   XCTestScreenshotResult,
   XCTestDragResult,
@@ -13,7 +13,7 @@ import {
   XCTestHierarchyResponse,
   IOSPerfTiming,
   XCTestHierarchy
-} from "../../src/features/observe/XCTestServiceClient";
+} from "../../src/features/observe/ios";
 import { ViewHierarchyResult } from "../../src/models";
 import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
 import { PerformanceTracker } from "../../src/utils/PerformanceTracker";

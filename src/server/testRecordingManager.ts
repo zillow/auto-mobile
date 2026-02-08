@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import yaml from "js-yaml";
 import { BootedDevice, Plan, PlanStep, Element } from "../models";
-import { AccessibilityServiceClient, InteractionEvent } from "../features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient, InteractionEvent } from "../features/observe/android";
 import { logger } from "../utils/logger";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 import { PlanValidator } from "../utils/plan/PlanValidator";

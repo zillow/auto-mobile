@@ -20,7 +20,7 @@ import { DefaultElementParser } from "../../utility/ElementParser";
 import { ExecuteGesture } from "../ExecuteGesture";
 import { logger } from "../../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../observe/android";
 import { buildElementSearchDebugContext } from "../../../utils/DebugContextBuilder";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { resolveSwipeDirection } from "../../../utils/swipeOnUtils";

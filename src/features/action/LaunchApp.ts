@@ -13,7 +13,7 @@ import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetri
 import { setLastTtiMs } from "../performance/PerformanceMonitor";
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { XCTestServiceClient } from "../observe/ios";
 
 export interface TargetUserDetector {
   detectTargetUserId(packageName: string, userId?: number): Promise<number>;
