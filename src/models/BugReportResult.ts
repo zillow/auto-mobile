@@ -90,13 +90,18 @@ export interface BugReportResult {
     elementCount: number;
 
     /**
+     * Number of traversed nodes that were filtered out (no valid bounds)
+     */
+    filteredNodeCount?: number;
+
+    /**
      * Clickable elements summary
      */
     clickableElements: {
       resourceId?: string;
       text?: string;
       contentDesc?: string;
-      bounds: string;
+      bounds: ElementBounds;
       className?: string;
     }[];
   };

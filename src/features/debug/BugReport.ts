@@ -17,6 +17,7 @@ import {
   ViewHierarchyResult
 } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
+import type { ViewHierarchy as ViewHierarchyContract } from "../observe/interfaces/ViewHierarchy";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisualHighlight } from "./VisualHighlight";
@@ -88,7 +89,7 @@ export interface BugReportOptions {
 export class BugReport {
   private device: BootedDevice;
   private readonly adb: AdbExecutor;
-  private viewHierarchy: ViewHierarchy;
+  private viewHierarchy: ViewHierarchyContract;
   private takeScreenshot: TakeScreenshot;
   private visualHighlight: VisualHighlight;
   private elementParser: ElementParser;
@@ -97,14 +98,16 @@ export class BugReport {
   constructor(
     device: BootedDevice,
     adbFactory: AdbClientFactory = defaultAdbClientFactory,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    elementParser: ElementParser = new DefaultElementParser(),
+    viewHierarchy?: ViewHierarchyContract
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
-    this.viewHierarchy = new ViewHierarchy(device, adbFactory);
+    this.viewHierarchy = viewHierarchy ?? new ViewHierarchy(device, adbFactory);
     this.takeScreenshot = new TakeScreenshot(device, adbFactory);
     this.visualHighlight = new VisualHighlight(device, adbFactory);
-    this.elementParser = new DefaultElementParser();
+    this.elementParser = elementParser;
     this.timer = timer;
   }
 
@@ -328,7 +331,7 @@ export class BugReport {
       // Get raw XML if requested
       if (includeRaw) {
         try {
-          const rawXml = await this.viewHierarchy.executeUiAutomatorDump();
+          const rawXml = await (this.viewHierarchy as any).executeUiAutomatorDump();
           result.viewHierarchy.rawXml = rawXml;
         } catch (error) {
           result.errors?.push(`Failed to get raw hierarchy XML: ${error}`);
@@ -338,40 +341,29 @@ export class BugReport {
       // Get parsed hierarchy for element summary
       const hierarchy = await this.viewHierarchy.getViewHierarchy(undefined, perf);
 
-      if (hierarchy && hierarchy.hierarchy && hierarchy.hierarchy.node) {
-        // Traverse hierarchy to count elements and extract clickable ones
-        const clickableElements: BugReportResult["viewHierarchy"]["clickableElements"] = [];
-        let elementCount = 0;
+      if (hierarchy) {
+        const flattenedElements = this.elementParser.flattenViewHierarchy(hierarchy);
 
-        const traverseNode = (node: any) => {
-          elementCount++;
-          const attrs = node.$ || node;
+        // Count total traversed nodes (including those without valid bounds)
+        let totalTraversedNodes = 0;
+        const rootNodes = this.elementParser.extractRootNodes(hierarchy);
+        for (const rootNode of rootNodes) {
+          this.elementParser.traverseNode(rootNode, () => { totalTraversedNodes++; });
+        }
 
-          if (attrs.clickable === "true" || attrs.clickable === true) {
-            const boundsStr = attrs.bounds || "";
-            clickableElements.push({
-              resourceId: attrs["resource-id"],
-              text: attrs.text,
-              contentDesc: attrs["content-desc"],
-              bounds: boundsStr,
-              className: attrs.class || attrs.className
-            });
-          }
+        result.viewHierarchy.elementCount = flattenedElements.length;
+        result.viewHierarchy.filteredNodeCount = totalTraversedNodes - flattenedElements.length;
 
-          // Traverse children
-          const children = node.node || node.children;
-          if (Array.isArray(children)) {
-            for (const child of children) {
-              traverseNode(child);
-            }
-          } else if (children) {
-            traverseNode(children);
-          }
-        };
+        const clickableElements = flattenedElements
+          .filter(({ element }) => element.clickable === true)
+          .map(({ element, text }) => ({
+            resourceId: element["resource-id"],
+            text: text ?? element.text,
+            contentDesc: element["content-desc"],
+            bounds: element.bounds,
+            className: element["class"]
+          }));
 
-        traverseNode(hierarchy.hierarchy.node);
-
-        result.viewHierarchy.elementCount = elementCount;
         result.viewHierarchy.clickableElements = clickableElements.slice(0, 50);
       }
 
