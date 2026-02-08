@@ -440,6 +440,26 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
       }
 
+  private val screenStateReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          when (intent?.action) {
+            Intent.ACTION_SCREEN_ON -> {
+              Log.i(TAG, "Screen turned ON, triggering hierarchy extraction")
+              if (::hierarchyDebouncer.isInitialized) {
+                hierarchyDebouncer.extractNow()
+              }
+            }
+            Intent.ACTION_SCREEN_OFF -> {
+              Log.i(TAG, "Screen turned OFF, triggering hierarchy extraction")
+              if (::hierarchyDebouncer.isInitialized) {
+                hierarchyDebouncer.extractNow()
+              }
+            }
+          }
+        }
+      }
+
   private val anrReceiver =
       object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -574,6 +594,14 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         registerReceiver(anrReceiver, anrFilter)
       }
       Log.d(TAG, "ANR receiver registered")
+
+      val screenStateFilter =
+          IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+          }
+      registerReceiver(screenStateReceiver, screenStateFilter)
+      Log.d(TAG, "Screen state receiver registered")
 
       // Initialize the navigation event accumulator
       navigationEventAccumulator.initialize()
@@ -812,6 +840,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       unregisterReceiver(anrReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering ANR receiver", e)
+    }
+
+    try {
+      unregisterReceiver(screenStateReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering screen state receiver", e)
     }
 
     if (::overlayDrawer.isInitialized) {
