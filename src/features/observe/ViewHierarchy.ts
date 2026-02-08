@@ -538,48 +538,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
    * @returns The focused element or null if none found
    */
   findFocusedElement(viewHierarchy: any): Element | null {
-    if (!viewHierarchy) {
-      return null;
-    }
-
-    let focusedElement: Element | null = null;
-
-    const traverseNode = (node: any): void => {
-      if (focusedElement) {
-        return; // Already found focused element, stop traversing
-      }
-
-      // Check if current node is focused
-      const props = node.$ || node;
-      if (props.focused === "true" || props.focused === true) {
-        // Parse the node into an Element
-        const element = this.parseNodeBounds(node);
-        if (element) {
-          // Ensure focused property is a boolean
-          element.focused = true;
-          focusedElement = element;
-          return;
-        }
-      }
-
-      // Continue traversing children
-      if (node.node) {
-        const children = Array.isArray(node.node) ? node.node : [node.node];
-        for (const child of children) {
-          traverseNode(child);
-          if (focusedElement) {
-            break; // Stop if we found the focused element
-          }
-        }
-      }
-    };
-
-    // Search in main hierarchy first
-    if (viewHierarchy.hierarchy) {
-      traverseNode(viewHierarchy.hierarchy);
-    }
-
-    return focusedElement;
+    return this.findElementByProperty(viewHierarchy, "focused");
   }
 
   /**
@@ -601,44 +560,47 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     }
 
     // Fallback: traverse the hierarchy to find the accessibility-focused element
-    let accessibilityFocusedElement: Element | null = null;
+    return this.findElementByProperty(viewHierarchy, "accessibility-focused");
+  }
+
+  private findElementByProperty(viewHierarchy: any, propertyName: string): Element | null {
+    if (!viewHierarchy) {
+      return null;
+    }
+
+    let foundElement: Element | null = null;
 
     const traverseNode = (node: any): void => {
-      if (accessibilityFocusedElement) {
-        return; // Already found accessibility-focused element, stop traversing
+      if (foundElement) {
+        return;
       }
 
-      // Check if current node has accessibility focus
       const props = node.$ || node;
-      if (props["accessibility-focused"] === "true" || props["accessibility-focused"] === true) {
-        // Parse the node into an Element
+      if (props[propertyName] === "true" || props[propertyName] === true) {
         const element = this.parseNodeBounds(node);
         if (element) {
-          // Ensure accessibility-focused property is a boolean
-          element["accessibility-focused"] = true;
-          accessibilityFocusedElement = element;
+          element[propertyName] = true;
+          foundElement = element;
           return;
         }
       }
 
-      // Continue traversing children
       if (node.node) {
         const children = Array.isArray(node.node) ? node.node : [node.node];
         for (const child of children) {
           traverseNode(child);
-          if (accessibilityFocusedElement) {
-            break; // Stop if we found the accessibility-focused element
+          if (foundElement) {
+            break;
           }
         }
       }
     };
 
-    // Search in main hierarchy first
     if (viewHierarchy.hierarchy) {
       traverseNode(viewHierarchy.hierarchy);
     }
 
-    return accessibilityFocusedElement;
+    return foundElement;
   }
 
   /**
