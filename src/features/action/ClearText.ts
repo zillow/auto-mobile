@@ -8,6 +8,7 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { logger } from "../../utils/logger";
+import { ANDROID_INPUT_CLASSES } from "../../utils/elementProperties";
 
 export class ClearText extends BaseVisualChange {
   private parser: ElementParser;
@@ -143,19 +144,11 @@ export class ClearText extends BaseVisualChange {
     let textLength = 0;
     const rootNodes = this.parser.extractRootNodes(viewHierarchy);
 
-    // Common input field classes
-    const inputClasses = [
-      "android.widget.EditText",
-      "android.widget.AutoCompleteTextView",
-      "android.widget.MultiAutoCompleteTextView",
-      "androidx.appcompat.widget.AppCompatEditText"
-    ];
-
     for (const rootNode of rootNodes) {
       this.parser.traverseNode(rootNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
         if (nodeProperties.class &&
-          inputClasses.some(cls => nodeProperties.class.includes(cls)) &&
+          ANDROID_INPUT_CLASSES.some(cls => nodeProperties.class.includes(cls)) &&
           nodeProperties.text && typeof nodeProperties.text === "string") {
           textLength = Math.max(textLength, nodeProperties.text.length);
         }

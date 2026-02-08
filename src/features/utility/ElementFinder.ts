@@ -6,6 +6,7 @@ import type { TextMatcher } from "../../utils/interfaces/TextMatcher";
 import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
 import { DefaultElementParser } from "./ElementParser";
 import { DefaultTextMatcher } from "./TextMatcher";
+import { ANDROID_INPUT_CLASSES } from "../../utils/elementProperties";
 
 /**
  * Handles searching and selection of elements in view hierarchy
@@ -260,7 +261,7 @@ export class DefaultElementFinder implements ElementFinder {
     return null;
   }
 
-  private findFocusedTextInputInRoots(rootNodes: ViewHierarchyNode[], inputClasses: string[]): Element | null {
+  private findFocusedTextInputInRoots(rootNodes: ViewHierarchyNode[], ANDROID_INPUT_CLASSES: string[]): Element | null {
     for (const rootNode of rootNodes) {
       let foundElement: Element | null = null;
       this.parser.traverseNode(rootNode, (node: any) => {
@@ -271,7 +272,7 @@ export class DefaultElementFinder implements ElementFinder {
         const nodeClass = nodeProperties.class || nodeProperties.className;
         if ((nodeProperties.focused === "true" || nodeProperties.focused === true) &&
           nodeClass &&
-          inputClasses.some(cls => nodeClass.includes(cls))) {
+          ANDROID_INPUT_CLASSES.some(cls => nodeClass.includes(cls))) {
           const parsedNode = this.parser.parseNodeBounds(node);
           if (parsedNode) {
             foundElement = parsedNode;
@@ -680,22 +681,15 @@ export class DefaultElementFinder implements ElementFinder {
    * @returns The focused text input element or null if not found
    */
   findFocusedTextInput(viewHierarchy: any): any {
-    const inputClasses = [
-      "android.widget.EditText",
-      "android.widget.AutoCompleteTextView",
-      "android.widget.MultiAutoCompleteTextView",
-      "androidx.appcompat.widget.AppCompatEditText"
-    ];
-
     const rootNodes = this.parser.extractRootNodes(viewHierarchy);
-    const mainMatch = this.findFocusedTextInputInRoots(rootNodes, inputClasses);
+    const mainMatch = this.findFocusedTextInputInRoots(rootNodes, ANDROID_INPUT_CLASSES);
     if (mainMatch) {
       return mainMatch;
     }
 
     const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
     for (const windowRoots of windowRootGroups) {
-      const windowMatch = this.findFocusedTextInputInRoots(windowRoots, inputClasses);
+      const windowMatch = this.findFocusedTextInputInRoots(windowRoots, ANDROID_INPUT_CLASSES);
       if (windowMatch) {
         return windowMatch;
       }

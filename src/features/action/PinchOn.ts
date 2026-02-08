@@ -17,6 +17,7 @@ import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClien
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { boundsArea, clamp } from "../../utils/bounds";
+import { buildContainerFromElement } from "../../utils/elementProperties";
 
 type PinchTarget = {
   bounds: Element["bounds"];
@@ -225,7 +226,7 @@ export class PinchOn extends BaseVisualChange {
     if (options.autoTarget !== false) {
       const autoTarget = this.selectAutoTargetElement(observeResult.viewHierarchy, screenBounds);
       if (autoTarget) {
-        const container = this.buildContainerFromElement(autoTarget);
+        const container = buildContainerFromElement(autoTarget);
         return {
           bounds: autoTarget.bounds,
           targetType: "container",
@@ -434,22 +435,6 @@ export class PinchOn extends BaseVisualChange {
     const classSuggestsSheet = className.includes("bottomsheet") || className.includes("sheet");
 
     return (scrollable && bottomAligned && shorterThanScreen) || (classSuggestsSheet && bottomAligned);
-  }
-
-  private buildContainerFromElement(element: Element): PinchOnOptions["container"] | null {
-    if (element["resource-id"]) {
-      return { elementId: element["resource-id"] };
-    }
-    if (element.text) {
-      return { text: element.text };
-    }
-    if (element["content-desc"]) {
-      return { text: element["content-desc"] };
-    }
-    if (element["ios-accessibility-label"]) {
-      return { text: element["ios-accessibility-label"] };
-    }
-    return null;
   }
 
 }

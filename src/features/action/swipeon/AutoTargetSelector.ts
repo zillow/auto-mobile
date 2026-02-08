@@ -51,22 +51,6 @@ export class AutoTargetSelector {
     return width >= height;
   }
 
-  buildContainerFromElement(element: Element): SwipeOnOptions["container"] | null {
-    if (element["resource-id"]) {
-      return { elementId: element["resource-id"] };
-    }
-    if (element.text) {
-      return { text: element.text };
-    }
-    if (element["content-desc"]) {
-      return { text: element["content-desc"] };
-    }
-    if (element["ios-accessibility-label"]) {
-      return { text: element["ios-accessibility-label"] };
-    }
-    return null;
-  }
-
   getScreenBounds(observeResult: ObserveResult): Element["bounds"] | null {
     if (!observeResult.screenSize) {
       return null;

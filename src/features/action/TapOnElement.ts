@@ -37,6 +37,7 @@ import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { refreshAndroidViewHierarchy } from "./refreshAndroidViewHierarchy";
 import { boundsEqual } from "../../utils/bounds";
+import { isTruthyFlag } from "../../utils/elementProperties";
 import { TalkBackTapStrategy } from "../talkback/TalkBackTapStrategy";
 import {
   DefaultTalkBackNavigationDriverFactory,
@@ -471,24 +472,20 @@ export class TapOnElement extends BaseVisualChange {
     return this.finder.hasContainerElement(viewHierarchy, container);
   }
 
-  private isTruthyFlag(value: unknown): boolean {
-    return value === true || value === "true";
-  }
-
   private isClickableElement(element: Element): boolean {
-    return this.isTruthyFlag(element.clickable);
+    return isTruthyFlag(element.clickable);
   }
 
   private isLongClickableElement(element: Element): boolean {
-    return this.isTruthyFlag(element["long-clickable"]) || this.isTruthyFlag(element.longClickable);
+    return isTruthyFlag(element["long-clickable"]) || isTruthyFlag(element.longClickable);
   }
 
   private isClickableProps(props: Record<string, unknown>): boolean {
-    return this.isTruthyFlag(props.clickable);
+    return isTruthyFlag(props.clickable);
   }
 
   private isLongClickableProps(props: Record<string, unknown>): boolean {
-    return this.isTruthyFlag(props["long-clickable"]) || this.isTruthyFlag(props.longClickable);
+    return isTruthyFlag(props["long-clickable"]) || isTruthyFlag(props.longClickable);
   }
 
   private nodeMatchesElement(

@@ -37,6 +37,7 @@ import { OverlayDetector } from "./OverlayDetector";
 import { AutoTargetSelector } from "./AutoTargetSelector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
 import { ScrollUntilVisible } from "./ScrollUntilVisible";
+import { buildContainerFromElement } from "../../../utils/elementProperties";
 import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
 
 export class SwipeOn extends BaseVisualChange {
@@ -216,7 +217,7 @@ export class SwipeOn extends BaseVisualChange {
           };
         }
 
-        const autoTargetContainer = this.autoTargetSelector.buildContainerFromElement(autoTargetElement);
+        const autoTargetContainer = buildContainerFromElement(autoTargetElement);
         if (!autoTargetContainer) {
           const result = await this.executeScreenSwipe(normalizedOptions, progress, perf);
           return {

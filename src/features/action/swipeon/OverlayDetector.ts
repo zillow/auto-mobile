@@ -11,6 +11,7 @@ import type { ElementParser } from "../../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../../utility/ElementParser";
 import { SwipeInterval, OverlayCandidate } from "./types";
 import { boundsArea, boundsEqual, clamp } from "../../../utils/bounds";
+import { isTruthyFlag, buildContainerFromElement } from "../../../utils/elementProperties";
 
 export class OverlayDetector {
   private static readonly OVERLAY_PADDING = 8;
@@ -27,7 +28,7 @@ export class OverlayDetector {
     container: SwipeOnOptions["container"] | undefined,
     containerElement: Element
   ): OverlayCandidate[] {
-    const containerSelector = container ?? this.buildContainerFromElement(containerElement);
+    const containerSelector = container ?? buildContainerFromElement(containerElement);
     if (!containerSelector) {
       return [];
     }
@@ -306,12 +307,8 @@ export class OverlayDetector {
     return { left, top, right, bottom };
   }
 
-  private isTruthyFlag(value: unknown): boolean {
-    return value === true || value === "true";
-  }
-
   private isClickableNode(nodeProperties: Record<string, unknown>): boolean {
-    return this.isTruthyFlag(nodeProperties.clickable) || this.isTruthyFlag(nodeProperties.focusable);
+    return isTruthyFlag(nodeProperties.clickable) || isTruthyFlag(nodeProperties.focusable);
   }
 
   private isContainerNode(
@@ -374,19 +371,4 @@ export class OverlayDetector {
     return null;
   }
 
-  buildContainerFromElement(element: Element): SwipeOnOptions["container"] | null {
-    if (element["resource-id"]) {
-      return { elementId: element["resource-id"] };
-    }
-    if (element.text) {
-      return { text: element.text };
-    }
-    if (element["content-desc"]) {
-      return { text: element["content-desc"] };
-    }
-    if (element["ios-accessibility-label"]) {
-      return { text: element["ios-accessibility-label"] };
-    }
-    return null;
-  }
 }
