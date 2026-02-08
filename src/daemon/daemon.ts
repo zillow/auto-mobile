@@ -31,7 +31,7 @@ import { startPerformancePushSocketServer, stopPerformancePushSocketServer } fro
 import { startDeviceDataStreamSocketServer, stopDeviceDataStreamSocketServer, getDeviceDataStreamServer } from "./deviceDataStreamSocketServer";
 import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
 import { startFailuresPushSocketServer, stopFailuresPushSocketServer } from "./failuresPushSocketServer";
-import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../features/observe/android";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";

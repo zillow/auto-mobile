@@ -11,7 +11,7 @@ import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
 import { DefaultElementFinder } from "../utility/ElementFinder";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";

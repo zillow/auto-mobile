@@ -7,7 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "./XCTestServiceClient";
+import { XCTestServiceClient } from "./ios";
 import type { ScreenSize } from "./interfaces/ScreenSize";
 
 export class GetScreenSize implements ScreenSize {

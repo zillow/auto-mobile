@@ -3,7 +3,7 @@ import { SessionManager } from "../../src/daemon/sessionManager";
 import { DevicePool } from "../../src/daemon/devicePool";
 import { createToolExecutionContext } from "../../src/server/ToolExecutionContext";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
-import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../src/features/observe/android";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeDeviceManager } from "../fakes/FakeDeviceManager";

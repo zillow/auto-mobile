@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { AccessibilityFocusTracker } from "../../src/utils/AccessibilityFocusTracker";
-import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../src/features/observe/android";
 import type { CurrentFocusResult, Element, TraversalOrderResult } from "../../src/models";
 import { FakeTimer } from "../fakes/FakeTimer";
 

@@ -6,7 +6,7 @@ import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-c
 import { DeviceDetection } from "../../utils/DeviceDetection";
 import { defaultTimer, type Timer } from "../../utils/SystemTimer";
 import { logger } from "../../utils/logger";
-import { AccessibilityServiceClient, type A11ySwipeResult } from "../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient, type A11ySwipeResult } from "../observe/android";
 import { GetScreenSize } from "../observe/GetScreenSize";
 import { FocusElementMatcher } from "./FocusElementMatcher";
 import { FocusPathCalculator, type FocusNavigationPath } from "./FocusPathCalculator";

@@ -10,7 +10,7 @@ import { FakeTargetUserDetector } from "../../fakes/FakeTargetUserDetector";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeXCTestService } from "../../fakes/FakeXCTestService";
-import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
+import { XCTestServiceClient } from "../../../src/features/observe/ios";
 
 describe("LaunchApp", () => {
   let device: BootedDevice;

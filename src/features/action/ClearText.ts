@@ -5,8 +5,8 @@ import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../utility/ElementParser";
 import { ObserveResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
+import { XCTestServiceClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 import { ANDROID_INPUT_CLASSES } from "../../utils/elementProperties";
 

@@ -292,6 +292,7 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
       requestManager: this.requestManager,
       timer: this.timer,
       ensureConnected: perf => this.ensureConnected(perf),
+      cancelScreenshotBackoff: () => this.cancelScreenshotBackoff(),
     };
   }
 

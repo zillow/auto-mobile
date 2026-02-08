@@ -15,7 +15,7 @@ import {
 import { highlightShapeSchema, VisualHighlightClient } from "../features/debug/VisualHighlight";
 import { recordVideoRecordingHighlightAdded } from "./videoRecordingManager";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
-import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../features/observe/android";
 import { DefaultElementSelector } from "../features/utility/DefaultElementSelector";
 import { DefaultElementFinder } from "../features/utility/ElementFinder";
 import { DefaultElementParser } from "../features/utility/ElementParser";

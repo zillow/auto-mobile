@@ -3,7 +3,7 @@ import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-c
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { DeviceSessionManager } from "../../utils/DeviceSessionManager";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
 import {
   ActionableError,
   BootedDevice,

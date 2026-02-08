@@ -3,7 +3,7 @@ import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/A
 import { BootedDevice, ClipboardResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
 
 export class Clipboard {
   private device: BootedDevice;

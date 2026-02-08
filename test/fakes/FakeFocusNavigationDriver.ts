@@ -1,5 +1,5 @@
 import type { FocusNavigationDriver } from "../../src/features/talkback/FocusNavigationExecutor";
-import type { A11ySwipeResult } from "../../src/features/observe/AccessibilityServiceClient";
+import type { A11ySwipeResult } from "../../src/features/observe/android";
 import type { CurrentFocusResult, ScreenSize, TraversalOrderResult } from "../../src/models";
 import type { Element } from "../../src/models/Element";
 

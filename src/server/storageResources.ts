@@ -1,6 +1,6 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
-import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../features/observe/android";
 import { BootedDevice } from "../models";
 import { logger } from "../utils/logger";
 import type { PreferenceFile, KeyValueEntry } from "../features/storage/storageTypes";

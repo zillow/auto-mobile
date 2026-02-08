@@ -11,7 +11,7 @@ import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from 
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ensureSecureTempDirSync, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ScreenshotService } from "./interfaces/ScreenshotService";
-import { XCTestServiceClient } from "./ios/XCTestServiceClient";
+import { XCTestServiceClient } from "./ios";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { BootedDevice, ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import { PinchOn } from "../../../src/features/action/PinchOn";
-import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../../src/features/observe/android";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
 import { FakeAccessibilityService } from "../../fakes/FakeAccessibilityService";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";

@@ -1,4 +1,4 @@
-import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../features/observe/android";
 import { Element, CurrentFocusResult, TraversalOrderResult } from "../models/index";
 import { PerformanceTracker, NoOpPerformanceTracker } from "./PerformanceTracker";
 import { logger } from "./logger";

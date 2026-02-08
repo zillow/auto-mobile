@@ -7,7 +7,7 @@ import {
 } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../../observe/AccessibilityServiceClient";
+import { AccessibilityServiceClient } from "../../observe/android";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
 import { SwipeResult } from "../../../models/SwipeResult";
 import { GestureExecutor, BoomerangConfig } from "./types";

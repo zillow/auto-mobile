@@ -1,7 +1,7 @@
 import { expect, describe, test, beforeEach, spyOn } from "bun:test";
 import { HomeScreen } from "../../../src/features/action/HomeScreen";
 import { BootedDevice, ObserveResult } from "../../../src/models";
-import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
+import { XCTestServiceClient } from "../../../src/features/observe/ios";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";

@@ -47,5 +47,13 @@ export type {
   NormalizedHighlightBounds,
 } from "./types";
 
+// Shared types
+export type {
+  PerfTiming,
+  BaseResult,
+  GestureTimingResult,
+  ActionTimingResult,
+} from "../shared/types";
+
 // Utility functions
 export { generateSecureId, quoteForAdbArg } from "./types";

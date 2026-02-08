@@ -8,6 +8,7 @@
 import type { Timer } from "../../utils/SystemTimer";
 import type { RequestManager } from "../../utils/RequestManager";
 import type { GestureResult, TextResult, ScreenshotResult } from "./DeviceService";
+import type { BaseResult, GestureTimingResult, ActionTimingResult } from "./shared/types";
 
 // =============================================================================
 // Connection Utilities
@@ -227,37 +228,19 @@ export function createMessage(
 // =============================================================================
 
 /**
- * Platform-specific gesture result with perfTiming that can be either
- * an array (Android) or an object (iOS).
+ * Platform-specific gesture result with properly-typed perfTiming.
  */
-export interface PlatformGestureResult {
-  success: boolean;
-  totalTimeMs: number;
-  gestureTimeMs?: number;
-  error?: string;
-  perfTiming?: unknown; // Android: AndroidPerfTiming[], iOS: XCTestPerfTiming
-}
+export type PlatformGestureResult = GestureTimingResult;
 
 /**
- * Platform-specific text result with perfTiming.
+ * Platform-specific text result with properly-typed perfTiming.
  */
-export interface PlatformTextResult {
-  success: boolean;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: unknown;
-}
+export type PlatformTextResult = BaseResult;
 
 /**
- * Platform-specific IME action result with perfTiming.
+ * Platform-specific IME action result with properly-typed perfTiming.
  */
-export interface PlatformImeActionResult {
-  success: boolean;
-  action?: string;
-  totalTimeMs: number;
-  error?: string;
-  perfTiming?: unknown;
-}
+export type PlatformImeActionResult = Omit<ActionTimingResult, "action"> & { action?: string };
 
 /**
  * Platform-specific screenshot result.

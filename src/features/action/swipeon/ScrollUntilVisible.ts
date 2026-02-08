@@ -10,8 +10,8 @@ import {
 } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../../observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../../observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../../observe/android";
+import { XCTestServiceClient } from "../../observe/ios";
 import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";

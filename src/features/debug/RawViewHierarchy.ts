@@ -4,8 +4,8 @@ import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { BootedDevice, RawViewHierarchyResult } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
-import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { AccessibilityServiceClient } from "../observe/android";
+import { XCTestServiceClient } from "../observe/ios";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export interface RawViewHierarchyOptions {
