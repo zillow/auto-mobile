@@ -69,7 +69,7 @@ export interface DebugSearchResult {
       elementId?: string;
       text?: string;
     };
-    fuzzyMatch: boolean;
+    partialMatch: boolean;
     caseSensitive: boolean;
   };
 

@@ -1,7 +1,7 @@
 import type { BootedDevice, Element, ObserveResult } from "../../models";
 import type { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import type { ProgressCallback } from "../action/BaseVisualChange";
-import type { ElementParser } from "../utility/ElementParser";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { TapOnElement } from "../action/TapOnElement";
 import { logger } from "../../utils/logger";
 import { extractAllElements } from "./ExploreElementExtraction";

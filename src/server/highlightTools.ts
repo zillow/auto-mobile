@@ -17,8 +17,8 @@ import { recordVideoRecordingHighlightAdded } from "./videoRecordingManager";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { DefaultElementSelector } from "../features/utility/DefaultElementSelector";
-import { ElementFinder } from "../features/utility/ElementFinder";
-import { ElementParser } from "../features/utility/ElementParser";
+import { DefaultElementFinder } from "../features/utility/ElementFinder";
+import { DefaultElementParser } from "../features/utility/ElementParser";
 import { NoOpPerformanceTracker } from "../utils/PerformanceTracker";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import {
@@ -124,7 +124,7 @@ const findContainerForElement = (
   viewHierarchy: ViewHierarchyResult,
   target: Element
 ): Element | null => {
-  const parser = new ElementParser();
+  const parser = new DefaultElementParser();
   const roots: ViewHierarchyNode[] = [
     ...parser.extractRootNodes(viewHierarchy),
     ...parser.extractWindowRootNodes(viewHierarchy, "topmost-first")
@@ -228,7 +228,7 @@ const resolveHighlightShapeFromSelector = async (
     throw new ActionableError("Unable to retrieve view hierarchy for highlight.");
   }
   const viewHierarchy = accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy);
-  const finder = new ElementFinder();
+  const finder = new DefaultElementFinder();
   const elementSelector = new DefaultElementSelector(finder);
   const container = args.container ?? null;
 
@@ -240,7 +240,7 @@ const resolveHighlightShapeFromSelector = async (
   const selection = args.text
     ? elementSelector.selectByText(viewHierarchy, args.text, {
       container,
-      fuzzyMatch: true,
+      partialMatch: true,
       caseSensitive: false,
       strategy
     })

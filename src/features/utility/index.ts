@@ -1,6 +1,5 @@
 // Export all element utility classes
-export { ElementUtils } from "./ElementUtils";
-export { ElementFinder } from "./ElementFinder";
-export { ElementGeometry } from "./ElementGeometry";
-export { ElementParser } from "./ElementParser";
-export { TextMatcher } from "./TextMatcher";
+export { DefaultElementFinder, DefaultElementFinder as ElementFinder } from "./ElementFinder";
+export { DefaultElementGeometry, DefaultElementGeometry as ElementGeometry } from "./ElementGeometry";
+export { DefaultElementParser, DefaultElementParser as ElementParser } from "./ElementParser";
+export { DefaultTextMatcher, DefaultTextMatcher as TextMatcher } from "./TextMatcher";

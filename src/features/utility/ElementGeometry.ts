@@ -1,11 +1,12 @@
 import { Element } from "../../models/Element";
 import { Point } from "../../models/Point";
 import { ElementBounds } from "../../models";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
 
 /**
  * Handles bounds and coordinate calculations for UI elements
  */
-export class ElementGeometry {
+export class DefaultElementGeometry implements ElementGeometry {
   /**
    * Calculate the center point of an element
    * @param element - Element to get center for

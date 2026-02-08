@@ -10,7 +10,8 @@ import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { IdentifyInteractions, IdentifyInteractionsOptions } from "../features/observe/IdentifyInteractions";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
-import { ElementUtils } from "../features/utility/ElementUtils";
+import { DefaultElementFinder } from "../features/utility/ElementFinder";
+import type { ElementFinder } from "../utils/interfaces/ElementFinder";
 import { defaultTimer } from "../utils/SystemTimer";
 import { consumeSetupTiming } from "./ToolExecutionContext";
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
@@ -103,12 +104,12 @@ type ObserveWaitForOptions = z.infer<typeof waitForSchema>;
 type ObserveArgs = z.infer<typeof observeSchema>;
 
 const findWaitForElement = (
-  elementUtils: ElementUtils,
+  finder: ElementFinder,
   waitFor: ObserveWaitForOptions,
   viewHierarchy: ViewHierarchyResult
 ): Element | null => {
   if ("elementId" in waitFor) {
-    return elementUtils.findElementByResourceId(
+    return finder.findElementByResourceId(
       viewHierarchy,
       waitFor.elementId,
       undefined
@@ -116,7 +117,7 @@ const findWaitForElement = (
   }
 
   if ("text" in waitFor) {
-    return elementUtils.findElementByText(
+    return finder.findElementByText(
       viewHierarchy,
       waitFor.text,
       undefined,
@@ -140,7 +141,7 @@ const waitForObservation = async (
 }> => {
   const startTime = defaultTimer.now();
   const timeoutMs = waitFor.timeout ?? 5000;
-  const elementUtils = new ElementUtils();
+  const finder = new DefaultElementFinder();
   const queryOptions = {
     text: "text" in waitFor ? waitFor.text : undefined,
     elementId: "elementId" in waitFor ? waitFor.elementId : undefined
@@ -155,7 +156,7 @@ const waitForObservation = async (
     signal
   );
   let awaitedElement = observation.viewHierarchy
-    ? findWaitForElement(elementUtils, waitFor, observation.viewHierarchy)
+    ? findWaitForElement(finder, waitFor, observation.viewHierarchy)
     : null;
 
   if (awaitedElement) {
@@ -187,7 +188,7 @@ const waitForObservation = async (
       signal
     );
     awaitedElement = observation.viewHierarchy
-      ? findWaitForElement(elementUtils, waitFor, observation.viewHierarchy)
+      ? findWaitForElement(finder, waitFor, observation.viewHierarchy)
       : null;
 
     if (awaitedElement) {

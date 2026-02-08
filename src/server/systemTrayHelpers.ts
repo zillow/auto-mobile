@@ -13,7 +13,10 @@ import {
 } from "../models";
 import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
-import { ElementUtils } from "../features/utility/ElementUtils";
+import type { ElementFinder } from "../utils/interfaces/ElementFinder";
+import { DefaultElementFinder } from "../features/utility/ElementFinder";
+import { DefaultElementGeometry } from "../features/utility/ElementGeometry";
+import { DefaultElementParser } from "../features/utility/ElementParser";
 import type { ProgressCallback } from "./toolRegistry";
 import type { SystemTrayNotificationArgs } from "./interactionToolTypes";
 
@@ -382,7 +385,7 @@ const nodeHasNotificationRowHint = (node: any): boolean => {
 
 const collectNotificationCandidates = (viewHierarchy: ViewHierarchyResult): SystemTrayNotificationCandidate[] => {
   const candidates: SystemTrayNotificationCandidate[] = [];
-  const elementUtils = new ElementUtils();
+  const parser = new DefaultElementParser();
 
   const visit = (node: any, depth: number): void => {
     if (!node) {
@@ -390,7 +393,7 @@ const collectNotificationCandidates = (viewHierarchy: ViewHierarchyResult): Syst
     }
 
     if (nodeHasNotificationRowHint(node)) {
-      const element = elementUtils.parseNodeBounds(node) ?? undefined;
+      const element = parser.parseNodeBounds(node) ?? undefined;
       candidates.push({ node, depth, element });
       return;
     }
@@ -542,7 +545,7 @@ const collectCompositeNotificationCandidates = (
   }
 
   const candidates: SystemTrayNotificationCandidate[] = [];
-  const elementUtils = new ElementUtils();
+  const parser = new DefaultElementParser();
 
   const resolveNodeMatches = (node: any): SystemTrayMatchResult["matches"] => {
     const nodeTextCandidates = extractNodeTextCandidates(node);
@@ -614,7 +617,7 @@ const collectCompositeNotificationCandidates = (
 
     const hasAll = requiredKeys.every(key => Boolean(combinedMatches[key]));
     if (hasAll && !childHasAll) {
-      const element = elementUtils.parseNodeBounds(node) ?? undefined;
+      const element = parser.parseNodeBounds(node) ?? undefined;
       candidates.push({ node, depth, element });
     }
 
@@ -629,16 +632,16 @@ const collectCompositeNotificationCandidates = (
 };
 
 const findTextMatch = (
-  elementUtils: ElementUtils,
+  finder: ElementFinder,
   viewHierarchy: ViewHierarchyResult,
   text: string
 ): SystemTrayTextMatch | null => {
-  const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
+  const exactMatch = finder.findElementByText(viewHierarchy, text, undefined, false, false);
   if (exactMatch) {
     return { text, matchType: "exact" };
   }
 
-  const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
+  const partialMatch = finder.findElementByText(viewHierarchy, text, undefined, true, false);
   if (partialMatch) {
     return { text, matchType: "partial" };
   }
@@ -647,20 +650,20 @@ const findTextMatch = (
 };
 
 const findFirstTextMatch = (
-  elementUtils: ElementUtils,
+  finder: ElementFinder,
   viewHierarchy: ViewHierarchyResult,
   texts: string[]
 ): SystemTrayTextMatch | null => {
   const candidates = texts.map(text => text.trim()).filter(Boolean);
   for (const text of candidates) {
-    const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
+    const exactMatch = finder.findElementByText(viewHierarchy, text, undefined, false, false);
     if (exactMatch) {
       return { text, matchType: "exact" };
     }
   }
 
   for (const text of candidates) {
-    const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
+    const partialMatch = finder.findElementByText(viewHierarchy, text, undefined, true, false);
     if (partialMatch) {
       return { text, matchType: "partial" };
     }
@@ -670,16 +673,16 @@ const findFirstTextMatch = (
 };
 
 const findElementMatch = (
-  elementUtils: ElementUtils,
+  finder: ElementFinder,
   viewHierarchy: ViewHierarchyResult,
   text: string
 ): SystemTrayElementMatch | null => {
-  const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
+  const exactMatch = finder.findElementByText(viewHierarchy, text, undefined, false, false);
   if (exactMatch) {
     return { text, matchType: "exact", element: exactMatch };
   }
 
-  const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
+  const partialMatch = finder.findElementByText(viewHierarchy, text, undefined, true, false);
   if (partialMatch) {
     return { text, matchType: "partial", element: partialMatch };
   }
@@ -688,20 +691,20 @@ const findElementMatch = (
 };
 
 const findFirstElementMatch = (
-  elementUtils: ElementUtils,
+  finder: ElementFinder,
   viewHierarchy: ViewHierarchyResult,
   texts: string[]
 ): SystemTrayElementMatch | null => {
   const candidates = texts.map(text => text.trim()).filter(Boolean);
   for (const text of candidates) {
-    const exactMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, false, false);
+    const exactMatch = finder.findElementByText(viewHierarchy, text, undefined, false, false);
     if (exactMatch) {
       return { text, matchType: "exact", element: exactMatch };
     }
   }
 
   for (const text of candidates) {
-    const partialMatch = elementUtils.findElementByText(viewHierarchy, text, undefined, true, false);
+    const partialMatch = finder.findElementByText(viewHierarchy, text, undefined, true, false);
     if (partialMatch) {
       return { text, matchType: "partial", element: partialMatch };
     }
@@ -715,12 +718,12 @@ const buildNotificationMatch = (
   criteria: SystemTrayNotificationArgs,
   appMatchTexts: string[]
 ): SystemTrayMatchResult => {
-  const elementUtils = new ElementUtils();
+  const finder = new DefaultElementFinder();
   const matches: SystemTrayMatchResult["matches"] = {};
   let matched = true;
 
   if (criteria.title) {
-    const titleMatch = findTextMatch(elementUtils, viewHierarchy, criteria.title);
+    const titleMatch = findTextMatch(finder, viewHierarchy, criteria.title);
     if (!titleMatch) {
       matched = false;
     } else {
@@ -729,7 +732,7 @@ const buildNotificationMatch = (
   }
 
   if (criteria.body) {
-    const bodyMatch = findTextMatch(elementUtils, viewHierarchy, criteria.body);
+    const bodyMatch = findTextMatch(finder, viewHierarchy, criteria.body);
     if (!bodyMatch) {
       matched = false;
     } else {
@@ -738,7 +741,7 @@ const buildNotificationMatch = (
   }
 
   if (criteria.tapActionLabel) {
-    const actionMatch = findTextMatch(elementUtils, viewHierarchy, criteria.tapActionLabel);
+    const actionMatch = findTextMatch(finder, viewHierarchy, criteria.tapActionLabel);
     if (!actionMatch) {
       matched = false;
     } else {
@@ -747,7 +750,7 @@ const buildNotificationMatch = (
   }
 
   if (criteria.appId) {
-    const appMatch = findFirstTextMatch(elementUtils, viewHierarchy, appMatchTexts);
+    const appMatch = findFirstTextMatch(finder, viewHierarchy, appMatchTexts);
     if (!appMatch) {
       matched = false;
     } else {
@@ -815,7 +818,7 @@ const findNotificationMatches = (
   criteria: SystemTrayNotificationArgs,
   appMatchTexts: string[]
 ): SystemTrayNotificationMatch[] => {
-  const elementUtils = new ElementUtils();
+  const parser = new DefaultElementParser();
   const candidates = collectNotificationCandidates(viewHierarchy);
   const criteriaCount = getNotificationCriteriaCount(criteria);
   const matchCandidates = (candidateList: SystemTrayNotificationCandidate[]): SystemTrayNotificationMatch[] => {
@@ -839,7 +842,7 @@ const findNotificationMatches = (
       fallbackCandidates = getHierarchyRoots(viewHierarchy).map(node => ({
         node,
         depth: 0,
-        element: elementUtils.parseNodeBounds(node) ?? undefined
+        element: parser.parseNodeBounds(node) ?? undefined
       }));
     }
   } else {
@@ -974,25 +977,25 @@ export const resolveNotificationTapElement = (
   match: SystemTrayNotificationMatch,
   criteria: SystemTrayNotificationArgs
 ): SystemTrayElementMatch | null => {
-  const elementUtils = new ElementUtils();
+  const finder = new DefaultElementFinder();
   const subHierarchy = match.subHierarchy;
 
   if (criteria.tapActionLabel) {
-    const actionMatch = findElementMatch(elementUtils, subHierarchy, criteria.tapActionLabel);
+    const actionMatch = findElementMatch(finder, subHierarchy, criteria.tapActionLabel);
     if (actionMatch) {
       return actionMatch;
     }
   }
 
   if (criteria.title) {
-    const titleMatch = findElementMatch(elementUtils, subHierarchy, criteria.title);
+    const titleMatch = findElementMatch(finder, subHierarchy, criteria.title);
     if (titleMatch) {
       return titleMatch;
     }
   }
 
   if (criteria.body) {
-    const bodyMatch = findElementMatch(elementUtils, subHierarchy, criteria.body);
+    const bodyMatch = findElementMatch(finder, subHierarchy, criteria.body);
     if (bodyMatch) {
       return bodyMatch;
     }
@@ -1010,25 +1013,25 @@ export const resolveNotificationSwipeElement = (
     return match.candidate.element;
   }
 
-  const elementUtils = new ElementUtils();
+  const finder = new DefaultElementFinder();
   const subHierarchy = match.subHierarchy;
 
   if (criteria.title) {
-    const titleMatch = findElementMatch(elementUtils, subHierarchy, criteria.title);
+    const titleMatch = findElementMatch(finder, subHierarchy, criteria.title);
     if (titleMatch) {
       return titleMatch.element;
     }
   }
 
   if (criteria.body) {
-    const bodyMatch = findElementMatch(elementUtils, subHierarchy, criteria.body);
+    const bodyMatch = findElementMatch(finder, subHierarchy, criteria.body);
     if (bodyMatch) {
       return bodyMatch.element;
     }
   }
 
   if (criteria.appId) {
-    const appMatch = findFirstElementMatch(elementUtils, subHierarchy, appMatchTexts);
+    const appMatch = findFirstElementMatch(finder, subHierarchy, appMatchTexts);
     if (appMatch) {
       return appMatch.element;
     }
@@ -1038,16 +1041,16 @@ export const resolveNotificationSwipeElement = (
 };
 
 export const tapElementWithAdb = async (device: BootedDevice, element: Element): Promise<void> => {
-  const elementUtils = new ElementUtils();
-  const center = elementUtils.getElementCenter(element);
+  const geometry = new DefaultElementGeometry();
+  const center = geometry.getElementCenter(element);
   const { adbFactory } = getSystemTrayDependencies();
   const adb = adbFactory(device);
   await adb.executeCommand(`shell input tap ${center.x} ${center.y}`);
 };
 
 export const swipeElementWithAdb = async (device: BootedDevice, element: Element): Promise<void> => {
-  const elementUtils = new ElementUtils();
-  const { startX, startY, endX, endY } = elementUtils.getSwipeWithinBounds("left", element.bounds);
+  const geometry = new DefaultElementGeometry();
+  const { startX, startY, endX, endY } = geometry.getSwipeWithinBounds("left", element.bounds);
   const { adbFactory } = getSystemTrayDependencies();
   const adb = adbFactory(device);
   await adb.executeCommand(

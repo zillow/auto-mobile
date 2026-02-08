@@ -20,7 +20,8 @@ import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisualHighlight } from "./VisualHighlight";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
 
 const HIGHLIGHT_RENDER_DELAY_MS = 250;
 const HIGHLIGHT_NEARBY_ELEMENT_LIMIT = 5;
@@ -90,7 +91,7 @@ export class BugReport {
   private viewHierarchy: ViewHierarchy;
   private takeScreenshot: TakeScreenshot;
   private visualHighlight: VisualHighlight;
-  private elementUtils: ElementUtils;
+  private elementParser: ElementParser;
   private timer: Timer;
 
   constructor(
@@ -103,7 +104,7 @@ export class BugReport {
     this.viewHierarchy = new ViewHierarchy(device, adbFactory);
     this.takeScreenshot = new TakeScreenshot(device, adbFactory);
     this.visualHighlight = new VisualHighlight(device, adbFactory);
-    this.elementUtils = new ElementUtils();
+    this.elementParser = new DefaultElementParser();
     this.timer = timer;
   }
 
@@ -520,7 +521,7 @@ export class BugReport {
     screenSize?: { width: number; height: number }
   ): BugReportHighlightEntry[] {
     const flattenedElements = viewHierarchy
-      ? this.elementUtils.flattenViewHierarchy(viewHierarchy)
+      ? this.elementParser.flattenViewHierarchy(viewHierarchy)
       : [];
 
     return highlightEntries.map(entry => {

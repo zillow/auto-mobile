@@ -1,6 +1,7 @@
 import { expect, describe, test, beforeEach } from "bun:test";
 import { Element } from "../../../src/models";
-import { ElementParser } from "../../../src/features/utility/ElementParser";
+import { DefaultElementParser } from "../../../src/features/utility/ElementParser";
+import type { ElementParser } from "../../../src/utils/interfaces/ElementParser";
 import {
   extractNavigationElements,
   enrichElementWithChildProperties,
@@ -16,7 +17,7 @@ describe("ExploreElementExtraction", () => {
   let elementParser: ElementParser;
 
   beforeEach(() => {
-    elementParser = new ElementParser();
+    elementParser = new DefaultElementParser();
   });
 
   function createMockElement(overrides: Partial<Element> = {}): Element {

@@ -12,7 +12,11 @@ import {
   ViewHierarchyResult
 } from "../../../models";
 import { AdbClient } from "../../../utils/android-cmdline-tools/AdbClient";
-import { ElementUtils } from "../../utility/ElementUtils";
+import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
+import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
+import { DefaultElementFinder } from "../../utility/ElementFinder";
+import { DefaultElementGeometry } from "../../utility/ElementGeometry";
+import { DefaultElementParser } from "../../utility/ElementParser";
 import { ExecuteGesture } from "../ExecuteGesture";
 import { logger } from "../../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
@@ -33,10 +37,12 @@ import { OverlayDetector } from "./OverlayDetector";
 import { AutoTargetSelector } from "./AutoTargetSelector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
 import { ScrollUntilVisible } from "./ScrollUntilVisible";
+import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
 
 export class SwipeOn extends BaseVisualChange {
   private executeGesture: GestureExecutor;
-  private elementUtils: ElementUtils;
+  private finder: ElementFinder;
+  private geometry: ElementGeometry;
   private accessibilityService: AccessibilityServiceClient;
   private accessibilityDetector: AccessibilityDetector;
   private overlayDetector: OverlayDetector;
@@ -54,7 +60,9 @@ export class SwipeOn extends BaseVisualChange {
   ) {
     super(device, adb);
     this.executeGesture = dependencies.executeGesture ?? new ExecuteGesture(device, adb);
-    this.elementUtils = dependencies.elementUtils ?? new ElementUtils();
+    const parser = dependencies.parser ?? new DefaultElementParser();
+    this.finder = dependencies.finder ?? new DefaultElementFinder();
+    this.geometry = dependencies.geometry ?? new DefaultElementGeometry();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.accessibilityDetector = dependencies.accessibilityDetector || defaultAccessibilityDetector;
     if (dependencies.observeScreen) {
@@ -62,7 +70,7 @@ export class SwipeOn extends BaseVisualChange {
     }
 
     // Initialize extracted modules
-    this.overlayDetector = new OverlayDetector(this.elementUtils);
+    this.overlayDetector = new OverlayDetector(this.finder, this.geometry, parser);
     this.autoTargetSelector = new AutoTargetSelector();
     this.talkBackExecutor = new TalkBackSwipeExecutor(
       device,
@@ -73,7 +81,8 @@ export class SwipeOn extends BaseVisualChange {
     );
     this.scrollUntilVisible = new ScrollUntilVisible({
       device,
-      elementUtils: this.elementUtils,
+      finder: this.finder,
+      geometry: this.geometry,
       observeScreen: this.observeScreen,
       accessibilityService: this.accessibilityService,
       accessibilityDetector: this.accessibilityDetector,
@@ -119,7 +128,7 @@ export class SwipeOn extends BaseVisualChange {
       return { scrollables: [], candidates: [], observeResult };
     }
 
-    const scrollables = this.elementUtils.findScrollableElements(observeResult.viewHierarchy);
+    const scrollables = this.finder.findScrollableElements(observeResult.viewHierarchy);
     const candidates = this.buildScrollableCandidates(scrollables);
     return { scrollables, candidates, observeResult };
   }
@@ -347,7 +356,7 @@ export class SwipeOn extends BaseVisualChange {
             bottom: screenHeight - insets.bottom
           };
 
-        const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
+        const { startX, startY, endX, endY } = this.geometry.getSwipeWithinBounds(
           options.direction,
           bounds
         );
@@ -471,44 +480,10 @@ export class SwipeOn extends BaseVisualChange {
     containerElement: Element,
     observeResult: ObserveResult
   ): { startX: number; startY: number; endX: number; endY: number; warning?: string } {
-    // Apply system insets to container bounds when includeSystemInsets is false (default)
-    let effectiveBounds = containerElement.bounds;
-    if (options.includeSystemInsets !== true && observeResult.systemInsets) {
-      const insets = observeResult.systemInsets;
-      effectiveBounds = {
-        left: Math.max(containerElement.bounds.left, insets.left),
-        top: Math.max(containerElement.bounds.top, insets.top),
-        right: Math.min(containerElement.bounds.right, observeResult.screenSize?.width ?? containerElement.bounds.right) - insets.right,
-        bottom: Math.min(containerElement.bounds.bottom, observeResult.screenSize?.height ?? containerElement.bounds.bottom) - insets.bottom
-      };
-    }
-
-    const defaultSwipe = this.elementUtils.getSwipeWithinBounds(
-      options.direction,
-      effectiveBounds
+    return resolveContainerSwipeCoordinates(
+      this.geometry, this.overlayDetector,
+      options, viewHierarchy, containerElement, observeResult
     );
-
-    const overlayCandidates = this.overlayDetector.collectOverlayCandidates(viewHierarchy, options.container, containerElement);
-    if (overlayCandidates.length === 0) {
-      return defaultSwipe;
-    }
-
-    // Pass all overlay bounds to find the best safe swipe path avoiding all overlays
-    const allOverlayBounds = overlayCandidates.map(overlay => overlay.overlapBounds);
-    const safeSwipe = this.overlayDetector.computeSafeSwipeCoordinates(
-      options.direction,
-      effectiveBounds,
-      allOverlayBounds
-    );
-
-    if (!safeSwipe) {
-      return {
-        ...defaultSwipe,
-        warning: "No unobstructed swipe area found; using container bounds."
-      };
-    }
-
-    return safeSwipe;
   }
 
   private getDuration(options: SwipeOnResolvedOptions): number {
@@ -516,7 +491,7 @@ export class SwipeOn extends BaseVisualChange {
       return options.duration;
     }
 
-    return this.elementUtils.getSwipeDurationFromSpeed(options.speed);
+    return this.geometry.getSwipeDurationFromSpeed(options.speed);
   }
 
   private resolveBoomerangConfig(options: SwipeOnResolvedOptions): BoomerangConfig | undefined {

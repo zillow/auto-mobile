@@ -2,7 +2,10 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, RecentAppsResult, ViewHierarchyResult } from "../../models";
 import { PressButton } from "./PressButton";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementFinder } from "../utility/ElementFinder";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ObserveResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
@@ -12,16 +15,20 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
  */
 export class RecentApps extends BaseVisualChange {
   private pressButton: PressButton;
-  private elementUtils: ElementUtils;
+  private finder: ElementFinder;
+  private geometry: ElementGeometry;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    finder: ElementFinder = new DefaultElementFinder(),
+    geometry: ElementGeometry = new DefaultElementGeometry()
   ) {
     super(device, adb, timer);
     this.pressButton = new PressButton(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.finder = finder;
+    this.geometry = geometry;
   }
 
   /**
@@ -95,7 +102,7 @@ export class RecentApps extends BaseVisualChange {
 
     // Check for legacy navigation bar with recent apps button
     for (const buttonId of recentAppsButtonIds) {
-      const element = this.elementUtils.findElementByResourceId(
+      const element = this.finder.findElementByResourceId(
         viewHierarchy,
         buttonId,
         { elementId: "@android:id/content" },
@@ -108,7 +115,7 @@ export class RecentApps extends BaseVisualChange {
 
     // Check for navigation bar presence (indicates gesture navigation if no recent button found)
     for (const navId of navigationBarIds) {
-      const element = this.elementUtils.findElementByResourceId(
+      const element = this.finder.findElementByResourceId(
         viewHierarchy,
         navId,
         { elementId: "@android:id/content" },
@@ -128,7 +135,7 @@ export class RecentApps extends BaseVisualChange {
     ];
 
     for (const indicator of gestureIndicators) {
-      const element = this.elementUtils.findElementByResourceId(
+      const element = this.finder.findElementByResourceId(
         viewHierarchy,
         indicator,
         { elementId: "@android:id/content" },
@@ -201,7 +208,7 @@ export class RecentApps extends BaseVisualChange {
     // Find the recent apps button
     let recentButton = null;
     for (const buttonId of recentAppsButtonIds) {
-      const element = this.elementUtils.findElementByResourceId(
+      const element = this.finder.findElementByResourceId(
         viewHierarchy,
         buttonId,
         { elementId: "@android:id/content" },
@@ -218,7 +225,7 @@ export class RecentApps extends BaseVisualChange {
     }
 
     // Tap on the recent apps button
-    const center = this.elementUtils.getElementCenter(recentButton);
+    const center = this.geometry.getElementCenter(recentButton);
     await this.adb.executeCommand(`shell input tap ${center.x} ${center.y}`);
 
     return {

@@ -7,9 +7,12 @@ import {
   ObserveResult,
   ViewHierarchyResult
 } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementFinder } from "../utility/ElementFinder";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
@@ -17,7 +20,7 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
-import { logger } from "../../utils/logger";
+import { refreshAndroidViewHierarchy } from "./refreshAndroidViewHierarchy";
 
 const PRESS_DURATION_MIN_MS = 600;
 const PRESS_DURATION_MAX_MS = 3000;
@@ -30,7 +33,8 @@ const DRAG_TIMEOUT_BUFFER_MS = 500;
 const HIERARCHY_REFRESH_TIMEOUT_MS = 5000;
 
 export class DragAndDrop extends BaseVisualChange {
-  private elementUtils: ElementUtils;
+  private finder: ElementFinder;
+  private geometry: ElementGeometry;
   private accessibilityService: AccessibilityServiceClient;
   private viewHierarchy: ViewHierarchy;
 
@@ -40,7 +44,8 @@ export class DragAndDrop extends BaseVisualChange {
     timer: Timer = defaultTimer
   ) {
     super(device, adb, timer);
-    this.elementUtils = new ElementUtils();
+    this.finder = new DefaultElementFinder();
+    this.geometry = new DefaultElementGeometry();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
   }
@@ -100,8 +105,8 @@ export class DragAndDrop extends BaseVisualChange {
 
           const source = this.resolveTarget(viewHierarchy, options.source, "source");
           const target = this.resolveTarget(viewHierarchy, options.target, "target");
-          const sourcePoint = this.elementUtils.getElementCenter(source);
-          const targetPoint = this.elementUtils.getElementCenter(target);
+          const sourcePoint = this.geometry.getElementCenter(source);
+          const targetPoint = this.geometry.getElementCenter(target);
 
           const dragResult = await this.executeAndroidDrag(
             sourcePoint.x,
@@ -200,14 +205,14 @@ export class DragAndDrop extends BaseVisualChange {
       throw new ActionableError(`dragAndDrop ${label} must specify exactly one of text or elementId`);
     }
     if (target.elementId) {
-      const element = this.elementUtils.findElementByResourceId(viewHierarchy, target.elementId);
+      const element = this.finder.findElementByResourceId(viewHierarchy, target.elementId);
       if (!element) {
         throw new ActionableError(`dragAndDrop ${label} not found with elementId '${target.elementId}'`);
       }
       return element;
     }
     if (target.text) {
-      const element = this.elementUtils.findElementByText(viewHierarchy, target.text);
+      const element = this.finder.findElementByText(viewHierarchy, target.text);
       if (!element) {
         throw new ActionableError(`dragAndDrop ${label} not found with text '${target.text}'`);
       }
@@ -234,32 +239,15 @@ export class DragAndDrop extends BaseVisualChange {
   }
 
   private async refreshViewHierarchy(signal?: AbortSignal): Promise<ViewHierarchyResult | null> {
-    const syncResult = await this.accessibilityService.requestHierarchySync(
-      new NoOpPerformanceTracker(),
-      serverConfig.isRawElementSearchEnabled(),
-      signal,
-      HIERARCHY_REFRESH_TIMEOUT_MS
+    const rawHierarchy = await refreshAndroidViewHierarchy(
+      this.accessibilityService,
+      this.viewHierarchy,
+      HIERARCHY_REFRESH_TIMEOUT_MS,
+      signal
     );
 
-    let rawHierarchy = syncResult
-      ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
-      : null;
     if (!rawHierarchy) {
       return null;
-    }
-
-    // Check if accessibility service hierarchy is incomplete and merge with uiautomator
-    if (rawHierarchy.accessibilityServiceIncomplete) {
-      logger.debug("[DRAG_AND_DROP] Accessibility service returned incomplete hierarchy, fetching uiautomator fallback");
-      try {
-        const uiautomatorHierarchy = await this.viewHierarchy.getUiAutomatorHierarchy(
-          signal,
-          !serverConfig.isRawElementSearchEnabled()
-        );
-        rawHierarchy = this.viewHierarchy.mergeHierarchies(rawHierarchy, uiautomatorHierarchy);
-      } catch (fallbackErr) {
-        logger.warn(`[DRAG_AND_DROP] Failed to get uiautomator fallback: ${fallbackErr}`);
-      }
     }
 
     if (!serverConfig.isRawElementSearchEnabled()) {

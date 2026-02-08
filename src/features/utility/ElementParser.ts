@@ -1,13 +1,14 @@
 import { Element } from "../../models/Element";
 import { ElementBounds, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
 import { resolveViewHierarchyForSearch } from "../../utils/viewHierarchySearch";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
 
 type WindowSearchOrder = "topmost-first" | "bottommost-first";
 
 /**
  * Handles parsing of view hierarchy structures
  */
-export class ElementParser {
+export class DefaultElementParser implements ElementParser {
   /**
    * Extract node properties from the view hierarchy node
    * @param node - The node to extract properties from

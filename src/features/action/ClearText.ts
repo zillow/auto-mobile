@@ -1,7 +1,8 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ClearTextResult } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
 import { ObserveResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
@@ -9,11 +10,11 @@ import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { logger } from "../../utils/logger";
 
 export class ClearText extends BaseVisualChange {
-  private elementUtils: ElementUtils;
+  private parser: ElementParser;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, parser: ElementParser = new DefaultElementParser()) {
     super(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.parser = parser;
   }
 
   async execute(progress?: ProgressCallback): Promise<ClearTextResult> {
@@ -123,11 +124,11 @@ export class ClearText extends BaseVisualChange {
 
   private findFocusedElementTextLength(viewHierarchy: any): number {
     let textLength = 0;
-    const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
 
     for (const rootNode of rootNodes) {
-      this.elementUtils.traverseNode(rootNode, (node: any) => {
-        const nodeProperties = this.elementUtils.extractNodeProperties(node);
+      this.parser.traverseNode(rootNode, (node: any) => {
+        const nodeProperties = this.parser.extractNodeProperties(node);
         if ((nodeProperties.focused === "true" || nodeProperties.focused === true) &&
           nodeProperties.text && typeof nodeProperties.text === "string") {
           textLength = Math.max(textLength, nodeProperties.text.length);
@@ -140,7 +141,7 @@ export class ClearText extends BaseVisualChange {
 
   private findAnyTextInputLength(viewHierarchy: any): number {
     let textLength = 0;
-    const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
 
     // Common input field classes
     const inputClasses = [
@@ -151,8 +152,8 @@ export class ClearText extends BaseVisualChange {
     ];
 
     for (const rootNode of rootNodes) {
-      this.elementUtils.traverseNode(rootNode, (node: any) => {
-        const nodeProperties = this.elementUtils.extractNodeProperties(node);
+      this.parser.traverseNode(rootNode, (node: any) => {
+        const nodeProperties = this.parser.extractNodeProperties(node);
         if (nodeProperties.class &&
           inputClasses.some(cls => nodeProperties.class.includes(cls)) &&
           nodeProperties.text && typeof nodeProperties.text === "string") {

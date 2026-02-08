@@ -9,7 +9,10 @@ import {
   ViewHierarchyResult,
   BootedDevice
 } from "../models";
-import { ElementUtils } from "../features/utility/ElementUtils";
+import type { ElementParser } from "./interfaces/ElementParser";
+import type { ElementGeometry } from "./interfaces/ElementGeometry";
+import { DefaultElementParser } from "../features/utility/ElementParser";
+import { DefaultElementGeometry } from "../features/utility/ElementGeometry";
 
 /**
  * Interface for deep link management and intent chooser handling
@@ -53,7 +56,8 @@ export interface DeepLinkManager {
 export class DeepLinkManager implements DeepLinkManager {
   private adbUtils: AdbExecutor;
   private adbFactory: AdbClientFactory;
-  private elementUtils: ElementUtils;
+  private parser: ElementParser;
+  private geometry: ElementGeometry;
 
   constructor(device: BootedDevice | null = null, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory) {
     // Detect if the argument is a factory (has create method) or an executor
@@ -69,7 +73,8 @@ export class DeepLinkManager implements DeepLinkManager {
       this.adbFactory = defaultAdbClientFactory;
       this.adbUtils = this.adbFactory.create(device);
     }
-    this.elementUtils = new ElementUtils();
+    this.parser = new DefaultElementParser();
+    this.geometry = new DefaultElementGeometry();
   }
 
   /**
@@ -299,16 +304,16 @@ export class DeepLinkManager implements DeepLinkManager {
       ];
 
       // Get root nodes from the view hierarchy
-      const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
+      const rootNodes = this.parser.extractRootNodes(viewHierarchy);
 
       // Check all nodes in the hierarchy
       for (const rootNode of rootNodes) {
         let foundIndicator = false;
 
-        this.elementUtils.traverseNode(rootNode, (node: any) => {
+        this.parser.traverseNode(rootNode, (node: any) => {
           if (foundIndicator) {return;}
 
-          const nodeProperties = this.elementUtils.extractNodeProperties(node);
+          const nodeProperties = this.parser.extractNodeProperties(node);
           const nodeClass = nodeProperties.class || "";
           const nodeText = nodeProperties.text || nodeProperties["content-desc"] || "";
           const nodeResourceId = nodeProperties["resource-id"] || "";
@@ -376,7 +381,7 @@ export class DeepLinkManager implements DeepLinkManager {
       logger.info(`[DeepLinkManager] Intent chooser detected, preference: ${preference}`);
 
       // Parse the view hierarchy to find buttons
-      const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
+      const rootNodes = this.parser.extractRootNodes(viewHierarchy);
       let targetElement = null;
 
       if (preference === "always") {
@@ -401,7 +406,7 @@ export class DeepLinkManager implements DeepLinkManager {
 
       if (targetElement) {
         // Simulate tap on the target element
-        const center = this.elementUtils.getElementCenter(targetElement);
+        const center = this.geometry.getElementCenter(targetElement);
         const tapResult = await this.adbUtils.executeCommand(`shell input tap ${center.x} ${center.y}`);
 
         // Check if tap command failed
@@ -448,10 +453,10 @@ export class DeepLinkManager implements DeepLinkManager {
   private findButtonByText(node: any, textOptions: string[]): any {
     let foundElement: any = null;
 
-    this.elementUtils.traverseNode(node, (currentNode: any) => {
+    this.parser.traverseNode(node, (currentNode: any) => {
       if (foundElement) {return;} // Already found
 
-      const properties = this.elementUtils.extractNodeProperties(currentNode);
+      const properties = this.parser.extractNodeProperties(currentNode);
       const text = properties.text || properties["content-desc"] || "";
       const className = properties.class || "";
 
@@ -474,10 +479,10 @@ export class DeepLinkManager implements DeepLinkManager {
   private findAppInChooser(node: any, appPackage: string): any {
     let foundElement: any = null;
 
-    this.elementUtils.traverseNode(node, (currentNode: any) => {
+    this.parser.traverseNode(node, (currentNode: any) => {
       if (foundElement) {return;} // Already found
 
-      const properties = this.elementUtils.extractNodeProperties(currentNode);
+      const properties = this.parser.extractNodeProperties(currentNode);
       const resourceId = properties["resource-id"] || "";
       const text = properties.text || properties["content-desc"] || "";
 

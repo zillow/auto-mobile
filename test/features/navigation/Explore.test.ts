@@ -25,7 +25,8 @@ import {
   markEdgeTraversed,
   selectNextEdgeToTraverse
 } from "../../../src/features/navigation/ExploreValidateMode";
-import { ElementParser } from "../../../src/features/utility/ElementParser";
+import { DefaultElementParser } from "../../../src/features/utility/ElementParser";
+import type { ElementParser } from "../../../src/utils/interfaces/ElementParser";
 
 describe("Explore", () => {
   let explore: Explore;
@@ -40,7 +41,7 @@ describe("Explore", () => {
     fakeGraph = new FakeNavigationGraphManager();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    elementParser = new ElementParser();
+    elementParser = new DefaultElementParser();
 
     // Create fake device
     device = {

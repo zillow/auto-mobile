@@ -1,5 +1,5 @@
 import type { Element } from "../../models";
-import type { ElementParser } from "../utility/ElementParser";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import type { TrackedElement } from "./ExploreTypes";
 
 /**

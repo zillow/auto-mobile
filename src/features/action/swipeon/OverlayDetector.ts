@@ -5,15 +5,21 @@ import {
   ViewHierarchyNode,
   ViewHierarchyResult
 } from "../../../models";
-import { ElementUtils } from "../../utility/ElementUtils";
-import { ElementParser } from "../../utility/ElementParser";
+import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
+import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
+import type { ElementParser } from "../../../utils/interfaces/ElementParser";
+import { DefaultElementParser } from "../../utility/ElementParser";
 import { SwipeInterval, OverlayCandidate } from "./types";
 
 export class OverlayDetector {
   private static readonly OVERLAY_PADDING = 8;
   private static readonly CANDIDATE_FRACTIONS = [0.5, 0.25, 0.75, 0.15, 0.85];
 
-  constructor(private readonly elementUtils: ElementUtils) {}
+  constructor(
+    private readonly finder: ElementFinder,
+    private readonly geometry: ElementGeometry,
+    private readonly elementParser: ElementParser
+  ) {}
 
   collectOverlayCandidates(
     viewHierarchy: ViewHierarchyResult,
@@ -25,8 +31,8 @@ export class OverlayDetector {
       return [];
     }
 
-    const containerNode = this.elementUtils.findContainerNode(viewHierarchy, containerSelector);
-    const parser = new ElementParser();
+    const containerNode = this.finder.findContainerNode(viewHierarchy, containerSelector);
+    const parser = new DefaultElementParser();
 
     const windowRootGroups = parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
     const rootGroups = windowRootGroups.length > 0
@@ -150,7 +156,7 @@ export class OverlayDetector {
         bottom: bounds.bottom
       };
 
-    const swipe = this.elementUtils.getSwipeWithinBounds(direction, safeBounds);
+    const swipe = this.geometry.getSwipeWithinBounds(direction, safeBounds);
     let { startX, startY, endX, endY } = swipe;
 
     if (isVertical) {
@@ -354,7 +360,7 @@ export class OverlayDetector {
     }
 
     if (typeof bounds === "string") {
-      const parsed = this.elementUtils.parseBounds(bounds);
+      const parsed = this.elementParser.parseBounds(bounds);
       if (parsed) {
         return parsed;
       }

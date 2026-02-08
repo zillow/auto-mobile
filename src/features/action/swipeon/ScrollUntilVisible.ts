@@ -12,7 +12,8 @@ import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../../observe/XCTestServiceClient";
-import { ElementUtils } from "../../utility/ElementUtils";
+import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
+import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
 import { serverConfig } from "../../../utils/ServerConfig";
@@ -20,10 +21,12 @@ import { Timer } from "../../../utils/SystemTimer";
 import { SwipeOnResolvedOptions, BoomerangConfig } from "./types";
 import { OverlayDetector } from "./OverlayDetector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
+import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
 
 export interface ScrollUntilVisibleDependencies {
   device: BootedDevice;
-  elementUtils: ElementUtils;
+  finder: ElementFinder;
+  geometry: ElementGeometry;
   observeScreen: ObserveScreen;
   accessibilityService: AccessibilityServiceClient;
   accessibilityDetector: AccessibilityDetector;
@@ -304,7 +307,7 @@ export class ScrollUntilVisible {
     }
 
     if (options.container.text) {
-      element = this.deps.elementUtils.findElementByText(
+      element = this.deps.finder.findElementByText(
         viewHierarchy,
         options.container.text,
         undefined,
@@ -312,7 +315,7 @@ export class ScrollUntilVisible {
         false
       );
     } else if (options.container.elementId) {
-      element = this.deps.elementUtils.findElementByResourceId(
+      element = this.deps.finder.findElementByResourceId(
         viewHierarchy,
         options.container.elementId,
         undefined
@@ -375,12 +378,12 @@ export class ScrollUntilVisible {
 
     // Try to find container by elementId or text
     if (options.container?.elementId) {
-      element = this.deps.elementUtils.findElementByResourceId(
+      element = this.deps.finder.findElementByResourceId(
         viewHierarchy,
         options.container.elementId
       );
     } else if (options.container?.text) {
-      element = this.deps.elementUtils.findElementByText(
+      element = this.deps.finder.findElementByText(
         viewHierarchy,
         options.container.text,
         undefined,
@@ -391,7 +394,7 @@ export class ScrollUntilVisible {
 
     // If no container specified or found, try to find a scrollable element
     if (!element) {
-      const scrollableElement = this.deps.elementUtils.findScrollableContainer(viewHierarchy);
+      const scrollableElement = this.deps.finder.findScrollableContainer(viewHierarchy);
       if (scrollableElement) {
         element = scrollableElement;
         logger.info(`[SwipeOn] Found scrollable container automatically`);
@@ -424,7 +427,7 @@ export class ScrollUntilVisible {
     container?: { elementId?: string; text?: string }
   ): Promise<Element | null> {
     if (lookFor.text) {
-      return this.deps.elementUtils.findElementByText(
+      return this.deps.finder.findElementByText(
         viewHierarchy,
         lookFor.text,
         container,
@@ -432,7 +435,7 @@ export class ScrollUntilVisible {
         false
       );
     } else if (lookFor.elementId) {
-      return this.deps.elementUtils.findElementByResourceId(
+      return this.deps.finder.findElementByResourceId(
         viewHierarchy,
         lookFor.elementId,
         container,
@@ -476,42 +479,9 @@ export class ScrollUntilVisible {
     containerElement: Element,
     observeResult: ObserveResult
   ): { startX: number; startY: number; endX: number; endY: number; warning?: string } {
-    // Apply system insets to container bounds when includeSystemInsets is false (default)
-    let effectiveBounds = containerElement.bounds;
-    if (options.includeSystemInsets !== true && observeResult.systemInsets) {
-      const insets = observeResult.systemInsets;
-      effectiveBounds = {
-        left: Math.max(containerElement.bounds.left, insets.left),
-        top: Math.max(containerElement.bounds.top, insets.top),
-        right: Math.min(containerElement.bounds.right, observeResult.screenSize?.width ?? containerElement.bounds.right) - insets.right,
-        bottom: Math.min(containerElement.bounds.bottom, observeResult.screenSize?.height ?? containerElement.bounds.bottom) - insets.bottom
-      };
-    }
-
-    const defaultSwipe = this.deps.elementUtils.getSwipeWithinBounds(
-      options.direction,
-      effectiveBounds
+    return resolveContainerSwipeCoordinates(
+      this.deps.geometry, this.deps.overlayDetector,
+      options, viewHierarchy, containerElement, observeResult
     );
-
-    const overlayCandidates = this.deps.overlayDetector.collectOverlayCandidates(viewHierarchy, options.container, containerElement);
-    if (overlayCandidates.length === 0) {
-      return defaultSwipe;
-    }
-
-    const allOverlayBounds = overlayCandidates.map(overlay => overlay.overlapBounds);
-    const safeSwipe = this.deps.overlayDetector.computeSafeSwipeCoordinates(
-      options.direction,
-      effectiveBounds,
-      allOverlayBounds
-    );
-
-    if (!safeSwipe) {
-      return {
-        ...defaultSwipe,
-        warning: "No unobstructed swipe area found; using container bounds."
-      };
-    }
-
-    return safeSwipe;
   }
 }

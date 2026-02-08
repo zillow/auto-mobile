@@ -1,15 +1,17 @@
+import type { TextMatcher } from "../../utils/interfaces/TextMatcher";
+
 /**
  * Handles text matching algorithms for element search
  */
-export class TextMatcher {
+export class DefaultTextMatcher implements TextMatcher {
   /**
-   * Perform fuzzy text matching between two strings
+   * Perform partial text matching between two strings (substring containment)
    * @param text1 - First string to compare
    * @param text2 - Second string to compare
    * @param caseSensitive - Whether to use case-sensitive matching
-   * @returns True if the strings match according to fuzzy logic
+   * @returns True if either string contains the other
    */
-  fuzzyTextMatch(text1: string, text2: string, caseSensitive: boolean = false): boolean {
+  partialTextMatch(text1: string, text2: string, caseSensitive: boolean = false): boolean {
     if (!text1 || !text2) {
       return false;
     }
@@ -24,11 +26,11 @@ export class TextMatcher {
   /**
    * Create a text matching function based on options
    * @param text - Text to search for
-   * @param fuzzyMatch - Whether to use fuzzy matching
+   * @param partialMatch - Whether to use partial matching (substring containment)
    * @param caseSensitive - Whether to use case-sensitive matching
    * @returns A function that tests if an input string matches the search text
    */
-  createTextMatcher(text: string, fuzzyMatch: boolean = true, caseSensitive: boolean = false): (input?: string) => boolean {
+  createTextMatcher(text: string, partialMatch: boolean = true, caseSensitive: boolean = false): (input?: string) => boolean {
     if (!text) {return () => false;}
 
     const searchText = caseSensitive ? text : text.toLowerCase();
@@ -38,7 +40,7 @@ export class TextMatcher {
 
       const targetText = caseSensitive ? input : input.toLowerCase();
 
-      return fuzzyMatch
+      return partialMatch
         ? targetText.includes(searchText)
         : targetText === searchText;
     };

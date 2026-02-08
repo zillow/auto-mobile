@@ -3,7 +3,8 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, GestureOptions } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { SwipeResult } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ActionableError, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -14,12 +15,12 @@ import { XCTestServiceClient } from "../observe/XCTestServiceClient";
  */
 export class SwipeOnScreen extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
-  private elementUtils: ElementUtils;
+  private geometry: ElementGeometry;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, geometry: ElementGeometry = new DefaultElementGeometry()) {
     super(device, adb);
     this.executeGesture = new ExecuteGesture(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.geometry = geometry;
   }
 
   /**
@@ -69,7 +70,7 @@ export class SwipeOnScreen extends BaseVisualChange {
 
     logger.info(`[SwipeOnScreen] Calculated bounds: ${JSON.stringify(bounds)}`);
 
-    const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
+    const { startX, startY, endX, endY } = this.geometry.getSwipeWithinBounds(
       direction,
       bounds
     );
@@ -144,7 +145,7 @@ export class SwipeOnScreen extends BaseVisualChange {
 
     logger.info(`[SwipeOnScreen] Calculated bounds: ${JSON.stringify(bounds)}`);
 
-    const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
+    const { startX, startY, endX, endY } = this.geometry.getSwipeWithinBounds(
       direction,
       bounds
     );

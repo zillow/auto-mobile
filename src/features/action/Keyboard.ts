@@ -1,7 +1,12 @@
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { BootedDevice, Element, ElementBounds, KeyboardResult, ViewHierarchyResult } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import { DefaultElementParser } from "../utility/ElementParser";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
+import { DefaultElementFinder } from "../utility/ElementFinder";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
@@ -42,18 +47,25 @@ export class Keyboard {
   private device: BootedDevice;
   private adb: AdbExecutor;
   private hierarchyProvider: KeyboardHierarchyProvider;
-  private elementUtils: ElementUtils;
+  private parser: ElementParser;
+  private geometry: ElementGeometry;
+  private finder: ElementFinder;
   private timer: Timer;
 
   constructor(
     device: BootedDevice,
     adbFactory: AdbClientFactory = defaultAdbClientFactory,
     hierarchyProvider?: KeyboardHierarchyProvider,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    parser: ElementParser = new DefaultElementParser(),
+    geometry: ElementGeometry = new DefaultElementGeometry(),
+    finder: ElementFinder = new DefaultElementFinder()
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
-    this.elementUtils = new ElementUtils();
+    this.parser = parser;
+    this.geometry = geometry;
+    this.finder = finder;
     this.timer = timer;
 
     if (hierarchyProvider) {
@@ -249,15 +261,15 @@ export class Keyboard {
   }
 
   private detectKeyboardInHierarchy(viewHierarchy: ViewHierarchyResult): boolean {
-    const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
     const indicators = ["delete", "enter", "keyboard", "emoji", "shift"];
     for (const rootNode of rootNodes) {
       let found = false;
-      this.elementUtils.traverseNode(rootNode, (node: any) => {
+      this.parser.traverseNode(rootNode, (node: any) => {
         if (found) {
           return;
         }
-        const props = this.elementUtils.extractNodeProperties(node);
+        const props = this.parser.extractNodeProperties(node);
         const resourceId = this.getStringProp(props, "resource-id", "resourceId");
         const contentDesc = this.getStringProp(props, "content-desc", "contentDesc");
         const resourceValue = resourceId?.toLowerCase();
@@ -292,7 +304,7 @@ export class Keyboard {
   }
 
   private findFocusedTextInput(viewHierarchy: ViewHierarchyResult): Element | null {
-    const focusedElement = this.elementUtils.findFocusedTextInput(viewHierarchy);
+    const focusedElement = this.finder.findFocusedTextInput(viewHierarchy);
     if (!focusedElement || !focusedElement.bounds) {
       return null;
     }
@@ -300,7 +312,7 @@ export class Keyboard {
   }
 
   private async tapOnElement(element: Element, signal?: AbortSignal): Promise<void> {
-    const center = this.elementUtils.getElementCenter(element);
+    const center = this.geometry.getElementCenter(element);
     const x = Math.round(center.x);
     const y = Math.round(center.y);
     await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);

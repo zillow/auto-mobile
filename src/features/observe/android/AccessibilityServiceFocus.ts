@@ -11,7 +11,7 @@ import type { PerformanceTracker } from "../../../utils/PerformanceTracker";
 import { NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
 import type { CurrentFocusResult, TraversalOrderResult, Element } from "../../../models";
 import type { DelegateContext, AccessibilityNode } from "./types";
-import { ElementParser } from "../../utility/ElementParser";
+import { DefaultElementParser } from "../../utility/ElementParser";
 
 /**
  * Delegate class for handling TalkBack focus and traversal operations.
@@ -211,7 +211,7 @@ export class AccessibilityServiceFocus {
       const converted = this.convertAccessibilityNode(node);
 
       // Then parse to Element using ElementParser
-      const elementParser = new ElementParser();
+      const elementParser = new DefaultElementParser();
       return elementParser.parseNodeBounds(converted);
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to convert node to Element: ${error}`);

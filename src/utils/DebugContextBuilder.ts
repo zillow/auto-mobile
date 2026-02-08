@@ -79,7 +79,7 @@ export async function buildElementSearchDebugContext(
       container: searchCriteria.container,
       includeNearMisses: true,
       maxNearMisses: 10,
-      fuzzyMatch: true,
+      partialMatch: true,
       caseSensitive: false
     });
 

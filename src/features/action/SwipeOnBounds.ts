@@ -2,7 +2,8 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { GestureOptions } from "../../models/GestureOptions";
 import { ExecuteGesture } from "./ExecuteGesture";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { SwipeResult } from "../../models/SwipeResult";
 import { BootedDevice } from "../../models";
 
@@ -11,12 +12,12 @@ import { BootedDevice } from "../../models";
  */
 export class SwipeOnBounds extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
-  private elementUtils: ElementUtils;
+  private geometry: ElementGeometry;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, geometry: ElementGeometry = new DefaultElementGeometry()) {
     super(device, adb);
     this.executeGesture = new ExecuteGesture(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.geometry = geometry;
   }
 
   /**

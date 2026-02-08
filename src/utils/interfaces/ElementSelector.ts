@@ -8,7 +8,7 @@ export interface ElementSelector {
     text: string,
     options?: {
       container?: { elementId?: string; text?: string } | null;
-      fuzzyMatch?: boolean;
+      partialMatch?: boolean;
       caseSensitive?: boolean;
       strategy?: ElementSelectionStrategy;
     }

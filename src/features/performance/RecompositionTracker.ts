@@ -13,7 +13,7 @@ import {
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { serverConfig } from "../../utils/ServerConfig";
-import { ElementParser } from "../utility/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
 
 const MAX_RECOMPOSITION_RECORDS = 10000;
 
@@ -46,7 +46,7 @@ export class RecompositionTracker {
   private latestTotals = new Map<string, number>();
   private lastObservationAt: number | null = null;
   private lastInteractionAt: number | null = null;
-  private readonly parser = new ElementParser();
+  private readonly parser = new DefaultElementParser();
   private timer: Timer;
 
   constructor(timer: Timer = defaultTimer) {

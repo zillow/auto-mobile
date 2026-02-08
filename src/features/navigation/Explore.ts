@@ -7,7 +7,8 @@ import { defaultNavigationGraphManager, type NavigationEdge, type NavigationGrap
 import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
 import { SwipeOnElement } from "../action/SwipeOnElement";
-import { ElementParser } from "../utility/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
@@ -106,7 +107,7 @@ export class Explore extends BaseVisualChange {
     super(device, adb, timer);
     this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
     this.exploredElements = new Map();
-    this.elementParser = new ElementParser();
+    this.elementParser = new DefaultElementParser();
   }
 
   /**

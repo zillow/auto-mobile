@@ -1,16 +1,17 @@
-import { TextMatcher } from "../utility/TextMatcher";
+import type { TextMatcher } from "../../utils/interfaces/TextMatcher";
+import { DefaultTextMatcher } from "../utility/TextMatcher";
 import type { Element } from "../../models/Element";
 import type { ElementSelector as FocusElementSelector } from "../../utils/AccessibilityFocusTracker";
 
 interface TextMatchOptions {
-  fuzzyMatch?: boolean;
+  partialMatch?: boolean;
   caseSensitive?: boolean;
 }
 
 export class FocusElementMatcher {
   private textMatcher: TextMatcher;
 
-  constructor(textMatcher: TextMatcher = new TextMatcher()) {
+  constructor(textMatcher: TextMatcher = new DefaultTextMatcher()) {
     this.textMatcher = textMatcher;
   }
 
@@ -121,9 +122,9 @@ export class FocusElementMatcher {
   }
 
   private createTextMatcher(text: string, options: TextMatchOptions): (input?: string) => boolean {
-    const fuzzyMatch = options.fuzzyMatch ?? true;
+    const partialMatch = options.partialMatch ?? true;
     const caseSensitive = options.caseSensitive ?? false;
-    return this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
+    return this.textMatcher.createTextMatcher(text, partialMatch, caseSensitive);
   }
 
   private findIndexByValue(

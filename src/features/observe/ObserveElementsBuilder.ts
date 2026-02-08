@@ -1,26 +1,26 @@
-import { Element, ObserveResult, ViewHierarchyResult } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
-
-export interface ElementUtilsLike {
-  findClickableElements(viewHierarchy: ViewHierarchyResult): Element[];
-  findScrollableElements(viewHierarchy: ViewHierarchyResult): Element[];
-  flattenViewHierarchy(
-    viewHierarchy: ViewHierarchyResult
-  ): Array<{ element: Element; text?: string }>;
-}
+import { ObserveResult, ViewHierarchyResult } from "../../models";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import { DefaultElementFinder } from "../utility/ElementFinder";
+import { DefaultElementParser } from "../utility/ElementParser";
 
 export class ObserveElementsBuilder {
-  private elementUtils: ElementUtilsLike;
+  private finder: ElementFinder;
+  private parser: ElementParser;
 
-  constructor(elementUtils: ElementUtilsLike = new ElementUtils()) {
-    this.elementUtils = elementUtils;
+  constructor(
+    finder: ElementFinder = new DefaultElementFinder(),
+    parser: ElementParser = new DefaultElementParser()
+  ) {
+    this.finder = finder;
+    this.parser = parser;
   }
 
   build(viewHierarchy: ViewHierarchyResult): ObserveResult["elements"] {
-    const clickable = this.elementUtils.findClickableElements(viewHierarchy);
-    const scrollable = this.elementUtils.findScrollableElements(viewHierarchy);
-    const text = this.elementUtils
-      .flattenViewHierarchy(viewHierarchy)
+    const clickable = this.finder.findClickableElements(viewHierarchy);
+    const scrollable = this.finder.findScrollableElements(viewHierarchy);
+    const text = this.parser
+      .flattenViewHierarchy(viewHierarchy, { includeWindows: true, windowOrder: "topmost-first" })
       .filter(entry => typeof entry.text === "string" && entry.text.trim().length > 0)
       .map(entry => entry.element);
 

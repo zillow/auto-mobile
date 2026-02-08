@@ -31,7 +31,7 @@ import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
-import { ElementUtils } from "../utility/ElementUtils";
+import { DefaultElementParser } from "../utility/ElementParser";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ObserveScreen } from "./interfaces/ObserveScreen";
 import type { ObserveScreenDependencies } from "./ObserveScreenDependencies";
@@ -1020,8 +1020,8 @@ export class RealObserveScreen implements ObserveScreen {
         const wcagAudit = new WcagAudit();
 
         // Extract elements directly from view hierarchy for audit
-        const elementUtils = new ElementUtils();
-        const allElements: Element[] = elementUtils.flattenViewHierarchy(result.viewHierarchy!)
+        const elementParser = new DefaultElementParser();
+        const allElements: Element[] = elementParser.flattenViewHierarchy(result.viewHierarchy!)
           .map(entry => entry.element);
 
         // Get screenshot path if available (from TakeScreenshot cache)

@@ -9,7 +9,10 @@ import {
   ViewHierarchyResult
 } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import { DefaultElementFinder } from "../utility/ElementFinder";
+import { DefaultElementParser } from "../utility/ElementParser";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -22,11 +25,18 @@ type PinchTarget = {
 };
 
 export class PinchOn extends BaseVisualChange {
-  private elementUtils: ElementUtils;
+  private finder: ElementFinder;
+  private parser: ElementParser;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    finder: ElementFinder = new DefaultElementFinder(),
+    parser: ElementParser = new DefaultElementParser()
+  ) {
     super(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.finder = finder;
+    this.parser = parser;
   }
 
   private createErrorResult(error: string, options: Partial<PinchOnOptions>): PinchOnResult {
@@ -241,14 +251,14 @@ export class PinchOn extends BaseVisualChange {
     }
 
     if (container.elementId) {
-      const element = this.elementUtils.findElementByResourceId(viewHierarchy, container.elementId, undefined, true);
+      const element = this.finder.findElementByResourceId(viewHierarchy, container.elementId, undefined, true);
       if (element) {
         return element;
       }
     }
 
     if (container.text) {
-      return this.elementUtils.findElementByText(viewHierarchy, container.text, undefined, true, false);
+      return this.finder.findElementByText(viewHierarchy, container.text, undefined, true, false);
     }
 
     return null;
@@ -277,9 +287,9 @@ export class PinchOn extends BaseVisualChange {
       }
     };
 
-    const scrollables = this.elementUtils.findScrollableElements(viewHierarchy);
-    const clickables = this.elementUtils.findClickableElements(viewHierarchy);
-    const flattened = this.elementUtils.flattenViewHierarchy(viewHierarchy).map(entry => entry.element);
+    const scrollables = this.finder.findScrollableElements(viewHierarchy);
+    const clickables = this.finder.findClickableElements(viewHierarchy);
+    const flattened = this.parser.flattenViewHierarchy(viewHierarchy).map(entry => entry.element);
 
     for (const element of scrollables) {
       addCandidate(element);

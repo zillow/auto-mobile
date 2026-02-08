@@ -11,13 +11,17 @@ import {
 } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
-import { ElementUtils } from "../utility/ElementUtils";
-import { ElementParser } from "../utility/ElementParser";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementParser } from "../utility/ElementParser";
+import { DefaultElementFinder } from "../utility/ElementFinder";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { DefaultElementSelector } from "../utility/DefaultElementSelector";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
-import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
@@ -31,6 +35,7 @@ import { NodeCryptoService } from "../../utils/crypto";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
+import { refreshAndroidViewHierarchy } from "./refreshAndroidViewHierarchy";
 import { TalkBackTapStrategy } from "../talkback/TalkBackTapStrategy";
 import {
   DefaultTalkBackNavigationDriverFactory,
@@ -56,7 +61,8 @@ export interface TapOnElementDependencies {
  * Command to tap on UI element containing specified text
  */
 export class TapOnElement extends BaseVisualChange {
-  private elementUtils: ElementUtils;
+  private finder: ElementFinder;
+  private geometry: ElementGeometry;
   private elementParser: ElementParser;
   private accessibilityService: AccessibilityServiceClient;
   private visionConfig: VisionFallbackConfig;
@@ -76,8 +82,9 @@ export class TapOnElement extends BaseVisualChange {
     options: TapOnElementDependencies = {}
   ) {
     super(device, adb, options.timer);
-    this.elementUtils = new ElementUtils();
-    this.elementParser = new ElementParser();
+    this.finder = new DefaultElementFinder();
+    this.geometry = new DefaultElementGeometry();
+    this.elementParser = new DefaultElementParser();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.visionConfig = options.visionConfig || DEFAULT_VISION_CONFIG;
     this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
@@ -166,7 +173,7 @@ export class TapOnElement extends BaseVisualChange {
       return {
         selection: this.elementSelector.selectByText(viewHierarchy, options.text, {
           container: options.container,
-          fuzzyMatch: true,
+          partialMatch: true,
           caseSensitive: false,
           strategy: options.selectionStrategy
         }),
@@ -230,29 +237,12 @@ export class TapOnElement extends BaseVisualChange {
     const effectiveTimeoutMs = Math.max(0, timeoutMs);
     switch (this.device.platform) {
       case "android": {
-        const syncResult = await this.accessibilityService.requestHierarchySync(
-          new NoOpPerformanceTracker(),
-          serverConfig.isRawElementSearchEnabled(),
-          signal,
-          effectiveTimeoutMs
+        const rawHierarchy = await refreshAndroidViewHierarchy(
+          this.accessibilityService,
+          this.viewHierarchy,
+          effectiveTimeoutMs,
+          signal
         );
-        let rawHierarchy = syncResult
-          ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
-          : null;
-
-        // Check if accessibility service hierarchy is incomplete and merge with uiautomator
-        if (rawHierarchy?.accessibilityServiceIncomplete) {
-          logger.debug("[TAP_ON_ELEMENT] Accessibility service returned incomplete hierarchy, fetching uiautomator fallback");
-          try {
-            const uiautomatorHierarchy = await this.viewHierarchy.getUiAutomatorHierarchy(
-              signal,
-              !serverConfig.isRawElementSearchEnabled()
-            );
-            rawHierarchy = this.viewHierarchy.mergeHierarchies(rawHierarchy, uiautomatorHierarchy);
-          } catch (fallbackErr) {
-            logger.warn(`[TAP_ON_ELEMENT] Failed to get uiautomator fallback: ${fallbackErr}`);
-          }
-        }
 
         return rawHierarchy
           ? this.prepareViewHierarchyForResponse(rawHierarchy, screenSize)
@@ -354,7 +344,7 @@ export class TapOnElement extends BaseVisualChange {
     }
 
     const bounds = selection.element.bounds;
-    const center = this.elementUtils.getElementCenter(selection.element);
+    const center = this.geometry.getElementCenter(selection.element);
     const text = typeof selection.element.text === "string" && selection.element.text.length > 0
       ? selection.element.text
       : (typeof selection.element["content-desc"] === "string"
@@ -477,7 +467,7 @@ export class TapOnElement extends BaseVisualChange {
       return true;
     }
 
-    return this.elementUtils.hasContainerElement(viewHierarchy, container);
+    return this.finder.hasContainerElement(viewHierarchy, container);
   }
 
   private isTruthyFlag(value: unknown): boolean {
@@ -713,13 +703,13 @@ export class TapOnElement extends BaseVisualChange {
           const selection = searchOutcome.selection;
           const element = selection.element as Element;
           const selectedElementMetadata = this.buildSelectedElementMetadata(selection);
-          const initialTapPoint = this.elementUtils.getElementCenter(element);
+          const initialTapPoint = this.geometry.getElementCenter(element);
           let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
 
           if (action === "focus") {
             // Check if element is already focused
-            const isFocused = this.elementUtils.isElementFocused(element);
+            const isFocused = this.finder.isElementFocused(element);
 
             if (isFocused) {
               logger.info(`Element is already focused, no action needed`);
@@ -754,7 +744,7 @@ export class TapOnElement extends BaseVisualChange {
           if (usedParent) {
             logger.info("[TapOnElement] Using clickable parent for non-clickable element");
           }
-          const tapPoint = this.elementUtils.getElementCenter(tapElement);
+          const tapPoint = this.geometry.getElementCenter(tapElement);
 
           selectionCapture = await this.selectionStateTracker.prepare({
             action,
@@ -1099,7 +1089,7 @@ export class TapOnElement extends BaseVisualChange {
       return false;
     }
     const previousRoots = this.getRootSignatures(previousHierarchy);
-    const currentRoots = this.elementUtils.extractRootNodes(currentHierarchy);
+    const currentRoots = this.elementParser.extractRootNodes(currentHierarchy);
 
     for (const root of currentRoots) {
       const signature = this.getRootSignature(root);
@@ -1122,7 +1112,7 @@ export class TapOnElement extends BaseVisualChange {
       return false;
     }
     const previousRoots = this.getRootSignatures(previousHierarchy);
-    const currentRoots = this.elementUtils.extractRootNodes(currentHierarchy);
+    const currentRoots = this.elementParser.extractRootNodes(currentHierarchy);
     if (currentRoots.length === 0) {
       return false;
     }
@@ -1135,7 +1125,7 @@ export class TapOnElement extends BaseVisualChange {
       return false;
     }
 
-    const roots = this.elementUtils.extractRootNodes(currentHierarchy);
+    const roots = this.elementParser.extractRootNodes(currentHierarchy);
     let selectionFound = false;
     const selectionKeyPairs: Array<[string, string]> = [
       ["textSelectionStart", "textSelectionEnd"],
@@ -1143,11 +1133,11 @@ export class TapOnElement extends BaseVisualChange {
     ];
 
     for (const root of roots) {
-      this.elementUtils.traverseNode(root, (node: any) => {
+      this.elementParser.traverseNode(root, (node: any) => {
         if (selectionFound) {
           return;
         }
-        const props = this.elementUtils.extractNodeProperties(node);
+        const props = this.elementParser.extractNodeProperties(node);
         for (const [startKey, endKey] of selectionKeyPairs) {
           const startValue = props?.[startKey] ?? props?.[startKey.toLowerCase()];
           const endValue = props?.[endKey] ?? props?.[endKey.toLowerCase()];
@@ -1174,12 +1164,12 @@ export class TapOnElement extends BaseVisualChange {
     if (!viewHierarchy) {
       return new Set();
     }
-    const roots = this.elementUtils.extractRootNodes(viewHierarchy);
+    const roots = this.elementParser.extractRootNodes(viewHierarchy);
     return new Set(roots.map(root => this.getRootSignature(root)));
   }
 
   private getRootSignature(root: any): string {
-    const props = this.elementUtils.extractNodeProperties(root);
+    const props = this.elementParser.extractNodeProperties(root);
     const resourceId = props["resource-id"] ?? props.resourceId ?? "";
     const className = props.class ?? props.className ?? "";
     const bounds = props.bounds ?? "";
@@ -1189,11 +1179,11 @@ export class TapOnElement extends BaseVisualChange {
 
   private containsMenuIndicators(root: any): boolean {
     let found = false;
-    this.elementUtils.traverseNode(root, (node: any) => {
+    this.elementParser.traverseNode(root, (node: any) => {
       if (found) {
         return;
       }
-      const props = this.elementUtils.extractNodeProperties(node);
+      const props = this.elementParser.extractNodeProperties(node);
       const resourceId = (props["resource-id"] ?? props.resourceId ?? "").toLowerCase();
       const className = (props.class ?? props.className ?? "").toLowerCase();
       const text = (props.text ?? props["content-desc"] ?? "").toLowerCase();

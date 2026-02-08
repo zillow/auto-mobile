@@ -36,6 +36,8 @@ export interface GestureExecutor {
 export interface SwipeOnDependencies {
   executeGesture?: GestureExecutor;
   observeScreen?: ObserveScreen;
-  elementUtils?: import("../../utility/ElementUtils").ElementUtils;
+  finder?: import("../../../utils/interfaces/ElementFinder").ElementFinder;
+  geometry?: import("../../../utils/interfaces/ElementGeometry").ElementGeometry;
+  parser?: import("../../../utils/interfaces/ElementParser").ElementParser;
   accessibilityDetector?: AccessibilityDetector;
 }

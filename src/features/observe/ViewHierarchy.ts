@@ -4,7 +4,10 @@ import { logger } from "../../utils/logger";
 import { BootedDevice } from "../../models";
 import { Element } from "../../models";
 import { ViewHierarchyResult } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementParser } from "../utility/ElementParser";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { XCTestServiceClient } from "./XCTestServiceClient";
@@ -26,7 +29,8 @@ interface ElementBounds {
 
 export class ViewHierarchy implements ViewHierarchyInterface {
   private device: BootedDevice;
-  private elementUtils: ElementUtils;
+  private parser: ElementParser;
+  private geometry: ElementGeometry;
   private accessibilityServiceClient: AccessibilityServiceClient;
   private timer: Timer;
 
@@ -43,7 +47,8 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     timer: Timer = defaultTimer,
   ) {
     this.device = device;
-    this.elementUtils = new ElementUtils();
+    this.parser = new DefaultElementParser();
+    this.geometry = new DefaultElementGeometry();
 
     // Detect if the argument is a factory (has create method) or an executor
     let adbFactory: AdbClientFactory;
@@ -642,7 +647,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
    * @returns The center coordinates
    */
   getElementCenter(element: Element): { x: number, y: number } {
-    return this.elementUtils.getElementCenter(element);
+    return this.geometry.getElementCenter(element);
   }
 
   /**
@@ -651,7 +656,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
    * @returns The node with parsed bounds or null
    */
   parseNodeBounds(node: any): Element | null {
-    return this.elementUtils.parseNodeBounds(node);
+    return this.parser.parseNodeBounds(node);
   }
 
   /**
@@ -660,7 +665,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
    * @param processNode - Function to process each node
    */
   traverseViewHierarchy(node: any, processNode: (node: any) => void): void {
-    this.elementUtils.traverseNode(node, processNode);
+    this.parser.traverseNode(node, processNode);
   }
 
   cleanNodeProperties(node: any): any {

@@ -35,7 +35,7 @@ export interface DebugSearchArgs {
     elementId?: string;
     text?: string;
   };
-  fuzzyMatch?: boolean;
+  partialMatch?: boolean;
   caseSensitive?: boolean;
   includeNearMisses?: boolean;
   maxNearMisses?: number;
@@ -74,7 +74,7 @@ const debugSearchBaseSchema = z.object({
   container: elementContainerSchema.optional().describe(
     "Container element to scope the search - specify elementId or text to locate it"
   ),
-  fuzzyMatch: z.boolean().optional().describe("Whether to use fuzzy matching (default: true)"),
+  partialMatch: z.boolean().optional().describe("Whether to use partial matching (substring containment, default: true)"),
   caseSensitive: z.boolean().optional().describe("Whether to use case-sensitive matching (default: false)"),
   includeNearMisses: z.boolean().optional().describe("Include elements that almost matched (default: true)"),
   maxNearMisses: z.number().optional().describe("Maximum number of near-misses to include (default: 10)")
@@ -129,7 +129,7 @@ export function registerDebugTools() {
         text: args.text,
         resourceId: args.elementId,
         container: args.container,
-        fuzzyMatch: args.fuzzyMatch,
+        partialMatch: args.partialMatch,
         caseSensitive: args.caseSensitive,
         includeNearMisses: args.includeNearMisses,
         maxNearMisses: args.maxNearMisses

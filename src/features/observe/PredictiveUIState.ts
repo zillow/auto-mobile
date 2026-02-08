@@ -1,4 +1,4 @@
-import { ElementParser } from "../utility/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
 import {
   Element,
   InteractablePrediction,
@@ -22,7 +22,7 @@ interface InteractableElement {
 }
 
 export class PredictiveUIState implements PredictiveUIStateInterface {
-  private elementParser = new ElementParser();
+  private elementParser = new DefaultElementParser();
   private historyRepository = new PredictionHistoryRepository();
   private readonly DEFAULT_CONFIDENCE = 0.5;
 

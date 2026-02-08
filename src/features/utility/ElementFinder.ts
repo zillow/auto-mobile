@@ -1,19 +1,25 @@
 import { Element } from "../../models/Element";
 import { ViewHierarchyNode, ViewHierarchyResult } from "../../models";
 import { logger } from "../../utils/logger";
-import { ElementParser } from "./ElementParser";
-import { TextMatcher } from "./TextMatcher";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import type { TextMatcher } from "../../utils/interfaces/TextMatcher";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import { DefaultElementParser } from "./ElementParser";
+import { DefaultTextMatcher } from "./TextMatcher";
 
 /**
  * Handles searching and selection of elements in view hierarchy
  */
-export class ElementFinder {
+export class DefaultElementFinder implements ElementFinder {
   private parser: ElementParser;
   private textMatcher: TextMatcher;
 
-  constructor() {
-    this.parser = new ElementParser();
-    this.textMatcher = new TextMatcher();
+  constructor(
+    parser: ElementParser = new DefaultElementParser(),
+    textMatcher: TextMatcher = new DefaultTextMatcher()
+  ) {
+    this.parser = parser;
+    this.textMatcher = textMatcher;
   }
 
   hasContainerElement(
@@ -118,8 +124,8 @@ export class ElementFinder {
     rootNodes: ViewHierarchyNode[],
     text: string,
     matchesText: (input?: string) => boolean
-  ): { exactMatches: Element[]; fuzzyMatches: Element[] } {
-    const fuzzyMatches: Element[] = [];
+  ): { exactMatches: Element[]; partialMatches: Element[] } {
+    const partialMatches: Element[] = [];
     const exactMatches: Element[] = [];
 
     for (const searchNode of rootNodes) {
@@ -139,7 +145,7 @@ export class ElementFinder {
             if (nodeProperties.text === text) {
               exactMatches.push(parsedNode);
             } else {
-              fuzzyMatches.push(parsedNode);
+              partialMatches.push(parsedNode);
             }
           }
         } else if (
@@ -153,7 +159,7 @@ export class ElementFinder {
             if (nodeProperties["content-desc"] === text) {
               exactMatches.push(parsedNode);
             } else {
-              fuzzyMatches.push(parsedNode);
+              partialMatches.push(parsedNode);
             }
           }
         } else if (
@@ -167,7 +173,7 @@ export class ElementFinder {
             if (nodeProperties["ios-accessibility-label"] === text) {
               exactMatches.push(parsedNode);
             } else {
-              fuzzyMatches.push(parsedNode);
+              partialMatches.push(parsedNode);
             }
           }
         } else if (
@@ -183,7 +189,7 @@ export class ElementFinder {
           logger.info("[Element] Matches clickable element with text");
           const parsedNode = this.parser.parseNodeBounds(node);
           if (parsedNode) {
-            fuzzyMatches.push(parsedNode);
+            partialMatches.push(parsedNode);
           }
         } else {
           logger.debug(`[Element] No match found in properties`);
@@ -194,11 +200,11 @@ export class ElementFinder {
     if (exactMatches.length > 0) {
       this.sortElementsByArea(exactMatches);
     }
-    if (fuzzyMatches.length > 0) {
-      this.sortElementsByArea(fuzzyMatches);
+    if (partialMatches.length > 0) {
+      this.sortElementsByArea(partialMatches);
     }
 
-    return { exactMatches, fuzzyMatches };
+    return { exactMatches, partialMatches };
   }
 
   private collectResourceIdMatchesInRoots(
@@ -284,7 +290,7 @@ export class ElementFinder {
    * @param viewHierarchy - The view hierarchy to search
    * @param text - The text to search for
    * @param container - Container element selector to restrict the search within its child nodes
-   * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
+   * @param partialMatch - Whether to use partial matching (substring containment)
    * @param caseSensitive - Whether to use case-sensitive matching
    * @returns Array of matching elements
    */
@@ -292,14 +298,14 @@ export class ElementFinder {
     viewHierarchy: ViewHierarchyResult,
     text: string,
     container: { elementId?: string; text?: string } | null = null,
-    fuzzyMatch: boolean = true,
+    partialMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element[] {
     if (!viewHierarchy || !text) {
       return [];
     }
 
-    const matchesText = this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
+    const matchesText = this.textMatcher.createTextMatcher(text, partialMatch, caseSensitive);
     const containerNode = container
       ? this.findContainerNodeInternal(viewHierarchy, container)
       : null;
@@ -308,8 +314,8 @@ export class ElementFinder {
       return [];
     }
 
-    const selectMatches = (matches: { exactMatches: Element[]; fuzzyMatches: Element[] }): Element[] => {
-      return matches.exactMatches.length > 0 ? matches.exactMatches : matches.fuzzyMatches;
+    const selectMatches = (matches: { exactMatches: Element[]; partialMatches: Element[] }): Element[] => {
+      return matches.exactMatches.length > 0 ? matches.exactMatches : matches.partialMatches;
     };
 
     if (containerNode) {
@@ -338,7 +344,7 @@ export class ElementFinder {
    * @param viewHierarchy - The view hierarchy to search
    * @param text - The text to search for
    * @param container - Container element selector to restrict the search within its child nodes
-   * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
+   * @param partialMatch - Whether to use partial matching (substring containment)
    * @param caseSensitive - Whether to use case-sensitive matching
    * @returns The found element or null
    */
@@ -346,10 +352,10 @@ export class ElementFinder {
     viewHierarchy: ViewHierarchyResult,
     text: string,
     container: { elementId?: string; text?: string } | null = null,
-    fuzzyMatch: boolean = true,
+    partialMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
-    const matches = this.findElementsByText(viewHierarchy, text, container, fuzzyMatch, caseSensitive);
+    const matches = this.findElementsByText(viewHierarchy, text, container, partialMatch, caseSensitive);
     return matches[0] ?? null;
   }
 
@@ -732,7 +738,7 @@ export class ElementFinder {
       return false; // Expected text but element has no text
     }
 
-    // Use fuzzy matching for text validation
-    return this.textMatcher.fuzzyTextMatch(foundElement.text, expectedText, false);
+    // Use partial matching for text validation
+    return this.textMatcher.partialTextMatch(foundElement.text, expectedText, false);
   }
 }

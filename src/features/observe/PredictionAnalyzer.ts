@@ -1,4 +1,4 @@
-import { ElementParser } from "../utility/ElementParser";
+import { DefaultElementParser } from "../utility/ElementParser";
 import { ObserveResult, PredictedAction } from "../../models";
 import { PredictionHistoryRepository, PredictionErrorType } from "../../db/predictionHistoryRepository";
 import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
@@ -23,7 +23,7 @@ export interface NavigationGraphLike {
 }
 
 export class PredictionAnalyzer {
-  private elementParser = new ElementParser();
+  private elementParser = new DefaultElementParser();
   private historyRepository: PredictionHistoryStore;
   private navigationGraph: NavigationGraphLike;
   private timer: Timer;

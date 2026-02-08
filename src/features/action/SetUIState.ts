@@ -9,7 +9,8 @@ import {
 import { SetUIStateOptions, FieldSpec, ElementSelector } from "../../models/SetUIStateOptions";
 import { SetUIStateResult, FieldResult, FieldType } from "../../models/SetUIStateResult";
 import { FieldTypeDetector } from "./FieldTypeDetector";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import { DefaultElementFinder } from "../utility/ElementFinder";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import type { ObserveScreen } from "../observe/interfaces/ObserveScreen";
@@ -76,17 +77,18 @@ const DEFAULT_SCROLL_DIRECTION = "down";
  */
 export class SetUIState extends BaseVisualChange {
   private fieldTypeDetector: FieldTypeDetector;
-  private elementUtils: ElementUtils;
+  private finder: ElementFinder;
   private dependencies: SetUIStateDependencies;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    dependencies: SetUIStateDependencies = {}
+    dependencies: SetUIStateDependencies = {},
+    finder: ElementFinder = new DefaultElementFinder()
   ) {
     super(device, adb, dependencies.timer ?? defaultTimer);
     this.fieldTypeDetector = dependencies.fieldTypeDetector ?? new FieldTypeDetector();
-    this.elementUtils = new ElementUtils();
+    this.finder = finder;
     this.dependencies = dependencies;
   }
 
@@ -302,11 +304,11 @@ export class SetUIState extends BaseVisualChange {
     }
 
     if (selector.text) {
-      return this.elementUtils.findElementByText(viewHierarchy, selector.text, undefined, true, false);
+      return this.finder.findElementByText(viewHierarchy, selector.text, undefined, true, false);
     }
 
     if (selector.elementId) {
-      return this.elementUtils.findElementByResourceId(viewHierarchy, selector.elementId);
+      return this.finder.findElementByResourceId(viewHierarchy, selector.elementId);
     }
 
     return null;

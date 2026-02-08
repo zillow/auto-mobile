@@ -3,7 +3,8 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, GestureOptions } from "../../models";
 import { Element } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
-import { ElementUtils } from "../utility/ElementUtils";
+import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { SwipeResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -13,12 +14,12 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
  */
 export class SwipeOnElement extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
-  private elementUtils: ElementUtils;
+  private geometry: ElementGeometry;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, geometry: ElementGeometry = new DefaultElementGeometry()) {
     super(device, adb);
     this.executeGesture = new ExecuteGesture(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.geometry = geometry;
   }
 
   /**
@@ -47,7 +48,7 @@ export class SwipeOnElement extends BaseVisualChange {
       async () => {
         logger.info(`[SwipeOnElement] In observedInteraction callback`);
 
-        const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
+        const { startX, startY, endX, endY } = this.geometry.getSwipeWithinBounds(
           direction,
           element.bounds
         );

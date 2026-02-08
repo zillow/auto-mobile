@@ -1,7 +1,8 @@
 import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { DeepLinkManager } from "../../src/utils/DeepLinkManager";
-import { ElementUtils } from "../../src/features/utility/ElementUtils";
 import { ViewHierarchyResult, BootedDevice } from "../../src/models";
+import { DefaultElementParser } from "../../src/features/utility/ElementParser";
+import { DefaultElementGeometry } from "../../src/features/utility/ElementGeometry";
 import { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 
@@ -9,7 +10,8 @@ describe("DeepLinkManager", () => {
   let deepLinkManager: DeepLinkManager;
   let fakeAdb: FakeAdbExecutor;
   let fakeAdbFactory: AdbClientFactory;
-  let mockElementUtils: ElementUtils;
+  let mockParser: DefaultElementParser;
+  let mockGeometry: DefaultElementGeometry;
   let testDevice: BootedDevice;
 
   beforeEach(() => {
@@ -92,9 +94,11 @@ Receiver Resolver Table:
     // Create deep link manager
     deepLinkManager = new DeepLinkManager(testDevice, fakeAdbFactory);
 
-    // Create mock element utils
-    mockElementUtils = new ElementUtils();
-    (deepLinkManager as any).elementUtils = mockElementUtils;
+    // Create mock parser and geometry
+    mockParser = new DefaultElementParser();
+    mockGeometry = new DefaultElementGeometry();
+    (deepLinkManager as any).parser = mockParser;
+    (deepLinkManager as any).geometry = mockGeometry;
   });
 
   afterEach(() => {
@@ -288,10 +292,10 @@ Receiver Resolver Table:
       };
 
       // Mock extractRootNodes
-      (mockElementUtils as any).extractRootNodes = () => [mockButton];
+      (mockParser as any).extractRootNodes = () => [mockButton];
 
       // Mock getElementCenter
-      (mockElementUtils as any).getElementCenter = () => ({ x: 200, y: 300 });
+      (mockGeometry as any).getElementCenter = () => ({ x: 200, y: 300 });
 
       // Mock findButtonByText method by adding it to the deep link manager
       (deepLinkManager as any).findButtonByText = (node: any, textOptions: string[]) => {
@@ -413,7 +417,7 @@ Receiver Resolver Table:
       };
 
       // Reset mocks for this specific test
-      (mockElementUtils as any).extractRootNodes = () => [
+      (mockParser as any).extractRootNodes = () => [
         {
           $: {
             class: "android.widget.LinearLayout"
@@ -487,7 +491,8 @@ Receiver Resolver Table:
       });
 
       const manager = new DeepLinkManager(testDevice, failingFake);
-      (manager as any).elementUtils = mockElementUtils;
+      (manager as any).parser = mockParser;
+      (manager as any).geometry = mockGeometry;
 
       const result = await manager.handleIntentChooser(viewHierarchy, "always");
 

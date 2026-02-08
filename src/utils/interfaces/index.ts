@@ -60,12 +60,16 @@ export {
 // Re-export from co-located interfaces
 export { DeviceSelector } from "../DeviceSelectorService";
 export { Logger, LogLevel } from "../logger";
-// Element utilities - split into focused classes (Phase 3.2)
-export { ElementFinder } from "../../features/utility/ElementFinder";
-export { ElementGeometry } from "../../features/utility/ElementGeometry";
-export { ElementParser } from "../../features/utility/ElementParser";
-export { TextMatcher } from "../../features/utility/TextMatcher";
-export { ElementUtils } from "../../features/utility/ElementUtils";
+// Element utility interfaces
+export type { ElementFinder } from "./ElementFinder";
+export type { ElementGeometry } from "./ElementGeometry";
+export type { ElementParser } from "./ElementParser";
+export type { TextMatcher } from "./TextMatcher";
+// Element utility concrete implementations
+export { DefaultElementFinder } from "../../features/utility/ElementFinder";
+export { DefaultElementGeometry } from "../../features/utility/ElementGeometry";
+export { DefaultElementParser } from "../../features/utility/ElementParser";
+export { DefaultTextMatcher } from "../../features/utility/TextMatcher";
 export { ElementSelector } from "./ElementSelector";
 export {
   NavigationGraph,

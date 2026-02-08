@@ -1,9 +1,9 @@
 import { Element } from "../../models/Element";
 import { ObserveResult } from "../../models/ObserveResult";
 import { ElementBounds } from "../../models/ElementBounds";
-import { ElementFinder } from "../utility/ElementFinder";
-import { ElementParser } from "../utility/ElementParser";
-import { ElementGeometry } from "../utility/ElementGeometry";
+import { DefaultElementFinder } from "../utility/ElementFinder";
+import { DefaultElementParser } from "../utility/ElementParser";
+import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { NavigationEdge } from "../../utils/interfaces/NavigationGraph";
 
 export type InteractionType = "navigation" | "input" | "action" | "scroll" | "toggle";
@@ -65,9 +65,9 @@ interface InteractionCandidate {
 }
 
 export class IdentifyInteractions {
-  private readonly elementFinder = new ElementFinder();
-  private readonly elementParser = new ElementParser();
-  private readonly geometry = new ElementGeometry();
+  private readonly elementFinder = new DefaultElementFinder();
+  private readonly elementParser = new DefaultElementParser();
+  private readonly geometry = new DefaultElementGeometry();
 
   analyze(
     observeResult: ObserveResult,

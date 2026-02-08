@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { ElementGeometry } from "../../../src/features/utility/ElementGeometry";
+import { DefaultElementGeometry } from "../../../src/features/utility/ElementGeometry";
 
 describe("ElementGeometry getSwipeWithinBounds", () => {
   test("uses element height for vertical swipe padding", () => {
-    const geometry = new ElementGeometry();
+    const geometry = new DefaultElementGeometry();
     const bounds = { left: 0, top: 378, right: 1000, bottom: 513 };
 
     const swipe = geometry.getSwipeWithinBounds("down", bounds);
@@ -15,7 +15,7 @@ describe("ElementGeometry getSwipeWithinBounds", () => {
   });
 
   test("uses element width for horizontal swipe padding", () => {
-    const geometry = new ElementGeometry();
+    const geometry = new DefaultElementGeometry();
     const bounds = { left: 800, top: 200, right: 1200, bottom: 600 };
 
     const swipe = geometry.getSwipeWithinBounds("left", bounds);
