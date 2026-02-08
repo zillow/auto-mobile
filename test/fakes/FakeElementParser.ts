@@ -43,8 +43,9 @@ export class FakeElementParser implements ElementParser {
   traverseNode(node: any, callback: (node: any, depth: number) => void, depth: number = 0): void {
     if (!node) {return;}
     callback(node, depth);
-    if (node.node) {
-      const children = Array.isArray(node.node) ? node.node : [node.node];
+    const childNodes = node.node || node.children;
+    if (childNodes) {
+      const children = Array.isArray(childNodes) ? childNodes : [childNodes];
       for (const child of children) {
         this.traverseNode(child, callback, depth + 1);
       }

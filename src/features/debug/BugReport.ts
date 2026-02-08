@@ -355,13 +355,13 @@ export class BugReport {
         result.viewHierarchy.filteredNodeCount = totalTraversedNodes - flattenedElements.length;
 
         const clickableElements = flattenedElements
-          .filter(({ element }) => element.clickable === true)
+          .filter(({ element }) => element.clickable === true || element.clickable as unknown === "true")
           .map(({ element, text }) => ({
             resourceId: element["resource-id"],
             text: text ?? element.text,
             contentDesc: element["content-desc"],
             bounds: element.bounds,
-            className: element["class"]
+            className: element["class"] ?? element.className
           }));
 
         result.viewHierarchy.clickableElements = clickableElements.slice(0, 50);

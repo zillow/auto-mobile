@@ -190,14 +190,14 @@ export class DefaultElementParser implements ElementParser {
     callback(node, depth);
 
     // Traverse child nodes with incremented depth
-    if (node.node) {
-      const children = node.node;
-      if (Array.isArray(children)) {
-        for (const child of children) {
+    const childNodes = node.node || node.children;
+    if (childNodes) {
+      if (Array.isArray(childNodes)) {
+        for (const child of childNodes) {
           this.traverseNode(child, callback, depth + 1);
         }
-      } else if (typeof children === "object") {
-        this.traverseNode(children, callback, depth + 1);
+      } else if (typeof childNodes === "object") {
+        this.traverseNode(childNodes, callback, depth + 1);
       }
     }
   }
