@@ -9,6 +9,7 @@ import { ActionableError, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
+import { getScreenBounds } from "../../utils/screenBounds";
 
 /**
  * Executes swipe gestures on the screen, respecting system insets
@@ -46,27 +47,10 @@ export class SwipeOnScreen extends BaseVisualChange {
       throw new ActionableError("Could not determine screen size");
     }
 
-    const screenWidth = observeResult.screenSize.width;
-    const screenHeight = observeResult.screenSize.height;
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
+    logger.info(`[SwipeOnScreen] Screen dimensions: ${observeResult.screenSize.width}x${observeResult.screenSize.height}`);
+    logger.info(`[SwipeOnScreen] System insets: ${JSON.stringify(observeResult.systemInsets)}`);
 
-    logger.info(`[SwipeOnScreen] Screen dimensions: ${screenWidth}x${screenHeight}`);
-    logger.info(`[SwipeOnScreen] System insets: ${JSON.stringify(insets)}`);
-
-    // Calculate the bounds based on system insets
-    const bounds = (options.includeSystemInsets === true)
-      ? {
-        left: 0,
-        top: 0,
-        right: screenWidth,
-        bottom: screenHeight
-      }
-      : {
-        left: insets.left,
-        top: insets.top,
-        right: screenWidth - insets.right,
-        bottom: screenHeight - insets.bottom
-      };
+    const bounds = getScreenBounds(observeResult.screenSize, observeResult.systemInsets, options.includeSystemInsets === true);
 
     logger.info(`[SwipeOnScreen] Calculated bounds: ${JSON.stringify(bounds)}`);
 
@@ -123,25 +107,11 @@ export class SwipeOnScreen extends BaseVisualChange {
 
     const screenWidth = observeResult.screenSize.width;
     const screenHeight = observeResult.screenSize.height;
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
 
     logger.info(`[SwipeOnScreen] Screen dimensions: ${screenWidth}x${screenHeight}`);
-    logger.info(`[SwipeOnScreen] System insets: ${JSON.stringify(insets)}`);
+    logger.info(`[SwipeOnScreen] System insets: ${JSON.stringify(observeResult.systemInsets)}`);
 
-    // Calculate the bounds based on system insets
-    const bounds = (options.includeSystemInsets === true)
-      ? {
-        left: 0,
-        top: 0,
-        right: screenWidth,
-        bottom: screenHeight
-      }
-      : {
-        left: insets.left,
-        top: insets.top,
-        right: screenWidth - insets.right,
-        bottom: screenHeight - insets.bottom
-      };
+    const bounds = getScreenBounds(observeResult.screenSize, observeResult.systemInsets, options.includeSystemInsets === true);
 
     logger.info(`[SwipeOnScreen] Calculated bounds: ${JSON.stringify(bounds)}`);
 

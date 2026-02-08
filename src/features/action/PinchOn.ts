@@ -18,6 +18,7 @@ import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilitySer
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { boundsArea, clamp } from "../../utils/bounds";
 import { buildContainerFromElement } from "../../utils/elementProperties";
+import { getScreenBounds as getScreenBoundsFromSize } from "../../utils/screenBounds";
 
 type PinchTarget = {
   bounds: Element["bounds"];
@@ -392,22 +393,7 @@ export class PinchOn extends BaseVisualChange {
       throw new ActionableError("Could not determine screen size");
     }
 
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
-    if (includeSystemInsets) {
-      return {
-        left: 0,
-        top: 0,
-        right: observeResult.screenSize.width,
-        bottom: observeResult.screenSize.height
-      };
-    }
-
-    return {
-      left: insets.left,
-      top: insets.top,
-      right: observeResult.screenSize.width - insets.right,
-      bottom: observeResult.screenSize.height - insets.bottom
-    };
+    return getScreenBoundsFromSize(observeResult.screenSize, observeResult.systemInsets, includeSystemInsets);
   }
 
   private getCenter(bounds: Element["bounds"]): { centerX: number; centerY: number } {

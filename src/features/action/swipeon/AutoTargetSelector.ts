@@ -5,6 +5,7 @@ import {
   SwipeOnOptions
 } from "../../../models";
 import { boundsArea, boundsEqual } from "../../../utils/bounds";
+import { getScreenBounds as getScreenBoundsFromSize } from "../../../utils/screenBounds";
 
 export class AutoTargetSelector {
   selectAutoTargetScrollable(
@@ -56,13 +57,7 @@ export class AutoTargetSelector {
       return null;
     }
 
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
-    return {
-      left: insets.left,
-      top: insets.top,
-      right: observeResult.screenSize.width - insets.right,
-      bottom: observeResult.screenSize.height - insets.bottom
-    };
+    return getScreenBoundsFromSize(observeResult.screenSize, observeResult.systemInsets);
   }
 
   describeContainer(container: SwipeOnOptions["container"]): string {

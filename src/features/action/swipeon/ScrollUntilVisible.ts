@@ -22,6 +22,7 @@ import { SwipeOnResolvedOptions, BoomerangConfig } from "./types";
 import { OverlayDetector } from "./OverlayDetector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
 import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
+import { getScreenBounds } from "../../../utils/screenBounds";
 
 export interface ScrollUntilVisibleDependencies {
   device: BootedDevice;
@@ -405,15 +406,9 @@ export class ScrollUntilVisible {
     if (!element) {
       logger.info(`[SwipeOn] No scrollable container found, using screen bounds`);
       const screenSize = observeResult.screenSize || { width: 1080, height: 1920 };
-      const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
 
       element = {
-        bounds: {
-          left: insets.left,
-          top: insets.top,
-          right: screenSize.width - insets.right,
-          bottom: screenSize.height - insets.bottom
-        },
+        bounds: getScreenBounds(screenSize, observeResult.systemInsets),
         scrollable: true
       } as Element;
     }
