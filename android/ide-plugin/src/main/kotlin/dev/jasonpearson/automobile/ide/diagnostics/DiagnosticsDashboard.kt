@@ -19,7 +19,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,7 +32,9 @@ import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.mcp.McpProcess
 import dev.jasonpearson.automobile.ide.mcp.McpConnectionType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 import java.io.File
@@ -50,17 +51,14 @@ fun DiagnosticsDashboard(
 ) {
     val colors = JewelTheme.globalColors
 
-    // Auto-refresh diagnostics every 2 seconds
-    var refreshTrigger by remember { mutableLongStateOf(0L) }
+    // Run system checks off the UI thread and refresh every 30 seconds
+    var systemChecks by remember { mutableStateOf(emptyList<DiagnosticCheck>()) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(2000)
-            refreshTrigger = System.currentTimeMillis()
+            systemChecks = withContext(Dispatchers.IO) { runSystemChecks() }
+            delay(30_000)
         }
     }
-
-    // System checks
-    val systemChecks = remember(refreshTrigger) { runSystemChecks() }
 
     Column(
         modifier = modifier

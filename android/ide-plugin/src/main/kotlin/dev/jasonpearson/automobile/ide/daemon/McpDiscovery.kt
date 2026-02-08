@@ -234,24 +234,12 @@ class GitWorktreeLister : WorktreeLister {
   }
 }
 
-class DefaultPortScanner : PortScanner {
-  override suspend fun scanListeningPorts(): Set<Int> =
-      withContext(Dispatchers.IO) {
-        val osName = System.getProperty("os.name", "").lowercase()
-        val outputs = mutableListOf<String>()
+interface PortCommandRunner {
+  fun runCommand(command: List<String>): String?
+}
 
-        if (osName.contains("win")) {
-          runCommand(listOf("netstat", "-ano", "-p", "tcp"))?.let { outputs.add(it) }
-        } else {
-          runCommand(listOf("lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P"))?.let { outputs.add(it) }
-          runCommand(listOf("ss", "-ltn"))?.let { outputs.add(it) }
-          runCommand(listOf("netstat", "-an"))?.let { outputs.add(it) }
-        }
-
-        outputs.flatMap { parsePorts(it) }.toSet()
-      }
-
-  private fun runCommand(command: List<String>): String? {
+class SystemPortCommandRunner : PortCommandRunner {
+  override fun runCommand(command: List<String>): String? {
     return try {
       val process = ProcessBuilder(command).redirectErrorStream(true).start()
       val completed = process.waitFor(2, TimeUnit.SECONDS)
@@ -267,8 +255,50 @@ class DefaultPortScanner : PortScanner {
       null
     }
   }
+}
 
-  private fun parsePorts(output: String): List<Int> {
+interface PlatformInfo {
+  val osName: String
+}
+
+object SystemPlatformInfo : PlatformInfo {
+  override val osName: String
+    get() = System.getProperty("os.name", "").lowercase()
+}
+
+class DefaultPortScanner(
+    private val commandRunner: PortCommandRunner = SystemPortCommandRunner(),
+    private val platformInfo: PlatformInfo = SystemPlatformInfo,
+) : PortScanner {
+  override suspend fun scanListeningPorts(): Set<Int> = coroutineScope {
+    val osName = platformInfo.osName
+    val commands = buildCommandList(osName)
+
+    val outputs = commands
+        .map { cmd -> async(Dispatchers.IO) { commandRunner.runCommand(cmd) } }
+        .awaitAll()
+        .filterNotNull()
+
+    outputs.flatMap { parsePorts(it) }.toSet()
+  }
+
+  internal fun buildCommandList(osName: String): List<List<String>> {
+    return if (osName.contains("win")) {
+      listOf(listOf("netstat", "-ano", "-p", "tcp"))
+    } else {
+      val commands = mutableListOf(
+          listOf("lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P"),
+      )
+      // ss is not available on macOS — skip it to avoid a 2s timeout
+      if (!osName.contains("mac") && !osName.contains("darwin")) {
+        commands.add(listOf("ss", "-ltn"))
+      }
+      commands.add(listOf("netstat", "-an"))
+      commands
+    }
+  }
+
+  internal fun parsePorts(output: String): List<Int> {
     val ports = mutableListOf<Int>()
     val listenRegex = Regex(":(\\d+)(?:\\s|\\)|$)")
     for (line in output.lineSequence()) {
