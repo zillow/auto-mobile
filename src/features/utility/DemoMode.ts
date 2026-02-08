@@ -4,6 +4,7 @@ import { logger } from "../../utils/logger";
 import { DemoModeResult } from "../../models/DemoModeResult";
 import { BaseVisualChange } from "../action/BaseVisualChange";
 import { BootedDevice, ExecResult } from "../../models";
+import { clamp } from "../../utils/bounds";
 
 export interface DemoModeOptions {
   time?: string; // In format "HHMM", default "1000"
@@ -198,18 +199,18 @@ export class DemoMode extends BaseVisualChange {
       args.push(`--dataNetwork ${dataNetwork.value}`);
     }
 
-    const wifiBars = this.clamp(wifiLevel, 0, 3);
+    const wifiBars = clamp(wifiLevel, 0, 3);
     args.push(`--wifiMode ${wifiBars > 0 ? "active" : "failed"}`);
     args.push(`--wifiBars ${wifiBars}`);
 
-    const cellularBars = this.clamp(mobileSignalLevel, 0, 4);
+    const cellularBars = clamp(mobileSignalLevel, 0, 4);
     const cellularMode = dataNetwork.value === "hide" ? "notSupported" : (cellularBars > 0 ? "active" : "failed");
     args.push(`--cellularMode ${cellularMode}`);
     args.push(`--cellularBars ${cellularBars}`);
 
     const batteryState = batteryPlugged ? "charging" : "discharging";
     args.push(`--batteryState ${batteryState}`);
-    args.push(`--batteryLevel ${this.clamp(batteryLevel, 0, 100)}`);
+    args.push(`--batteryLevel ${clamp(batteryLevel, 0, 100)}`);
 
     try {
       if (args.length === 0) {
@@ -327,7 +328,4 @@ export class DemoMode extends BaseVisualChange {
     }
   }
 
-  private clamp(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value));
-  }
 }

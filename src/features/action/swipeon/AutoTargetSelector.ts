@@ -4,6 +4,7 @@ import {
   SwipeDirection,
   SwipeOnOptions
 } from "../../../models";
+import { boundsArea, boundsEqual } from "../../../utils/bounds";
 
 export class AutoTargetSelector {
   selectAutoTargetScrollable(
@@ -20,7 +21,7 @@ export class AutoTargetSelector {
     }
 
     const nonScreenScrollables = screenBounds
-      ? scrollables.filter(scrollable => !this.boundsEqual(scrollable.bounds, screenBounds))
+      ? scrollables.filter(scrollable => !boundsEqual(scrollable.bounds, screenBounds))
       : scrollables.slice();
 
     const candidates = nonScreenScrollables.length > 0 ? nonScreenScrollables : scrollables;
@@ -33,8 +34,8 @@ export class AutoTargetSelector {
     }
 
     return scrollables.reduce((largest, current) => {
-      const largestArea = this.boundsArea(largest.bounds);
-      const currentArea = this.boundsArea(current.bounds);
+      const largestArea = boundsArea(largest.bounds);
+      const currentArea = boundsArea(current.bounds);
       return currentArea > largestArea ? current : largest;
     });
   }
@@ -78,14 +79,6 @@ export class AutoTargetSelector {
       right: observeResult.screenSize.width - insets.right,
       bottom: observeResult.screenSize.height - insets.bottom
     };
-  }
-
-  boundsArea(bounds: Element["bounds"]): number {
-    return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
-  }
-
-  boundsEqual(a: Element["bounds"], b: Element["bounds"]): boolean {
-    return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
   }
 
   describeContainer(container: SwipeOnOptions["container"]): string {

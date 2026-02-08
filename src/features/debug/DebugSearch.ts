@@ -6,6 +6,7 @@ import { BootedDevice, Element, ViewHierarchyResult, DebugSearchResult, DebugSea
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { resolveViewHierarchyForSearch } from "../../utils/viewHierarchySearch";
+import { boundsArea } from "../../utils/bounds";
 
 export interface DebugSearchOptions {
   /**
@@ -251,8 +252,8 @@ export class DebugSearch {
       if (a.isExactMatch !== b.isExactMatch) {
         return a.isExactMatch ? -1 : 1;
       }
-      const aArea = this.getElementArea(a.element);
-      const bArea = this.getElementArea(b.element);
+      const aArea = boundsArea(a.element.bounds);
+      const bArea = boundsArea(b.element.bounds);
       return aArea - bArea;
     });
 
@@ -327,14 +328,6 @@ export class DebugSearch {
     }
 
     return false;
-  }
-
-  /**
-   * Calculate element area
-   */
-  private getElementArea(element: Element): number {
-    return (element.bounds.right - element.bounds.left) *
-           (element.bounds.bottom - element.bounds.top);
   }
 
   /**

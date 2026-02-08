@@ -36,6 +36,7 @@ import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { refreshAndroidViewHierarchy } from "./refreshAndroidViewHierarchy";
+import { boundsEqual } from "../../utils/bounds";
 import { TalkBackTapStrategy } from "../talkback/TalkBackTapStrategy";
 import {
   DefaultTalkBackNavigationDriverFactory,
@@ -490,16 +491,12 @@ export class TapOnElement extends BaseVisualChange {
     return this.isTruthyFlag(props["long-clickable"]) || this.isTruthyFlag(props.longClickable);
   }
 
-  private boundsEqual(a: Element["bounds"], b: Element["bounds"]): boolean {
-    return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
-  }
-
   private nodeMatchesElement(
     target: Element,
     props: Record<string, unknown>,
     parsed: Element
   ): boolean {
-    if (!this.boundsEqual(parsed.bounds, target.bounds)) {
+    if (!boundsEqual(parsed.bounds, target.bounds)) {
       return false;
     }
 

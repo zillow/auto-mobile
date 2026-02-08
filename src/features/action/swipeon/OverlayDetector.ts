@@ -10,6 +10,7 @@ import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry"
 import type { ElementParser } from "../../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../../utility/ElementParser";
 import { SwipeInterval, OverlayCandidate } from "./types";
+import { boundsArea, boundsEqual, clamp } from "../../../utils/bounds";
 
 export class OverlayDetector {
   private static readonly OVERLAY_PADDING = 8;
@@ -91,7 +92,7 @@ export class OverlayDetector {
             return;
           }
 
-          const coverage = this.boundsArea(overlapBounds);
+          const coverage = boundsArea(overlapBounds);
           if (coverage <= 0) {
             return;
           }
@@ -167,10 +168,10 @@ export class OverlayDetector {
       endY = bestCandidate.coordinate;
     }
 
-    startX = this.clamp(startX, safeBounds.left, safeBounds.right);
-    endX = this.clamp(endX, safeBounds.left, safeBounds.right);
-    startY = this.clamp(startY, safeBounds.top, safeBounds.bottom);
-    endY = this.clamp(endY, safeBounds.top, safeBounds.bottom);
+    startX = clamp(startX, safeBounds.left, safeBounds.right);
+    endX = clamp(endX, safeBounds.left, safeBounds.right);
+    startY = clamp(startY, safeBounds.top, safeBounds.bottom);
+    endY = clamp(endY, safeBounds.top, safeBounds.bottom);
 
     const primaryLength = Math.max(1, primaryEnd - primaryStart);
     const minDistance = Math.max(50, primaryLength * 0.1);
@@ -305,6 +306,10 @@ export class OverlayDetector {
     return { left, top, right, bottom };
   }
 
+  private isTruthyFlag(value: unknown): boolean {
+    return value === true || value === "true";
+  }
+
   private isClickableNode(nodeProperties: Record<string, unknown>): boolean {
     return this.isTruthyFlag(nodeProperties.clickable) || this.isTruthyFlag(nodeProperties.focusable);
   }
@@ -337,7 +342,7 @@ export class OverlayDetector {
 
     if (!containerElement["resource-id"] && !containerElement.text && !containerElement["content-desc"]) {
       const parsedBounds = this.parseBoundsFromProperties(nodeProperties);
-      if (parsedBounds && this.boundsEqual(parsedBounds, containerBounds)) {
+      if (parsedBounds && boundsEqual(parsedBounds, containerBounds)) {
         return true;
       }
     }
@@ -367,22 +372,6 @@ export class OverlayDetector {
     }
 
     return null;
-  }
-
-  private isTruthyFlag(value: unknown): boolean {
-    return value === true || value === "true";
-  }
-
-  boundsArea(bounds: Element["bounds"]): number {
-    return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
-  }
-
-  boundsEqual(a: Element["bounds"], b: Element["bounds"]): boolean {
-    return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
-  }
-
-  private clamp(value: number, min: number, max: number): number {
-    return Math.min(Math.max(value, min), max);
   }
 
   buildContainerFromElement(element: Element): SwipeOnOptions["container"] | null {

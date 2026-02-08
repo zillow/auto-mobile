@@ -27,6 +27,7 @@ import {
   elementSelectionStrategySchema,
   validateElementIdTextSelector
 } from "./elementSelectorSchemas";
+import { boundsEqual } from "../utils/bounds";
 
 const UNSUPPORTED_MESSAGE = "Visual highlights are only supported on Android devices.";
 
@@ -112,13 +113,6 @@ const toHighlightErrorResponse = (error: unknown) => {
 };
 
 const DEFAULT_HIERARCHY_TIMEOUT_MS = 10000;
-
-const boundsEqual = (left: Element["bounds"], right: Element["bounds"]): boolean => (
-  left.left === right.left
-  && left.top === right.top
-  && left.right === right.right
-  && left.bottom === right.bottom
-);
 
 const findContainerForElement = (
   viewHierarchy: ViewHierarchyResult,
