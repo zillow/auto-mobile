@@ -2,11 +2,17 @@ import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-c
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
-import { BootedDevice, Element, ViewHierarchyResult, DebugSearchResult, DebugSearchMatch } from "../../models";
+import { BootedDevice, Element, DebugSearchResult, DebugSearchMatch } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { resolveViewHierarchyForSearch } from "../../utils/viewHierarchySearch";
 import { boundsArea } from "../../utils/bounds";
+import type { ElementParser } from "../../utils/interfaces/ElementParser";
+import type { TextMatcher } from "../../utils/interfaces/TextMatcher";
+import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
+import { DefaultElementParser } from "../utility/ElementParser";
+import { DefaultTextMatcher } from "../utility/TextMatcher";
+import { DefaultElementFinder } from "../utility/ElementFinder";
 
 export interface DebugSearchOptions {
   /**
@@ -57,16 +63,25 @@ export class DebugSearch {
   private readonly adb: AdbExecutor;
   private viewHierarchy: ViewHierarchy;
   private timer: Timer;
+  private parser: ElementParser;
+  private textMatcher: TextMatcher;
+  private finder: ElementFinder;
 
   constructor(
     device: BootedDevice,
     adbFactory: AdbClientFactory = defaultAdbClientFactory,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    parser: ElementParser = new DefaultElementParser(),
+    textMatcher: TextMatcher = new DefaultTextMatcher(),
+    finder: ElementFinder = new DefaultElementFinder()
   ) {
     this.device = device;
     this.adb = adbFactory.create(device);
     this.viewHierarchy = new ViewHierarchy(device, adbFactory);
     this.timer = timer;
+    this.parser = parser;
+    this.textMatcher = textMatcher;
+    this.finder = finder;
   }
 
   /**
@@ -108,37 +123,15 @@ export class DebugSearch {
     let totalElements = 0;
 
     // Create text matcher
-    const matchesText = this.createTextMatcher(options.text || "", partialMatch, caseSensitive);
+    const matchesText = this.textMatcher.createTextMatcher(options.text || "", partialMatch, caseSensitive);
 
     // Traverse the hierarchy and find all matches
-    const rootNodes = this.extractRootNodes(searchHierarchy);
+    const rootNodes = this.parser.extractRootNodes(searchHierarchy);
 
     // If container is specified, find container first
     let containerNode: any = null;
     if (options.container) {
-      const containerMatcher = options.container.text
-        ? this.createTextMatcher(options.container.text, partialMatch, caseSensitive)
-        : null;
-      for (const rootNode of rootNodes) {
-        this.traverseNode(rootNode, (node: any) => {
-          if (containerNode) {return;}
-          const props = this.extractNodeProperties(node);
-          if (options.container?.elementId && props["resource-id"] === options.container.elementId) {
-            containerNode = node;
-            return;
-          }
-          if (containerMatcher) {
-            const textMatches = typeof props.text === "string" && containerMatcher(props.text);
-            const contentDescMatches = typeof props["content-desc"] === "string" && containerMatcher(props["content-desc"]);
-            const iosLabelMatches = typeof props["ios-accessibility-label"] === "string" && containerMatcher(props["ios-accessibility-label"]);
-            if (textMatches || contentDescMatches || iosLabelMatches) {
-              containerNode = node;
-            }
-          }
-        });
-        if (containerNode) {break;}
-      }
-
+      containerNode = this.finder.findContainerNode(searchHierarchy, options.container);
       if (!containerNode) {
         logger.warn(`[DebugSearch] Container "${options.container.elementId || options.container.text}" not found`);
       }
@@ -147,10 +140,10 @@ export class DebugSearch {
     const searchNodes = containerNode ? [containerNode] : rootNodes;
 
     for (const searchNode of searchNodes) {
-      this.traverseNode(searchNode, (node: any) => {
+      this.parser.traverseNode(searchNode, (node: any) => {
         totalElements++;
-        const props = this.extractNodeProperties(node);
-        const element = this.parseNodeBounds(node);
+        const props = this.parser.extractNodeProperties(node);
+        const element = this.parser.parseNodeBounds(node);
 
         if (!element) {return;}
 
@@ -159,7 +152,7 @@ export class DebugSearch {
           resourceId: props["resource-id"],
           clickable: props.clickable === "true" || props.clickable === true,
           enabled: props.enabled !== "false" && props.enabled !== false,
-          visible: this.isElementVisible(element)
+          visible: boundsArea(element.bounds) > 0
         };
 
         // Check for text match
@@ -284,27 +277,6 @@ export class DebugSearch {
   }
 
   /**
-   * Create a text matcher function
-   */
-  private createTextMatcher(
-    text: string,
-    partialMatch: boolean,
-    caseSensitive: boolean
-  ): (value: string) => boolean {
-    if (!text) {return () => false;}
-
-    const searchText = caseSensitive ? text : text.toLowerCase();
-
-    return (value: string) => {
-      const compareValue = caseSensitive ? value : value.toLowerCase();
-      if (partialMatch) {
-        return compareValue.includes(searchText);
-      }
-      return compareValue === searchText;
-    };
-  }
-
-  /**
    * Check if two strings are similar (for near-miss detection)
    */
   private isSimilar(a: string, b: string): boolean {
@@ -328,110 +300,5 @@ export class DebugSearch {
     }
 
     return false;
-  }
-
-  /**
-   * Check if element is visible on screen
-   */
-  private isElementVisible(element: Element): boolean {
-    const bounds = element.bounds;
-    // Simple visibility check - element has positive dimensions
-    return bounds.right > bounds.left && bounds.bottom > bounds.top;
-  }
-
-  /**
-   * Extract root nodes from view hierarchy
-   */
-  private extractRootNodes(viewHierarchy: ViewHierarchyResult): any[] {
-    const hierarchy = viewHierarchy.hierarchy as any;
-    if (!hierarchy) {return [];}
-
-    if (Array.isArray(hierarchy.node)) {
-      return hierarchy.node;
-    } else if (hierarchy.node) {
-      return [hierarchy.node];
-    } else if (hierarchy.hierarchy) {
-      return [hierarchy.hierarchy];
-    }
-    return [hierarchy];
-  }
-
-  /**
-   * Traverse node tree
-   */
-  private traverseNode(node: any, callback: (node: any) => void): void {
-    if (!node) {return;}
-    callback(node);
-
-    const children = node.node || node.children;
-    if (Array.isArray(children)) {
-      for (const child of children) {
-        this.traverseNode(child, callback);
-      }
-    } else if (children) {
-      this.traverseNode(children, callback);
-    }
-  }
-
-  /**
-   * Extract node properties
-   */
-  private extractNodeProperties(node: any): Record<string, any> {
-    // Handle both XML-style ($ attributes) and JSON-style (direct properties)
-    if (node.$) {
-      return node.$;
-    }
-    return node;
-  }
-
-  /**
-   * Parse node bounds into Element
-   */
-  private parseNodeBounds(node: any): Element | null {
-    const props = this.extractNodeProperties(node);
-    const boundsStr = props.bounds;
-
-    if (!boundsStr) {
-      // Try to get bounds from left/top/right/bottom properties
-      if (props.left !== undefined && props.top !== undefined &&
-          props.right !== undefined && props.bottom !== undefined) {
-        return {
-          bounds: {
-            left: Number(props.left),
-            top: Number(props.top),
-            right: Number(props.right),
-            bottom: Number(props.bottom)
-          },
-          text: props.text,
-          contentDesc: props["content-desc"],
-          resourceId: props["resource-id"],
-          className: props.class || props.className,
-          clickable: props.clickable === "true" || props.clickable === true,
-          enabled: props.enabled !== "false" && props.enabled !== false,
-          focused: props.focused === "true" || props.focused === true
-        };
-      }
-      return null;
-    }
-
-    // Parse bounds string like "[0,0][1080,1920]"
-    const matches = boundsStr.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
-    if (!matches) {return null;}
-
-    return {
-      bounds: {
-        left: parseInt(matches[1], 10),
-        top: parseInt(matches[2], 10),
-        right: parseInt(matches[3], 10),
-        bottom: parseInt(matches[4], 10)
-      },
-      text: props.text,
-      contentDesc: props["content-desc"],
-      resourceId: props["resource-id"],
-      className: props.class || props.className,
-      clickable: props.clickable === "true" || props.clickable === true,
-      enabled: props.enabled !== "false" && props.enabled !== false,
-      focused: props.focused === "true" || props.focused === true
-    };
   }
 }
