@@ -14,6 +14,8 @@ import { SOCKET_PATH } from "./constants";
 import { DaemonState } from "./daemonState";
 import { DaemonStateAccess, handleDaemonRequest } from "./daemonRequestHandlers";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
+import type { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
+import type { FeatureFlagKey } from "../features/featureFlags/FeatureFlagDefinitions";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server
@@ -34,17 +36,20 @@ export class UnixSocketServer {
   private mcpClient: Client | null = null;
   private mcpClientPromise: Promise<Client> | null = null;
   private timer: Timer;
+  private featureFlagService: FeatureFlagService | null;
 
   constructor(
     socketPath: string = SOCKET_PATH,
     mcpEndpoint: string,
     daemonState: DaemonStateAccess = DaemonState.getInstance(),
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    featureFlagService: FeatureFlagService | null = null
   ) {
     this.socketPath = socketPath;
     this.mcpEndpoint = mcpEndpoint;
     this.daemonState = daemonState;
     this.timer = timer;
+    this.featureFlagService = featureFlagService;
     logger.info(`UnixSocketServer initialized with endpoint: "${mcpEndpoint}"`);
     if (!mcpEndpoint) {
       logger.error("ERROR: mcpEndpoint is empty or undefined!");
@@ -162,6 +167,17 @@ export class UnixSocketServer {
           };
         }
 
+        // Handle IDE-only requests that don't need the MCP client
+        const localResult = await this.handleLocalIdeRequest(request);
+        if (localResult !== undefined) {
+          return {
+            id: request.id,
+            type: "mcp_response",
+            success: true,
+            result: localResult,
+          };
+        }
+
         const mcpClient = await this.getMcpClient();
 
         const result = await this.handleIdeRequest(mcpClient, request);
@@ -186,6 +202,44 @@ export class UnixSocketServer {
         };
       }
     });
+  }
+
+  /**
+   * Handle IDE requests that don't require the MCP client.
+   * Returns undefined if the request should be forwarded to MCP.
+   */
+  private async handleLocalIdeRequest(
+    request: DaemonRequest
+  ): Promise<any | undefined> {
+    switch (request.method) {
+      case "ide/listFeatureFlags": {
+        if (!this.featureFlagService) {
+          throw new Error("Feature flag service not available");
+        }
+        const flags = await this.featureFlagService.listFlags();
+        return { flags };
+      }
+      case "ide/setFeatureFlag": {
+        if (!this.featureFlagService) {
+          throw new Error("Feature flag service not available");
+        }
+        const args = request.params as { key?: string; enabled?: boolean; config?: Record<string, unknown> | null };
+        if (!args.key || typeof args.enabled !== "boolean") {
+          throw new Error("setFeatureFlag requires 'key' (string) and 'enabled' (boolean) params");
+        }
+        const updated = await this.featureFlagService.setFlag(
+          args.key as FeatureFlagKey,
+          args.enabled,
+          args.config
+        );
+        return updated;
+      }
+      case "ide/ping": {
+        return { ok: true, timestamp: this.timer.now() };
+      }
+      default:
+        return undefined;
+    }
   }
 
   private async handleIdeRequest(
@@ -222,9 +276,6 @@ export class UnixSocketServer {
       case "ide/getNavigationGraph": {
         const args = request.params ?? {};
         return await mcpClient.callTool({ name: "getNavigationGraph", arguments: args }, undefined, requestOptions);
-      }
-      case "ide/ping": {
-        return { ok: true, timestamp: this.timer.now() };
       }
       default:
         throw new Error(`Unsupported daemon method: ${request.method}`);

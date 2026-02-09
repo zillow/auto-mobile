@@ -83,8 +83,9 @@ class McpDaemonClient(
   }
 
   override fun listFeatureFlags(): List<FeatureFlagState> {
-    val response = callTool("listFeatureFlags", JsonObject(emptyMap()))
-    val result = decodeToolResponse(json, response, FeatureFlagListResult.serializer())
+    val response = sendRequest("ide/listFeatureFlags")
+    ensureSuccess(response)
+    val result = json.decodeFromJsonElement(FeatureFlagListResult.serializer(), response.result!!)
     return result.flags
   }
 
@@ -94,8 +95,8 @@ class McpDaemonClient(
       config: JsonObject?,
   ): FeatureFlagState {
     val response =
-        callTool(
-            "setFeatureFlag",
+        sendRequest(
+            "ide/setFeatureFlag",
             buildJsonObject {
               put("key", JsonPrimitive(key))
               put("enabled", JsonPrimitive(enabled))
@@ -104,7 +105,8 @@ class McpDaemonClient(
               }
             },
         )
-    return decodeToolResponse(json, response, FeatureFlagState.serializer())
+    ensureSuccess(response)
+    return json.decodeFromJsonElement(FeatureFlagState.serializer(), response.result!!)
   }
 
   override fun listPerformanceAuditResults(

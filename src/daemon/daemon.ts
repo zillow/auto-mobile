@@ -40,6 +40,7 @@ import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../ut
 import { startPerformanceMonitor, stopPerformanceMonitor, getPerformanceMonitor } from "../features/performance/PerformanceMonitor";
 import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
+import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 
 const DEVICE_DISCONNECT_POLL_INTERVAL_MS = 5000;
 const DEVICE_DISCONNECT_MISS_THRESHOLD = 2;
@@ -126,7 +127,13 @@ export class Daemon {
     logger.info(`MCP_STREAMABLE_PATH: "${MCP_STREAMABLE_PATH}"`);
     const mcpEndpoint = `http://${this.host}:${this.port}${MCP_STREAMABLE_PATH}`;
     logger.info(`Creating UnixSocketServer with endpoint: "${mcpEndpoint}"`);
-    this.socketServer = new UnixSocketServer(SOCKET_PATH, mcpEndpoint);
+    this.socketServer = new UnixSocketServer(
+      SOCKET_PATH,
+      mcpEndpoint,
+      undefined,
+      undefined,
+      FeatureFlagService.getInstance()
+    );
     logger.info("Starting Unix socket server...");
     startupBenchmark.startPhase("socketServerStart");
     await this.socketServer.start();
@@ -764,7 +771,13 @@ export class Daemon {
 
         // Recreate socket server
         const mcpEndpoint = `http://${this.host}:${this.port}${MCP_STREAMABLE_PATH}`;
-        this.socketServer = new UnixSocketServer(SOCKET_PATH, mcpEndpoint);
+        this.socketServer = new UnixSocketServer(
+          SOCKET_PATH,
+          mcpEndpoint,
+          undefined,
+          undefined,
+          FeatureFlagService.getInstance()
+        );
         try {
           await this.socketServer.start();
           logger.info("Socket server restarted successfully");
