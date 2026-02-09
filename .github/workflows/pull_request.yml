@@ -613,6 +613,7 @@ jobs:
         config:
           - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
           - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+          - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -661,6 +662,7 @@ jobs:
         config:
           - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
           - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+          - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -675,7 +677,7 @@ jobs:
 
   ios-xcodegen:
     name: "Generate Xcode Projects"
-    runs-on: macos-14
+    runs-on: macos-26
     needs: detect-changes
     if: needs.detect-changes.outputs.ios_should_run == 'true'
     steps:
@@ -699,6 +701,7 @@ jobs:
         config:
           - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
           - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+          - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
