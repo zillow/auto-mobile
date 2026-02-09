@@ -26,7 +26,6 @@ class ServerConfig {
   private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
   private _appearanceDefaults: AppearanceConfigInput = {};
   private _skipAccessibilityDownload: boolean = false;
-  private _testVideoRecordingEnabled: boolean = false;
 
   private constructor() {}
 
@@ -129,13 +128,6 @@ class ServerConfig {
     return this._skipAccessibilityDownload;
   }
 
-  setTestVideoRecordingEnabled(enabled: boolean): void {
-    this._testVideoRecordingEnabled = enabled;
-  }
-
-  isTestVideoRecordingEnabled(): boolean {
-    return this._testVideoRecordingEnabled;
-  }
 }
 
 export const serverConfig = ServerConfig.getInstance();

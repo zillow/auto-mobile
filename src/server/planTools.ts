@@ -12,7 +12,6 @@ import { PlanSchemaValidator } from "../utils/plan/PlanSchemaValidator";
 import { DaemonState } from "../daemon/daemonState";
 import { normalizePlanDevices } from "../utils/plan/PlanDevices";
 import { ExecutePlanStepDebugInfo } from "../models/ExecutePlanResult";
-import { serverConfig } from "../utils/ServerConfig";
 import { startVideoRecording, stopVideoRecording } from "./videoRecordingManager";
 import { startTestRecording, stopTestRecording, getTestRecordingStatus } from "./testRecordingManager";
 import { defaultTimer } from "../utils/SystemTimer";
@@ -356,23 +355,20 @@ const executePlanTool = async (device: BootedDevice, params: {
       throw new ActionableError("Device label requires a devices list to be provided.");
     }
 
-    // Start video recording if enabled
-    const testVideoRecordingEnabled = serverConfig.isTestVideoRecordingEnabled();
+    // Start video recording for test plan execution
     let videoRecordingId: string | undefined;
-    if (testVideoRecordingEnabled) {
-      try {
-        logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Starting automatic video recording for test`);
-        const recording = await startVideoRecording({
-          device,
-          outputName: `test-${plan.name}-${defaultTimer.now()}`,
-          maxDurationSeconds: 300, // 5 minutes max
-        });
-        videoRecordingId = recording.recordingId;
-        logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Video recording started: ${videoRecordingId}`);
-      } catch (videoError) {
-        logger.warn(`[PERF +${defaultTimer.now() - perfStart}ms] Failed to start automatic video recording: ${videoError}`);
-        // Continue with plan execution even if video recording fails to start
-      }
+    try {
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Starting automatic video recording for test`);
+      const recording = await startVideoRecording({
+        device,
+        outputName: `test-${plan.name}-${defaultTimer.now()}`,
+        maxDurationSeconds: 300, // 5 minutes max
+      });
+      videoRecordingId = recording.recordingId;
+      logger.info(`[PERF +${defaultTimer.now() - perfStart}ms] Video recording started: ${videoRecordingId}`);
+    } catch (videoError) {
+      logger.warn(`[PERF +${defaultTimer.now() - perfStart}ms] Failed to start automatic video recording: ${videoError}`);
+      // Continue with plan execution even if video recording fails to start
     }
 
     // Execute the plan with device context, ensuring video recording is stopped in finally block

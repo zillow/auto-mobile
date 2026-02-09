@@ -101,7 +101,6 @@ function parseArgs(): {
   skipAccessibilityDownload: boolean;
   noProxy: boolean;
   noDaemon: boolean;
-  testVideoRecording: boolean;
   } {
   const args = process.argv.slice(2);
 
@@ -159,9 +158,6 @@ function parseArgs(): {
   const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
   const rawElementSearch = args.includes("--raw-element-search");
   const skipAccessibilityDownload = args.includes("--skip-accessibility-download");
-  const testVideoRecording =
-    args.includes("--test-video-recording") ||
-    process.env.AUTO_MOBILE_TEST_VIDEO_RECORDING === "1";
   let planExecutionLockScope: PlanExecutionLockScope = "session";
   const videoRecordingDefaults: VideoRecordingConfigInput = {};
 
@@ -364,7 +360,6 @@ function parseArgs(): {
     skipAccessibilityDownload,
     noProxy,
     noDaemon,
-    testVideoRecording,
   };
 }
 
@@ -1119,13 +1114,11 @@ async function main() {
       skipAccessibilityDownload,
       noProxy,
       noDaemon,
-      testVideoRecording,
     } = parseArgs();
 
     serverConfig.setPlanExecutionLockScope(planExecutionLockScope);
     serverConfig.setVideoRecordingDefaults(videoRecordingDefaults);
     serverConfig.setSkipAccessibilityDownload(skipAccessibilityDownload);
-    serverConfig.setTestVideoRecordingEnabled(testVideoRecording);
     if (skipAccessibilityDownload) {
       logger.info("Accessibility APK download disabled (--skip-accessibility-download)");
     } else {
@@ -1162,7 +1155,6 @@ async function main() {
       ["accessibility-audit", a11yAuditMode, "--accessibility-audit", accessibilityConfig],
       ["predictive-ui", predictiveUi, "--predictive/--predictive-ui"],
       ["raw-element-search", rawElementSearch, "--raw-element-search"],
-      ["test-video-recording", testVideoRecording, "--test-video-recording"],
     ];
 
     for (const [key, enabled, flagLabel, config] of cliOverrides) {
@@ -1220,7 +1212,6 @@ async function main() {
         videoFps: videoRecordingDefaults.fps,
         videoFormat: videoRecordingDefaults.format,
         videoMaxArchiveSizeMb: videoRecordingDefaults.maxArchiveSizeMb,
-        testVideoRecording,
       };
 
       if (useProxyMode) {

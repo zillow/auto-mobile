@@ -184,9 +184,6 @@ export class DaemonManager {
     if (options.videoMaxArchiveSizeMb !== undefined) {
       args.push("--video-archive-size-mb", options.videoMaxArchiveSizeMb.toString());
     }
-    if (options.testVideoRecording) {
-      args.push("--test-video-recording");
-    }
 
     // Create secure temp directory with random suffix to prevent symlink attacks
     const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
@@ -450,8 +447,6 @@ export async function runDaemonCommand(
           } else if (args[i] === "--video-archive-size-mb") {
             options.videoMaxArchiveSizeMb = Number(args[i + 1]);
             i++;
-          } else if (args[i] === "--test-video-recording") {
-            options.testVideoRecording = true;
           }
         }
 
@@ -530,8 +525,6 @@ export async function runDaemonCommand(
           } else if (args[i] === "--video-archive-size-mb") {
             options.videoMaxArchiveSizeMb = Number(args[i + 1]);
             i++;
-          } else if (args[i] === "--test-video-recording") {
-            options.testVideoRecording = true;
           }
         }
 

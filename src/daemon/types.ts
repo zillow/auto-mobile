@@ -90,8 +90,6 @@ export interface DaemonOptions {
   videoFormat?: string;
   /** Default video archive size limit in MB */
   videoMaxArchiveSizeMb?: number;
-  /** Enable automatic video recording during plan execution */
-  testVideoRecording?: boolean;
 }
 
 /**
