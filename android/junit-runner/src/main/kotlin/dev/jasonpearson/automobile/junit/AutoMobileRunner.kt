@@ -764,30 +764,30 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         if (text != null) {
           val parsed = json.parseToJsonElement(text).jsonObject
           val success = parsed["success"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
-          if (success == false) {
-            val failedStepObj = parsed["failedStep"]?.jsonObject
-            val failedStep =
-                if (failedStepObj != null) {
-                  FailedStepInfo(
-                      stepIndex =
-                          failedStepObj["stepIndex"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                      tool = failedStepObj["tool"]?.jsonPrimitive?.content ?: "unknown",
-                      error =
-                          failedStepObj["error"]?.jsonPrimitive?.content ?: "Unknown step error",
-                      device = failedStepObj["device"]?.jsonPrimitive?.content,
-                  )
-                } else {
-                  null
-                }
-            val executedSteps = parsed["executedSteps"]?.jsonPrimitive?.content?.toIntOrNull()
-            val totalSteps = parsed["totalSteps"]?.jsonPrimitive?.content?.toIntOrNull()
-            val fallbackError = parsed["error"]?.jsonPrimitive?.content
-
-            val errorMessage =
-                buildFailureMessage(failedStep, executedSteps, totalSteps, fallbackError)
-            return ParsedToolResult(false, errorMessage)
+          if (success == true) {
+            return ParsedToolResult(true, "")
           }
-          return ParsedToolResult(true, "")
+          val failedStepObj = parsed["failedStep"]?.jsonObject
+          val failedStep =
+              if (failedStepObj != null) {
+                FailedStepInfo(
+                    stepIndex =
+                        failedStepObj["stepIndex"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
+                    tool = failedStepObj["tool"]?.jsonPrimitive?.content ?: "unknown",
+                    error =
+                        failedStepObj["error"]?.jsonPrimitive?.content ?: "Unknown step error",
+                    device = failedStepObj["device"]?.jsonPrimitive?.content,
+                )
+              } else {
+                null
+              }
+          val executedSteps = parsed["executedSteps"]?.jsonPrimitive?.content?.toIntOrNull()
+          val totalSteps = parsed["totalSteps"]?.jsonPrimitive?.content?.toIntOrNull()
+          val fallbackError = parsed["error"]?.jsonPrimitive?.content
+
+          val errorMessage =
+              buildFailureMessage(failedStep, executedSteps, totalSteps, fallbackError)
+          return ParsedToolResult(false, errorMessage)
         }
       }
     }

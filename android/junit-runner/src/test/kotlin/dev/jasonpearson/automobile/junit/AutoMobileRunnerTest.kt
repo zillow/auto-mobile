@@ -9,7 +9,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.Description
+import org.junit.runner.notification.Failure
+import org.junit.runner.notification.RunNotifier
+import org.junit.runners.model.FrameworkMethod
 
 /**
  * Unit tests for the AutoMobileRunner.
@@ -321,4 +326,247 @@ fun AutoMobileRunner.invokeParseDaemonToolResult(
   errorMessageField.isAccessible = true
   val errorMessage = errorMessageField.get(parseResult) as String
   return Pair(parseSuccess, errorMessage)
+}
+
+/**
+ * Full-flow tests that exercise runChild → runAutoMobileTest → notifier to verify that daemon
+ * responses correctly produce JUnit pass/fail events.
+ */
+class AutoMobileRunnerFailureReportingTest {
+  private val json = Json { ignoreUnknownKeys = true }
+  private lateinit var fakeDaemonClient: RunnerFakeDaemonToolClient
+  private lateinit var fakeDeviceChecker: RunnerFakeDeviceChecker
+  private lateinit var runner: AutoMobileRunner
+  private lateinit var notifier: RecordingRunNotifier
+
+  @Before
+  fun setup() {
+    fakeDaemonClient = RunnerFakeDaemonToolClient()
+    fakeDeviceChecker = RunnerFakeDeviceChecker(devicesAvailable = true)
+    DaemonSocketClientManager.testClient = fakeDaemonClient
+    AutoMobileSharedUtils.testDeviceChecker = fakeDeviceChecker
+    DaemonHeartbeat.testController = RunnerFakeDaemonHeartbeat()
+    AutoMobileRunner.testConnectivityChecker = FakeDaemonConnectivityChecker()
+    runner = AutoMobileRunner(RunnerTestTarget::class.java)
+    notifier = RecordingRunNotifier()
+  }
+
+  @After
+  fun tearDown() {
+    DaemonSocketClientManager.testClient = null
+    AutoMobileSharedUtils.testDeviceChecker = null
+    DaemonHeartbeat.testController = null
+    AutoMobileRunner.testConnectivityChecker = null
+    SystemPropertyCache.clear()
+    PlanCache.clear()
+    RegexCache.clear()
+    TestTimingCache.clear()
+  }
+
+  @Test
+  fun testRunChildFiresTestFailureWhenDaemonReturnsFailure() {
+    val failedStepJson =
+        JsonObject(
+            mapOf(
+                "stepIndex" to JsonPrimitive(2),
+                "tool" to JsonPrimitive("tapOn"),
+                "error" to JsonPrimitive("Element not found"),
+                "device" to JsonPrimitive("emulator-5554"),
+            )
+        )
+    fakeDaemonClient.setResponse(
+        "executePlan",
+        buildDaemonResponse(
+            JsonObject(
+                mapOf(
+                    "success" to JsonPrimitive(false),
+                    "executedSteps" to JsonPrimitive(2),
+                    "totalSteps" to JsonPrimitive(5),
+                    "failedStep" to failedStepJson,
+                )
+            )
+        ),
+    )
+
+    val method = RunnerTestTarget::class.java.getMethod("testLaunchClockApp")
+    val frameworkMethod =
+        runner.testClass.annotatedMethods.first { it.name == method.name }
+    invokeRunChild(runner, frameworkMethod, notifier)
+
+    assertEquals("fireTestStarted should be called once", 1, notifier.startedDescriptions.size)
+    assertEquals("fireTestFinished should be called once", 1, notifier.finishedDescriptions.size)
+    assertEquals("fireTestFailure should be called once", 1, notifier.failures.size)
+    val failureMessage = notifier.failures[0].message
+    assertTrue(
+        "Failure message should mention the failed step",
+        failureMessage.contains("Element not found"),
+    )
+  }
+
+  @Test
+  fun testRunChildFiresTestFailureWhenDaemonSuccessFieldMissing() {
+    fakeDaemonClient.setResponse(
+        "executePlan",
+        buildDaemonResponse(
+            JsonObject(
+                mapOf(
+                    "executedSteps" to JsonPrimitive(3),
+                    "totalSteps" to JsonPrimitive(5),
+                )
+            )
+        ),
+    )
+
+    val method = RunnerTestTarget::class.java.getMethod("testLaunchClockApp")
+    val frameworkMethod =
+        runner.testClass.annotatedMethods.first { it.name == method.name }
+    invokeRunChild(runner, frameworkMethod, notifier)
+
+    assertEquals("fireTestStarted should be called once", 1, notifier.startedDescriptions.size)
+    assertEquals("fireTestFinished should be called once", 1, notifier.finishedDescriptions.size)
+    assertEquals(
+        "fireTestFailure should be called when success field is missing",
+        1,
+        notifier.failures.size,
+    )
+  }
+
+  @Test
+  fun testRunChildDoesNotFireTestFailureOnSuccess() {
+    fakeDaemonClient.setResponse(
+        "executePlan",
+        buildDaemonResponse(
+            JsonObject(
+                mapOf(
+                    "success" to JsonPrimitive(true),
+                    "executedSteps" to JsonPrimitive(5),
+                    "totalSteps" to JsonPrimitive(5),
+                )
+            )
+        ),
+    )
+
+    val method = RunnerTestTarget::class.java.getMethod("testLaunchClockApp")
+    val frameworkMethod =
+        runner.testClass.annotatedMethods.first { it.name == method.name }
+    invokeRunChild(runner, frameworkMethod, notifier)
+
+    assertEquals("fireTestStarted should be called once", 1, notifier.startedDescriptions.size)
+    assertEquals("fireTestFinished should be called once", 1, notifier.finishedDescriptions.size)
+    assertTrue("fireTestFailure should NOT be called on success", notifier.failures.isEmpty())
+  }
+
+  private fun invokeRunChild(
+      runner: AutoMobileRunner,
+      method: FrameworkMethod,
+      notifier: RunNotifier,
+  ) {
+    val runChildMethod =
+        AutoMobileRunner::class
+            .java
+            .getDeclaredMethod(
+                "runChild",
+                FrameworkMethod::class.java,
+                RunNotifier::class.java,
+            )
+    runChildMethod.isAccessible = true
+    runChildMethod.invoke(runner, method, notifier)
+  }
+
+  private fun buildDaemonResponse(payload: JsonObject): DaemonResponse {
+    val textPayload = json.encodeToString(JsonElement.serializer(), payload)
+    val result =
+        JsonObject(
+            mapOf(
+                "content" to
+                    JsonArray(
+                        listOf(
+                            JsonObject(
+                                mapOf(
+                                    "type" to JsonPrimitive("text"),
+                                    "text" to JsonPrimitive(textPayload),
+                                )
+                            )
+                        )
+                    )
+            )
+        )
+    return DaemonResponse(
+        id = "test",
+        type = "mcp_response",
+        success = true,
+        result = result,
+        error = null,
+    )
+  }
+}
+
+/** Test target class for failure reporting tests. Uses an existing test resource plan. */
+class RunnerTestTarget {
+  @Test
+  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", aiAssistance = false)
+  fun testLaunchClockApp() {}
+}
+
+/** RunNotifier that records events for assertion in tests. */
+private class RecordingRunNotifier : RunNotifier() {
+  val startedDescriptions = mutableListOf<Description>()
+  val finishedDescriptions = mutableListOf<Description>()
+  val failures = mutableListOf<Failure>()
+
+  override fun fireTestStarted(description: Description) {
+    startedDescriptions.add(description)
+  }
+
+  override fun fireTestFinished(description: Description) {
+    finishedDescriptions.add(description)
+  }
+
+  override fun fireTestFailure(failure: Failure) {
+    failures.add(failure)
+  }
+}
+
+private class FakeDaemonConnectivityChecker : DaemonConnectivityChecker {
+  override fun isDaemonAlive(): Boolean = true
+
+  override fun waitForDaemon(timeoutMs: Long): Boolean = true
+}
+
+private class RunnerFakeDaemonToolClient : DaemonToolClient {
+  private val responses = mutableMapOf<String, DaemonResponse>()
+  override val sessionUuid: String = "test-session"
+
+  fun setResponse(toolName: String, response: DaemonResponse) {
+    responses[toolName] = response
+  }
+
+  override fun callTool(
+      toolName: String,
+      arguments: JsonObject,
+      timeoutMs: Long,
+  ): DaemonResponse {
+    return responses[toolName]
+        ?: throw IllegalStateException("No response configured for tool: $toolName")
+  }
+
+  override fun readResource(uri: String, timeoutMs: Long): DaemonResponse {
+    throw IllegalStateException("readResource not configured for $uri")
+  }
+}
+
+private class RunnerFakeDeviceChecker(private val devicesAvailable: Boolean) : DeviceChecker {
+  override fun checkDeviceAvailability() = Unit
+
+  override fun areDevicesAvailable(): Boolean = devicesAvailable
+
+  override fun getDeviceCount(): Int = if (devicesAvailable) 1 else 0
+}
+
+private class RunnerFakeDaemonHeartbeat : DaemonHeartbeatController {
+  override fun startBackground(intervalMs: Long) = java.io.Closeable {}
+
+  override fun registerSession(sessionId: String) = Unit
+
+  override fun unregisterSession(sessionId: String) = Unit
 }
