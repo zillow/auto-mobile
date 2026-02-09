@@ -13,39 +13,20 @@ permissions:
 
 jobs:
   build-xctestservice-ipa:
-    name: "Build XCTestService IPA"
-    runs-on: macos-15
-    outputs:
-      sha256: ${{ steps.checksum.outputs.ipa_sha256 }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    uses: ./.github/workflows/build-xctestservice-ipa.yml
 
-      - name: "Select Xcode 16.2"
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "16.2"
+  build-accessibility-service-apk:
+    uses: ./.github/workflows/build-accessibility-service-apk.yml
+    secrets:
+      GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
-      - name: "Install XcodeGen"
-        run: brew install xcodegen
-
-      - name: "Install xcpretty"
-        run: gem install xcpretty
-
-      - name: "Build XCTestService IPA"
-        id: checksum
-        run: ./scripts/ios/xctestservice-create-ipa.sh --output /tmp/XCTestService.ipa
-
-      - name: "Upload XCTestService IPA"
-        uses: actions/upload-artifact@v4
-        with:
-          name: xctestservice-ipa
-          path: /tmp/XCTestService.ipa
-          retention-days: 1
-
-  build-and-release:
+  verify-and-release:
     runs-on: ubuntu-latest
-    needs: build-xctestservice-ipa
+    needs: [build-xctestservice-ipa, build-accessibility-service-apk]
 
     steps:
       - name: Checkout code
@@ -66,16 +47,6 @@ jobs:
       - name: Ensure npm CLI is 11.5.1+
         run: npm install -g npm@11.5.1
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Extract version from tag
         id: version
         run: |
@@ -86,118 +57,31 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Setup Release Keystore
-        run: |
-          mkdir -p android/keystore
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > android/keystore/release.keystore
-
-      - name: Build Accessibility Service APK
-        env:
-          RELEASE_KEYSTORE_PATH: keystore/release.keystore
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: |
-          cd android
-          ./gradlew clean
-          ./gradlew :accessibility-service:assembleDebug
-
-      - name: Verify APK exists
-        run: |
-          APK_PATH="android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
-          if [ ! -f "$APK_PATH" ]; then
-            echo "Error: APK not found at $APK_PATH"
-            exit 1
-          fi
-          echo "APK found at $APK_PATH"
-          ls -lh "$APK_PATH"
-
-      - name: Verify APK SHA256 matches source
-        id: verify_checksum
-        run: |
-          APK_PATH="android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
-
-          BUILT_SHA256=$(sha256sum "$APK_PATH" | cut -d' ' -f1)
-          echo "Built APK SHA256: $BUILT_SHA256"
-
-          SOURCE_SHA256=$(grep 'APK_SHA256_CHECKSUM' src/constants/release.ts | sed 's/.*"\([^"]*\)".*/\1/')
-          echo "Source SHA256:    $SOURCE_SHA256"
-
-          if [ -z "$SOURCE_SHA256" ]; then
-            echo ""
-            echo "ERROR: No SHA256 checksum in source!"
-            echo ""
-            echo "The source file has an empty checksum. This means the auto-update PR"
-            echo "was never merged. Please ensure the SHA256 update PR is merged before releasing."
-            echo ""
-            echo "Check for open PRs: gh pr list --search 'update accessibility service APK SHA256'"
-            exit 1
-          fi
-
-          if [ "$BUILT_SHA256" != "$SOURCE_SHA256" ]; then
-            echo ""
-            echo "ERROR: APK SHA256 mismatch!"
-            echo ""
-            echo "The built APK has a different checksum than what's in source."
-            echo "This likely means accessibility-service code changed after the last"
-            echo "checksum update PR was merged."
-            echo ""
-            echo "Please:"
-            echo "1. Check if there's a pending SHA256 update PR"
-            echo "2. If not, trigger a new build on main to generate one"
-            echo "3. Merge the update PR before releasing"
-            exit 1
-          fi
-
-          echo ""
-          echo "SHA256 verified successfully."
-          echo "checksum=$BUILT_SHA256" >> $GITHUB_OUTPUT
+      - name: "Download Accessibility Service APK"
+        uses: actions/download-artifact@v7
+        with:
+          name: accessibility-service-apk
+          path: /tmp
 
       - name: "Download XCTestService IPA"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: xctestservice-ipa
           path: /tmp
 
+      - name: "Verify APK SHA256 matches source"
+        id: verify_checksum
+        run: |
+          bash scripts/ci/verify-artifact-sha256.sh /tmp/accessibility-service-debug.apk APK_SHA256_CHECKSUM | tee /tmp/apk-verify.log
+          CHECKSUM=$(grep '^checksum=' /tmp/apk-verify.log | cut -d= -f2)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+
       - name: "Verify XCTestService IPA SHA256 matches source"
         id: verify_ipa_checksum
         run: |
-          IPA_PATH="/tmp/XCTestService.ipa"
-
-          BUILT_SHA256=$(sha256sum "$IPA_PATH" | cut -d' ' -f1)
-          echo "Built IPA SHA256: $BUILT_SHA256"
-
-          SOURCE_SHA256=$(grep 'XCTESTSERVICE_SHA256_CHECKSUM' src/constants/release.ts | sed 's/.*"\([^"]*\)".*/\1/')
-          echo "Source SHA256:    $SOURCE_SHA256"
-
-          if [ -z "$SOURCE_SHA256" ]; then
-            echo ""
-            echo "WARNING: No XCTestService SHA256 checksum in source."
-            echo "This is expected for the first release with XCTestService IPA."
-            echo "Skipping verification."
-            echo ""
-          elif [ "$BUILT_SHA256" != "$SOURCE_SHA256" ]; then
-            echo ""
-            echo "ERROR: XCTestService IPA SHA256 mismatch!"
-            echo ""
-            echo "The built IPA has a different checksum than what's in source."
-            echo "This likely means XCTestService code changed after the last"
-            echo "checksum update PR was merged."
-            echo ""
-            echo "Please:"
-            echo "1. Check if there's a pending SHA256 update PR"
-            echo "2. If not, trigger the nightly workflow to generate one"
-            echo "3. Merge the update PR before releasing"
-            exit 1
-          else
-            echo ""
-            echo "XCTestService IPA SHA256 verified successfully."
-          fi
-
-          echo "checksum=$BUILT_SHA256" >> $GITHUB_OUTPUT
+          bash scripts/ci/verify-artifact-sha256.sh /tmp/XCTestService.ipa XCTESTSERVICE_SHA256_CHECKSUM | tee /tmp/ipa-verify.log
+          CHECKSUM=$(grep '^checksum=' /tmp/ipa-verify.log | cut -d= -f2)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
       - name: Generate release constants
         run: |
@@ -250,6 +134,24 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Setup Release Keystore
+        run: |
+          mkdir -p android/keystore
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > android/keystore/release.keystore
+
       - name: Publish Android Libraries to Maven Central
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
@@ -257,6 +159,10 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
+          RELEASE_KEYSTORE_PATH: keystore/release.keystore
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           cd android
           # Override VERSION_NAME with the release version from git tag (not the SNAPSHOT in gradle.properties)
@@ -318,7 +224,7 @@ jobs:
           name: AutoMobile v${{ steps.version.outputs.version }}
           body_path: release_notes.txt
           files: |
-            android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+            /tmp/accessibility-service-debug.apk
             /tmp/XCTestService.ipa
           draft: false
           prerelease: false

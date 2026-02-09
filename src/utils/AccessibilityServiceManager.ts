@@ -2,24 +2,18 @@ import { AdbClientFactory, defaultAdbClientFactory } from "./android-cmdline-too
 import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
-import { createWriteStream } from "fs";
 import * as path from "path";
-import { exec } from "child_process";
-import { createReadStream } from "fs";
-import { promisify } from "util";
 import { BootedDevice } from "../models";
 import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
 import AdmZip from "adm-zip";
 import crypto from "crypto";
-import http from "http";
-import https from "https";
 import os from "os";
 import { accessibilityDetector } from "./AccessibilityDetector";
 import type { AccessibilityDetector } from "./interfaces/AccessibilityDetector";
 import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
 import { Timer, defaultTimer } from "./SystemTimer";
-
-const execAsync = promisify(exec);
+import { type FileDownloader, DefaultFileDownloader } from "./FileDownloader";
+import { type ChecksumCalculator, DefaultChecksumCalculator } from "./ChecksumCalculator";
 
 /**
  * Result of accessibility service setup
@@ -113,7 +107,19 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
   private timer: Timer;
 
-  private constructor(device: BootedDevice, adb: AdbExecutor, timer: Timer = defaultTimer) {
+  // Shared utilities for download and checksum
+  private readonly fileDownloader: FileDownloader;
+  private readonly checksumCalculator: ChecksumCalculator;
+  private static readonly defaultFileDownloader: FileDownloader = new DefaultFileDownloader();
+  private static readonly defaultChecksumCalculator: ChecksumCalculator = new DefaultChecksumCalculator();
+
+  private constructor(
+    device: BootedDevice,
+    adb: AdbExecutor,
+    timer: Timer = defaultTimer,
+    fileDownloader: FileDownloader = AndroidAccessibilityServiceManager.defaultFileDownloader,
+    checksumCalculator: ChecksumCalculator = AndroidAccessibilityServiceManager.defaultChecksumCalculator
+  ) {
     // home should either be process.env.HOME or bash resolution of home for current user
     const homeDir = process.env.HOME || require("os").homedir();
     if (!homeDir) {
@@ -122,6 +128,8 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     this.device = device;
     this.adb = adb;
     this.timer = timer;
+    this.fileDownloader = fileDownloader;
+    this.checksumCalculator = checksumCalculator;
   }
 
   public static getInstance(device: BootedDevice, adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory): AndroidAccessibilityServiceManager {
@@ -207,7 +215,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
     // Download the APK
     logger.info("[ACCESSIBILITY_SERVICE] Prefetch: downloading APK", { url: APK_URL, destination: apkPath });
-    await AndroidAccessibilityServiceManager.downloadApkFromUrlStatic(APK_URL, apkPath);
+    await AndroidAccessibilityServiceManager.defaultFileDownloader.download(APK_URL, apkPath);
 
     // Verify the file exists and has reasonable size
     const stats = await fs.stat(apkPath);
@@ -221,7 +229,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     // Verify checksum if provided
     const expectedChecksum = AndroidAccessibilityServiceManager.expectedChecksumOverride ?? APK_SHA256_CHECKSUM;
     if (expectedChecksum.length > 0) {
-      const actualChecksum = await AndroidAccessibilityServiceManager.computeFileSha256Static(apkPath);
+      const { checksum: actualChecksum } = await AndroidAccessibilityServiceManager.defaultChecksumCalculator.computeFileSha256(apkPath);
       if (actualChecksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
         // Clean up invalid file
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
@@ -300,92 +308,6 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   }
 
   /**
-   * Static download helper for prefetch (no device/adb context)
-   */
-  private static async downloadApkFromUrlStatic(url: string, destination: string): Promise<void> {
-    // Try curl first, then wget, then Node HTTP
-    try {
-      await execAsync(`curl --fail --location --retry 3 --retry-delay 1 --silent --show-error -o "${destination}" "${url}"`);
-      return;
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException & { stderr?: string };
-      const combinedMessage = `${err.message ?? ""} ${err.stderr ?? ""}`.toLowerCase();
-      const isUnavailable = err.code === "ENOENT" ||
-        combinedMessage.includes("command not found") ||
-        combinedMessage.includes("not recognized");
-      if (!isUnavailable) {
-        throw error;
-      }
-    }
-
-    try {
-      await execAsync(`wget --tries=3 --timeout=30 -O "${destination}" "${url}"`);
-      return;
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException & { stderr?: string };
-      const combinedMessage = `${err.message ?? ""} ${err.stderr ?? ""}`.toLowerCase();
-      const isUnavailable = err.code === "ENOENT" ||
-        combinedMessage.includes("command not found") ||
-        combinedMessage.includes("not recognized");
-      if (!isUnavailable) {
-        throw error;
-      }
-    }
-
-    // Node HTTP fallback
-    await AndroidAccessibilityServiceManager.downloadWithNodeHttpStatic(url, destination, 0);
-  }
-
-  /**
-   * Static Node HTTP download for prefetch
-   */
-  private static async downloadWithNodeHttpStatic(url: string, destination: string, redirectCount: number): Promise<void> {
-    if (redirectCount > 5) {
-      throw new Error(`Too many redirects while downloading ${url}`);
-    }
-
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-
-    await new Promise<void>((resolve, reject) => {
-      const transport = url.startsWith("https:") ? https : http;
-      const request = transport.get(
-        url,
-        { headers: { "User-Agent": "auto-mobile" } },
-        response => {
-          const statusCode = response.statusCode ?? 0;
-          if (statusCode >= 300 && statusCode < 400 && response.headers.location) {
-            response.resume();
-            const redirectedUrl = new URL(response.headers.location, url).toString();
-            void AndroidAccessibilityServiceManager.downloadWithNodeHttpStatic(redirectedUrl, destination, redirectCount + 1)
-              .then(resolve)
-              .catch(reject);
-            return;
-          }
-
-          if (statusCode !== 200) {
-            response.resume();
-            reject(new Error(`Download failed with status ${statusCode} from ${url}`));
-            return;
-          }
-
-          const fileStream = createWriteStream(destination);
-          response.pipe(fileStream);
-          fileStream.on("finish", () => fileStream.close(() => resolve()));
-          fileStream.on("error", err => {
-            fileStream.close();
-            reject(err);
-          });
-        }
-      );
-
-      request.setTimeout(30000, () => {
-        request.destroy(new Error(`Download request timed out for ${url}`));
-      });
-      request.on("error", reject);
-    });
-  }
-
-  /**
    * Static APK integrity verification for prefetch
    */
   private static verifyApkIntegrityStatic(apkPath: string): void {
@@ -399,20 +321,6 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     } catch (error) {
       throw new Error(`APK integrity check failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  /**
-   * Static SHA256 computation for prefetch
-   */
-  private static async computeFileSha256Static(apkPath: string): Promise<string> {
-    const hash = crypto.createHash("sha256");
-    await new Promise<void>((resolve, reject) => {
-      const stream = createReadStream(apkPath);
-      stream.on("data", chunk => hash.update(chunk));
-      stream.on("error", reject);
-      stream.on("end", () => resolve());
-    });
-    return hash.digest("hex");
   }
 
   public static setExpectedChecksumForTesting(checksum: string | null): void {
@@ -447,49 +355,6 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     this.attemptedAutomatedSetup = false;
     this.clearAvailabilityCache();
     logger.info("[ACCESSIBILITY_SERVICE] Reset setup state - next setup will be a full attempt");
-  }
-
-  private async execShell(command: string): Promise<{ stdout: string; stderr: string }> {
-    return execAsync(command);
-  }
-
-  private async tryChecksumCommand(command: string, tool: string): Promise<string | null> {
-    try {
-      const { stdout } = await this.execShell(command);
-      const checksum = stdout.trim().split(/\s+/)[0];
-      if (!checksum) {
-        logger.warn("APK checksum command returned no output", { tool });
-        return null;
-      }
-      return checksum;
-    } catch (error) {
-      logger.info("APK checksum tool unavailable, falling back", {
-        tool,
-        error: error instanceof Error ? error.message : String(error)
-      });
-      return null;
-    }
-  }
-
-  private async computeFileSha256(apkPath: string): Promise<{ checksum: string; source: "sha256sum" | "shasum" | "node" }> {
-    const sha256sum = await this.tryChecksumCommand(`sha256sum "${apkPath}"`, "sha256sum");
-    if (sha256sum) {
-      return { checksum: sha256sum, source: "sha256sum" };
-    }
-
-    const shasum = await this.tryChecksumCommand(`shasum -a 256 "${apkPath}"`, "shasum");
-    if (shasum) {
-      return { checksum: shasum, source: "shasum" };
-    }
-
-    const hash = crypto.createHash("sha256");
-    await new Promise<void>((resolve, reject) => {
-      const stream = createReadStream(apkPath);
-      stream.on("data", chunk => hash.update(chunk));
-      stream.on("error", reject);
-      stream.on("end", () => resolve());
-    });
-    return { checksum: hash.digest("hex"), source: "node" };
   }
 
   /**
@@ -795,7 +660,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
           logger.info("Using prefetched accessibility service APK", { path: apkPath });
         } else {
           logger.info("Downloading APK", { url: AndroidAccessibilityServiceManager.APK_URL, destination: apkPath });
-          await this.downloadApkFromUrl(AndroidAccessibilityServiceManager.APK_URL, apkPath);
+          await this.fileDownloader.download(AndroidAccessibilityServiceManager.APK_URL, apkPath);
         }
       }
 
@@ -810,7 +675,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       const expectedChecksum = this.getExpectedChecksum();
       // Perform checksum verification (only if checksum is provided)
       if (expectedChecksum.length > 0) {
-        const { checksum: actualChecksum, source } = await this.computeFileSha256(apkPath);
+        const { checksum: actualChecksum, source } = await this.checksumCalculator.computeFileSha256(apkPath);
         const normalizedActual = actualChecksum.toLowerCase();
         const normalizedExpected = expectedChecksum.toLowerCase();
 
@@ -840,111 +705,6 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
       throw new Error(`Failed to download APK: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  private async downloadApkFromUrl(url: string, destination: string): Promise<void> {
-    try {
-      await this.downloadWithCurl(url, destination);
-      return;
-    } catch (error) {
-      if (!this.isCommandUnavailable(error, "curl")) {
-        throw error;
-      }
-      logger.warn("curl unavailable, falling back to alternate downloader", {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-
-    try {
-      await this.downloadWithWget(url, destination);
-      return;
-    } catch (error) {
-      if (!this.isCommandUnavailable(error, "wget")) {
-        throw error;
-      }
-      logger.warn("wget unavailable, falling back to Node HTTP download", {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-
-    await this.downloadWithNodeHttp(url, destination, 0);
-  }
-
-  private async downloadWithCurl(url: string, destination: string): Promise<void> {
-    const command = `curl --fail --location --retry 3 --retry-delay 1 --silent --show-error -o "${destination}" "${url}"`;
-    await this.execShell(command);
-  }
-
-  private async downloadWithWget(url: string, destination: string): Promise<void> {
-    const command = `wget --tries=3 --timeout=30 -O "${destination}" "${url}"`;
-    await this.execShell(command);
-  }
-
-  private async downloadWithNodeHttp(url: string, destination: string, redirectCount: number): Promise<void> {
-    if (redirectCount > 5) {
-      throw new Error(`Too many redirects while downloading ${url}`);
-    }
-
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-
-    await new Promise<void>((resolve, reject) => {
-      const transport = url.startsWith("https:") ? https : http;
-      const request = transport.get(
-        url,
-        { headers: { "User-Agent": "auto-mobile" } },
-        response => {
-          const statusCode = response.statusCode ?? 0;
-          if (statusCode >= 300 && statusCode < 400 && response.headers.location) {
-            response.resume();
-            const redirectedUrl = new URL(response.headers.location, url).toString();
-            void this.downloadWithNodeHttp(redirectedUrl, destination, redirectCount + 1)
-              .then(resolve)
-              .catch(reject);
-            return;
-          }
-
-          if (statusCode !== 200) {
-            response.resume();
-            reject(new Error(`Download failed with status ${statusCode} from ${url}`));
-            return;
-          }
-
-          const fileStream = createWriteStream(destination);
-          response.pipe(fileStream);
-          fileStream.on("finish", () => fileStream.close(() => resolve()));
-          fileStream.on("error", err => {
-            fileStream.close();
-            reject(err);
-          });
-        }
-      );
-
-      request.setTimeout(30000, () => {
-        request.destroy(new Error(`Download request timed out for ${url}`));
-      });
-      request.on("error", reject);
-    });
-  }
-
-  private isCommandUnavailable(error: unknown, command: string): boolean {
-    if (!error || typeof error !== "object") {
-      return false;
-    }
-
-    const err = error as NodeJS.ErrnoException & { stderr?: string };
-    const numericCode = typeof err.code === "number" ? err.code : Number(err.code);
-    if (err.code === "ENOENT" || (!Number.isNaN(numericCode) && numericCode === 127)) {
-      return true;
-    }
-
-    const combinedMessage = `${err.message ?? ""} ${err.stderr ?? ""}`.toLowerCase();
-    if (combinedMessage.includes("command not found") ||
-      combinedMessage.includes("not recognized as an internal or external command") ||
-      combinedMessage.includes(`${command}: not found`)) {
-      return true;
-    }
-
-    return false;
   }
 
   private verifyApkIntegrity(apkPath: string): void {
