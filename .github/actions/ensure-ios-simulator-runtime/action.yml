@@ -1,0 +1,40 @@
+name: "Ensure iOS Simulator Runtime"
+description: "Detect missing iOS simulator runtimes and install them if needed"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Check iOS Simulator runtimes"
+      id: check
+      shell: bash
+      run: |
+        sdk_version=$(xcrun --sdk iphonesimulator --show-sdk-version)
+        major_version="${sdk_version%%.*}"
+        echo "Xcode SDK version: ${sdk_version} (need iOS ${major_version}.x runtime)"
+        echo "major_version=${major_version}" >> "$GITHUB_OUTPUT"
+
+        match_count=$(xcrun simctl list runtimes iOS --json \
+          | jq --arg v "${major_version}" '[.runtimes[] | select(.version | startswith($v + "."))] | length')
+        echo "Found ${match_count} iOS ${major_version}.x simulator runtime(s)"
+        if [ "${match_count}" -eq 0 ]; then
+          echo "::warning::No iOS ${major_version}.x simulator runtime found — downloading platform"
+          echo "needs_download=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: "Download iOS Simulator runtime"
+      if: steps.check.outputs.needs_download == 'true'
+      shell: bash
+      run: xcodebuild -downloadPlatform iOS
+
+    - name: "Verify iOS Simulator runtime"
+      if: steps.check.outputs.needs_download == 'true'
+      shell: bash
+      run: |
+        major_version="${{ steps.check.outputs.major_version }}"
+        match_count=$(xcrun simctl list runtimes iOS --json \
+          | jq --arg v "${major_version}" '[.runtimes[] | select(.version | startswith($v + "."))] | length')
+        echo "Found ${match_count} iOS ${major_version}.x simulator runtime(s) after download"
+        if [ "${match_count}" -eq 0 ]; then
+          echo "::error::Still no iOS ${major_version}.x simulator runtime after download"
+          exit 1
+        fi
