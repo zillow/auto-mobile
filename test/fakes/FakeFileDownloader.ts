@@ -1,4 +1,5 @@
 import * as fs from "fs/promises";
+import * as os from "os";
 import * as path from "path";
 import type { FileDownloader } from "../../src/utils/FileDownloader";
 
@@ -7,6 +8,7 @@ export class FakeFileDownloader implements FileDownloader {
   public downloadedDestinations: string[] = [];
   public payload: Buffer = Buffer.from("a".repeat(12000));
   public shouldThrow: Error | null = null;
+  public lastWrittenPath: string | null = null;
 
   public async download(url: string, destination: string): Promise<void> {
     if (this.shouldThrow) {
@@ -14,7 +16,9 @@ export class FakeFileDownloader implements FileDownloader {
     }
     this.downloadedUrls.push(url);
     this.downloadedDestinations.push(destination);
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, this.payload);
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "fake-dl-"));
+    const tempFile = path.join(tempDir, "downloaded-file");
+    await fs.writeFile(tempFile, this.payload);
+    this.lastWrittenPath = tempFile;
   }
 }

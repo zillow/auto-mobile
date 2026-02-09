@@ -31,12 +31,13 @@ echo "Source SHA256:         $SOURCE_SHA256"
 
 if [ -z "$SOURCE_SHA256" ]; then
   echo ""
-  echo "WARNING: No SHA256 checksum found for $CONSTANT_NAME in source."
-  echo "This is expected for the first release with this artifact."
-  echo "Skipping verification."
+  echo "ERROR: No SHA256 checksum found for $CONSTANT_NAME in source."
   echo ""
-  echo "checksum=$BUILT_SHA256"
-  exit 0
+  echo "A release cannot proceed without a checksum in $RELEASE_TS."
+  echo "Please:"
+  echo "1. Trigger the nightly workflow to generate a checksum update PR"
+  echo "2. Merge the update PR before releasing"
+  exit 1
 fi
 
 if [ "$BUILT_SHA256" != "$SOURCE_SHA256" ]; then
