@@ -1,0 +1,32 @@
+name: "Ensure iOS Simulator Runtime"
+description: "Detect missing iOS simulator runtimes and install them if needed"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Check iOS Simulator runtimes"
+      id: check
+      shell: bash
+      run: |
+        runtime_count=$(xcrun simctl list runtimes iOS --json | jq '.runtimes | length')
+        echo "Found ${runtime_count} iOS simulator runtime(s)"
+        if [ "${runtime_count}" -eq 0 ]; then
+          echo "::warning::No iOS simulator runtimes found — downloading platform"
+          echo "needs_download=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: "Download iOS Simulator runtime"
+      if: steps.check.outputs.needs_download == 'true'
+      shell: bash
+      run: xcodebuild -downloadPlatform iOS
+
+    - name: "Verify iOS Simulator runtime"
+      if: steps.check.outputs.needs_download == 'true'
+      shell: bash
+      run: |
+        runtime_count=$(xcrun simctl list runtimes iOS --json | jq '.runtimes | length')
+        echo "Found ${runtime_count} iOS simulator runtime(s) after download"
+        if [ "${runtime_count}" -eq 0 ]; then
+          echo "::error::Still no iOS simulator runtimes after download"
+          exit 1
+        fi
