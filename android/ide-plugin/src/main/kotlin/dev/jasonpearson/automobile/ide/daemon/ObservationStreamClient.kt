@@ -37,7 +37,7 @@ import kotlinx.serialization.json.contentOrNull
  */
 class ObservationStreamClient {
     companion object {
-        private fun getSocketPath(): String {
+        internal fun getSocketPath(): String {
             // Check for external mode (matches the server's logic)
             val isExternalMode = System.getenv("AUTOMOBILE_EMULATOR_EXTERNAL") == "true"
             return if (isExternalMode) {
@@ -46,6 +46,8 @@ class ObservationStreamClient {
                 "${System.getProperty("user.home")}/.auto-mobile/observation-stream.sock"
             }
         }
+
+        fun socketExists(): Boolean = Files.exists(Path.of(getSocketPath()))
     }
 
     private val log = Logger.getInstance(ObservationStreamClient::class.java)

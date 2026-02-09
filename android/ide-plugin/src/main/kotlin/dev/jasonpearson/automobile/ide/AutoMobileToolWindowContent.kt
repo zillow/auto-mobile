@@ -87,6 +87,7 @@ import dev.jasonpearson.automobile.ide.daemon.McpHttpClient
 import dev.jasonpearson.automobile.ide.daemon.McpDaemonClient
 import dev.jasonpearson.automobile.ide.daemon.DaemonSocketPaths
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
+import dev.jasonpearson.automobile.ide.daemon.StreamConnectionState
 import dev.jasonpearson.automobile.ide.daemon.FailuresPushSocketClient
 import dev.jasonpearson.automobile.ide.failures.FailuresVerticalPanel
 import dev.jasonpearson.automobile.ide.failures.DateRange
@@ -410,8 +411,12 @@ fun AutoMobileToolWindowContent() {
       while (true) {
           kotlinx.coroutines.delay(5000)
           if (!client.isConnected()) {
-              LOG.info("Observation stream disconnected, attempting reconnect for device: $deviceId")
-              client.connect(deviceId)
+              if (!ObservationStreamClient.socketExists()) {
+                  LOG.info("Observation stream socket missing, daemon appears down - skipping reconnect")
+              } else {
+                  LOG.info("Observation stream disconnected, attempting reconnect for device: $deviceId")
+                  client.connect(deviceId)
+              }
           }
       }
   }
@@ -457,6 +462,20 @@ fun AutoMobileToolWindowContent() {
           currentMemoryMb = update.memoryUsageMb
           currentTouchLatencyMs = update.touchLatencyMs
           perfUpdateCounter++
+      }
+  }
+
+  // Clear performance metrics when stream disconnects
+  LaunchedEffect(observationStreamClient) {
+      val client = observationStreamClient ?: return@LaunchedEffect
+      client.connectionState.collect { connectionState ->
+          if (connectionState is StreamConnectionState.Disconnected) {
+              currentFps = null
+              currentFrameTimeMs = null
+              currentJankFrames = null
+              currentMemoryMb = null
+              currentTouchLatencyMs = null
+          }
       }
   }
 
@@ -746,6 +765,10 @@ fun AutoMobileToolWindowContent() {
                 clientProvider = clientProvider,
                 observationStreamClient = observationStreamClient!!,
                 platform = platformString,
+                onRestartDaemon = {
+                    activeDeviceId = null
+                    isDevicePanelExpanded = true
+                },
             )
 
             // Right vertical panels: Failures and Performance

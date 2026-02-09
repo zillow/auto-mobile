@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
+import dev.jasonpearson.automobile.ide.daemon.StreamConnectionState
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.tabs.PanelHeader
 import dev.jasonpearson.automobile.ide.tabs.VerticalCollapsibleTab
@@ -36,6 +37,7 @@ fun LayoutInspectorDashboard(
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
     observationStreamClient: ObservationStreamClient,  // Shared stream client (managed at app level)
     platform: String = "android",  // Device platform ("android" or "ios")
+    onRestartDaemon: (() -> Unit)? = null,
 ) {
     val state = rememberLayoutInspectorState()
     val colors = JewelTheme.globalColors
@@ -80,6 +82,25 @@ fun LayoutInspectorDashboard(
                     timestamp = update.timestamp,
                 )
                 dashboardLog.info("Updated state with new screenshot")
+            }
+        }
+    }
+
+    // Collect stream connection state to update layout inspector state (Real mode only)
+    if (dataSourceMode == DataSourceMode.Real) {
+        LaunchedEffect(streamClient) {
+            streamClient.connectionState.collect { connectionState ->
+                when (connectionState) {
+                    is StreamConnectionState.Connected -> {
+                        state.updateConnectionStatus(ConnectionStatus.Connected)
+                    }
+                    is StreamConnectionState.Connecting -> {
+                        state.updateConnectionStatus(ConnectionStatus.Connecting)
+                    }
+                    is StreamConnectionState.Disconnected -> {
+                        state.disconnect()
+                    }
+                }
             }
         }
     }
@@ -167,6 +188,9 @@ fun LayoutInspectorDashboard(
                 onElementHovered = { state.hoverElement(it) },
                 showTapTargetIssues = state.showTapTargetIssues,
                 onToggleTapTargetIssues = { state.toggleTapTargetIssues() },
+                connectionStatus = state.connectionStatus,
+                socketExists = ObservationStreamClient.socketExists(),
+                onRestartDaemon = onRestartDaemon,
                 modifier = Modifier.fillMaxSize(),
                 refitTrigger = refitTrigger,  // Trigger refit when panels toggle
             )

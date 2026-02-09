@@ -2,6 +2,13 @@
 
 package dev.jasonpearson.automobile.ide.layout
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,8 +20,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,6 +89,9 @@ fun DeviceScreenView(
     onElementHovered: (String?) -> Unit,
     showTapTargetIssues: Boolean = false,
     onToggleTapTargetIssues: () -> Unit = {},
+    connectionStatus: ConnectionStatus = ConnectionStatus.Connected,
+    socketExists: Boolean = true,
+    onRestartDaemon: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     refitTrigger: Any? = null,  // When this changes, refit the view to center
 ) {
@@ -463,7 +475,7 @@ fun DeviceScreenView(
                                 }
                         )
                     } else {
-                        // Placeholder device frame
+                        // Placeholder device frame - context-aware based on connection status
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -471,11 +483,71 @@ fun DeviceScreenView(
                                 .border(2.dp, Color(0xFF333333), RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                "Awaiting Observation",
-                                color = colors.text.normal.copy(alpha = 0.5f),
-                                fontSize = 12.sp,
-                            )
+                            when {
+                                connectionStatus == ConnectionStatus.Disconnected && !socketExists -> {
+                                    // Daemon is down - show restart button
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        Text(
+                                            "Device Disconnected",
+                                            color = colors.text.normal.copy(alpha = 0.5f),
+                                            fontSize = 12.sp,
+                                        )
+                                        if (onRestartDaemon != null) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                                                    .border(1.dp, colors.text.normal.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                                    .clickable(onClick = onRestartDaemon)
+                                                    .pointerHoverIcon(PointerIcon.Hand)
+                                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                            ) {
+                                                Text(
+                                                    "Restart MCP Daemon",
+                                                    color = colors.text.normal.copy(alpha = 0.7f),
+                                                    fontSize = 11.sp,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                connectionStatus == ConnectionStatus.Disconnected -> {
+                                    // Socket exists but device gone
+                                    Text(
+                                        "Device Disconnected",
+                                        color = colors.text.normal.copy(alpha = 0.5f),
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                                connectionStatus == ConnectionStatus.Connecting -> {
+                                    // Reconnecting state with spinner
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            "Device Disconnected",
+                                            color = colors.text.normal.copy(alpha = 0.5f),
+                                            fontSize = 12.sp,
+                                        )
+                                        ReconnectingSpinner()
+                                        Text(
+                                            "Reconnecting...",
+                                            color = colors.text.normal.copy(alpha = 0.25f),
+                                            fontSize = 10.sp,
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    Text(
+                                        "Awaiting Observation",
+                                        color = colors.text.normal.copy(alpha = 0.5f),
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -623,6 +695,46 @@ private fun TapTargetComplianceToggle(
                     color = if (issueCount > 0) Color(0xFFFF6B00) else colors.text.normal.copy(alpha = 0.5f),
                 )
             }
+        }
+    }
+}
+
+/**
+ * Low-contrast reconnecting spinner with rotating dots.
+ */
+@Composable
+private fun ReconnectingSpinner() {
+    val infiniteTransition = rememberInfiniteTransition(label = "reconnecting")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "rotation",
+    )
+
+    val colors = JewelTheme.globalColors
+    val dotColor = colors.text.normal.copy(alpha = 0.2f)
+
+    Canvas(modifier = Modifier.size(24.dp)) {
+        val centerX = size.width / 2
+        val centerY = size.height / 2
+        val radius = size.width / 2 - 4.dp.toPx()
+        val dotRadius = 2.dp.toPx()
+        val dotCount = 8
+
+        for (i in 0 until dotCount) {
+            val dotAngle = Math.toRadians((angle + i * 360.0 / dotCount).toDouble())
+            val alpha = 0.15f + 0.15f * (i.toFloat() / dotCount)
+            val x = centerX + radius * kotlin.math.cos(dotAngle).toFloat()
+            val y = centerY + radius * kotlin.math.sin(dotAngle).toFloat()
+            drawCircle(
+                color = dotColor.copy(alpha = alpha),
+                radius = dotRadius,
+                center = androidx.compose.ui.geometry.Offset(x, y),
+            )
         }
     }
 }

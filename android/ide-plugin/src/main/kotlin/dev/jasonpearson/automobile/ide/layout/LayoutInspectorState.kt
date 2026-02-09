@@ -253,12 +253,23 @@ class LayoutInspectorState {
     }
 
     /**
-     * Disconnect from device.
+     * Update connection status externally (e.g., from stream connection state).
+     */
+    fun updateConnectionStatus(status: ConnectionStatus) {
+        connectionStatus = status
+    }
+
+    /**
+     * Disconnect from device. Clears all device-specific stale data.
      */
     fun disconnect() {
         connectionStatus = ConnectionStatus.Disconnected
         streamingMode = StreamingMode.Paused
         screenshotData = null
+        hierarchy = null
+        selectedElementId = null
+        hoveredElementId = null
+        changedElementIds = emptySet()
     }
 
     // ========================================
