@@ -40,7 +40,8 @@ export class DefaultChecksumCalculator implements ChecksumCalculator {
         timeout: 120000,
         maxBuffer: 10 * 1024 * 1024
       });
-      const checksum = stdout.trim().split(/\s+/)[0];
+      // On Windows, sha256sum prefixes output with \ when the path contains backslashes
+      const checksum = stdout.trim().split(/\s+/)[0]?.replace(/^\\/, "");
       if (!checksum) {
         logger.warn("[ChecksumCalculator] checksum tool returned no output", { tool });
         return null;
