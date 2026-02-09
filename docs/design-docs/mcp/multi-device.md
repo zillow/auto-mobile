@@ -1,9 +1,5 @@
 # Multi-device
 
-## Status
-
-**Implemented** - Multi-device parallel execution with device labels and critical sections is now available.
-
 ## Goal
 
 Enable true parallel steps in `executePlan`, while supporting critical
@@ -13,7 +9,7 @@ step and a simple `devices` list. Parallelism is implicit: top-level steps
 for different devices run concurrently unless synchronized via
 `criticalSection`.
 
-## Proposed YAML extensions
+## YAML Syntax
 
 Simple device labels, allocated by JUnitRunner/Daemon:
 
@@ -75,7 +71,7 @@ steps:
     label: Verify notification
 ```
 
-YAML anchors (merge keys) should be supported for reuse and validation:
+YAML anchors (merge keys) are supported for reuse and validation:
 
 ```yaml
 devices: ["A", "B"]
@@ -102,17 +98,8 @@ Semantics:
 - `device` on a step selects the label for routing.
 - Steps targeting different devices run concurrently by default.
 - `criticalSection` is a mutex; all devices must reach it, then steps execute
-  one device at a time within the section.
+  one device at a time within the section. See [Critical Section](daemon/critical-section.md) for details.
 - Optional `barrier` tool can synchronize devices without serializing actions.
-
-## Android implementation
-
-- Resolve label -> session routing in JUnitRunner/Daemon, not in the plan.
-- Use a per-plan scheduler to track device tasks and locks.
-- `criticalSection` waits until all devices reach the block before executing
-  steps in a single-device sequence.
-- Emit per-device timing metadata for debugging.
-- Support YAML merge keys (`<<`) so anchors validate correctly.
 
 ## Implementation
 
@@ -136,12 +123,6 @@ Plans are validated at parse time:
 - Steps within a device maintain their relative order
 - Both plan position and device track position are tracked for debugging
 
-**Critical Sections:**
-- Added to all device tracks at the same plan position
-- All devices wait at the barrier until all arrive
-- Steps inside execute serially, one device at a time
-- Coordinator handles synchronization and mutex
-
 ### Abort Strategy
 
 Configurable behavior when a device fails:
@@ -156,23 +137,6 @@ Debug mode or failures log per-device execution timing:
 [PARALLEL_EXEC]   B: FAILED - 3/5 steps (987ms)
 [PARALLEL_EXEC]   B: Failed at plan step 7 (track step 2): Timeout waiting for element
 ```
-
-### Key Files
-
-- `src/models/Plan.ts` - Plan schema with devices field
-- `src/utils/plan/PlanValidator.ts` - Multi-device validation
-- `src/utils/plan/PlanPartitioner.ts` - Partition plan into device tracks
-- `src/utils/plan/PlanExecutor.ts` - Parallel execution logic
-- `src/server/CriticalSectionCoordinator.ts` - Barrier synchronization
-
-## Completed Features
-
-1. ✅ Add `devices` list and `device` routing key on steps.
-2. ✅ Run top-level steps in parallel when device labels differ.
-3. ✅ Add `criticalSection` tool support with coordinator.
-4. ✅ Per-device timing and debug output.
-5. ✅ Configurable abort strategy.
-6. ✅ Maintain both plan and device track positions.
 
 ## Known Limitations
 

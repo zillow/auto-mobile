@@ -12,21 +12,7 @@ Real-time screen streaming from mobile devices to the IDE plugin, enabling inter
 - Integrate with existing observation architecture
 - Single device streaming at a time (no multi-device simultaneous streams)
 
-## Current State
-
-Screenshots are captured on-demand when hierarchy updates occur:
-
-1. Device captures screenshot (JPEG)
-2. Base64 encoded and sent via WebSocket/JSON
-3. MCP server forwards to observation stream socket
-4. IDE plugin decodes and displays
-
-**Problems:**
-- On-demand capture can catch mid-transition frames during animations
-- Base64 encoding adds ~33% payload overhead
-- No continuous streaming for live interaction
-
-## Proposed Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -126,36 +112,6 @@ Client → Server: { "command": "unsubscribe" }
 Server → Client: { "type": "stream_stopped", "reason": "..." }
 ```
 
-## IDE Plugin Frame Handling
-
-```kotlin
-class VideoStreamClient(private val socketPath: Path) {
-    private val _frames = MutableSharedFlow<ImageBitmap>(replay = 1)
-    val frames: SharedFlow<ImageBitmap> = _frames.asSharedFlow()
-
-    fun start(deviceId: String, platform: Platform) {
-        scope.launch(Dispatchers.IO) {
-            val socket = connectToSocket(socketPath)
-            subscribe(socket, deviceId)
-
-            when (platform) {
-                Platform.ANDROID -> decodeH264Frames(socket)  // Uses Klarity
-                Platform.IOS -> decodeRawFrames(socket)       // Direct BGRA
-            }
-        }
-    }
-
-    private suspend fun decodeRawFrames(socket: SocketChannel) {
-        while (isActive) {
-            val header = readFrameHeader(socket)
-            val pixels = readPixelData(socket, header)
-            val bitmap = createImageBitmap(pixels, header.width, header.height)
-            _frames.emit(bitmap)
-        }
-    }
-}
-```
-
 ## Quality Presets
 
 | Quality | Android Bitrate | Resolution | Target FPS |
@@ -174,47 +130,18 @@ When video streaming is unavailable:
 3. Display indicator in UI showing "Screenshot mode"
 4. Retry video streaming on user request or device reconnection
 
-## Implementation Phases
-
-### Phase 1: Android Video Streaming
-- [ ] Video server JAR (VirtualDisplay + MediaCodec)
-- [ ] MCP server video socket
-- [ ] Klarity integration in IDE plugin
-- [ ] Basic DeviceScreenView updates
-
-### Phase 2: iOS Video Streaming
-- [ ] Swift helper for AVFoundation capture (via Swift-to-Node bridge)
-- [ ] ScreenCaptureKit for simulator
-- [ ] Raw frame path in IDE plugin
-
-### Phase 3: Audio Streaming
-- [ ] Android audio capture (AudioRecord or AudioPlaybackCapture)
-- [ ] iOS audio capture (AVCaptureDevice audio channels)
-- [ ] Audio playback in IDE plugin
-
-### Phase 4: Polish
-- [ ] Automatic quality adjustment based on frame rate
-- [ ] Quality controls UI
-- [ ] FPS/latency overlay
-- [ ] Graceful fallback handling
-
-### Future: Touch Input (Planned, Not Implemented)
-- [ ] Click-to-tap on video view
-- [ ] Drag gestures
-- [ ] Keyboard input forwarding
-
 ## Decisions
 
 | Question | Decision |
 |----------|----------|
-| Audio streaming | ✅ Include audio for complete mirroring |
-| Touch input | ✅ Plan for it, implement later |
-| Quality auto-adjustment | ✅ Automatically lower quality on frame drops |
-| Multiple devices | ✅ Single device streaming at a time |
-| Android decoder | ✅ Klarity only, no FFmpeg subprocess fallback |
-| iOS Swift integration | ✅ Swift-to-Node bridge |
-| macOS permissions | ✅ User handles permission prompts |
-| macOS entitlements | ✅ No special entitlements needed for iOS capture |
+| Audio streaming | Include audio for complete mirroring |
+| Touch input | Plan for it, implement later |
+| Quality auto-adjustment | Automatically lower quality on frame drops |
+| Multiple devices | Single device streaming at a time |
+| Android decoder | Klarity only, no FFmpeg subprocess fallback |
+| iOS Swift integration | Swift-to-Node bridge |
+| macOS permissions | User handles permission prompts |
+| macOS entitlements | No special entitlements needed for iOS capture |
 
 ## References
 

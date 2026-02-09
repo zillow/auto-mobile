@@ -15,10 +15,7 @@ The implementation is based on extensive research testing multiple strategies ac
 - **6 strategies** evaluated
 - **100% success rate** for non-keyboard scenarios achieved with shallow scrollable markers
 
-Research findings documented in:
-- `scratch/UPDATED_FINDINGS.md` - Final strategy and results
-- `scratch/FINDINGS.md` - Initial research and strategy comparison
-- `scratch/SCROLLABLE_TABS_FINDINGS.md` - Critical scrollable tabs discovery
+The tiered strategy was validated across 4 screen types and 11 observations with a 100% success rate for non-keyboard scenarios.
 
 ---
 

@@ -1,5 +1,7 @@
 # TalkBack simulation
 
+For the overall accessibility adaptation design (detection strategy, gesture adaptations, and tool-level changes), see [TalkBack/VoiceOver Adaptation](../../mcp/a11y/talkback-voiceover.md). This document covers Android-specific ADB commands and simulation details.
+
 ## Goal
 
 Support TalkBack testing on emulator images (API 29/35) either by

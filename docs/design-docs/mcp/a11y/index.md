@@ -65,16 +65,3 @@ flowchart LR
 | Android | TalkBack | Primary focus |
 | iOS | VoiceOver | Planned |
 
-## Quick Reference
-
-**Detection methods (Android)**:
-```bash
-# Check TalkBack state via ADB
-adb shell settings get secure enabled_accessibility_services
-```
-
-**Feature flag override**:
-```typescript
-// Force accessibility mode for testing
-FeatureFlag.FORCE_ACCESSIBILITY_MODE = true
-```

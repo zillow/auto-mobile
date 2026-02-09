@@ -58,26 +58,4 @@
     class B,C,F decision;
     ```
 
-All collected data is assembled into an object containing (fields may be omitted when unavailable):
-
-- `updatedAt`: device timestamp (or server timestamp fallback)
-- `screenSize`: current screen dimensions (rotation-aware)
-- `systemInsets`: UI insets for all screen edges
-- `rotation`: current device rotation value
-- `activeWindow`: current app/activity information when resolved
-- `viewHierarchy`: complete UI hierarchy (if available)
-- `focusedElement`: currently focused UI element (if any)
-- `intentChooserDetected`: whether a system intent chooser is visible
-- `wakefulness` and `backStack`: Android-specific state
-- `perfTiming`, `displayedTimeMetrics` (Android launchApp "Displayed" startup timings), `performanceAudit`, and `accessibilityAudit`: present when the relevant modes are enabled
-- `error`: error messages encountered during observation
-
-The observation gracefully handles various error conditions:
-
-- Screen off or device locked states
-- Missing accessibility service
-- Network timeouts or ADB connection issues
-- Partial failures (returns available data even if some operations fail)
-
-Each error is captured in the result object without causing the entire observation to fail, ensuring maximum data
-availability for automation workflows.
+See [Observation Overview](../../mcp/observe/index.md) for the full list of collected fields and error handling.
