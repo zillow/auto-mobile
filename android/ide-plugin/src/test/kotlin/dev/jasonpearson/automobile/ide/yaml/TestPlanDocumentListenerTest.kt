@@ -24,6 +24,7 @@ class TestPlanDocumentListenerTest {
     listener =
         TestPlanDocumentListener(
             validationTrigger = fakeValidationTrigger,
+            parentDisposable = testDisposable,
             isLintingEnabled = { lintingEnabled },
             delayMs = 0, // No delay for tests
         )
@@ -104,6 +105,7 @@ class TestPlanDocumentListenerTest {
     val debouncingListener =
         TestPlanDocumentListener(
             validationTrigger = debounceTrigger,
+            parentDisposable = debounceDisposable,
             isLintingEnabled = { lintingEnabled },
             delayMs = 100, // 100ms delay
         )
@@ -141,6 +143,7 @@ class TestPlanDocumentListenerTest {
     val debouncingListener =
         TestPlanDocumentListener(
             validationTrigger = disposeTrigger,
+            parentDisposable = disposeDisposable,
             isLintingEnabled = { lintingEnabled },
             delayMs = 500, // Long delay
         )

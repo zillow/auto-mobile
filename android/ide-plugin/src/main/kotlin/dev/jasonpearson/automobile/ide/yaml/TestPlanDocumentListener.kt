@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.ide.yaml
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.editor.event.BulkAwareDocumentListener
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.util.Alarm
@@ -16,14 +17,14 @@ import dev.jasonpearson.automobile.ide.settings.AutoMobileSettings
  */
 class TestPlanDocumentListener(
     private val validationTrigger: ValidationTrigger,
+    parentDisposable: Disposable,
     private val isLintingEnabled: () -> Boolean = {
       AutoMobileSettings.getInstance().enableYamlLinting
     },
     private val delayMs: Int = 300,
 ) : BulkAwareDocumentListener {
 
-  private val alarm =
-      Alarm(Alarm.ThreadToUse.POOLED_THREAD, validationTrigger as? com.intellij.openapi.Disposable)
+  private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, parentDisposable)
 
   override fun documentChanged(event: DocumentEvent) {
     if (!isLintingEnabled()) {

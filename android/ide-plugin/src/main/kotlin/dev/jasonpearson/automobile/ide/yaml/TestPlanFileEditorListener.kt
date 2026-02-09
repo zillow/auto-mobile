@@ -26,7 +26,7 @@ class TestPlanFileEditorListener : FileEditorManagerListener {
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return
         val project = source.project
         val validationTrigger = IntellijValidationTrigger(project)
-        val listener = TestPlanDocumentListener(validationTrigger)
+        val listener = TestPlanDocumentListener(validationTrigger, project)
         document.addDocumentListener(listener)
         listeners[file] = listener
         log.info("Attached test plan document listener to ${file.name}")
