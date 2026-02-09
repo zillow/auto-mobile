@@ -20,7 +20,7 @@ on:
 
 jobs:
   build:
-    name: "Build Accessibility Service APK"
+    name: "Build Accessibility Service"
     runs-on: ubuntu-latest
     outputs:
       sha256: ${{ steps.checksum.outputs.sha256 }}
