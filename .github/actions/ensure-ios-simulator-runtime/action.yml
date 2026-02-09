@@ -8,10 +8,16 @@ runs:
       id: check
       shell: bash
       run: |
-        runtime_count=$(xcrun simctl list runtimes iOS --json | jq '.runtimes | length')
-        echo "Found ${runtime_count} iOS simulator runtime(s)"
-        if [ "${runtime_count}" -eq 0 ]; then
-          echo "::warning::No iOS simulator runtimes found — downloading platform"
+        sdk_version=$(xcrun --sdk iphonesimulator --show-sdk-version)
+        major_version="${sdk_version%%.*}"
+        echo "Xcode SDK version: ${sdk_version} (need iOS ${major_version}.x runtime)"
+        echo "major_version=${major_version}" >> "$GITHUB_OUTPUT"
+
+        match_count=$(xcrun simctl list runtimes iOS --json \
+          | jq --arg v "${major_version}" '[.runtimes[] | select(.version | startswith($v + "."))] | length')
+        echo "Found ${match_count} iOS ${major_version}.x simulator runtime(s)"
+        if [ "${match_count}" -eq 0 ]; then
+          echo "::warning::No iOS ${major_version}.x simulator runtime found — downloading platform"
           echo "needs_download=true" >> "$GITHUB_OUTPUT"
         fi
 
@@ -24,9 +30,11 @@ runs:
       if: steps.check.outputs.needs_download == 'true'
       shell: bash
       run: |
-        runtime_count=$(xcrun simctl list runtimes iOS --json | jq '.runtimes | length')
-        echo "Found ${runtime_count} iOS simulator runtime(s) after download"
-        if [ "${runtime_count}" -eq 0 ]; then
-          echo "::error::Still no iOS simulator runtimes after download"
+        major_version="${{ steps.check.outputs.major_version }}"
+        match_count=$(xcrun simctl list runtimes iOS --json \
+          | jq --arg v "${major_version}" '[.runtimes[] | select(.version | startswith($v + "."))] | length')
+        echo "Found ${match_count} iOS ${major_version}.x simulator runtime(s) after download"
+        if [ "${match_count}" -eq 0 ]; then
+          echo "::error::Still no iOS ${major_version}.x simulator runtime after download"
           exit 1
         fi
