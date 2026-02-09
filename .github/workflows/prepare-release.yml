@@ -15,60 +15,16 @@ permissions:
 
 jobs:
   build-xctestservice-ipa:
-    name: "Build XCTestService IPA"
-    runs-on: macos-15
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: "Select Xcode 16.2"
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "16.2"
-
-      - name: "Install XcodeGen"
-        run: brew install xcodegen
-
-      - name: "Install xcpretty"
-        run: gem install xcpretty
-
-      - name: "Build XCTestService IPA"
-        run: ./scripts/ios/xctestservice-create-ipa.sh --output /tmp/XCTestService.ipa
-
-      - name: "Upload XCTestService IPA"
-        uses: actions/upload-artifact@v4
-        with:
-          name: xctestservice-ipa
-          path: /tmp/XCTestService.ipa
+    uses: ./.github/workflows/build-xctestservice-ipa.yml
 
   build-accessibility-service-apk:
-    name: "Build Accessibility Service APK"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build Accessibility Service APK
-        uses: ./.github/actions/gradle-task-run
-        with:
-          gradle-tasks: ":accessibility-service:assembleDebug"
-          gradle-project-directory: "android"
-          gradle-home-directory: "~/.gradle/${{ github.job }}"
-          reuse-configuration-cache: true
-          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
-          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
-
-      - name: "Copy APK to output directory"
-        run: cp android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk /tmp/accessibility-service-debug.apk
-
-      - name: "Upload Accessibility Service APK"
-        uses: actions/upload-artifact@v4
-        with:
-          name: accessibility-service-apk
-          path: /tmp/accessibility-service-debug.apk
+    uses: ./.github/workflows/build-accessibility-service-apk.yml
+    secrets:
+      GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
   prepare:
     runs-on: ubuntu-latest
@@ -98,13 +54,13 @@ jobs:
         run: scripts/changelog/update_changelog_from_issues.sh
 
       - name: "Download XCTestService IPA"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: xctestservice-ipa
           path: /tmp
 
       - name: "Download Accessibility Service APK"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: accessibility-service-apk
           path: /tmp

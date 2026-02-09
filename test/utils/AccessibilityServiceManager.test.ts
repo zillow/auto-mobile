@@ -9,7 +9,7 @@ import * as path from "path";
 import crypto from "crypto";
 import os from "os";
 import AdmZip from "adm-zip";
-import { FakeTimer } from "../fakes/FakeTimer";
+
 import { FakeAccessibilityDetector } from "../fakes/FakeAccessibilityDetector";
 
 describe("AccessibilityServiceManager", function() {
@@ -462,62 +462,6 @@ describe("AccessibilityServiceManager", function() {
   });
 
   describe("downloadApk", () => {
-    type ShellCommandResult = { stdout: string; stderr: string };
-
-    interface ShellCommandExecutor {
-      exec(command: string): Promise<ShellCommandResult>;
-      getExecutedCommands(): string[];
-      on(
-        matcher: (command: string) => boolean,
-        handler: (command: string) => Promise<ShellCommandResult>
-      ): void;
-    }
-
-    class FakeShellCommandExecutor implements ShellCommandExecutor {
-      private handlers: Array<{
-        matcher: (command: string) => boolean;
-        handler: (command: string) => Promise<ShellCommandResult>;
-      }> = [];
-      private executedCommands: string[] = [];
-
-      on(
-        matcher: (command: string) => boolean,
-        handler: (command: string) => Promise<ShellCommandResult>
-      ): void {
-        this.handlers.push({ matcher, handler });
-      }
-
-      async exec(command: string): Promise<ShellCommandResult> {
-        this.executedCommands.push(command);
-        // Use setImmediate to simulate async behavior without depending on timer
-        await new Promise(resolve => setImmediate(resolve));
-
-        const match = this.handlers.find(entry => entry.matcher(command));
-        if (!match) {
-          return { stdout: "", stderr: "" };
-        }
-
-        return match.handler(command);
-      }
-
-      getExecutedCommands(): string[] {
-        return [...this.executedCommands];
-      }
-    }
-
-    const getCurlOutputPath = (command: string): string => {
-      const match = command.match(/-o "([^"]+)"/);
-      if (!match) {
-        throw new Error("Missing output path for APK download");
-      }
-      return match[1];
-    };
-
-    const getQuotedPath = (command: string): string => {
-      const match = command.match(/"([^"]+)"/);
-      return match?.[1] ?? "";
-    };
-
     test("should copy from local APK override when provided", async function() {
       const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-test-apk-"));
       const localApkPath = path.join(tempDir, "accessibility-service-debug.apk");
@@ -540,7 +484,7 @@ describe("AccessibilityServiceManager", function() {
       expect(stats.size).toBeGreaterThan(10000);
     });
 
-    test("should fall back to node checksum when sha tools are unavailable", async function() {
+    test("should download remote APK and verify checksum via injected utilities", async function() {
       // Create a valid APK structure (ZIP with AndroidManifest.xml)
       const zip = new AdmZip();
       const manifestContent = '<?xml version="1.0" encoding="utf-8"?><manifest></manifest>';
@@ -551,72 +495,28 @@ describe("AccessibilityServiceManager", function() {
       const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
-      const timer = new FakeTimer();
-      timer.enableAutoAdvance();
-      const shell = new FakeShellCommandExecutor();
+      // Inject fake FileDownloader that writes the APK payload
       let downloadedPath: string | null = null;
+      (accessibilityServiceClient as any).fileDownloader = {
+        download: async (_url: string, destination: string) => {
+          downloadedPath = destination;
+          await fs.mkdir(path.dirname(destination), { recursive: true });
+          await fs.writeFile(destination, payload);
+        }
+      };
 
-      shell.on(command => command.startsWith("curl "), async command => {
-        const outputPath = getCurlOutputPath(command);
-        downloadedPath = outputPath;
-        await fs.mkdir(path.dirname(outputPath), { recursive: true });
-        await fs.writeFile(outputPath, payload);
-        return { stdout: "", stderr: "" };
-      });
-      shell.on(command => command.includes("sha256sum"), async () => {
-        throw new Error("command not found");
-      });
-      shell.on(command => command.includes("shasum -a 256"), async () => {
-        throw new Error("command not found");
-      });
-
-      (accessibilityServiceClient as any).execShell = (command: string) => shell.exec(command);
+      // Inject fake ChecksumCalculator that returns the expected checksum
+      (accessibilityServiceClient as any).checksumCalculator = {
+        computeFileSha256: async () => ({
+          checksum: expectedChecksum,
+          source: "node" as const
+        })
+      };
 
       const apkPath = await accessibilityServiceClient.downloadApk();
       const stats = await fs.stat(apkPath);
       expect(stats.size).toBe(payload.length);
       expect(apkPath).toBe(downloadedPath);
-      expect(shell.getExecutedCommands().some(command => command.includes("sha256sum"))).toBe(true);
-      expect(shell.getExecutedCommands().some(command => command.includes("shasum -a 256"))).toBe(true);
-      expect(shell.getExecutedCommands().some(command => command.startsWith("curl ") && command.includes("-o"))).toBe(true);
-    });
-
-    test("should download remote APK and verify checksum", async function() {
-      // Create a valid APK structure (ZIP with AndroidManifest.xml)
-      const zip = new AdmZip();
-      const manifestContent = '<?xml version="1.0" encoding="utf-8"?><manifest></manifest>';
-      zip.addFile("AndroidManifest.xml", Buffer.from(manifestContent, "utf8"));
-      const paddingData = crypto.randomBytes(15000);
-      zip.addFile("classes.dex", paddingData);
-      const payload = zip.toBuffer();
-      const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
-      AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
-
-      const timer = new FakeTimer();
-      timer.enableAutoAdvance();
-      const shell = new FakeShellCommandExecutor();
-      let downloadedPath: string | null = null;
-
-      shell.on(command => command.startsWith("curl "), async command => {
-        const outputPath = getCurlOutputPath(command);
-        downloadedPath = outputPath;
-        await fs.mkdir(path.dirname(outputPath), { recursive: true });
-        await fs.writeFile(outputPath, payload);
-        return { stdout: "", stderr: "" };
-      });
-      shell.on(command => command.includes("sha256sum"), async command => ({
-        stdout: `${expectedChecksum} ${getQuotedPath(command)}\n`,
-        stderr: ""
-      }));
-
-      (accessibilityServiceClient as any).execShell = (command: string) => shell.exec(command);
-
-      const apkPath = await accessibilityServiceClient.downloadApk();
-      const stats = await fs.stat(apkPath);
-      expect(stats.size).toBe(payload.length);
-      expect(apkPath).toBe(downloadedPath);
-      expect(shell.getExecutedCommands().some(command => command.startsWith("curl ") && command.includes("-o"))).toBe(true);
-      expect(shell.getExecutedCommands().some(command => command.includes("sha256sum"))).toBe(true);
       await accessibilityServiceClient.cleanupApk(apkPath);
     });
 
@@ -631,66 +531,54 @@ describe("AccessibilityServiceManager", function() {
       const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
-      const timer = new FakeTimer();
-      timer.enableAutoAdvance();
-      const shell = new FakeShellCommandExecutor();
+      // Inject fake FileDownloader that writes the APK payload
+      (accessibilityServiceClient as any).fileDownloader = {
+        download: async (_url: string, destination: string) => {
+          await fs.mkdir(path.dirname(destination), { recursive: true });
+          await fs.writeFile(destination, payload);
+        }
+      };
 
-      shell.on(command => command.startsWith("curl "), async command => {
-        const outputPath = getCurlOutputPath(command);
-        await fs.mkdir(path.dirname(outputPath), { recursive: true });
-        await fs.writeFile(outputPath, payload);
-        return { stdout: "", stderr: "" };
-      });
-      shell.on(command => command.includes("sha256sum"), async command => ({
-        stdout: `mismatched-checksum ${getQuotedPath(command)}\n`,
-        stderr: ""
-      }));
-
-      (accessibilityServiceClient as any).execShell = (command: string) => shell.exec(command);
+      // Inject fake ChecksumCalculator that returns a mismatched checksum
+      (accessibilityServiceClient as any).checksumCalculator = {
+        computeFileSha256: async () => ({
+          checksum: "mismatched-checksum",
+          source: "node" as const
+        })
+      };
 
       await expect(accessibilityServiceClient.downloadApk()).rejects.toThrow(
         "APK checksum verification failed"
       );
-      expect(shell.getExecutedCommands().some(command => command.includes("sha256sum"))).toBe(true);
     });
 
     test("should fail when downloaded APK is too small", async function() {
       const payload = Buffer.alloc(250, 5);
 
-      const timer = new FakeTimer();
-      timer.enableAutoAdvance();
-      const shell = new FakeShellCommandExecutor();
-
-      shell.on(command => command.startsWith("curl "), async command => {
-        const outputPath = getCurlOutputPath(command);
-        await fs.mkdir(path.dirname(outputPath), { recursive: true });
-        await fs.writeFile(outputPath, payload);
-        return { stdout: "", stderr: "" };
-      });
-
-      (accessibilityServiceClient as any).execShell = (command: string) => shell.exec(command);
+      // Inject fake FileDownloader that writes a tiny payload
+      (accessibilityServiceClient as any).fileDownloader = {
+        download: async (_url: string, destination: string) => {
+          await fs.mkdir(path.dirname(destination), { recursive: true });
+          await fs.writeFile(destination, payload);
+        }
+      };
 
       await expect(accessibilityServiceClient.downloadApk()).rejects.toThrow(
         "Downloaded APK is too small"
       );
-      expect(shell.getExecutedCommands().some(command => command.includes("sha256sum"))).toBe(false);
     });
 
-    test("should fail when curl download errors", async function() {
-      const timer = new FakeTimer();
-      timer.enableAutoAdvance();
-      const shell = new FakeShellCommandExecutor();
-
-      shell.on(command => command.startsWith("curl "), async () => {
-        throw new Error("curl failed");
-      });
-
-      (accessibilityServiceClient as any).execShell = (command: string) => shell.exec(command);
+    test("should fail when download errors", async function() {
+      // Inject fake FileDownloader that throws
+      (accessibilityServiceClient as any).fileDownloader = {
+        download: async () => {
+          throw new Error("download failed");
+        }
+      };
 
       await expect(accessibilityServiceClient.downloadApk()).rejects.toThrow(
-        "Failed to download APK: curl failed"
+        "Failed to download APK: download failed"
       );
-
     });
   });
 

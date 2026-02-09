@@ -625,9 +625,6 @@ jobs:
   build-android-accessibility-service:
     name: "Build Accessibility Service"
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     defaults:
       run:
         working-directory: android
@@ -756,7 +753,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         if: ${{ endsWith(steps.library-version.outputs.version, '-SNAPSHOT') }}
         with:
-          gradle-tasks: ":junit-runner:publishToMavenCentral :auto-mobile-sdk:publishToMavenCentral"
+          gradle-tasks: ":junit-runner:publish :auto-mobile-sdk:publish"
           gradle-project-directory: "android"
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
