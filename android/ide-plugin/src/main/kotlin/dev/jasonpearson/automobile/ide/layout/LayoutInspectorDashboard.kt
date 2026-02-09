@@ -105,6 +105,22 @@ fun LayoutInspectorDashboard(
         }
     }
 
+    // Poll socket existence so the UI reacts when the daemon starts or stops.
+    // Only active when disconnected/connecting — connected state doesn't need this.
+    var socketExists by remember { mutableStateOf(ObservationStreamClient.socketExists()) }
+    val isDisconnectedOrConnecting = state.connectionStatus == ConnectionStatus.Disconnected ||
+        state.connectionStatus == ConnectionStatus.Connecting
+    LaunchedEffect(isDisconnectedOrConnecting) {
+        if (isDisconnectedOrConnecting) {
+            while (true) {
+                socketExists = ObservationStreamClient.socketExists()
+                kotlinx.coroutines.delay(2000)
+            }
+        } else {
+            socketExists = true
+        }
+    }
+
     // Initial fetch as fallback (in case stream hasn't pushed yet)
     LaunchedEffect(dataSourceMode, clientProvider) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -189,7 +205,7 @@ fun LayoutInspectorDashboard(
                 showTapTargetIssues = state.showTapTargetIssues,
                 onToggleTapTargetIssues = { state.toggleTapTargetIssues() },
                 connectionStatus = state.connectionStatus,
-                socketExists = ObservationStreamClient.socketExists(),
+                socketExists = socketExists,
                 onRestartDaemon = onRestartDaemon,
                 modifier = Modifier.fillMaxSize(),
                 refitTrigger = refitTrigger,  // Trigger refit when panels toggle
