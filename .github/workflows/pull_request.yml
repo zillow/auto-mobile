@@ -1062,15 +1062,34 @@ jobs:
           path: core/build/outputs/aar/core-debug.aar
 
   build-android-accessibility-service:
+    name: "Build Accessibility Service"
+    runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.android_should_run == 'true'
-    uses: ./.github/workflows/build-accessibility-service-apk.yml
-    secrets:
-      GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":accessibility-service:assembleDebug"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+      - name: "Store Accessibility Service APK"
+        uses: actions/upload-artifact@v6
+        with:
+          name: accessibility-service-apk
+          path: android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
 
   build-playground-app:
     name: "Build Playground App"
