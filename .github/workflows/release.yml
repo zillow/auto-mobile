@@ -166,7 +166,7 @@ jobs:
         run: |
           cd android
           # Override VERSION_NAME with the release version from git tag (not the SNAPSHOT in gradle.properties)
-          ./gradlew :junit-runner:publishAndReleaseToMavenCentral :auto-mobile-sdk:publishAndReleaseToMavenCentral \
+          ./gradlew :junit-runner:publish :auto-mobile-sdk:publish \
             -PVERSION_NAME=${{ steps.version.outputs.version }} \
             --no-configuration-cache
 
