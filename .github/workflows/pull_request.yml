@@ -720,6 +720,97 @@ jobs:
       - name: "Build Xcode Projects"
         run: ./scripts/ios/xcode-build.sh
 
+  ios-xctestservice-build:
+    name: "Build XCTestService for Testing"
+    runs-on: macos-26
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode 26.0"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.0"
+
+      - name: "Ensure iOS Simulator runtime"
+        uses: ./.github/actions/ensure-ios-simulator-runtime
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Install xcpretty"
+        run: gem install xcpretty
+
+      - name: "Build XCTestService for Testing"
+        run: ./scripts/ios/xctestservice-build-for-testing.sh
+
+      - name: "Upload XCTestService Artifacts"
+        uses: actions/upload-artifact@v6
+        with:
+          name: xctestservice-simulator-xcode26
+          path: /tmp/automobile-xctestservice/Build/Products
+          retention-days: 1
+
+  ios-xctest-runner-simulator-tests:
+    name: "XCTestRunner Simulator Tests (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    needs: [detect-changes, ios-xctestservice-build]
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-15", xcode: "15.4" }
+          - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
+    timeout-minutes: 30
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Ensure iOS Simulator runtime"
+        uses: ./.github/actions/ensure-ios-simulator-runtime
+
+      - name: "Download XCTestService Artifacts"
+        uses: actions/download-artifact@v7
+        with:
+          name: xctestservice-simulator-xcode26
+          path: /tmp/automobile-xctestservice/Build/Products
+
+      - name: "Setup Bun"
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Boot iOS Simulator"
+        run: |
+          xcrun simctl boot "iPhone 16"
+          xcrun simctl bootstatus "iPhone 16" -b
+
+      - name: "Verify XCTestService Artifacts"
+        run: |
+          echo "Checking XCTestService artifacts..."
+          ls -la /tmp/automobile-xctestservice/Build/Products/
+          ls -la /tmp/automobile-xctestservice/Build/Products/Debug-iphonesimulator/ || true
+          XCTESTRUN=$(find /tmp/automobile-xctestservice/Build/Products -name "*.xctestrun" | head -1)
+          echo "xctestrun file: ${XCTESTRUN}"
+
+      - name: "Run Reminders integration tests"
+        timeout-minutes: 10
+        env:
+          AUTOMOBILE_TEST_PLAN: "Plans/launch-reminders-app.yaml"
+        run: |
+          cd ios/XCTestRunner
+          swift test --filter RemindersLaunchPlanTests 2>&1
+
   # =============================================================================
   # Android Build and Test Jobs (Android-related changes only)
   # =============================================================================
