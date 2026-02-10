@@ -92,6 +92,7 @@ fun DeviceScreenView(
     connectionStatus: ConnectionStatus = ConnectionStatus.Connected,
     socketExists: Boolean = true,
     onRestartDaemon: (() -> Unit)? = null,
+    elementMap: Map<String, UIElementInfo>? = null,
     modifier: Modifier = Modifier,
     refitTrigger: Any? = null,  // When this changes, refit the view to center
 ) {
@@ -122,24 +123,18 @@ fun DeviceScreenView(
         }
     }
 
-    // Find selected and hovered elements
-    val selectedElement = remember(hierarchy, selectedElementId) {
-        if (hierarchy != null && selectedElementId != null) {
-            LayoutInspectorMockData.findElementById(hierarchy, selectedElementId)
-        } else null
+    // Find selected and hovered elements — O(1) map lookups instead of DFS
+    val selectedElement = remember(elementMap, selectedElementId) {
+        selectedElementId?.let { elementMap?.get(it) }
     }
 
-    val hoveredElement = remember(hierarchy, hoveredElementId) {
-        if (hierarchy != null && hoveredElementId != null) {
-            LayoutInspectorMockData.findElementById(hierarchy, hoveredElementId)
-        } else null
+    val hoveredElement = remember(elementMap, hoveredElementId) {
+        hoveredElementId?.let { elementMap?.get(it) }
     }
 
     // Flash element for highlight animation on double-click
-    val flashElement = remember(hierarchy, flashElementId) {
-        if (hierarchy != null && flashElementId != null) {
-            LayoutInspectorMockData.findElementById(hierarchy, flashElementId)
-        } else null
+    val flashElement = remember(elementMap, flashElementId) {
+        flashElementId?.let { elementMap?.get(it) }
     }
 
     // Flash animation state
@@ -209,8 +204,14 @@ fun DeviceScreenView(
                 frameWidthPx = maxFrameHeight / deviceAspectRatio
             }
 
-            // Scale factor from frame pixels to device pixels (for hit testing)
+            // Scale factor from frame pixels to device pixels (for aspect ratio calculations only)
             val frameToDeviceScale = if (frameWidthPx > 0) effectiveWidth.toFloat() / frameWidthPx else 1f
+
+            // Scale factor from frame pixels to hierarchy bounds coordinates (for hit testing).
+            // Hierarchy bounds may differ from image pixels (e.g. iOS points vs pixels),
+            // so we use the root element bounds width — matching the overlay drawing scale.
+            val rootBoundsWidth = hierarchy?.bounds?.width ?: effectiveWidth
+            val frameToHierarchyScale = if (frameWidthPx > 0) rootBoundsWidth.toFloat() / frameWidthPx else 1f
 
             // Reset fit state when refitTrigger changes (e.g., panels toggled)
             LaunchedEffect(refitTrigger) {
@@ -274,14 +275,14 @@ fun DeviceScreenView(
                 zoomAroundPoint(newScale, viewportWidth / 2, viewportHeight / 2)
             }
 
-            // Convert screen coordinates to device pixel coordinates (for hit testing)
-            fun screenToDevice(screenX: Float, screenY: Float): Pair<Int, Int> {
-                // First convert to frame coordinates, then scale to device pixels
+            // Convert screen coordinates to hierarchy bounds coordinates (for hit testing).
+            // Uses the same coordinate system as element.bounds so findElementAt works correctly.
+            fun screenToHierarchyCoords(screenX: Float, screenY: Float): Pair<Int, Int> {
                 val frameX = (screenX - offsetX) / scale
                 val frameY = (screenY - offsetY) / scale
-                val deviceX = (frameX * frameToDeviceScale).roundToInt()
-                val deviceY = (frameY * frameToDeviceScale).roundToInt()
-                return deviceX to deviceY
+                val hierX = (frameX * frameToHierarchyScale).roundToInt()
+                val hierY = (frameY * frameToHierarchyScale).roundToInt()
+                return hierX to hierY
             }
 
             // Focus requester for keyboard events
@@ -320,7 +321,7 @@ fun DeviceScreenView(
                     .pointerInput(hierarchy) {
                         detectTapGestures { offset ->
                             if (hierarchy != null) {
-                                val (deviceX, deviceY) = screenToDevice(offset.x, offset.y)
+                                val (deviceX, deviceY) = screenToHierarchyCoords(offset.x, offset.y)
                                 val element = LayoutInspectorMockData.findElementAt(hierarchy, deviceX, deviceY)
                                 onElementSelected(element?.id)
                             }
@@ -330,7 +331,7 @@ fun DeviceScreenView(
                         if (hierarchy != null) {
                             val pos = event.changes.firstOrNull()?.position
                             if (pos != null) {
-                                val (deviceX, deviceY) = screenToDevice(pos.x, pos.y)
+                                val (deviceX, deviceY) = screenToHierarchyCoords(pos.x, pos.y)
                                 val element = LayoutInspectorMockData.findElementAt(hierarchy, deviceX, deviceY)
                                 onElementHovered(element?.id)
                             }

@@ -39,9 +39,20 @@ class LayoutInspectorState {
     var lastScreenshotTimestamp by mutableStateOf(0L)
         private set
 
-    // Hierarchy state
-    var hierarchy by mutableStateOf<UIElementInfo?>(null)
-        private set
+    // Hierarchy state — stores the full parsed hierarchy with prebuilt indexes
+    private var currentParsedHierarchy by mutableStateOf<ParsedHierarchy?>(null)
+
+    /** The root of the current UI hierarchy tree. */
+    val hierarchy: UIElementInfo?
+        get() = currentParsedHierarchy?.root
+
+    /** Pre-built element map for O(1) lookups by ID. */
+    val currentElementMap: Map<String, UIElementInfo>
+        get() = currentParsedHierarchy?.elementMap ?: emptyMap()
+
+    /** Pre-built parent map for O(depth) path lookups. */
+    val parentMap: Map<String, String>
+        get() = currentParsedHierarchy?.parentMap ?: emptyMap()
 
     // Changed elements tracking - IDs of elements that changed in the last update
     // Used to trigger flash animations in the tree view
@@ -59,13 +70,9 @@ class LayoutInspectorState {
     var showTapTargetIssues by mutableStateOf(false)
         private set
 
-    // Selected element (computed from hierarchy and selectedElementId)
-    val selectedElement: UIElementInfo?
-        get() = hierarchy?.let { root ->
-            selectedElementId?.let { id ->
-                LayoutInspectorMockData.findElementById(root, id)
-            }
-        }
+    // Cached selected element — O(1) map lookup instead of DFS per recomposition
+    var selectedElement by mutableStateOf<UIElementInfo?>(null)
+        private set
 
     // Initialize with mock data for Phase 1
     init {
@@ -76,7 +83,8 @@ class LayoutInspectorState {
      * Load mock data for development/testing.
      */
     fun loadMockData() {
-        hierarchy = LayoutInspectorMockData.mockHierarchy
+        val root = LayoutInspectorMockData.mockHierarchy
+        currentParsedHierarchy = buildParsedHierarchy(root)
         connectionStatus = ConnectionStatus.Connected
         streamingMode = StreamingMode.Paused
     }
@@ -86,6 +94,7 @@ class LayoutInspectorState {
      */
     fun selectElement(elementId: String?) {
         selectedElementId = elementId
+        selectedElement = elementId?.let { currentElementMap[it] }
     }
 
     /**
@@ -107,6 +116,7 @@ class LayoutInspectorState {
      */
     fun clearSelection() {
         selectedElementId = null
+        selectedElement = null
     }
 
     /**
@@ -133,7 +143,8 @@ class LayoutInspectorState {
      */
     fun refreshHierarchy() {
         // Phase 1: Just reload mock data
-        hierarchy = LayoutInspectorMockData.mockHierarchy
+        val root = LayoutInspectorMockData.mockHierarchy
+        currentParsedHierarchy = buildParsedHierarchy(root)
         lastScreenshotTimestamp = System.currentTimeMillis()
     }
 
@@ -149,29 +160,33 @@ class LayoutInspectorState {
     }
 
     /**
-     * Update hierarchy data.
-     * Called when receiving hierarchy updates from device.
-     * Detects changed elements and tracks them for visual feedback.
-     * Clears selection if the selected element is no longer in the hierarchy.
+     * Update hierarchy data from a raw [UIElementInfo] root (e.g. from initial fetch).
+     * Builds indexes internally. For the streaming path, prefer
+     * [applyHierarchyUpdate] with a pre-computed [ParsedHierarchy].
      */
     fun updateHierarchy(newHierarchy: UIElementInfo) {
-        // Detect changed elements by comparing with the previous hierarchy
-        val oldHierarchy = hierarchy
-        changedElementIds = if (oldHierarchy != null) {
-            findChangedElements(oldHierarchy, newHierarchy)
-        } else {
-            emptySet()
-        }
+        val parsed = buildParsedHierarchy(newHierarchy)
+        val changedIds = computeChangedElements(currentElementMap, parsed.elementMap)
+        applyHierarchyUpdate(parsed, changedIds)
+    }
 
-        // Always update - Compose will efficiently diff the actual UI changes.
-        hierarchy = newHierarchy
+    /**
+     * Apply a pre-computed hierarchy update on the main thread.
+     * Only performs fast state assignments — no tree traversals.
+     */
+    fun applyHierarchyUpdate(parsed: ParsedHierarchy, changedIds: Set<String>) {
+        changedElementIds = changedIds
+        currentParsedHierarchy = parsed
 
-        // Clear selection if the selected element no longer exists in the new hierarchy
+        // Clear selection if the selected element no longer exists — O(1) map check
         val currentSelectedId = selectedElementId
         if (currentSelectedId != null) {
-            val newElementsById = flattenToMap(newHierarchy)
-            if (!newElementsById.containsKey(currentSelectedId)) {
+            if (!parsed.elementMap.containsKey(currentSelectedId)) {
                 selectedElementId = null
+                selectedElement = null
+            } else {
+                // Update cached reference in case the element object changed
+                selectedElement = parsed.elementMap[currentSelectedId]
             }
         }
     }
@@ -185,28 +200,23 @@ class LayoutInspectorState {
     }
 
     /**
-     * Find elements that changed between two hierarchies.
-     * Compares elements by their stable ID and detects property changes.
+     * Compare two element maps to find IDs that are new or have changed properties.
+     * Pure function — safe to call off the main thread.
      */
-    private fun findChangedElements(old: UIElementInfo, new: UIElementInfo): Set<String> {
+    fun computeChangedElements(
+        oldElementMap: Map<String, UIElementInfo>,
+        newElementMap: Map<String, UIElementInfo>,
+    ): Set<String> {
+        if (oldElementMap.isEmpty()) return emptySet()
         val changedIds = mutableSetOf<String>()
-        val oldElementsById = flattenToMap(old)
-        val newElementsById = flattenToMap(new)
-
-        // Find elements that exist in both but have changed properties
-        for ((id, newElement) in newElementsById) {
-            val oldElement = oldElementsById[id]
+        for ((id, newElement) in newElementMap) {
+            val oldElement = oldElementMap[id]
             if (oldElement == null) {
-                // New element appeared
                 changedIds.add(id)
             } else if (hasElementChanged(oldElement, newElement)) {
-                // Existing element changed
                 changedIds.add(id)
             }
         }
-
-        // Elements that were removed don't need to flash (they're gone)
-
         return changedIds
     }
 
@@ -225,19 +235,6 @@ class LayoutInspectorState {
             old.isCheckable != new.isCheckable ||
             old.isChecked != new.isChecked ||
             old.children.size != new.children.size
-    }
-
-    /**
-     * Flatten hierarchy into a map by element ID for efficient lookup.
-     */
-    private fun flattenToMap(root: UIElementInfo): Map<String, UIElementInfo> {
-        val result = mutableMapOf<String, UIElementInfo>()
-        fun traverse(element: UIElementInfo) {
-            result[element.id] = element
-            element.children.forEach { traverse(it) }
-        }
-        traverse(root)
-        return result
     }
 
     /**
@@ -266,8 +263,9 @@ class LayoutInspectorState {
         connectionStatus = ConnectionStatus.Disconnected
         streamingMode = StreamingMode.Paused
         screenshotData = null
-        hierarchy = null
+        currentParsedHierarchy = null
         selectedElementId = null
+        selectedElement = null
         hoveredElementId = null
         changedElementIds = emptySet()
     }
@@ -295,6 +293,24 @@ class LayoutInspectorState {
         // Phase 2: Send WebSocket message
         // { "type": "unsubscribe_screenshots" }
     }
+}
+
+/**
+ * Build a [ParsedHierarchy] from a raw [UIElementInfo] tree.
+ * Traverses the tree once to build element and parent maps.
+ */
+fun buildParsedHierarchy(root: UIElementInfo): ParsedHierarchy {
+    val elementMap = mutableMapOf<String, UIElementInfo>()
+    val parentMap = mutableMapOf<String, String>()
+    fun traverse(element: UIElementInfo) {
+        elementMap[element.id] = element
+        for (child in element.children) {
+            parentMap[child.id] = element.id
+            traverse(child)
+        }
+    }
+    traverse(root)
+    return ParsedHierarchy(root = root, elementMap = elementMap, parentMap = parentMap)
 }
 
 /**

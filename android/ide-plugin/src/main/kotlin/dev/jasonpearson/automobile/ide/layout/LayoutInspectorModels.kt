@@ -186,6 +186,31 @@ fun findNonCompliantTapTargets(
     return result
 }
 
+/**
+ * Pre-computed hierarchy with lookup indexes built during parsing.
+ * Eliminates the need for repeated tree traversals.
+ */
+data class ParsedHierarchy(
+    val root: UIElementInfo,
+    val elementMap: Map<String, UIElementInfo>,
+    val parentMap: Map<String, String>,
+)
+
+/**
+ * Build the path from root to [targetId] using the pre-computed parent map.
+ * Returns a list of element IDs from root to target (inclusive).
+ * O(depth) instead of O(n) DFS.
+ */
+fun getPathFromParentMap(parentMap: Map<String, String>, targetId: String): List<String> {
+    val path = mutableListOf(targetId)
+    var current = targetId
+    while (parentMap.containsKey(current)) {
+        current = parentMap[current]!!
+        path.add(0, current)
+    }
+    return path
+}
+
 // Mock data for development
 object LayoutInspectorMockData {
 

@@ -2,7 +2,12 @@
 #
 # AutoMobile hot-reload development workflow.
 #
-# This script watches all components in a single loop and processes changes in order:
+# Builds all components, then launches a background watcher that monitors for
+# changes and rebuilds/restarts as needed. The script exits after setup; the
+# background watcher keeps running until another invocation replaces it or
+# the timeout expires (default 60 minutes).
+#
+# Components watched (in order):
 #   1. IntelliJ/Android Studio IDE plugin
 #   2. Android AccessibilityService (with sha updates for TypeScript)
 #   3. iOS XCTestService (with sha updates for TypeScript)
@@ -17,6 +22,7 @@
 #   --simulator <udid>   Target specific iOS simulator
 #   --once               Build all components once and exit
 #   --poll-interval <s>  File watch interval (default: 2)
+#   --timeout <m>        Background watcher timeout in minutes (default: 60)
 #   --no-ide-restart     Install IDE plugin without restarting
 #   --help               Show help
 #
@@ -58,6 +64,7 @@ DEVICE_ID=""
 SIMULATOR_ID=""
 RUN_ONCE=false
 POLL_INTERVAL=2
+TIMEOUT_MINUTES=60
 NO_IDE_RESTART=false
 
 # Runtime state
@@ -97,6 +104,7 @@ Options:
   --simulator <udid>   Target specific iOS simulator
   --once               Build all components once and exit
   --poll-interval <s>  File watch interval (default: 2)
+  --timeout <m>        Background watcher timeout in minutes (default: 60)
   --no-ide-restart     Install IDE plugin without restarting
   --help               Show this help text
 
@@ -114,8 +122,14 @@ kill_previous() {
     if [[ -n "${old_pid}" ]] && kill -0 "${old_pid}" 2>/dev/null; then
       log_info "Killing previous hot-reload process (PID ${old_pid})..."
       kill "${old_pid}" 2>/dev/null || true
-      sleep 1
+      # Wait up to 10 seconds for graceful shutdown (allows XCTestService cleanup)
+      local count=0
+      while kill -0 "${old_pid}" 2>/dev/null && [[ ${count} -lt 10 ]]; do
+        sleep 1
+        count=$((count + 1))
+      done
       if kill -0 "${old_pid}" 2>/dev/null; then
+        log_warn "Force killing previous watcher..."
         kill -9 "${old_pid}" 2>/dev/null || true
       fi
     fi
@@ -132,6 +146,20 @@ kill_previous() {
     pids=$(pgrep -f "hot-reload.sh" 2>/dev/null | grep -v "$$" || true)
     if [[ -n "${pids}" ]]; then
       log_warn "Force killing orphaned hot-reload processes..."
+      echo "${pids}" | xargs kill -9 2>/dev/null || true
+    fi
+  fi
+
+  # Kill any orphaned xcodebuild test processes for XCTestService that may
+  # have been left behind when a watcher was SIGKILL'd
+  pids=$(pgrep -f "xcodebuild.*test.*XCTestService" 2>/dev/null || true)
+  if [[ -n "${pids}" ]]; then
+    log_info "Killing orphaned XCTestService xcodebuild processes: ${pids}"
+    echo "${pids}" | xargs kill 2>/dev/null || true
+    sleep 2
+    pids=$(pgrep -f "xcodebuild.*test.*XCTestService" 2>/dev/null || true)
+    if [[ -n "${pids}" ]]; then
+      log_warn "Force killing orphaned xcodebuild processes..."
       echo "${pids}" | xargs kill -9 2>/dev/null || true
     fi
   fi
@@ -486,7 +514,6 @@ unified_watch_loop() {
 
   log_info "Starting unified watch loop (poll interval ${poll_interval}s)..."
   log_info "Watching: IDE plugin=$(bool_str ${IDE_PLUGIN_ENABLED}), Android=$(bool_str ${ANDROID_ENABLED}), iOS=$(bool_str ${IOS_ENABLED}), TypeScript=true"
-  log_info "Press Ctrl+C to stop."
 
   # Initialize hashes
   if [[ "${IDE_PLUGIN_ENABLED}" == "true" ]]; then
@@ -510,6 +537,15 @@ unified_watch_loop() {
 
   while true; do
     sleep "${poll_interval}"
+
+    # Check timeout if running with a deadline
+    if [[ -n "${WATCHER_START_TIME:-}" ]] && [[ -n "${MAX_DURATION:-}" ]]; then
+      local elapsed=$(( $(date +%s) - WATCHER_START_TIME ))
+      if [[ ${elapsed} -ge ${MAX_DURATION} ]]; then
+        log_info "Hot-reload timeout reached (${TIMEOUT_MINUTES:-60} minutes). Stopping."
+        return 0
+      fi
+    fi
 
     # === 1. Check IDE plugin changes ===
     if [[ "${IDE_PLUGIN_ENABLED}" == "true" ]]; then
@@ -670,10 +706,8 @@ bool_str() {
   fi
 }
 
-# Cleanup on exit
+# Cleanup on foreground exit (only removes PID file if we fail before backgrounding)
 cleanup() {
-  log_info "Cleaning up..."
-  stop_xctestservice
   rm -f "${PID_FILE}"
 }
 
@@ -718,6 +752,15 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       POLL_INTERVAL="$2"
+      shift 2
+      ;;
+    --timeout)
+      if [[ $# -lt 2 ]]; then
+        log_error "--timeout requires a value."
+        usage
+        exit 1
+      fi
+      TIMEOUT_MINUTES="$2"
       shift 2
       ;;
     --no-ide-restart)
@@ -783,29 +826,53 @@ if [[ "${RUN_ONCE}" == "true" ]]; then
   exit 0
 fi
 
-# Kill previous processes before writing our PID
+# Kill previous background watchers
 kill_previous
-
-# Save PID for later cleanup
-echo "$$" > "${PID_FILE}"
 
 # Change to project root
 cd "${PROJECT_ROOT}"
 
-# Restart IDE for initial plugin install
+# Restart IDE for initial plugin install (foreground, before backgrounding)
 if [[ "${IDE_PLUGIN_ENABLED}" == "true" && "${NO_IDE_RESTART}" != "true" ]]; then
   restart_ide_full_path
 fi
 
-# Start initial iOS XCTestService if simulator available
-if [[ "${IOS_ENABLED}" == "true" ]]; then
-  initial_simulator="$(get_current_simulator)"
-  if [[ -n "${initial_simulator}" ]]; then
-    start_xctestservice "${initial_simulator}"
-    LAST_SIMULATOR="${initial_simulator}"
-  fi
-fi
+# Launch background watcher
+WATCHER_LOG="${PROJECT_ROOT}/scratch/hot-reload.log"
+: > "${WATCHER_LOG}"
 
-# Run the watch loop
-log_info "Hot-reload running. Press Ctrl+C to stop."
-unified_watch_loop "${POLL_INTERVAL}"
+(
+  # Background watcher cleanup — stops XCTestService and removes PID file
+  # shellcheck disable=SC2317,SC2329 # invoked indirectly via trap
+  watcher_cleanup() {
+    log_info "Watcher stopping..."
+    stop_xctestservice
+    rm -f "${PID_FILE}"
+  }
+  trap watcher_cleanup EXIT TERM INT HUP
+
+  WATCHER_START_TIME=$(date +%s)
+  MAX_DURATION=$(( TIMEOUT_MINUTES * 60 ))
+
+  # Start initial iOS XCTestService if simulator available
+  if [[ "${IOS_ENABLED}" == "true" ]]; then
+    initial_simulator="$(get_current_simulator)"
+    if [[ -n "${initial_simulator}" ]]; then
+      start_xctestservice "${initial_simulator}"
+      LAST_SIMULATOR="${initial_simulator}"
+    fi
+  fi
+
+  unified_watch_loop "${POLL_INTERVAL}"
+) >> "${WATCHER_LOG}" 2>&1 &
+
+WATCHER_PID=$!
+echo "${WATCHER_PID}" > "${PID_FILE}"
+disown "${WATCHER_PID}"
+
+# Clear the foreground trap — PID file now belongs to the background watcher
+trap - EXIT INT TERM
+
+log_info "Hot-reload watcher running in background (PID ${WATCHER_PID})."
+log_info "Auto-stops after ${TIMEOUT_MINUTES} minutes. Re-run to restart."
+log_info "Watch logs: tail -f ${WATCHER_LOG}"

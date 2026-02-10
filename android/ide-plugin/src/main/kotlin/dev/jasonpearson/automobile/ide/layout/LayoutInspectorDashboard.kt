@@ -54,10 +54,15 @@ fun LayoutInspectorDashboard(
             dashboardLog.info("Received hierarchy update in dashboard - deviceId=${update.deviceId}, hasData=${update.data != null}")
             update.data?.let { hierarchyJson ->
                 dashboardLog.info("Parsing hierarchy JSON...")
-                val hierarchy = parseHierarchyFromJson(hierarchyJson)
-                if (hierarchy != null) {
-                    dashboardLog.info("Parsed hierarchy: root=${hierarchy.className}, children=${hierarchy.children.size}")
-                    state.updateHierarchy(hierarchy)
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val parsed = parseHierarchyFromJson(hierarchyJson) ?: return@withContext null
+                    val oldMap = state.currentElementMap
+                    val changedIds = state.computeChangedElements(oldMap, parsed.elementMap)
+                    parsed to changedIds
+                }
+                if (result != null) {
+                    dashboardLog.info("Parsed hierarchy: root=${result.first.root.className}, children=${result.first.root.children.size}")
+                    state.applyHierarchyUpdate(result.first, result.second)
                     dashboardLog.info("Updated state with new hierarchy")
                 } else {
                     dashboardLog.warn("Failed to parse hierarchy from JSON")
@@ -72,8 +77,10 @@ fun LayoutInspectorDashboard(
         streamClient.screenshotUpdates.collect { update ->
             dashboardLog.info("Received screenshot update in dashboard - deviceId=${update.deviceId}, hasScreenshot=${update.screenshotBase64 != null}")
             update.screenshotBase64?.let { base64 ->
-                // Decode base64 to byte array
-                val screenshotData = java.util.Base64.getDecoder().decode(base64)
+                // Decode base64 to byte array off main thread
+                val screenshotData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    java.util.Base64.getDecoder().decode(base64)
+                }
                 dashboardLog.info("Decoded screenshot: ${screenshotData.size} bytes")
                 state.updateScreenshot(
                     data = screenshotData,
@@ -207,6 +214,7 @@ fun LayoutInspectorDashboard(
                 connectionStatus = state.connectionStatus,
                 socketExists = socketExists,
                 onRestartDaemon = onRestartDaemon,
+                elementMap = state.currentElementMap.takeIf { it.isNotEmpty() },
                 modifier = Modifier.fillMaxSize(),
                 refitTrigger = refitTrigger,  // Trigger refit when panels toggle
             )
@@ -242,6 +250,7 @@ fun LayoutInspectorDashboard(
                         // Open the properties panel
                         isPropertiesCollapsed = false
                     },
+                    parentMap = state.parentMap,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

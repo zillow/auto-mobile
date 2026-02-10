@@ -55,7 +55,6 @@ private data class FlatTreeNode(
     val depth: Int,
     val isExpanded: Boolean,
     val hasChildren: Boolean,
-    val isInSelectedPath: Boolean,
 )
 
 /**
@@ -75,6 +74,7 @@ fun HierarchyTreeView(
     onElementSelected: (String?) -> Unit,
     onElementHovered: (String?) -> Unit,
     onElementDoubleClicked: ((String) -> Unit)? = null,
+    parentMap: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
@@ -91,38 +91,59 @@ fun HierarchyTreeView(
     // Expanded state for tree nodes - initialize with all nodes expanded up to depth 10
     var expandedIds by remember { mutableStateOf(setOf<String>()) }
 
-    // Auto-expand nodes up to depth 10 when hierarchy changes
+    // Track which root we've auto-expanded so we only reset on a genuinely new hierarchy
+    // (different root id), not on live-update mutations of the same tree.
+    var expandedRootId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(hierarchy) {
-        if (hierarchy != null) {
+        if (hierarchy != null && hierarchy.id != expandedRootId) {
             expandedIds = collectIdsUpToDepth(hierarchy, maxDepth = 10)
+            expandedRootId = hierarchy.id
         }
     }
 
-    // Also expand to selected element when selection changes
-    LaunchedEffect(selectedElementId, hierarchy) {
-        if (selectedElementId != null && hierarchy != null) {
-            val path = LayoutInspectorMockData.getPathToElement(hierarchy, selectedElementId)
-            expandedIds = expandedIds + path.dropLast(1).toSet() // Expand all parents
+    // Expand to selected element when selection changes — O(depth) via parentMap
+    LaunchedEffect(selectedElementId, parentMap) {
+        if (selectedElementId != null && parentMap.isNotEmpty()) {
+            val path = getPathFromParentMap(parentMap, selectedElementId)
+            expandedIds = expandedIds + path.dropLast(1).toSet()
         }
     }
 
-    // Flatten hierarchy for virtualized list
-    val flatNodes = remember(hierarchy, expandedIds, debouncedQuery, selectedElementId) {
-        if (hierarchy == null) emptyList()
-        else flattenTree(
-            root = hierarchy,
-            expandedIds = expandedIds,
-            searchQuery = debouncedQuery,
-            selectedElementId = selectedElementId,
-        )
+    // Compute selected path separately so it doesn't trigger flattenTree rebuild
+    val selectedPath = remember(selectedElementId, parentMap) {
+        if (selectedElementId != null && parentMap.isNotEmpty()) {
+            getPathFromParentMap(parentMap, selectedElementId).toSet()
+        } else emptySet()
     }
 
-    // Scroll to selected item
+    // Pre-compute matching IDs for search — O(n) single pass instead of O(n^2) per-node
+    val matchingIds = remember(hierarchy, debouncedQuery) {
+        if (hierarchy != null && debouncedQuery.isNotEmpty()) {
+            computeMatchingIds(hierarchy, debouncedQuery)
+        } else emptySet()
+    }
+
+    // Flatten hierarchy for virtualized list + build index map for O(1) scroll
+    val (flatNodes, nodeIndexMap) = remember(hierarchy, expandedIds, debouncedQuery) {
+        if (hierarchy == null) {
+            emptyList<FlatTreeNode>() to emptyMap()
+        } else {
+            val nodes = flattenTree(
+                root = hierarchy,
+                expandedIds = expandedIds,
+                searchQuery = debouncedQuery,
+                matchingIds = matchingIds,
+            )
+            nodes to nodes.withIndex().associate { (i, n) -> n.element.id to i }
+        }
+    }
+
+    // Scroll to selected item — O(1) via index map
     val listState = rememberLazyListState()
-    LaunchedEffect(selectedElementId, flatNodes) {
+    LaunchedEffect(selectedElementId, nodeIndexMap) {
         if (selectedElementId != null) {
-            val index = flatNodes.indexOfFirst { it.element.id == selectedElementId }
-            if (index >= 0) {
+            val index = nodeIndexMap[selectedElementId]
+            if (index != null) {
                 listState.animateScrollToItem(index)
             }
         }
@@ -175,6 +196,7 @@ fun HierarchyTreeView(
                             node = node,
                             isSelected = node.element.id == selectedElementId,
                             isHovered = node.element.id == hoveredElementId,
+                            isInSelectedPath = node.element.id in selectedPath,
                             onToggleExpand = {
                                 expandedIds = if (node.isExpanded) {
                                     expandedIds - node.element.id
@@ -258,6 +280,7 @@ private fun TreeNodeRow(
     node: FlatTreeNode,
     isSelected: Boolean,
     isHovered: Boolean,
+    isInSelectedPath: Boolean,
     onToggleExpand: () -> Unit,
     onSelect: () -> Unit,
     onDoubleClick: () -> Unit,
@@ -268,7 +291,7 @@ private fun TreeNodeRow(
     val bgColor = when {
         isSelected -> Color(0xFF2196F3).copy(alpha = 0.2f)
         isHovered -> colors.text.normal.copy(alpha = 0.08f)
-        node.isInSelectedPath -> colors.text.normal.copy(alpha = 0.04f)
+        isInSelectedPath -> colors.text.normal.copy(alpha = 0.04f)
         else -> Color.Transparent
     }
 
@@ -414,41 +437,24 @@ private fun getSimpleClassName(fullName: String): String {
 /**
  * Flattens the tree hierarchy for virtualized rendering.
  * Filters by search query and handles expanded state.
+ * [matchingIds] is pre-computed via [computeMatchingIds] for O(1) membership checks.
  */
 private fun flattenTree(
     root: UIElementInfo,
     expandedIds: Set<String>,
     searchQuery: String,
-    selectedElementId: String?,
+    matchingIds: Set<String>,
 ): List<FlatTreeNode> {
     val result = mutableListOf<FlatTreeNode>()
-    val selectedPath = if (selectedElementId != null) {
-        LayoutInspectorMockData.getPathToElement(root, selectedElementId).toSet()
-    } else emptySet()
-
-    fun matchesSearch(element: UIElementInfo): Boolean {
-        if (searchQuery.isEmpty()) return true
-        val query = searchQuery.lowercase()
-        return element.className.lowercase().contains(query) ||
-                element.resourceId?.lowercase()?.contains(query) == true ||
-                element.text?.lowercase()?.contains(query) == true ||
-                element.contentDescription?.lowercase()?.contains(query) == true
-    }
-
-    fun hasMatchingDescendant(element: UIElementInfo): Boolean {
-        if (matchesSearch(element)) return true
-        return element.children.any { hasMatchingDescendant(it) }
-    }
 
     fun traverse(element: UIElementInfo, depth: Int) {
-        val matches = matchesSearch(element)
-        val hasMatchingChild = element.children.any { hasMatchingDescendant(it) }
+        val isIncluded = searchQuery.isEmpty() || element.id in matchingIds
 
-        // Include this node if it matches or has matching descendants (when searching)
-        if (searchQuery.isEmpty() || matches || hasMatchingChild) {
+        if (isIncluded) {
+            val hasMatchingChild = searchQuery.isNotEmpty() &&
+                element.children.any { it.id in matchingIds }
             val isExpanded = element.id in expandedIds ||
-                    (searchQuery.isNotEmpty() && hasMatchingChild) ||
-                    element.id in selectedPath
+                (searchQuery.isNotEmpty() && hasMatchingChild)
 
             result.add(
                 FlatTreeNode(
@@ -456,11 +462,9 @@ private fun flattenTree(
                     depth = depth,
                     isExpanded = isExpanded,
                     hasChildren = element.children.isNotEmpty(),
-                    isInSelectedPath = element.id in selectedPath,
                 )
             )
 
-            // Traverse children if expanded
             if (isExpanded) {
                 element.children.forEach { child ->
                     traverse(child, depth + 1)
@@ -471,6 +475,37 @@ private fun flattenTree(
 
     traverse(root, 0)
     return result
+}
+
+/**
+ * Pre-compute the set of element IDs that match the search query or have matching descendants.
+ * Single O(n) pass — each node is visited exactly once.
+ */
+fun computeMatchingIds(root: UIElementInfo, searchQuery: String): Set<String> {
+    if (searchQuery.isEmpty()) return emptySet()
+    val ids = mutableSetOf<String>()
+    fun traverse(element: UIElementInfo): Boolean {
+        val selfMatches = matchesSearch(element, searchQuery)
+        var childMatches = false
+        for (child in element.children) {
+            if (traverse(child)) childMatches = true
+        }
+        if (selfMatches || childMatches) {
+            ids.add(element.id)
+            return true
+        }
+        return false
+    }
+    traverse(root)
+    return ids
+}
+
+private fun matchesSearch(element: UIElementInfo, searchQuery: String): Boolean {
+    val query = searchQuery.lowercase()
+    return element.className.lowercase().contains(query) ||
+        element.resourceId?.lowercase()?.contains(query) == true ||
+        element.text?.lowercase()?.contains(query) == true ||
+        element.contentDescription?.lowercase()?.contains(query) == true
 }
 
 /**

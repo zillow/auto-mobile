@@ -53,8 +53,8 @@ public protocol HierarchyDebouncing {
 public class HierarchyDebouncer: HierarchyDebouncing {
     // MARK: - Configuration
 
-    /// How often to poll for changes (default 10ms for quick detection)
-    public static let defaultPollIntervalMs: Int64 = 10
+    /// How often to poll for changes (default 1s)
+    public static let defaultPollIntervalMs: Int64 = 1000
 
     /// How long to skip broadcasts after detecting animation (default 100ms)
     public static let animationSkipWindowMs: Int64 = 100
@@ -201,15 +201,27 @@ public class HierarchyDebouncer: HierarchyDebouncing {
 
     private func captureInitialState() {
         do {
+            let startTime = timer.now()
             let hierarchy = try elementLocator.getViewHierarchy(disableAllFiltering: false)
+            let extractionTime = timer.now() - startTime
             let hash = StructuralHasher.computeHash(hierarchy)
 
             lock.lock()
             lastStructuralHash = hash
             lastHierarchy = hierarchy
+            lastBroadcastTime = timer.now()
+            let callback = onResult
             lock.unlock()
 
-            print("[HierarchyDebouncer] Initial state captured (hash=\(hash))")
+            print("[HierarchyDebouncer] Initial state captured (hash=\(hash)), broadcasting")
+
+            // Broadcast initial state so the IDE receives hierarchy immediately
+            let result = HierarchyResult.changed(
+                hierarchy: hierarchy,
+                hash: hash,
+                extractionTimeMs: extractionTime
+            )
+            callback?(result)
         } catch {
             print("[HierarchyDebouncer] Failed to capture initial state: \(error)")
         }
@@ -280,7 +292,6 @@ public class HierarchyDebouncer: HierarchyDebouncing {
 
                 lock.lock()
                 inAnimationMode = false
-                lastStructuralHash = newHash
                 lastHierarchy = hierarchy
                 skippedPollCount = 0
                 lock.unlock()
@@ -290,7 +301,13 @@ public class HierarchyDebouncer: HierarchyDebouncing {
                 let shouldBroadcast = !skipBroadcast && timeSinceLastBroadcast >= HierarchyDebouncer.broadcastDebounceMs
 
                 if shouldBroadcast {
+                    // Only update the structural hash when we actually broadcast.
+                    // This ensures that if a change is debounced, the next poll will
+                    // re-detect it and broadcast once the debounce window has passed.
+                    // Without this, the last change in a rapid sequence can be silently
+                    // dropped (hash updated but never broadcast).
                     lock.lock()
+                    lastStructuralHash = newHash
                     lastBroadcastTime = now
                     lock.unlock()
 
@@ -307,8 +324,9 @@ public class HierarchyDebouncer: HierarchyDebouncing {
                 }
             }
         } catch {
-            // Silently ignore errors during polling
+            // Log errors during polling for debuggability
             // This can happen if the app is transitioning between states
+            print("[HierarchyDebouncer] Extraction error: \(error)")
         }
     }
 }
@@ -337,22 +355,34 @@ public enum StructuralHasher {
     }
 
     private static func hashElement(_ element: UIElementInfo, into hasher: inout Hasher, depth: Int, maxDepth: Int) {
-        // Hash key identifying properties (NOT bounds - those change during animations)
-        if let text = element.text {
-            hasher.combine(text)
-        }
-        if let resourceId = element.resourceId {
-            hasher.combine(resourceId)
-        }
-        if let className = element.className {
-            hasher.combine(className)
-        }
+        // Hash all identifying & state properties (NOT bounds/textSize - those change during animations)
+        hasher.combine(element.text)
+        hasher.combine(element.contentDesc)
+        hasher.combine(element.resourceId)
+        hasher.combine(element.className)
+        hasher.combine(element.role)
+        hasher.combine(element.testTag)
+        hasher.combine(element.hintText)
+        hasher.combine(element.stateDescription)
+        hasher.combine(element.errorMessage)
 
-        // Hash state properties
-        hasher.combine(element.focused)
-        hasher.combine(element.selected)
-        hasher.combine(element.checked)
+        // Hash interactive/state properties
+        hasher.combine(element.clickable)
         hasher.combine(element.enabled)
+        hasher.combine(element.focusable)
+        hasher.combine(element.focused)
+        hasher.combine(element.accessibilityFocused)
+        hasher.combine(element.scrollable)
+        hasher.combine(element.password)
+        hasher.combine(element.checkable)
+        hasher.combine(element.checked)
+        hasher.combine(element.selected)
+        hasher.combine(element.longClickable)
+
+        // Hash available actions
+        if let actions = element.actions {
+            hasher.combine(actions)
+        }
 
         // Hash children recursively (up to maxDepth)
         if depth < maxDepth, let children = element.node {

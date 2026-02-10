@@ -213,7 +213,26 @@ start_xctestservice() {
     cmd+=("XCTESTSERVICE_TIMEOUT=${XCTESTSERVICE_TIMEOUT}")
   fi
 
-  (cd "${XCTEST_SERVICE_DIR}" && "${cmd[@]}") > "${XCODEBUILD_LOG}" 2>&1 &
+  # Kill any orphaned xcodebuild test processes for XCTestService (e.g. from a
+  # previous watcher that was SIGKILL'd before it could clean up its children).
+  local existing_pids
+  existing_pids=$(pgrep -f "xcodebuild.*test.*XCTestService" 2>/dev/null || true)
+  if [[ -n "${existing_pids}" ]]; then
+    log_info "Killing orphaned XCTestService xcodebuild processes: ${existing_pids}"
+    echo "${existing_pids}" | xargs kill 2>/dev/null || true
+    sleep 2
+    # Force kill if still running
+    existing_pids=$(pgrep -f "xcodebuild.*test.*XCTestService" 2>/dev/null || true)
+    if [[ -n "${existing_pids}" ]]; then
+      log_warn "Force killing orphaned xcodebuild processes..."
+      echo "${existing_pids}" | xargs kill -9 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+
+  echo "" >> "${XCODEBUILD_LOG}"
+  echo "=== XCTestService starting at $(date) ===" >> "${XCODEBUILD_LOG}"
+  (cd "${XCTEST_SERVICE_DIR}" && "${cmd[@]}") >> "${XCODEBUILD_LOG}" 2>&1 &
   XCODEBUILD_PID=$!
   log_info "XCTestService started (PID ${XCODEBUILD_PID})"
   log_info "Logs: ${XCODEBUILD_LOG}"
