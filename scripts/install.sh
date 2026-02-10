@@ -785,7 +785,7 @@ install_bundled_gum() {
     tar -xzf "${archive_path}" -C "${temp_dir}"
 
     mkdir -p "${GUM_INSTALL_DIR}"
-    mv "${temp_dir}/gum" "${GUM_BINARY}"
+    mv "${temp_dir}"/gum_*/gum "${GUM_BINARY}"
     chmod +x "${GUM_BINARY}"
     echo "${GUM_VERSION}" > "${GUM_VERSION_FILE}"
     rm -rf "${temp_dir}"
