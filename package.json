@@ -112,7 +112,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
-    "@eslint/js": "^9.38.0",
+    "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.2.0",
     "@stylistic/eslint-plugin": "^5.7.0",
     "@types/express": "^5.0.5",
