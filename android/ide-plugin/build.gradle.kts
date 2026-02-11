@@ -48,6 +48,7 @@ dependencies {
   // Test dependencies
   testImplementation("junit:junit:4.13.2")
   testImplementation(libs.kotlin.test)
+  testImplementation(libs.kotlinx.coroutines.test)
 
   intellijPlatform {
     intellijIdea("2025.3")

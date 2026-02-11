@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -19,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
-import dev.jasonpearson.automobile.ide.daemon.StreamConnectionState
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.tabs.PanelHeader
 import dev.jasonpearson.automobile.ide.tabs.VerticalCollapsibleTab
@@ -94,20 +95,23 @@ fun LayoutInspectorDashboard(
     }
 
     // Collect stream connection state to update layout inspector state (Real mode only)
+    // Uses a grace period to absorb brief disconnections during reconnection,
+    // preventing the UI from flashing "Device Disconnected" on transient interruptions.
     if (dataSourceMode == DataSourceMode.Real) {
-        LaunchedEffect(streamClient) {
+        val gracePeriodScope = rememberCoroutineScope()
+        val gracePeriod = remember(state, streamClient) {
+            StreamConnectionGracePeriod(
+                scope = gracePeriodScope,
+                onStatusChange = { status -> state.updateConnectionStatus(status) },
+                onDisconnectConfirmed = { state.disconnect() },
+            )
+        }
+        DisposableEffect(gracePeriod) {
+            onDispose { gracePeriod.cancel() }
+        }
+        LaunchedEffect(streamClient, gracePeriod) {
             streamClient.connectionState.collect { connectionState ->
-                when (connectionState) {
-                    is StreamConnectionState.Connected -> {
-                        state.updateConnectionStatus(ConnectionStatus.Connected)
-                    }
-                    is StreamConnectionState.Connecting -> {
-                        state.updateConnectionStatus(ConnectionStatus.Connecting)
-                    }
-                    is StreamConnectionState.Disconnected -> {
-                        state.disconnect()
-                    }
-                }
+                gracePeriod.onStreamStateChange(connectionState)
             }
         }
     }
