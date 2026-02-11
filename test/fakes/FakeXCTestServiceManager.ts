@@ -162,4 +162,23 @@ export class FakeXCTestServiceManager implements XCTestServiceManager {
       message: "XCTestService was already running"
     };
   }
+
+  // MARK: - Auto-restart Methods
+
+  private autoRestartEnabled: boolean = false;
+
+  setAutoRestart(enabled: boolean): void {
+    this.executedOperations.push(`setAutoRestart:${enabled}`);
+    this.autoRestartEnabled = enabled;
+  }
+
+  isAutoRestartEnabled(): boolean {
+    this.executedOperations.push("isAutoRestartEnabled");
+    return this.autoRestartEnabled;
+  }
+
+  async forceRestart(): Promise<void> {
+    this.executedOperations.push("forceRestart");
+    this.runningState = true;
+  }
 }

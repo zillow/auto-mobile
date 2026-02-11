@@ -19,12 +19,12 @@ import {
   ViewHierarchyResult,
 } from "../../../models";
 import { ViewHierarchyQueryOptions } from "../../../models/ViewHierarchyQueryOptions";
-import { PerformanceTracker } from "../../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../../utils/SystemTimer";
 import { PortManager } from "../../../utils/PortManager";
 import { shouldUseHostControl, getHostControlHost } from "../../../utils/hostControlClient";
 import { isRunningInDocker } from "../../../utils/dockerEnv";
-import { IOSXCTestServiceManager } from "../../../utils/XCTestServiceManager";
+import { IOSXCTestServiceManager, XCTestServiceManager } from "../../../utils/XCTestServiceManager";
 import { NavigationGraphManager } from "../../navigation/NavigationGraphManager";
 import {
   HierarchyNavigationDetector,
@@ -43,6 +43,12 @@ import {
   DefaultScreenshotBackoffScheduler,
   ScreenshotCaptureResult,
 } from "../ScreenshotBackoffScheduler";
+
+/**
+ * Factory function type for creating XCTestServiceManager instances.
+ * Used for testing to inject fake service managers.
+ */
+export type ServiceManagerFactory = (device: BootedDevice) => XCTestServiceManager;
 
 // Import delegates
 import { XCTestServiceGestures } from "./XCTestServiceGestures";
@@ -232,15 +238,21 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
   private isRequestingServiceRestart: boolean = false;
   private static readonly MAX_FAILURES_BEFORE_RESTART = 3;
 
+  // Auto-setup on connection failure
+  private readonly serviceManagerFactory: ServiceManagerFactory;
+  private isAttemptingAutoSetup: boolean = false;
+
   private constructor(
     device: BootedDevice,
     port: number = XCTestServiceClient.DEFAULT_PORT,
     wsFactory: WebSocketFactory = defaultWebSocketFactory,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    serviceManagerFactory: ServiceManagerFactory = d => IOSXCTestServiceManager.getInstance(d)
   ) {
     super(timer, wsFactory);
     this.device = device;
     this.port = port;
+    this.serviceManagerFactory = serviceManagerFactory;
   }
 
   /**
@@ -267,9 +279,10 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     device: BootedDevice,
     port: number,
     wsFactory: WebSocketFactory,
-    timer: Timer
+    timer: Timer,
+    serviceManagerFactory?: ServiceManagerFactory
   ): XCTestServiceClient {
-    return new XCTestServiceClient(device, port, wsFactory, timer);
+    return new XCTestServiceClient(device, port, wsFactory, timer, serviceManagerFactory);
   }
 
   /**
@@ -280,6 +293,50 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
       void instance.close();
     }
     XCTestServiceClient.instances.clear();
+  }
+
+  // ===========================================================================
+  // Auto-setup on connection failure
+  // ===========================================================================
+
+  /**
+   * Override ensureConnected to automatically set up XCTestService when
+   * the WebSocket connection fails. This covers all tool calls (observe, tap, etc.).
+   */
+  public override async ensureConnected(
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<boolean> {
+    const connected = await super.ensureConnected(perf);
+    if (connected) {
+      return true;
+    }
+
+    // Prevent re-entry during auto-setup
+    if (this.isAttemptingAutoSetup) {
+      return false;
+    }
+
+    this.isAttemptingAutoSetup = true;
+    try {
+      logger.info(`[XCTestServiceClient] WebSocket connection failed, attempting auto-setup of XCTestService`);
+      const manager = this.serviceManagerFactory(this.device);
+      const result = await manager.setup(true, perf);
+
+      if (!result.success) {
+        logger.warn(`[XCTestServiceClient] Auto-setup failed: ${result.message}`);
+        return false;
+      }
+
+      logger.info(`[XCTestServiceClient] Auto-setup succeeded, retrying WebSocket connection`);
+      // Reset connection attempts to allow fresh connection attempts
+      this.connectionAttempts = 0;
+      return await super.ensureConnected(perf);
+    } catch (error) {
+      logger.warn(`[XCTestServiceClient] Auto-setup error: ${error}`);
+      return false;
+    } finally {
+      this.isAttemptingAutoSetup = false;
+    }
   }
 
   // ===========================================================================
@@ -400,7 +457,7 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     this.isRequestingServiceRestart = true;
     logger.info(`[XCTestServiceClient] Triggering XCTestService restart after ${this.consecutiveConnectionFailures} connection failures`);
 
-    const manager = IOSXCTestServiceManager.getInstance(this.device);
+    const manager = this.serviceManagerFactory(this.device);
 
     // Check if service is actually not running before restarting
     void manager.isRunning().then(running => {
