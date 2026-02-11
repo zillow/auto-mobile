@@ -1702,3 +1702,94 @@ jobs:
                 body: body
               });
             }
+
+  # =============================================================================
+  # Gate Jobs for Branch Protection
+  # =============================================================================
+  # These jobs always run and aggregate pass/skip/fail status of their group.
+  # Branch protection required checks should point to these gate jobs instead
+  # of the individual conditional jobs, avoiding the GitHub Actions issue where
+  # skipped matrix jobs produce uninterpolated check names that block merges.
+
+  ios-gate:
+    name: "iOS"
+    if: always()
+    needs:
+      - ios-swift-build
+      - ios-swift-test
+      - ios-xcodegen
+      - ios-xcode-build
+      - ios-xctestservice-build
+      - ios-xctest-runner-simulator-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check results"
+        run: |
+          results=( \
+            "${{ needs.ios-swift-build.result }}" \
+            "${{ needs.ios-swift-test.result }}" \
+            "${{ needs.ios-xcodegen.result }}" \
+            "${{ needs.ios-xcode-build.result }}" \
+            "${{ needs.ios-xctestservice-build.result }}" \
+            "${{ needs.ios-xctest-runner-simulator-tests.result }}" \
+          )
+          for r in "${results[@]}"; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
+              echo "One or more jobs failed or were cancelled"
+              exit 1
+            fi
+          done
+
+  android-gate:
+    name: "Android"
+    if: always()
+    needs:
+      - build-android-accessibility-service
+      - build-junit-runner-library
+      - build-playground-app
+      - junit-runner-unit-tests
+      - junit-runner-emulator-tests
+      - junit-runner-emulator-wtf-tests
+      - playground-automobile-emulator-tests
+      - android-accessibility-service-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check results"
+        run: |
+          results=( \
+            "${{ needs.build-android-accessibility-service.result }}" \
+            "${{ needs.build-junit-runner-library.result }}" \
+            "${{ needs.build-playground-app.result }}" \
+            "${{ needs.junit-runner-unit-tests.result }}" \
+            "${{ needs.junit-runner-emulator-tests.result }}" \
+            "${{ needs.junit-runner-emulator-wtf-tests.result }}" \
+            "${{ needs.playground-automobile-emulator-tests.result }}" \
+            "${{ needs.android-accessibility-service-unit-tests.result }}" \
+          )
+          for r in "${results[@]}"; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
+              echo "One or more jobs failed or were cancelled"
+              exit 1
+            fi
+          done
+
+  ide-plugin-gate:
+    name: "IDE Plugin"
+    if: always()
+    needs:
+      - build-ide-plugin
+      - ide-plugin-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check results"
+        run: |
+          results=( \
+            "${{ needs.build-ide-plugin.result }}" \
+            "${{ needs.ide-plugin-unit-tests.result }}" \
+          )
+          for r in "${results[@]}"; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
+              echo "One or more jobs failed or were cancelled"
+              exit 1
+            fi
+          done
