@@ -497,4 +497,35 @@ final class HierarchyDebouncerTests: XCTestCase {
 
         XCTAssertNotEqual(hash1, hash2, "Hash should change when clickable/enabled state changes")
     }
+
+    func testHashChangesWhenCheckedStateChanges() {
+        let hierarchyUnchecked = ViewHierarchy(
+            packageName: "com.test.app",
+            hierarchy: UIElementInfo(
+                text: "Wi-Fi",
+                className: "UISwitch",
+                bounds: ElementBounds(left: 280, top: 100, right: 340, bottom: 130),
+                checkable: "true",
+                checked: nil
+            ),
+            windowInfo: WindowInfo(id: 0, type: 1, isActive: true, isFocused: true)
+        )
+
+        let hierarchyChecked = ViewHierarchy(
+            packageName: "com.test.app",
+            hierarchy: UIElementInfo(
+                text: "Wi-Fi",
+                className: "UISwitch",
+                bounds: ElementBounds(left: 280, top: 100, right: 340, bottom: 130),
+                checkable: "true",
+                checked: "true"
+            ),
+            windowInfo: WindowInfo(id: 0, type: 1, isActive: true, isFocused: true)
+        )
+
+        let hashUnchecked = StructuralHasher.computeHash(hierarchyUnchecked)
+        let hashChecked = StructuralHasher.computeHash(hierarchyChecked)
+
+        XCTAssertNotEqual(hashUnchecked, hashChecked, "Hash should change when checked state changes")
+    }
 }

@@ -640,6 +640,13 @@ public class ElementLocator: ElementLocating {
             let isScrollable = isScrollableType(snapshot.elementType)
             let isCheckable = isCheckableType(snapshot.elementType)
             let isSelected = snapshot.isSelected
+            // UISwitch reports toggle state via value ("0"/"1"), not isSelected
+            let isChecked: Bool
+            if isCheckable, let value = snapshot.value as? String {
+                isChecked = value == "1"
+            } else {
+                isChecked = isCheckable && isSelected
+            }
             let hasFocus = snapshot.hasFocus
             let isPassword = snapshot.elementType == .secureTextField
 
@@ -673,7 +680,7 @@ public class ElementLocator: ElementLocating {
                 scrollable: isScrollable ? "true" : nil,
                 password: isPassword ? "true" : nil,
                 checkable: isCheckable ? "true" : nil,
-                checked: (isCheckable && isSelected) ? "true" : nil,
+                checked: isChecked ? "true" : nil,
                 selected: isSelected ? "true" : nil,
                 longClickable: nil, // Don't include - same as clickable on iOS
                 testTag: nil, // Don't duplicate - identifier is in resourceId
