@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.12] - 2026-02-11
+### Other
+- No changes.
+
 ## [v0.0.11] - 2026-02-11
 ### Added
 - IDE plugin: always use active (white) toolbar icon ([#1214](https://github.com/kaeawc/auto-mobile/issues/1214)) (intellij plugin)
