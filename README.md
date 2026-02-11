@@ -1,5 +1,18 @@
 # AutoMobile
 
+[![Pull Request](https://github.com/kaeawc/auto-mobile/actions/workflows/pull_request.yml/badge.svg)](https://github.com/kaeawc/auto-mobile/actions/workflows/pull_request.yml)
+[![On Merge](https://github.com/kaeawc/auto-mobile/actions/workflows/merge.yml/badge.svg)](https://github.com/kaeawc/auto-mobile/actions/workflows/merge.yml)
+[![Nightly](https://github.com/kaeawc/auto-mobile/actions/workflows/nightly.yml/badge.svg)](https://github.com/kaeawc/auto-mobile/actions/workflows/nightly.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey)
+![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey)
+
+![TypeScript tests: 2,109](https://img.shields.io/badge/TypeScript_tests-2%2C109-3178C6)
+![Kotlin tests: 573](https://img.shields.io/badge/Kotlin_tests-573-7F52FF)
+![Swift tests: 79](https://img.shields.io/badge/Swift_tests-79-F05138)
+![Coverage](https://img.shields.io/endpoint?url=https://kaeawc.github.io/auto-mobile/coverage-badge.json)
+
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
 **AutoMobile lets AI agents control your mobile devices using natural language.** Tell an AI what you want to do, and it interacts with your Android or iOS app.
