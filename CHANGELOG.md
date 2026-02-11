@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.0.11] - 2026-02-11
+### Added
+- IDE plugin: always use active (white) toolbar icon ([#1214](https://github.com/kaeawc/auto-mobile/issues/1214)) (intellij plugin)
+- Remove feature flag for video test recording ([#1203](https://github.com/kaeawc/auto-mobile/issues/1203)) (video)
+- IDE plugin: show 'Device Disconnected' when observed device becomes unavailable ([#1202](https://github.com/kaeawc/auto-mobile/issues/1202)) (intellij plugin)
+- IDE Plugin: Add full-window FileEditor mode for dashboard ([#1167](https://github.com/kaeawc/auto-mobile/issues/1167)) (intellij plugin)
+- feat: iOS version matrix testing in CI ([#836](https://github.com/kaeawc/auto-mobile/issues/836)) (ios, ci, testing)
+- Support custom accessibility rules ([#104](https://github.com/kaeawc/auto-mobile/issues/104)) (devxp, a11y)
+### Changed
+- refactor: ViewHierarchy has near-clone findFocusedElement / findAccessibilityFocusedElement ([#1191](https://github.com/kaeawc/auto-mobile/issues/1191))
+- refactor: UIStateExtractor reimplements ElementParser traversal and property extraction ([#1190](https://github.com/kaeawc/auto-mobile/issues/1190))
+- refactor: BugReport.traverseNode() reimplements ElementParser inline ([#1189](https://github.com/kaeawc/auto-mobile/issues/1189))
+- refactor: DebugSearch reimplements ElementParser, TextMatcher, and ElementFinder inline ([#1188](https://github.com/kaeawc/auto-mobile/issues/1188))
+- chore: upgrade GitHub Actions upload-artifact and download-artifact to v4.6+ ([#1158](https://github.com/kaeawc/auto-mobile/issues/1158)) (ci)
+- Dead Code Detection: Threshold Exceeded ([#1143](https://github.com/kaeawc/auto-mobile/issues/1143)) (automated, dead-code)
+### Fixed
+- IDE plugin: device disconnected notification is too aggressive ([#1244](https://github.com/kaeawc/auto-mobile/issues/1244)) (intellij plugin)
+- iOS: toggle switch tap does not trigger view hierarchy or screenshot update ([#1227](https://github.com/kaeawc/auto-mobile/issues/1227))
+- bug: IDE plugin settings page fails to load feature flags with MCP error -32603 ([#1213](https://github.com/kaeawc/auto-mobile/issues/1213)) (intellij plugin)
+- Bug: IDE plugin crashes with IllegalArgumentException when opening test plan YAML file ([#1205](https://github.com/kaeawc/auto-mobile/issues/1205)) (intellij plugin)
+- Bug: failing JUnit Runner test does not produce a failing JUnit test result ([#1204](https://github.com/kaeawc/auto-mobile/issues/1204)) (testing)
+- iOS: Unable to observe system permission dialogs in view hierarchy ([#1147](https://github.com/kaeawc/auto-mobile/issues/1147)) (ios)
+### Other
+- CI: add Xcode 26 to iOS build and test matrix ([#1207](https://github.com/kaeawc/auto-mobile/issues/1207)) (ios, ci)
+- CI: auto-retry iOS jobs when no simulator runtimes are installed on macOS runner ([#1206](https://github.com/kaeawc/auto-mobile/issues/1206)) (ios, ci)
+- CI: add macOS job for iOS Accessibility Bridge build + XCTest runner tests ([#372](https://github.com/kaeawc/auto-mobile/issues/372)) (ios, ci)
+- Publish AutoMobile Android SDK on Maven Central ([#122](https://github.com/kaeawc/auto-mobile/issues/122)) (android, ci, release engineering)
+- Publish AutoMobile JUnitRunner Library ([#121](https://github.com/kaeawc/auto-mobile/issues/121)) (android, ci, release engineering, testing)
+
 ## [v0.0.10] - 2026-02-06
 ### Added
 - Support custom accessibility rules ([#104](https://github.com/kaeawc/auto-mobile/issues/104)) (devxp, a11y)
