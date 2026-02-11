@@ -13,6 +13,7 @@
 #   version_gte()              - Semver comparison (returns 0 if $1 >= $2)
 #   ensure_gum()               - Check gum availability (installed by install.sh)
 #   ensure_auto_mobile()       - Build and npm link auto-mobile CLI
+#   ensure_dev_tools()         - Install brew packages, Java, manual tools if missing
 #   ensure_dependencies()      - Run all dependency checks via install.sh
 
 # Required versions (populated by parse_required_versions)
@@ -142,6 +143,106 @@ ensure_auto_mobile() {
   return 1
 }
 
+# Install a Homebrew package if the command is not already available.
+# Usage: brew_install_if_missing <command_name> [<brew_package_name>]
+# If brew_package_name is omitted, command_name is used.
+brew_install_if_missing() {
+  local cmd="$1"
+  local pkg="${2:-$1}"
+
+  if command -v "${cmd}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! command -v brew >/dev/null 2>&1; then
+    log_warn "${cmd} not found and Homebrew not available — skipping"
+    return 1
+  fi
+
+  log_info "Installing ${pkg} via Homebrew..."
+  if brew install "${pkg}"; then
+    log_info "${pkg} installed"
+  else
+    log_warn "Failed to install ${pkg}"
+    return 1
+  fi
+}
+
+# Install a Homebrew cask if the command/directory is not detected.
+brew_cask_install_if_missing() {
+  local check_cmd="$1"
+  local cask="$2"
+
+  if command -v "${check_cmd}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! command -v brew >/dev/null 2>&1; then
+    log_warn "${check_cmd} not found and Homebrew not available — skipping"
+    return 1
+  fi
+
+  log_info "Installing ${cask} via Homebrew cask..."
+  if brew install --cask "${cask}"; then
+    log_info "${cask} installed"
+  else
+    log_warn "Failed to install ${cask}"
+    return 1
+  fi
+}
+
+# Ensure all development tools that clean-env-uninstall.sh removes are present.
+# Installs missing tools via Homebrew, project install scripts, or gem.
+ensure_dev_tools() {
+  log_info "Checking development tools..."
+
+  local missing=0
+
+  # --- Homebrew packages ---------------------------------------------------
+  brew_install_if_missing rg        ripgrep     || ((missing++)) || true
+  brew_install_if_missing shellcheck shellcheck  || ((missing++)) || true
+  brew_install_if_missing jq        jq          || ((missing++)) || true
+  brew_install_if_missing ffmpeg    ffmpeg       || ((missing++)) || true
+  brew_install_if_missing xmlstarlet xmlstarlet  || ((missing++)) || true
+  brew_install_if_missing swiftformat swiftformat || ((missing++)) || true
+  brew_install_if_missing swiftlint swiftlint    || ((missing++)) || true
+  brew_install_if_missing xcodegen  xcodegen     || ((missing++)) || true
+  brew_install_if_missing yq        yq           || ((missing++)) || true
+  brew_install_if_missing gum       gum          || ((missing++)) || true
+  brew_install_if_missing hadolint  hadolint     || ((missing++)) || true
+  brew_install_if_missing vips      vips         || ((missing++)) || true
+
+  # --- Java 21 (needed for Gradle / Android builds) -----------------------
+  if ! java -version 2>&1 | grep -q 'version "21'; then
+    log_info "Java 21 not detected"
+    brew_cask_install_if_missing java zulu-jdk21 || ((missing++)) || true
+  fi
+
+  # --- Manual tool installs (use project install scripts) ------------------
+  if ! command -v lychee >/dev/null 2>&1; then
+    log_info "Installing lychee..."
+    bash "${PROJECT_ROOT}/scripts/lychee/install_lychee.sh" || ((missing++)) || true
+  fi
+
+  if ! command -v ktfmt >/dev/null 2>&1; then
+    log_info "Installing ktfmt..."
+    bash "${PROJECT_ROOT}/scripts/ktfmt/install_ktfmt.sh" || ((missing++)) || true
+  fi
+
+  if ! command -v xcpretty >/dev/null 2>&1; then
+    log_info "Installing xcpretty..."
+    gem install xcpretty 2>/dev/null || ((missing++)) || true
+  fi
+
+  if [[ "${missing}" -gt 0 ]]; then
+    log_warn "${missing} tool(s) could not be installed — some features may be unavailable"
+  else
+    log_info "All development tools present."
+  fi
+
+  return 0
+}
+
 # Run all dependency checks via install.sh
 ensure_dependencies() {
   log_info "Checking dependencies..."
@@ -197,6 +298,9 @@ ensure_dependencies() {
     log_error "Bun not found after install"
     return 1
   fi
+
+  # Install development tools (brew packages, Java, manual installs)
+  ensure_dev_tools
 
   # Build and npm link auto-mobile (local-dev specific)
   if ! ensure_auto_mobile; then

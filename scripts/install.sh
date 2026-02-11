@@ -2566,6 +2566,73 @@ start_mcp_daemon() {
     log_info "MCP daemon is running and healthy."
 }
 
+# Install runtime dependencies needed for AutoMobile features.
+# These are not development/CI tools — they are required for end-user functionality:
+#   ffmpeg  - video recording and encoding (demoMode, videoRecording tools)
+#   vips    - native image processing via sharp (observe screenshots, image comparison)
+install_runtime_deps() {
+    local os
+    os=$(detect_os)
+
+    # ffmpeg — required for video recording features
+    if ! command_exists ffmpeg; then
+        if [[ "${os}" == "macos" ]] && command_exists brew; then
+            if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+                log_info "Installing ffmpeg (required for video recording)..."
+                if run_spinner "Installing ffmpeg" brew install ffmpeg; then
+                    CHANGES_MADE=true
+                else
+                    log_warn "ffmpeg install failed — video recording will be unavailable"
+                fi
+            elif gum confirm "Install ffmpeg? (required for video recording)"; then
+                if run_spinner "Installing ffmpeg" brew install ffmpeg; then
+                    CHANGES_MADE=true
+                else
+                    log_warn "ffmpeg install failed — video recording will be unavailable"
+                fi
+            else
+                log_info "Skipped ffmpeg — install later with: brew install ffmpeg"
+            fi
+        else
+            log_warn "ffmpeg not found — video recording will be unavailable"
+            if [[ "${os}" == "macos" ]]; then
+                log_info "Install with: brew install ffmpeg"
+            else
+                log_info "Install with: apt-get install ffmpeg (or your package manager)"
+            fi
+        fi
+    fi
+
+    # vips — required by sharp for screenshot processing
+    if ! command_exists vips; then
+        if [[ "${os}" == "macos" ]] && command_exists brew; then
+            if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+                log_info "Installing vips (required for image processing)..."
+                if run_spinner "Installing vips" brew install vips; then
+                    CHANGES_MADE=true
+                else
+                    log_warn "vips install failed — image processing may fall back to slower paths"
+                fi
+            elif gum confirm "Install vips? (required for image processing)"; then
+                if run_spinner "Installing vips" brew install vips; then
+                    CHANGES_MADE=true
+                else
+                    log_warn "vips install failed — image processing may fall back to slower paths"
+                fi
+            else
+                log_info "Skipped vips — install later with: brew install vips"
+            fi
+        else
+            log_warn "vips not found — image processing may fall back to slower paths"
+            if [[ "${os}" == "macos" ]]; then
+                log_info "Install with: brew install vips"
+            else
+                log_info "Install with: apt-get install libvips42 libvips-dev (or your package manager)"
+            fi
+        fi
+    fi
+}
+
 handle_bun_setup() {
     # Enforce version requirement even if bun is already installed
     if [[ "${BUN_INSTALLED}" == "true" ]] && [[ -n "${REQUIRED_BUN_VERSION}" ]]; then
@@ -3386,6 +3453,10 @@ main() {
         fi
     fi
 
+    # Check runtime dependencies
+    spin_check "Checking ffmpeg" "command -v ffmpeg >/dev/null 2>&1" || true
+    spin_check "Checking vips" "command -v vips >/dev/null 2>&1" || true
+
     # Check Android SDK
     local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
     if spin_check "Checking Android SDK (adb)" "${adb_check}"; then
@@ -3638,6 +3709,9 @@ main() {
             log_warn "npm install failed"
         fi
     fi
+
+    # Runtime dependencies (needed for AutoMobile features)
+    install_runtime_deps
 
     # Platform-specific setup
     case "${platform_choice}" in
