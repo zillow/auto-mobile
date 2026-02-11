@@ -50,6 +50,28 @@ import {
  */
 export type ServiceManagerFactory = (device: BootedDevice) => XCTestServiceManager;
 
+/** Default production factory that delegates to the real singleton. */
+const defaultServiceManagerFactory: ServiceManagerFactory = d => IOSXCTestServiceManager.getInstance(d);
+
+/**
+ * No-op factory used by createForTesting so that tests which don't supply
+ * a factory never trigger real XCTestService setup on connection failure.
+ */
+class NoOpXCTestServiceManager implements XCTestServiceManager {
+  async setup(): Promise<{ success: false; message: string }> { return { success: false, message: "no-op test stub" }; }
+  async isInstalled(): Promise<boolean> { return false; }
+  async isRunning(): Promise<boolean> { return false; }
+  async isAvailable(): Promise<boolean> { return false; }
+  async start(): Promise<void> {}
+  async stop(): Promise<void> {}
+  getServicePort(): number { return 0; }
+  setAutoRestart(): void {}
+  isAutoRestartEnabled(): boolean { return false; }
+  async forceRestart(): Promise<void> {}
+}
+
+const noOpServiceManagerFactory: ServiceManagerFactory = () => new NoOpXCTestServiceManager();
+
 // Import delegates
 import { XCTestServiceGestures } from "./XCTestServiceGestures";
 import { XCTestServiceText } from "./XCTestServiceText";
@@ -247,7 +269,7 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     port: number = XCTestServiceClient.DEFAULT_PORT,
     wsFactory: WebSocketFactory = defaultWebSocketFactory,
     timer: Timer = defaultTimer,
-    serviceManagerFactory: ServiceManagerFactory = d => IOSXCTestServiceManager.getInstance(d)
+    serviceManagerFactory: ServiceManagerFactory = defaultServiceManagerFactory
   ) {
     super(timer, wsFactory);
     this.device = device;
@@ -280,7 +302,7 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
     port: number,
     wsFactory: WebSocketFactory,
     timer: Timer,
-    serviceManagerFactory?: ServiceManagerFactory
+    serviceManagerFactory: ServiceManagerFactory = noOpServiceManagerFactory
   ): XCTestServiceClient {
     return new XCTestServiceClient(device, port, wsFactory, timer, serviceManagerFactory);
   }
