@@ -99,7 +99,7 @@ fun LayoutInspectorDashboard(
     // preventing the UI from flashing "Device Disconnected" on transient interruptions.
     if (dataSourceMode == DataSourceMode.Real) {
         val gracePeriodScope = rememberCoroutineScope()
-        val gracePeriod = remember(state) {
+        val gracePeriod = remember(state, streamClient) {
             StreamConnectionGracePeriod(
                 scope = gracePeriodScope,
                 onStatusChange = { status -> state.updateConnectionStatus(status) },
