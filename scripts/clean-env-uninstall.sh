@@ -203,7 +203,7 @@ remove_bun() {
     if command_exists brew && brew list oven-sh/bun/bun >/dev/null 2>&1; then
         found+=("Homebrew: oven-sh/bun/bun")
     fi
-    if command_exists npm && npm list -g @anthropic-ai/bun 2>/dev/null | grep -q bun; then
+    if command_exists npm && npm list -g bun >/dev/null 2>&1; then
         found+=("npm global bun package")
     fi
 
