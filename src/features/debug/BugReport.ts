@@ -68,7 +68,7 @@ export class BugReport {
   async execute(options: BugReportOptions = {}): Promise<BugReportResult> {
     const startTime = this.timer.now();
     const reportId = `bug-${this.timer.now()}-${randomBytes(4).toString("hex")}`;
-    const logcatLines = options.logcatLines || 1000;
+    const logcatLines = options.logcatLines ?? 1000;
 
     logger.info(`[BugReport] Generating report ${reportId}`);
 

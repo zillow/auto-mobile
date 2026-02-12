@@ -236,4 +236,21 @@ describe("BugReport", () => {
       expect(result.viewHierarchy.clickableElements[0].className).toBe("android.widget.TextView");
     });
   });
+
+  describe("logcatLines", () => {
+    test("honors explicit zero for logcatLines", async () => {
+      const { bugReport, elementParser, viewHierarchy, adbFactory } = setup();
+      viewHierarchy.configureHierarchy({ hierarchy: {} });
+      elementParser.nextRootNodes = [];
+      elementParser.nextFlattenedElements = [];
+
+      await bugReport.execute({ logcatLines: 0 });
+
+      const logcatCalls = adbFactory.getFakeClient().getCommandCalls()
+        .filter(c => c.command.includes("logcat"));
+      for (const call of logcatCalls) {
+        expect(call.command).toContain("-t 0");
+      }
+    });
+  });
 });
