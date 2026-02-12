@@ -64,6 +64,13 @@ export class FakeViewHierarchy implements ViewHierarchy {
     return viewHierarchy;
   }
 
+  /**
+   * Execute uiautomator dump (fake implementation).
+   */
+  async executeUiAutomatorDump(): Promise<string> {
+    return "<hierarchy></hierarchy>";
+  }
+
   // Test helpers
 
   /**

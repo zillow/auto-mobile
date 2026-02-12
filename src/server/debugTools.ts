@@ -4,9 +4,8 @@ import { ActionableError } from "../models/ActionableError";
 import { RawViewHierarchy } from "../features/debug/RawViewHierarchy";
 import { DebugSearch } from "../features/debug/DebugSearch";
 import { BugReport } from "../features/debug/BugReport";
-import { highlightShapeSchema } from "../features/debug/VisualHighlight";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { BootedDevice, HighlightShape, Platform } from "../models";
+import { BootedDevice, Platform } from "../models";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { isDebugModeEnabled } from "../utils/debug";
 import {
@@ -44,17 +43,8 @@ export interface DebugSearchArgs {
 export interface BugReportArgs {
   platform: Platform;
   appId?: string;
-  includeScreenshot?: boolean;
-  includeRawHierarchy?: boolean;
-  includeLogcat?: boolean;
   logcatLines?: number;
-  saveToFile?: boolean;
   saveDir?: string;
-  highlights?: Array<{
-    description?: string;
-    shape: HighlightShape;
-  }>;
-  includeHighlightsInScreenshot?: boolean;
 }
 
 // Schema definitions
@@ -87,17 +77,8 @@ export const debugSearchSchema = addDeviceTargetingToSchema(debugSearchBaseSchem
 export const bugReportSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   appId: z.string().optional().describe("App package ID to filter logcat for specific app"),
-  includeScreenshot: z.boolean().optional().describe("Whether to include screenshot (default: true)"),
-  includeRawHierarchy: z.boolean().optional().describe("Whether to include raw view hierarchy XML (default: true)"),
-  includeLogcat: z.boolean().optional().describe("Whether to include logcat entries (default: true)"),
-  logcatLines: z.number().optional().describe("Number of recent logcat lines to include (default: 100)"),
-  saveToFile: z.boolean().optional().describe("Whether to save full report to a file (default: false)"),
-  saveDir: z.string().optional().describe("Directory to save report to"),
-  highlights: z.array(z.object({
-    description: z.string().min(1).optional().describe("Description of the highlight"),
-    shape: highlightShapeSchema
-  })).optional().describe("Highlights to add during report generation"),
-  includeHighlightsInScreenshot: z.boolean().optional().describe("Whether screenshot should include highlight overlays (default: true)")
+  logcatLines: z.number().optional().describe("Number of recent logcat lines to include (default: 1000)"),
+  saveDir: z.string().optional().describe("Directory to save report to")
 }));
 
 // Register debug tools
@@ -150,14 +131,8 @@ export function registerDebugTools() {
       const bugReport = new BugReport(device);
       const result = await bugReport.execute({
         appId: args.appId,
-        includeScreenshot: args.includeScreenshot,
-        includeRawHierarchy: args.includeRawHierarchy,
-        includeLogcat: args.includeLogcat,
         logcatLines: args.logcatLines,
-        saveToFile: args.saveToFile,
-        saveDir: args.saveDir,
-        highlights: args.highlights,
-        includeHighlightsInScreenshot: args.includeHighlightsInScreenshot
+        saveDir: args.saveDir
       });
       return createJSONToolResponse(result);
     } catch (error) {
@@ -186,7 +161,7 @@ export function registerDebugTools() {
 
   ToolRegistry.registerDeviceAware(
     "bugReport",
-    "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, optional screenshot, and optional visual highlight metadata. The report can be saved to a file for sharing with AutoMobile developers.",
+    "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, and screenshot. The report is saved to a file for sharing with AutoMobile developers.",
     bugReportSchema,
     bugReportHandler,
     false,

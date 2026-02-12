@@ -33,8 +33,8 @@ describe("BugReport", () => {
     return { bugReport, elementParser, viewHierarchy, adbFactory, timer };
   };
 
-  const executeHierarchyOnly = (bugReport: BugReport) =>
-    bugReport.execute({ includeScreenshot: false, includeLogcat: false, includeRawHierarchy: false });
+  const executeReport = (bugReport: BugReport) =>
+    bugReport.execute();
 
   describe("getHierarchy", () => {
     test("sets elementCount to number of elements with valid bounds", async () => {
@@ -47,7 +47,7 @@ describe("BugReport", () => {
       ];
       elementParser.nextRootNodes = [{ $: {} }];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.elementCount).toBe(3);
     });
 
@@ -65,7 +65,7 @@ describe("BugReport", () => {
         { element: makeElement(), index: 0, depth: 0 }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.filteredNodeCount).toBe(2);
     });
 
@@ -89,7 +89,7 @@ describe("BugReport", () => {
         }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.clickableElements).toHaveLength(1);
       expect(result.viewHierarchy.clickableElements[0].bounds).toEqual(bounds);
       expect(result.viewHierarchy.clickableElements[0].bounds.left).toBe(10);
@@ -105,7 +105,7 @@ describe("BugReport", () => {
         depth: 0
       }));
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.clickableElements).toHaveLength(50);
     });
 
@@ -115,7 +115,7 @@ describe("BugReport", () => {
       elementParser.nextRootNodes = [];
       elementParser.nextFlattenedElements = [];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.elementCount).toBe(0);
       expect(result.viewHierarchy.clickableElements).toHaveLength(0);
       expect(result.errors).toEqual([]);
@@ -140,7 +140,7 @@ describe("BugReport", () => {
         }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       const el = result.viewHierarchy.clickableElements[0];
       expect(el.resourceId).toBe("com.app:id/submit");
       expect(el.text).toBe("overridden text");
@@ -160,7 +160,7 @@ describe("BugReport", () => {
         }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.clickableElements[0].text).toBe("element text");
     });
 
@@ -174,7 +174,7 @@ describe("BugReport", () => {
         { element: makeElement({ "resource-id": "text" }), index: 2, depth: 0 }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.clickableElements).toHaveLength(1);
       expect(result.viewHierarchy.clickableElements[0].resourceId).toBe("button");
     });
@@ -196,7 +196,7 @@ describe("BugReport", () => {
         }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.clickableElements).toHaveLength(2);
       expect(result.viewHierarchy.clickableElements[0].resourceId).toBe("string-clickable");
       expect(result.viewHierarchy.clickableElements[1].resourceId).toBe("bool-clickable");
@@ -215,7 +215,7 @@ describe("BugReport", () => {
         { element: makeElement(), index: 0, depth: 0 }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       // 3 traversed (root + 2 children), 1 flattened = 2 filtered
       expect(result.viewHierarchy.filteredNodeCount).toBe(2);
     });
@@ -232,8 +232,25 @@ describe("BugReport", () => {
         }
       ];
 
-      const result = await executeHierarchyOnly(bugReport);
+      const result = await executeReport(bugReport);
       expect(result.viewHierarchy.clickableElements[0].className).toBe("android.widget.TextView");
+    });
+  });
+
+  describe("logcatLines", () => {
+    test("honors explicit zero for logcatLines", async () => {
+      const { bugReport, elementParser, viewHierarchy, adbFactory } = setup();
+      viewHierarchy.configureHierarchy({ hierarchy: {} });
+      elementParser.nextRootNodes = [];
+      elementParser.nextFlattenedElements = [];
+
+      await bugReport.execute({ logcatLines: 0 });
+
+      const logcatCalls = adbFactory.getFakeClient().getCommandCalls()
+        .filter(c => c.command.includes("logcat"));
+      for (const call of logcatCalls) {
+        expect(call.command).toContain("-t 0");
+      }
     });
   });
 });
