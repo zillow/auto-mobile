@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.jasonpearson/auto-mobile",
+  "title": "AutoMobile",
+  "description": "Mobile device interaction automation via MCP",
+  "version": "0.0.12",
+  "websiteUrl": "https://kaeawc.github.io/auto-mobile/",
+  "repository": {
+    "url": "https://github.com/kaeawc/auto-mobile",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@kaeawc/auto-mobile",
+      "version": "0.0.12",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

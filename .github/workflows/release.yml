@@ -134,6 +134,15 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
 
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+
+      - name: Publish to MCP Registry
+        run: |
+          ./mcp-publisher login dns --domain jasonpearson.dev --private-key "${{ secrets.MCP_DNS_PRIVATE_KEY }}"
+          ./mcp-publisher publish
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -247,6 +256,7 @@ jobs:
           echo "- **GitHub Release:** https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Maven Central:** [auto-mobile-junit-runner](https://central.sonatype.com/artifact/dev.jasonpearson.auto-mobile/auto-mobile-junit-runner)" >> $GITHUB_STEP_SUMMARY
           echo "- **Maven Central:** [auto-mobile-sdk](https://central.sonatype.com/artifact/dev.jasonpearson.auto-mobile/auto-mobile-sdk)" >> $GITHUB_STEP_SUMMARY
+          echo "- **MCP Registry:** [dev.jasonpearson/auto-mobile](https://registry.modelcontextprotocol.io/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker Images" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

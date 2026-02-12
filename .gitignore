@@ -41,6 +41,7 @@ docs/contributing.md
 .mcp.json
 .mcp.local.json
 *.pid
+*.pem
 # IntelliJ Platform Gradle plugin artifacts
 android/ide-plugin/.intellijPlatform/
 .lycheecache

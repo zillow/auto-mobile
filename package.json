@@ -71,6 +71,7 @@
     "type": "git",
     "url": "https://github.com/kaeawc/auto-mobile.git"
   },
+  "mcpName": "dev.jasonpearson/auto-mobile",
   "publishConfig": {
     "access": "public"
   },

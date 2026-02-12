@@ -91,6 +91,37 @@ PY
 update_json_version "package.json" "$new_version" "$dry_run"
 update_json_version ".claude-plugin/plugin.json" "$new_version" "$dry_run"
 
+# Update server.json top-level version and packages[0].version for MCP registry
+update_server_json_version() {
+  local path="$1"
+  local version="$2"
+  local dry="$3"
+  if [[ "$dry" == true ]]; then
+    return 0
+  fi
+  python3 - "$path" "$version" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+version = sys.argv[2]
+
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+data["version"] = version
+
+if "packages" in data:
+    for pkg in data["packages"]:
+        pkg["version"] = version
+
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2)
+    handle.write("\n")
+PY
+}
+update_server_json_version "server.json" "$new_version" "$dry_run"
+
 # Update VERSION_NAME in android/gradle.properties (single source of truth for Android libraries)
 update_gradle_properties_version() {
   local path="$1"
