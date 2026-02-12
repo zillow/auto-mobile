@@ -288,9 +288,10 @@ export class UnixSocketServer {
         if (args.platform === "android") {
           const manager = AndroidAccessibilityServiceManager.getInstance(targetDevice);
           const result = await manager.ensureCompatibleVersion();
+          const successStatuses = new Set(["compatible", "upgraded", "reinstalled"]);
           return {
-            success: result.status !== "failed",
-            message: `Accessibility service ${result.status}`,
+            success: successStatuses.has(result.status),
+            message: `Accessibility service ${result.status}${result.error ? `: ${result.error}` : ""}`,
             status: result,
           };
         } else {
