@@ -4,45 +4,43 @@ import dev.jasonpearson.automobile.slides.model.BulletPoint
 import dev.jasonpearson.automobile.slides.model.PresentationEmoji
 import dev.jasonpearson.automobile.slides.model.SlideContent
 
-/** Slides for Introduction to AutoMobile? */
+/** Slides introducing the problem space and AutoMobile's mission. */
 fun getIntroductionSlides(): List<SlideContent> =
     listOf(
         SlideContent.LargeText(title = "AutoMobile", subtitle = "Jason Pearson"),
         SlideContent.Emoji(emoji = PresentationEmoji.PROGRAMMER, caption = "Who am I?"),
-
-        // Swipe screen to show promo video
-
+        SlideContent.LargeText(
+            title = "The best of mobile tooling has been inaccessible",
+        ),
         SlideContent.BulletPoints(
-            title = "UI testing up until now",
+            title = "Behind walls of",
             points =
                 listOf(
-                    BulletPoint(text = "Manual"),
-                    BulletPoint(text = "Automated"),
+                    BulletPoint(text = "Cost"),
+                    BulletPoint(text = "Specialized expertise"),
                 ),
         ),
         SlideContent.LargeText(
-            title = "AutoMobile is a set of tools for automating mobile engineering"
+            title = "No cohesive UX ties them together",
+        ),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.SLOW,
+            caption = "More like AutoCAD 2008",
+        ),
+        SlideContent.LargeText(
+            title = "Automating tedium in mobile engineering has been out of reach",
+        ),
+        SlideContent.LargeText(
+            title = "I built AutoMobile to change that",
         ),
         SlideContent.BulletPoints(
-            title = "AutoMobile includes:",
+            title = "AutoMobile is:",
             points =
                 listOf(
-                    BulletPoint("MCP server that doubles as a CLI tool"),
-                    BulletPoint("A Kotlin test authoring Clikt app"),
-                    BulletPoint("A custom JUnitRunner"),
-                    BulletPoint("Accessibility service to expose data quickly"),
-                    // TODO: Uncomment if koog lands BulletPoint("An agentic loop for intelligently
-                    // self-healing tests")
-                ),
-        ),
-        SlideContent.BulletPoints(
-            title = "How does it work?",
-            points =
-                listOf(
-                    BulletPoint(text = "Works on any Android debug or prod app"),
-                    BulletPoint(text = "Directly uses Android platform tools"),
-                    BulletPoint(text = "Indexes your project source code"),
-                    BulletPoint(text = "Can write tests for you"),
+                    BulletPoint("Open source MCP server"),
+                    BulletPoint("AI agents control Android & iOS devices"),
+                    BulletPoint("Natural language interaction"),
+                    BulletPoint("Most features require no SDK dependency"),
                 ),
         ),
     )

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -90,12 +89,6 @@ fun FlowMapListView(
 @Composable
 fun ScreenNodeRow(screen: ScreenNode, onClick: () -> Unit) {
     val colors = JewelTheme.globalColors
-    val coverageColor = when {
-        screen.testCoverage >= 80 -> Color(0xFF4CAF50)
-        screen.testCoverage >= 50 -> Color(0xFFFFC107)
-        else -> Color(0xFFFF5722)
-    }
-
     Row(
         modifier =
         Modifier.fillMaxWidth()
@@ -128,32 +121,12 @@ fun ScreenNodeRow(screen: ScreenNode, onClick: () -> Unit) {
             )
         }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Coverage indicator
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier.size(8.dp).background(coverageColor, CircleShape),
-                )
-                Text(
-                    "${screen.testCoverage}%",
-                    fontSize = 11.sp,
-                    color = colors.text.normal.copy(alpha = 0.6f),
-                )
-            }
-
-            // Transition count
-            Text(
-                "${screen.transitionCount} →",
-                fontSize = 11.sp,
-                color = colors.text.normal.copy(alpha = 0.5f),
-            )
-        }
+        // Transition count
+        Text(
+            "${screen.transitionCount} →",
+            fontSize = 11.sp,
+            color = colors.text.normal.copy(alpha = 0.5f),
+        )
     }
 }
 
@@ -259,7 +232,7 @@ fun ScreenDetailView(
     var screenshotBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var isLoadingScreenshot by remember { mutableStateOf(false) }
 
-    LaunchedEffect(screen.screenshotUri) {
+    LaunchedEffect(screen.screenshotUri, screenshotLoader) {
         if (screen.screenshotUri != null && screenshotLoader != null) {
             isLoadingScreenshot = true
             screenshotBitmap = withContext(Dispatchers.IO) {
@@ -330,7 +303,6 @@ fun ScreenDetailView(
 
         // Stats row
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            StatItem("Test Coverage", "${screen.testCoverage}%")
             StatItem("Outgoing", "${outgoing.size}")
             StatItem("Incoming", "${incoming.size}")
         }

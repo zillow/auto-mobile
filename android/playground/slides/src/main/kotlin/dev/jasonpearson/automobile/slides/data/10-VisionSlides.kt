@@ -2,51 +2,34 @@ package dev.jasonpearson.automobile.slides.data
 
 import dev.jasonpearson.automobile.slides.R
 import dev.jasonpearson.automobile.slides.model.BulletPoint
-import dev.jasonpearson.automobile.slides.model.PresentationEmoji
 import dev.jasonpearson.automobile.slides.model.SlideContent
 
 fun getVisionSlides(): List<SlideContent> =
     listOf(
-        SlideContent.LargeText(title = "Vision"),
-        SlideContent.LargeText(title = "Built-in opt-in testing"),
-        SlideContent.Emoji(
-            emoji = PresentationEmoji.ACCESSIBILITY,
-            caption = "Accessibility Testing",
+        SlideContent.LargeText(title = "State of the Project"),
+        SlideContent.LargeText(title = "Android platform support is solid"),
+        SlideContent.LargeText(
+            title = "iOS support prototyped",
+            subtitle = "AI agent & IDE plugin running on iOS simulators",
         ),
-        SlideContent.Emoji(
-            emoji = PresentationEmoji.SECURE,
-            caption = "Security and Privacy Testing",
-        ),
-        SlideContent.Emoji(emoji = PresentationEmoji.FAST, caption = "Performance Testing"),
-        SlideContent.Emoji(
-            emoji = PresentationEmoji.DATA_TRANSFER,
-            caption = "State Capture and Restoration",
-        ),
-        SlideContent.Emoji(
-            emoji = PresentationEmoji.TOOLBOX,
-            caption = "We can build a better toolbox",
-        ),
-        SlideContent.LargeText(title = "Project Status"),
-        SlideContent.LargeText(title = "Works on all Android apps today"),
-        SlideContent.LargeText(title = "iOS support prototyped"),
+        SlideContent.LargeText(title = "What's Next"),
         SlideContent.BulletPoints(
-            title = "Parameterization of everything",
+            title = "Actively building toward 1.0",
             points =
                 listOf(
-                    BulletPoint(text = "Day/Night"),
-                    BulletPoint(text = "Portrait/Landscape"),
-                    BulletPoint(text = "API Levels"),
-                    BulletPoint(text = "Input devices"),
+                    BulletPoint(text = "Design docs to organize project vision and architecture"),
+                    BulletPoint(text = "Technical blog posts on the journey"),
+                    BulletPoint(text = "Standalone desktop apps in the works"),
                 ),
         ),
-        SlideContent.LargeText(title = "Self healing soon"),
         SlideContent.BulletPoints(
-            title = "Android MCP SDK which is also OSS",
+            title = "Writing about:",
             points =
                 listOf(
-                    BulletPoint(text = "Tools: View Hierarchy, Storage, Network"),
-                    BulletPoint(text = "Resources: App Resources, Filesystem"),
-                    BulletPoint(text = "https://github.com/kaeawc/android-mcp-sdk"),
+                    BulletPoint(text = "Performance improvements"),
+                    BulletPoint(text = "How it reuses its observability"),
+                    BulletPoint(text = "Challenges of emulator/simulator operation"),
+                    BulletPoint(text = "Keeping a mono-repo with big ambitions organized"),
                 ),
         ),
         SlideContent.Screenshot(

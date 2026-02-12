@@ -18,6 +18,16 @@ data class BootedDevicesResponse(
 )
 
 @Serializable
+data class DeviceServiceStatus(
+    val installed: Boolean = false,
+    val enabled: Boolean = false,
+    val running: Boolean = false,
+    val installedSha256: String? = null,
+    val expectedSha256: String = "",
+    val isCompatible: Boolean = true,
+)
+
+@Serializable
 data class BootedDeviceInfo(
     val name: String,
     val platform: String, // "android" or "ios"
@@ -25,6 +35,28 @@ data class BootedDeviceInfo(
     val source: String, // "local" or "remote"
     val isVirtual: Boolean,
     val status: String, // "booted"
+    val serviceStatus: DeviceServiceStatus? = null,
+)
+
+@Serializable
+data class ServiceExpectedInfo(
+    val expectedSha256: String = "",
+    val url: String = "",
+    val expectedAppHash: String = "",
+)
+
+@Serializable
+data class DaemonPlatformInfo(
+    val accessibilityService: ServiceExpectedInfo? = null,
+    val xcTestService: ServiceExpectedInfo? = null,
+)
+
+@Serializable
+data class DaemonStatusResponse(
+    val version: String = "",
+    val releaseVersion: String = "",
+    val android: DaemonPlatformInfo? = null,
+    val ios: DaemonPlatformInfo? = null,
 )
 
 /**

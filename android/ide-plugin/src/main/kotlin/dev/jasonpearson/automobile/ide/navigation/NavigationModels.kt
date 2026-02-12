@@ -5,7 +5,6 @@ data class ScreenNode(
     val name: String,
     val type: String, // Activity, Fragment, Composable
     val packageName: String,
-    val testCoverage: Int, // percentage
     val transitionCount: Int,
     val discoveredAt: Long, // epoch millis - older = discovered earlier during exploration
     val screenshotUri: String? = null, // MCP resource URI for screenshot thumbnail
@@ -29,25 +28,25 @@ object NavigationMockData {
 
     val screens = listOf(
         // Discovery order: Splash → Login → Signup → Home → ChatList → Chat → Profile → Settings
-        ScreenNode("splash", "Splash", "Activity", "com.chat.app", 95, 2, BASE_TIME),
-        ScreenNode("login", "Login", "Composable", "com.chat.auth", 88, 3, BASE_TIME + 2_000),
-        ScreenNode("signup", "Signup", "Composable", "com.chat.auth", 82, 2, BASE_TIME + 4_000),
-        ScreenNode("home", "Home", "Composable", "com.chat.main", 90, 5, BASE_TIME + 6_000),
-        ScreenNode("chats", "ChatList", "Composable", "com.chat.main", 85, 2, BASE_TIME + 8_000),
-        ScreenNode("chat", "Chat", "Composable", "com.chat.main", 80, 2, BASE_TIME + 10_000),
-        ScreenNode("profile", "Profile", "Composable", "com.chat.user", 78, 2, BASE_TIME + 12_000),
-        ScreenNode("settings", "Settings", "Composable", "com.chat.user", 75, 1, BASE_TIME + 14_000),
+        ScreenNode("splash", "Splash", "Activity", "com.chat.app", 2, BASE_TIME),
+        ScreenNode("login", "Login", "Composable", "com.chat.auth", 3, BASE_TIME + 2_000),
+        ScreenNode("signup", "Signup", "Composable", "com.chat.auth", 2, BASE_TIME + 4_000),
+        ScreenNode("home", "Home", "Composable", "com.chat.main", 5, BASE_TIME + 6_000),
+        ScreenNode("chats", "ChatList", "Composable", "com.chat.main", 2, BASE_TIME + 8_000),
+        ScreenNode("chat", "Chat", "Composable", "com.chat.main", 2, BASE_TIME + 10_000),
+        ScreenNode("profile", "Profile", "Composable", "com.chat.user", 2, BASE_TIME + 12_000),
+        ScreenNode("settings", "Settings", "Composable", "com.chat.user", 1, BASE_TIME + 14_000),
         // Additional screens
-        ScreenNode("contacts", "Contacts", "Composable", "com.chat.contacts", 72, 3, BASE_TIME + 16_000),
-        ScreenNode("newchat", "NewChat", "Composable", "com.chat.main", 68, 2, BASE_TIME + 18_000),
-        ScreenNode("groupchat", "GroupChat", "Composable", "com.chat.main", 65, 3, BASE_TIME + 20_000),
-        ScreenNode("media", "MediaGallery", "Composable", "com.chat.media", 70, 2, BASE_TIME + 22_000),
-        ScreenNode("call", "VoiceCall", "Activity", "com.chat.calls", 60, 2, BASE_TIME + 24_000),
-        ScreenNode("videocall", "VideoCall", "Activity", "com.chat.calls", 55, 2, BASE_TIME + 26_000),
-        ScreenNode("notifications", "Notifications", "Composable", "com.chat.settings", 73, 1, BASE_TIME + 28_000),
-        ScreenNode("search", "Search", "Composable", "com.chat.main", 77, 2, BASE_TIME + 30_000),
-        ScreenNode("editprofile", "EditProfile", "Composable", "com.chat.user", 62, 1, BASE_TIME + 32_000),
-        ScreenNode("privacy", "Privacy", "Composable", "com.chat.settings", 58, 1, BASE_TIME + 34_000),
+        ScreenNode("contacts", "Contacts", "Composable", "com.chat.contacts", 3, BASE_TIME + 16_000),
+        ScreenNode("newchat", "NewChat", "Composable", "com.chat.main", 2, BASE_TIME + 18_000),
+        ScreenNode("groupchat", "GroupChat", "Composable", "com.chat.main", 3, BASE_TIME + 20_000),
+        ScreenNode("media", "MediaGallery", "Composable", "com.chat.media", 2, BASE_TIME + 22_000),
+        ScreenNode("call", "VoiceCall", "Activity", "com.chat.calls", 2, BASE_TIME + 24_000),
+        ScreenNode("videocall", "VideoCall", "Activity", "com.chat.calls", 2, BASE_TIME + 26_000),
+        ScreenNode("notifications", "Notifications", "Composable", "com.chat.settings", 1, BASE_TIME + 28_000),
+        ScreenNode("search", "Search", "Composable", "com.chat.main", 2, BASE_TIME + 30_000),
+        ScreenNode("editprofile", "EditProfile", "Composable", "com.chat.user", 1, BASE_TIME + 32_000),
+        ScreenNode("privacy", "Privacy", "Composable", "com.chat.settings", 1, BASE_TIME + 34_000),
     )
 
     val transitions = listOf(

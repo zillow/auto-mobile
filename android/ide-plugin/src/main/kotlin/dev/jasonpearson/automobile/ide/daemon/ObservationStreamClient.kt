@@ -329,6 +329,24 @@ class ObservationStreamClient {
         }
     }
 
+    /**
+     * Request the current navigation graph from the server.
+     * The response arrives through the existing navigation_update flow.
+     *
+     * @param appId Optional app ID to request the graph for a specific app.
+     *              If null, the server returns the graph for the current foreground app.
+     */
+    fun requestNavigationGraph(appId: String? = null) {
+        if (!connected.get()) return
+
+        val request = StreamRequest(
+            id = UUID.randomUUID().toString(),
+            command = "request_navigation_graph",
+            appId = appId,
+        )
+        sendRequest(request)
+    }
+
     private fun sendPong() {
         val request = StreamRequest(
             id = UUID.randomUUID().toString(),
@@ -359,6 +377,7 @@ data class StreamRequest(
     val id: String,
     val command: String,
     val deviceId: String? = null,
+    val appId: String? = null,
 )
 
 @Serializable

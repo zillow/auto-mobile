@@ -28,41 +28,31 @@ fun NavigationDashboard(
     highlightedScreens: List<String> = emptyList(),  // Screen names to highlight (e.g., from test flow)
     currentStepScreen: String? = highlightedScreens.lastOrNull(),  // Current step being replayed
     onHighlightCleared: () -> Unit = {},  // Called when user interacts to clear external highlights
-    onFocusModeChanged: (Boolean) -> Unit = {},  // Called when zoom causes content to extend beyond canvas
-    headerHeightPx: Float = 0f,  // Height of header area to check overlap against
-    chromeAlpha: Float = 1f,  // Alpha for chrome elements (toggle/zoom controls)
+    onDetailViewChanged: (Boolean) -> Unit = {},  // Called when entering/leaving a detail view (screen/transition)
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
     selectedAppId: String? = null,  // App ID to filter navigation graph by (managed by parent)
     observationStreamClient: ObservationStreamClient? = null,  // Real-time stream client for navigation updates
+    screenshotLoader: ScreenshotLoader? = null,  // Screenshot loader (hoisted to parent so cache persists across toggles)
 ) {
     var currentSection by remember { mutableStateOf(NavigationSection.FlowMap) }
     var selectedScreenId by remember { mutableStateOf<String?>(null) }
     var selectedTransitionId by remember { mutableStateOf<String?>(null) }
 
-    // Fog mode settings - read from persisted settings
+    // Notify parent when entering/leaving detail view
+    LaunchedEffect(currentSection) {
+        onDetailViewChanged(currentSection != NavigationSection.FlowMap)
+    }
+
+    // Fog mode settings - read from persisted settings (fog+auto are one combined toggle)
     val settings = remember { AutoMobileSettings.getInstance() }
     var fogModeEnabled by remember { mutableStateOf(settings.fogModeEnabled) }
-    var autoFocusEnabled by remember { mutableStateOf(settings.autoFocusEnabled) }
 
-    // Track current screen from navigation stream
+    // Track current screen and app from navigation stream
     var currentObservedScreen by remember { mutableStateOf<String?>(null) }
-
-    // Screenshot loader for navigation graph thumbnails (only for real data mode)
-    val screenshotLoader = remember(clientProvider, dataSourceMode) {
-        if (dataSourceMode == DataSourceMode.Real && clientProvider != null) {
-            NavigationScreenshotLoader(clientProvider)
-        } else {
-            null
-        }
-    }
-
-    // Reset focus mode when navigating away from FlowMap
-    LaunchedEffect(currentSection) {
-        if (currentSection != NavigationSection.FlowMap) {
-            onFocusModeChanged(false)
-        }
-    }
+    var lastObservedAppId by remember { mutableStateOf<String?>(null) }
+    // Incremented when we want the canvas to re-fit to show the entire graph
+    var fitToViewTrigger by remember { mutableStateOf(0) }
 
     // Fetch navigation data from data source
     var navigationGraph by remember { mutableStateOf<NavigationGraph?>(null) }
@@ -103,6 +93,15 @@ fun NavigationDashboard(
         }
     }
 
+    // Request latest navigation graph on composition entry and when stream client becomes available
+    LaunchedEffect(observationStreamClient) {
+        if (observationStreamClient != null) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                observationStreamClient.requestNavigationGraph()
+            }
+        }
+    }
+
     // Collect real-time navigation updates from the stream
     LaunchedEffect(observationStreamClient, selectedAppId) {
         if (observationStreamClient == null) return@LaunchedEffect
@@ -112,8 +111,22 @@ fun NavigationDashboard(
             // Only update if it's for the selected app (or if no app filter is set)
             if (selectedAppId == null || update.appId == selectedAppId) {
                 LOG.info("Received navigation update - appId=${update.appId}, nodes=${update.nodes.size}, edges=${update.edges.size}, currentScreen=${update.currentScreen}")
+                // Check for foreground app change before switching to Main
+                val newAppId = update.appId
+                val appChanged = lastObservedAppId != null && newAppId != null && newAppId != lastObservedAppId
+                if (appChanged) {
+                    LOG.info("Foreground app changed: $lastObservedAppId -> $newAppId, requesting nav graph")
+                    // Request the full navigation graph for the new foreground app (non-suspending IO call)
+                    observationStreamClient.requestNavigationGraph(newAppId)
+                }
                 // Ensure state updates happen on the main thread for proper recomposition
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (appChanged) {
+                        fogModeEnabled = false
+                        settings.fogModeEnabled = false
+                        fitToViewTrigger++
+                    }
+                    lastObservedAppId = newAppId
                     navigationGraph = convertStreamUpdateToGraph(update)
                     currentObservedScreen = update.currentScreen
                     isLoading = false
@@ -151,21 +164,14 @@ fun NavigationDashboard(
                     },
                     externalHighlightedScreens = highlightedScreens,
                     currentReplayScreen = currentStepScreen,
-                    onFocusModeChanged = onFocusModeChanged,
-                    headerHeightPx = headerHeightPx,
                     screenshotLoader = screenshotLoader,
                     fogModeEnabled = fogModeEnabled,
-                    autoFocusEnabled = autoFocusEnabled,
                     currentObservedScreen = currentObservedScreen,
                     onFogModeToggled = { enabled ->
                         fogModeEnabled = enabled
                         settings.fogModeEnabled = enabled
                     },
-                    onAutoFocusToggled = { enabled ->
-                        autoFocusEnabled = enabled
-                        settings.autoFocusEnabled = enabled
-                    },
-                    chromeAlpha = chromeAlpha,
+                    fitToViewTrigger = fitToViewTrigger,
                 )
             }
 
@@ -214,7 +220,6 @@ private fun convertStreamUpdateToGraph(update: NavigationGraphStreamUpdate): Nav
             name = node.screenName,
             type = "Screen",  // Default type
             packageName = update.appId ?: "",
-            testCoverage = 0,  // Not available from stream
             transitionCount = node.visitCount,
             discoveredAt = 0L,  // Not available from stream
             screenshotUri = node.screenshotPath,

@@ -65,8 +65,26 @@ interface AutoMobileClient {
 
   fun observe(platform: String = "android"): ObserveResult
 
+  fun killDevice(name: String, deviceId: String, platform: String): KillDeviceResult
+
+  fun getDaemonStatus(): dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse
+
+  fun updateService(deviceId: String, platform: String): UpdateServiceResult
+
   fun close() {}
 }
+
+@Serializable
+data class KillDeviceResult(
+    val success: Boolean = true,
+    val message: String? = null,
+)
+
+@Serializable
+data class UpdateServiceResult(
+    val success: Boolean = true,
+    val message: String? = null,
+)
 
 @Serializable
 data class StartDeviceResult(

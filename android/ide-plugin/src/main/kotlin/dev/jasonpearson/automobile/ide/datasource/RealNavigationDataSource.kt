@@ -56,7 +56,6 @@ class RealNavigationDataSource(
                     name = node.screenName,
                     type = inferScreenType(node.screenName),
                     packageName = response.appId ?: "",
-                    testCoverage = 0, // Not available from MCP yet
                     transitionCount = outgoingEdgeCounts[node.screenName] ?: 0,
                     discoveredAt = System.currentTimeMillis(), // Not available from summary
                     screenshotUri = node.screenshotPath, // MCP resource URI for screenshot

@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.slides.data
 
+import dev.jasonpearson.automobile.slides.model.PresentationEmoji
 import dev.jasonpearson.automobile.slides.model.SlideContent
 
 /**
@@ -8,12 +9,12 @@ import dev.jasonpearson.automobile.slides.model.SlideContent
  */
 fun getAllSlides(): List<SlideContent> =
     getIntroductionSlides() +
-        getOriginSlides() +
-        getEarlySuccessSlides() +
-        listOf(SlideContent.LargeText(title = "Optimizations & Automations")) +
-        getViewHierarchyCacheSlides() +
-        getMcpLearningsSlides() +
-        getSourceMappingSlides() +
-        getTestAuthoringExecutionSlides() +
-        getDevWorkflowAssistSlides() +
+        getMobileUseSlides() +
+        getWhatAutoMobileDoesSlides() +
+        listOf(
+            SlideContent.Emoji(
+                emoji = PresentationEmoji.PLAYGROUND,
+                caption = "Demo: AutoMobile Playground",
+            ),
+        ) +
         getVisionSlides()

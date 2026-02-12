@@ -63,7 +63,15 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.skia.Image
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import kotlin.math.roundToInt
+
+private val IS_MAC = System.getProperty("os.name", "").contains("Mac", ignoreCase = true)
+
+private fun PointerEvent.isZoomModifierPressed(): Boolean =
+    if (IS_MAC) keyboardModifiers.isMetaPressed else keyboardModifiers.isCtrlPressed
 
 /**
  * Device screen view with screenshot display, zoom/pan controls, and element overlays.
@@ -163,11 +171,12 @@ fun DeviceScreenView(
     }
 
     Column(modifier = modifier) {
-        // Tap target compliance toggle
+        // Tap target compliance toggle - top padding to clear the Layout/Navigation toggle overlay
         TapTargetComplianceToggle(
             enabled = showTapTargetIssues,
             issueCount = nonCompliantElements.size,
             onToggle = onToggleTapTargetIssues,
+            modifier = Modifier.padding(top = 36.dp),
         )
 
         // Screenshot viewport
@@ -341,15 +350,14 @@ fun DeviceScreenView(
                         onElementHovered(null)
                     }
                     .onPointerEvent(PointerEventType.Scroll) { event ->
-                        // Only allow zoom when an element is selected
-                        if (selectedElementId != null) {
-                            val change = event.changes.firstOrNull() ?: return@onPointerEvent
-                            val scrollDelta = change.scrollDelta.y
-                            if (scrollDelta != 0f) {
-                                val zoomFactor = if (scrollDelta > 0) 0.95f else 1.05f
-                                val newScale = (scale * zoomFactor).coerceIn(0.1f, 5f)
-                                zoomAroundPoint(newScale, change.position.x, change.position.y)
-                            }
+                        // Only allow zoom when Cmd (macOS) / Ctrl (other) is held
+                        if (!event.isZoomModifierPressed()) return@onPointerEvent
+                        val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                        val scrollDelta = change.scrollDelta.y
+                        if (scrollDelta != 0f) {
+                            val zoomFactor = if (scrollDelta > 0) 0.95f else 1.05f
+                            val newScale = (scale * zoomFactor).coerceIn(0.1f, 5f)
+                            zoomAroundPoint(newScale, change.position.x, change.position.y)
                         }
                     }
             ) {
@@ -635,6 +643,7 @@ private fun TapTargetComplianceToggle(
     enabled: Boolean,
     issueCount: Int,
     onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
     val backgroundColor = if (enabled) {
@@ -649,7 +658,7 @@ private fun TapTargetComplianceToggle(
     }
 
     BoxWithConstraints(
-        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = modifier.padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         val isCompact = maxWidth < 150.dp
 

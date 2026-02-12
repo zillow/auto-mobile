@@ -25,35 +25,10 @@ class SlidesScreenTest {
     val hasLargeText = slides.any { it is SlideContent.LargeText }
     val hasEmoji = slides.any { it is SlideContent.Emoji }
     val hasBulletPoints = slides.any { it is SlideContent.BulletPoints }
-    val hasCodeSample = slides.any { it is SlideContent.CodeSample }
-    val hasMermaidDiagram = slides.any { it is SlideContent.MermaidDiagram }
 
     assertTrue("Should include LargeText slides", hasLargeText)
     assertTrue("Should include Emoji slides", hasEmoji)
     assertTrue("Should include BulletPoints slides", hasBulletPoints)
-    assertTrue("Should include CodeSample slides", hasCodeSample)
-    assertTrue("Should include MermaidDiagram slides", hasMermaidDiagram)
-  }
-
-  @Test
-  fun `getAllSlides should contain MermaidDiagram slides`() {
-    val slides = getAllSlides()
-    val mermaidSlides = slides.filterIsInstance<SlideContent.MermaidDiagram>()
-    assertTrue("Should contain at least one Mermaid diagram slide", mermaidSlides.isNotEmpty())
-
-    // Verify the Mermaid slide has proper content
-    val testFlowSlide = mermaidSlides.find { it.title == "View Hierarchy Cache System" }
-    assertTrue("Should contain the View Hierarchy Cache System diagram", testFlowSlide != null)
-    testFlowSlide?.let { slide ->
-      assertTrue(
-          "Should contain flowchart or sequenceDiagram syntax",
-          slide.code.contains("flowchart") || slide.code.contains("sequenceDiagram"),
-      )
-      assertTrue(
-          "Should contain View Hierarchy Cache content",
-          slide.code.contains("View Hierarchy") || slide.code.contains("Cache"),
-      )
-    }
   }
 
   @Test
@@ -80,24 +55,6 @@ class SlidesScreenTest {
 
     bulletPointSlides.forEach { slide ->
       assertTrue("Bullet point slides should have multiple points", slide.points.size >= 2)
-    }
-
-    // Check code sample slides have valid content
-    val codeSlides = slides.filterIsInstance<SlideContent.CodeSample>()
-    assertTrue("Should have code sample slides", codeSlides.isNotEmpty())
-
-    codeSlides.forEach { slide ->
-      assertTrue("Code should not be empty", slide.code.isNotEmpty())
-      assertTrue("Language should not be empty", slide.language.isNotEmpty())
-      // Updated to be more flexible for mermaid diagrams and other content
-      assertTrue(
-          "Code should contain meaningful content",
-          slide.code.contains("@Test") ||
-              slide.code.contains("fun ") ||
-              slide.code.contains("flowchart") ||
-              slide.code.contains("sequenceDiagram") ||
-              slide.code.length > 20,
-      )
     }
   }
 }

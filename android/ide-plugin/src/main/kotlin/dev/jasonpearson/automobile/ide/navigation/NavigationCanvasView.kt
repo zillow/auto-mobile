@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -65,7 +66,15 @@ import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import kotlinx.coroutines.launch
+
+private val IS_MAC = System.getProperty("os.name", "").contains("Mac", ignoreCase = true)
+
+private fun PointerEvent.isZoomModifierPressed(): Boolean =
+    if (IS_MAC) keyboardModifiers.isMetaPressed else keyboardModifiers.isCtrlPressed
 
 // Layout constants
 private val NODE_WIDTH = 80.dp
@@ -86,15 +95,11 @@ fun NavigationCanvasView(
     onScreenSelected: (String) -> Unit,
     externalHighlightedScreens: List<String> = emptyList(),  // External highlights (e.g., from test flow)
     currentReplayScreen: String? = null,  // Currently active screen during replay
-    onFocusModeChanged: (Boolean) -> Unit = {},  // Called when zoom causes content to extend beyond canvas
-    headerHeightPx: Float = 0f,  // Height of header area to check overlap against
-    screenshotLoader: NavigationScreenshotLoader? = null,  // Loader for screenshot thumbnails
-    fogModeEnabled: Boolean = true,  // Whether fog mode overlay is enabled
-    autoFocusEnabled: Boolean = true,  // Whether to auto-center on current device screen
+    screenshotLoader: ScreenshotLoader? = null,  // Loader for screenshot thumbnails
+    fogModeEnabled: Boolean = true,  // Whether fog mode + auto-focus is enabled
     currentObservedScreen: String? = null,  // Current screen from device observation stream
     onFogModeToggled: (Boolean) -> Unit = {},  // Called when user toggles fog mode
-    onAutoFocusToggled: (Boolean) -> Unit = {},  // Called when user toggles auto-focus
-    chromeAlpha: Float = 1f,  // Alpha for chrome elements (toggle/zoom controls)
+    fitToViewTrigger: Int = 0,  // Incremented to trigger fit-to-view animation
 ) {
     val density = LocalDensity.current
     val colors = JewelTheme.globalColors
@@ -111,9 +116,6 @@ fun NavigationCanvasView(
     // Mouse position for edge hover detection
     var mouseX by remember { mutableFloatStateOf(0f) }
     var mouseY by remember { mutableFloatStateOf(0f) }
-
-    // Track if canvas is hovered - focus mode only activates when canvas is hovered
-    var isCanvasHovered by remember { mutableStateOf(false) }
 
     // Fog mode state - tracks which screen the fog is centered on
     var focusedScreenName by remember { mutableStateOf<String?>(null) }
@@ -305,10 +307,17 @@ fun NavigationCanvasView(
     var hasInitialFit by remember { mutableStateOf(false) }
     var lastAutoPannedScreens by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    // Update focusedScreenName from currentObservedScreen when auto-focus is enabled
-    LaunchedEffect(autoFocusEnabled, currentObservedScreen) {
-        if (autoFocusEnabled && currentObservedScreen != null) {
+    // Update focusedScreenName from currentObservedScreen when fog mode is enabled.
+    // Also set hoveredScreenName so that connected edges and from/to nodes get highlighted.
+    LaunchedEffect(fogModeEnabled, currentObservedScreen) {
+        if (fogModeEnabled && currentObservedScreen != null) {
             focusedScreenName = currentObservedScreen
+            hoveredScreenName = currentObservedScreen
+        } else if (!fogModeEnabled) {
+            // Clear auto-set hover when fog is turned off
+            if (hoveredScreenName == focusedScreenName) {
+                hoveredScreenName = null
+            }
         }
     }
 
@@ -334,8 +343,7 @@ fun NavigationCanvasView(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .onPointerEvent(PointerEventType.Enter) { isCanvasHovered = true }
-            .onPointerEvent(PointerEventType.Exit) { isCanvasHovered = false }
+            .clipToBounds()
     ) {
         val viewportWidth = constraints.maxWidth.toFloat()
         val viewportHeight = constraints.maxHeight.toFloat()
@@ -373,6 +381,33 @@ fun NavigationCanvasView(
                 animatedOffsetX.snapTo(newOffsetX)
                 animatedOffsetY.snapTo(newOffsetY)
                 hasInitialFit = true
+            }
+        }
+
+        // Fit entire graph when triggered (e.g., foreground app changed)
+        LaunchedEffect(fitToViewTrigger) {
+            if (fitToViewTrigger > 0 && nodePositions.isNotEmpty() && viewportWidth > 0 && viewportHeight > 0) {
+                val minX = nodePositions.minOf { it.x }
+                val maxX = nodePositions.maxOf { it.x } + nodeWidthPx
+                val minY = nodePositions.minOf { it.y }
+                val maxY = nodePositions.maxOf { it.y } + nodeHeightPx
+
+                val padding = 60f
+                val boundsWidth = maxX - minX + padding * 2
+                val boundsHeight = maxY - minY + padding * 2
+                val centerX = (minX + maxX) / 2
+                val centerY = (minY + maxY) / 2
+
+                val scaleX = viewportWidth / boundsWidth
+                val scaleY = viewportHeight / boundsHeight
+                val newScale = minOf(scaleX, scaleY, 1.5f).coerceIn(0.2f, 1.5f)
+
+                val newOffsetX = viewportWidth / 2 - centerX * newScale
+                val newOffsetY = viewportHeight / 2 - centerY * newScale
+
+                launch { animatedScale.animateTo(newScale, tween(350, easing = FastOutSlowInEasing)) }
+                launch { animatedOffsetX.animateTo(newOffsetX, tween(350, easing = FastOutSlowInEasing)) }
+                launch { animatedOffsetY.animateTo(newOffsetY, tween(350, easing = FastOutSlowInEasing)) }
             }
         }
 
@@ -416,41 +451,18 @@ fun NavigationCanvasView(
             }
         }
 
-        // Animated pan and zoom for fog mode focus
-        LaunchedEffect(focusedScreenName, autoFocusEnabled, fogModeEnabled, viewportWidth, viewportHeight, nodePositions) {
+        // Animated pan and zoom for fog mode focus — fixed 4x zoom centered on focused node
+        LaunchedEffect(focusedScreenName, fogModeEnabled, viewportWidth, viewportHeight, nodePositions) {
             if (fogModeEnabled && focusedScreenName != null && viewportWidth > 0 && viewportHeight > 0) {
                 val targetPos = positionByName[focusedScreenName]
                 if (targetPos != null) {
-                    // Compute 2-step neighborhood for auto-zoom
-                    val neighborhood = computeNeighborhood(focusedScreenName!!, 2)
-                    val neighborPositions = neighborhood.mapNotNull { positionByName[it] }
+                    val newScale = 1.5f
+                    val targetOffsetX = viewportWidth / 2 - (targetPos.x + nodeWidthPx / 2) * newScale
+                    val targetOffsetY = viewportHeight / 2 - (targetPos.y + nodeHeightPx / 2) * newScale
 
-                    if (neighborPositions.isNotEmpty()) {
-                        // Compute bounding box of neighborhood
-                        val minX = neighborPositions.minOf { it.x }
-                        val maxX = neighborPositions.maxOf { it.x } + nodeWidthPx
-                        val minY = neighborPositions.minOf { it.y }
-                        val maxY = neighborPositions.maxOf { it.y } + nodeHeightPx
-
-                        // Add padding
-                        val padding = 80f
-                        val boundsWidth = maxX - minX + padding * 2
-                        val boundsHeight = maxY - minY + padding * 2
-
-                        // Calculate scale to fit neighborhood in viewport
-                        val scaleX = viewportWidth / boundsWidth
-                        val scaleY = viewportHeight / boundsHeight
-                        val newScale = minOf(scaleX, scaleY, 1.5f).coerceIn(0.3f, 1.5f)
-
-                        // Calculate target offset to center the focused node
-                        val targetOffsetX = viewportWidth / 2 - (targetPos.x + nodeWidthPx / 2) * newScale
-                        val targetOffsetY = viewportHeight / 2 - (targetPos.y + nodeHeightPx / 2) * newScale
-
-                        // Animate scale and offset together with smooth easing
-                        launch { animatedScale.animateTo(newScale, tween(350, easing = FastOutSlowInEasing)) }
-                        launch { animatedOffsetX.animateTo(targetOffsetX, tween(350, easing = FastOutSlowInEasing)) }
-                        launch { animatedOffsetY.animateTo(targetOffsetY, tween(350, easing = FastOutSlowInEasing)) }
-                    }
+                    launch { animatedScale.animateTo(newScale, tween(350, easing = FastOutSlowInEasing)) }
+                    launch { animatedOffsetX.animateTo(targetOffsetX, tween(350, easing = FastOutSlowInEasing)) }
+                    launch { animatedOffsetY.animateTo(targetOffsetY, tween(350, easing = FastOutSlowInEasing)) }
                 }
             }
         }
@@ -460,39 +472,6 @@ fun NavigationCanvasView(
             scale = animatedScale.value
             offsetX = animatedOffsetX.value
             offsetY = animatedOffsetY.value
-        }
-
-        // Detect focus mode: when canvas is hovered AND any node extends beyond visible bounds
-        // Top bound is the header area, other bounds are viewport edges
-        // Focus mode only activates when user is actively interacting with the canvas
-        LaunchedEffect(scale, offsetX, offsetY, nodePositions, viewportWidth, viewportHeight, headerHeightPx, isCanvasHovered) {
-            if (!isCanvasHovered || nodePositions.isEmpty() || viewportWidth <= 0 || viewportHeight <= 0) {
-                onFocusModeChanged(false)
-                return@LaunchedEffect
-            }
-
-            // Check if any node extends beyond visible bounds
-            var contentExceedsBounds = false
-            for (pos in nodePositions) {
-                // Calculate node screen bounds
-                val nodeScreenLeft = pos.x * scale + offsetX
-                val nodeScreenTop = pos.y * scale + offsetY
-                val nodeScreenRight = nodeScreenLeft + nodeWidthPx * scale
-                val nodeScreenBottom = nodeScreenTop + nodeHeightPx * scale
-
-                // Check all four edges:
-                // - Top: overlap with header area
-                // - Left/Right/Bottom: extend beyond viewport edges
-                if (nodeScreenTop < headerHeightPx ||
-                    nodeScreenLeft < 0 ||
-                    nodeScreenRight > viewportWidth ||
-                    nodeScreenBottom > viewportHeight) {
-                    contentExceedsBounds = true
-                    break
-                }
-            }
-
-            onFocusModeChanged(contentExceedsBounds)
         }
 
         // Zoom helper that keeps a specific point fixed
@@ -542,14 +521,14 @@ fun NavigationCanvasView(
                     hoveredTransitionId = null
                 }
                 .onPointerEvent(PointerEventType.Scroll) { event ->
-                    // Only allow scroll-to-zoom when a graph element is selected (hovered)
-                    if (hoveredScreenName == null && hoveredTransitionId == null) return@onPointerEvent
+                    // Only allow scroll-to-zoom when Cmd (macOS) / Ctrl (other) is held
+                    if (!event.isZoomModifierPressed()) return@onPointerEvent
                     val change = event.changes.firstOrNull() ?: return@onPointerEvent
                     val scrollDelta = change.scrollDelta.y
                     if (scrollDelta != 0f) {
                         // 10x less sensitive: smaller zoom factor per scroll tick
                         val zoomFactor = if (scrollDelta > 0) 0.99f else 1.01f
-                        val newScale = (scale * zoomFactor).coerceIn(0.05f, 3f)
+                        val newScale = (scale * zoomFactor).coerceIn(0.05f, 5f)
                         // Zoom around cursor position
                         zoomAroundPoint(newScale, change.position.x, change.position.y)
                         // Snap animatables to prevent conflicts with manual zoom
@@ -727,11 +706,6 @@ fun NavigationCanvasView(
                         isFogFocused = fogModeEnabled && screen.name == focusedScreenName,
                         isDimmed = hasAnyHighlight && screen.name !in highlightedScreens,
                         onClick = {
-                            // When clicking a node, focus on it and disable auto-focus
-                            if (fogModeEnabled) {
-                                focusedScreenName = screen.name
-                                onAutoFocusToggled(false)
-                            }
                             onScreenSelected(screen.id)
                         },
                         onHoverChange = { isHovered ->
@@ -749,10 +723,10 @@ fun NavigationCanvasView(
                     val centerX = (focusPos.x + nodeWidthPx / 2) * scale + offsetX
                     val centerY = (focusPos.y + nodeHeightPx / 2) * scale + offsetY
                     val surfaceColor = colors.text.normal.copy(alpha = 0f)
-                    val fogColor = JewelTheme.globalColors.text.normal.copy(alpha = 0.5f)
+                    val fogColor = JewelTheme.globalColors.text.normal
 
                     Canvas(modifier = Modifier.fillMaxSize().zIndex(1f)) {
-                        val maxRadius = maxOf(size.width, size.height)
+                        val maxRadius = maxOf(size.width, size.height) * 0.625f
 
                         drawRect(
                             brush = Brush.radialGradient(
@@ -760,7 +734,7 @@ fun NavigationCanvasView(
                                     0.0f to Color.Transparent,
                                     0.3f to fogColor.copy(alpha = 0.05f),
                                     0.6f to fogColor.copy(alpha = 0.20f),
-                                    1.0f to fogColor,
+                                    1.0f to fogColor.copy(alpha = 0.50f),
                                 ),
                                 center = androidx.compose.ui.geometry.Offset(centerX, centerY),
                                 radius = maxRadius,
@@ -771,33 +745,26 @@ fun NavigationCanvasView(
                 }
             }
 
-            // Toggle controls inside canvas, below the header
+            // Fog + auto-focus toggle, below the Layout/Navigation toggle
+            val fogEnabled = currentObservedScreen != null
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .zIndex(2f)
-                    .offset(y = with(density) { headerHeightPx.toDp() } + 8.dp)
-                    .padding(start = 12.dp)
+                    .padding(start = 12.dp, top = 44.dp)
+                    .graphicsLayer { alpha = if (fogEnabled) 1f else 0.4f }
                     .background(colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
-                    .graphicsLayer { alpha = chromeAlpha },
+                    .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Fog Mode toggle
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Fog", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.7f))
                     Spacer(Modifier.width(4.dp))
-                    ToggleSwitch(checked = fogModeEnabled, onCheckedChange = onFogModeToggled)
-                }
-
-                // Auto-Focus toggle (only visible when fog mode is on)
-                if (fogModeEnabled) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Auto", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.7f))
-                        Spacer(Modifier.width(4.dp))
-                        ToggleSwitch(checked = autoFocusEnabled, onCheckedChange = onAutoFocusToggled)
-                    }
+                    ToggleSwitch(
+                        checked = fogModeEnabled && fogEnabled,
+                        onCheckedChange = { if (fogEnabled) onFogModeToggled(it) },
+                    )
                 }
             }
 
@@ -805,7 +772,7 @@ fun NavigationCanvasView(
             ZoomControls(
                 scale = scale,
                 onZoomIn = {
-                    zoomAroundCenter((scale * 1.2f).coerceAtMost(3f))
+                    zoomAroundCenter((scale * 1.2f).coerceAtMost(5f))
                     animationScope.launch {
                         animatedScale.snapTo(scale)
                         animatedOffsetX.snapTo(offsetX)
@@ -833,8 +800,7 @@ fun NavigationCanvasView(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .zIndex(2f)
-                    .padding(16.dp)
-                    .graphicsLayer { alpha = chromeAlpha },
+                    .padding(16.dp),
             )
 
         }
@@ -853,14 +819,14 @@ private fun ScreenNodeCard(
     isDimmed: Boolean,
     onClick: () -> Unit,
     onHoverChange: (Boolean) -> Unit,
-    screenshotLoader: NavigationScreenshotLoader? = null,
+    screenshotLoader: ScreenshotLoader? = null,
 ) {
     // Screenshot loading state
     var screenshotBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var isLoadingScreenshot by remember { mutableStateOf(false) }
 
-    // Load screenshot when available
-    LaunchedEffect(screen.screenshotUri) {
+    // Load screenshot when available (key on screenshotLoader too, so it re-fires if loader becomes available later)
+    LaunchedEffect(screen.screenshotUri, screenshotLoader) {
         if (screen.screenshotUri != null && screenshotLoader != null) {
             isLoadingScreenshot = true
             screenshotBitmap = withContext(Dispatchers.IO) {
@@ -906,7 +872,6 @@ private fun ScreenNodeCard(
                 Text(screen.name, fontSize = 12.sp)
                 Text(screen.type, fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.7f))
                 Text(screen.packageName, fontSize = 10.sp, color = colors.text.normal.copy(alpha = 0.5f))
-                Text("Coverage: ${screen.testCoverage}%", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.7f))
             }
         },
     ) {

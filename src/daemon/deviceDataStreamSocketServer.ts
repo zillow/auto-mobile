@@ -117,6 +117,12 @@ interface DeviceDataPush {
 export type OnSubscriberConnectedCallback = (deviceId: string | null) => void;
 
 /**
+ * Callback invoked when a client requests the current navigation graph.
+ * Returns the current graph data, or null if no graph is available.
+ */
+export type OnNavigationGraphRequestedCallback = (appId?: string | null) => Promise<NavigationGraphStreamData | null>;
+
+/**
  * Socket server that streams device data updates (hierarchy, screenshot, storage) to connected IDE plugins.
  *
  * Unlike other socket servers which are request-response, this one maintains persistent
@@ -134,6 +140,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
   DeviceDataPush
 > {
   private onSubscriberConnected: OnSubscriberConnectedCallback | null = null;
+  private onNavigationGraphRequested: OnNavigationGraphRequestedCallback | null = null;
 
   constructor(socketPath: string = getSocketPath(SOCKET_CONFIG), timer: Timer = defaultTimer) {
     super(socketPath, timer, "DeviceDataStream");
@@ -145,6 +152,13 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
    */
   setOnSubscriberConnected(callback: OnSubscriberConnectedCallback): void {
     this.onSubscriberConnected = callback;
+  }
+
+  /**
+   * Set a callback to handle on-demand navigation graph requests.
+   */
+  setOnNavigationGraphRequested(callback: OnNavigationGraphRequestedCallback): void {
+    this.onNavigationGraphRequested = callback;
   }
 
   /**
@@ -243,7 +257,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
    * Override processLine to handle additional commands and the onSubscriberConnected callback.
    */
   protected async processLine(socket: Socket, line: string): Promise<void> {
-    const request = this.parseJson<{ id?: string; command: string; deviceId?: string }>(line);
+    const request = this.parseJson<{ id?: string; command: string; deviceId?: string; appId?: string }>(line);
 
     if (!request) {
       const errorResponse: SubscriptionResponse = {
@@ -265,6 +279,49 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
         success: true,
       };
       this.sendJson(socket, response);
+      return;
+    }
+
+    // Handle request_navigation_graph command
+    if (request.command === "request_navigation_graph") {
+      if (!this.onNavigationGraphRequested) {
+        const response: SubscriptionResponse = {
+          id: request.id,
+          type: "subscription_response",
+          success: true,
+        };
+        this.sendJson(socket, response);
+        return;
+      }
+
+      try {
+        const graphData = await this.onNavigationGraphRequested(request.appId ?? null);
+        if (graphData) {
+          const message: DeviceDataStreamMessage = {
+            id: request.id,
+            type: "navigation_update",
+            timestamp: this.timer.now(),
+            navigationGraph: graphData,
+          };
+          this.sendJson(socket, message);
+        } else {
+          const response: SubscriptionResponse = {
+            id: request.id,
+            type: "subscription_response",
+            success: true,
+          };
+          this.sendJson(socket, response);
+        }
+      } catch (error) {
+        logger.warn(`[DeviceDataStream] Error handling request_navigation_graph: ${error}`);
+        const errorResponse: SubscriptionResponse = {
+          id: request.id,
+          type: "error",
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+        this.sendJson(socket, errorResponse);
+      }
       return;
     }
 
