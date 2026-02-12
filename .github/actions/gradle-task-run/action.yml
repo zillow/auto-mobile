@@ -107,8 +107,8 @@ runs:
       shell: ${{ inputs.shell }}
       if: success() || failure()
       run: |
-        # Remove or replace non-alphanumeric characters (keeping hyphens and underscores)
-        sanitized_name=$(echo "${{ inputs.gradle-tasks }}" | sed 's/[^a-zA-Z0-9_-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+        # Remove or replace non-alphanumeric characters (keeping hyphens and underscores), then truncate to 64 chars
+        sanitized_name=$(echo "${{ inputs.gradle-tasks }}" | sed 's/[^a-zA-Z0-9_-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-64 | sed 's/-$//')
         echo "sanitized_name=$sanitized_name" >> $GITHUB_OUTPUT
         echo "Sanitized name: $sanitized_name"
 

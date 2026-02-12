@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Generate a shields.io-compatible JSON badge from lcov coverage data.
-# Usage: bash scripts/coverage/generate-badge.sh
+# Usage: bash scripts/coverage/generate-badge.sh [LCOV_FILE] [OUTPUT_FILE] [LABEL] [LABEL_COLOR]
 set -euo pipefail
 
-LCOV_FILE="coverage/lcov.info"
-OUTPUT_FILE="coverage/coverage-badge.json"
+LCOV_FILE="${1:-coverage/lcov.info}"
+OUTPUT_FILE="${2:-coverage/coverage-badge.json}"
+LABEL="${3:-coverage}"
+LABEL_COLOR="${4:-}"
 
 if [[ ! -f "$LCOV_FILE" ]]; then
   echo "Error: $LCOV_FILE not found. Run 'bun run test:coverage' first." >&2
@@ -40,13 +42,25 @@ fi
 
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 
-cat > "$OUTPUT_FILE" <<EOF
+if [[ -n "$LABEL_COLOR" ]]; then
+  cat > "$OUTPUT_FILE" <<EOF
 {
   "schemaVersion": 1,
-  "label": "coverage",
+  "label": "${LABEL}",
+  "message": "${pct}%",
+  "color": "${color}",
+  "labelColor": "${LABEL_COLOR}"
+}
+EOF
+else
+  cat > "$OUTPUT_FILE" <<EOF
+{
+  "schemaVersion": 1,
+  "label": "${LABEL}",
   "message": "${pct}%",
   "color": "${color}"
 }
 EOF
+fi
 
 echo "Badge written to $OUTPUT_FILE: ${pct}% (${color})"

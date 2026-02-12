@@ -54,6 +54,28 @@ subprojects {
     jvmArgs(gradleWorkerJvmArgs.split(" ").filter { it.isNotBlank() })
   }
 
+  plugins.withId("java") {
+    apply(plugin = "jacoco")
+    tasks.withType<JacocoReport> {
+      reports {
+        xml.required.set(true)
+        html.required.set(false)
+      }
+    }
+  }
+
+  plugins.withId("com.android.application") {
+    configure<com.android.build.api.dsl.ApplicationExtension> {
+      buildTypes { getByName("debug") { enableUnitTestCoverage = true } }
+    }
+  }
+
+  plugins.withId("com.android.library") {
+    configure<com.android.build.api.dsl.LibraryExtension> {
+      buildTypes { getByName("debug") { enableUnitTestCoverage = true } }
+    }
+  }
+
   tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
       languageVersion.set(

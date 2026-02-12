@@ -736,19 +736,74 @@ jobs:
         run: bun run test:coverage
 
       - name: "Generate Coverage Badge"
-        run: bash scripts/coverage/generate-badge.sh
+        run: bash scripts/coverage/generate-badge.sh coverage/lcov.info coverage/ts-coverage-badge.json "TS coverage" "3178C6"
 
       - name: "Upload Coverage Badge"
         uses: actions/upload-artifact@v6
         with:
-          name: coverage-badge
-          path: coverage/coverage-badge.json
+          name: ts-coverage-badge
+          path: coverage/ts-coverage-badge.json
+          retention-days: 90
+
+  # =============================================================================
+  # Kotlin Code Coverage
+  # =============================================================================
+
+  kotlin-code-coverage:
+    name: "Kotlin Code Coverage"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":junit-runner:test :junit-runner:jacocoTestReport :accessibility-service:testDebugUnitTest :accessibility-service:createDebugUnitTestCoverageReport :test-plan-validation:test :test-plan-validation:jacocoTestReport :protocol:test :protocol:jacocoTestReport"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Generate Kotlin Coverage Badge"
+        run: bash scripts/coverage/generate-kotlin-badge.sh
+
+      - name: "Upload Kotlin Coverage Badge"
+        uses: actions/upload-artifact@v6
+        with:
+          name: kotlin-coverage-badge
+          path: coverage/kotlin-coverage-badge.json
+          retention-days: 90
+
+  # =============================================================================
+  # Swift Code Coverage
+  # =============================================================================
+
+  swift-code-coverage:
+    name: "Swift Code Coverage"
+    runs-on: macos-14
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode 15.4"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15.4"
+
+      - name: "Generate Swift Coverage Badge"
+        run: bash scripts/coverage/generate-swift-coverage.sh
+
+      - name: "Upload Swift Coverage Badge"
+        uses: actions/upload-artifact@v6
+        with:
+          name: swift-coverage-badge
+          path: coverage/swift-coverage-badge.json
           retention-days: 90
 
   deploy-docs:
     name: "Deploy Documentation"
     runs-on: ubuntu-latest
-    needs: ts-code-coverage
+    needs: [ts-code-coverage, kotlin-code-coverage, swift-code-coverage]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: read
@@ -781,10 +836,22 @@ jobs:
       - name: "Build documentation"
         run: scripts/github/deploy_pages.py build
 
-      - name: "Download Coverage Badge"
+      - name: "Download TS Coverage Badge"
         uses: actions/download-artifact@v7
         with:
-          name: coverage-badge
+          name: ts-coverage-badge
+          path: site
+
+      - name: "Download Kotlin Coverage Badge"
+        uses: actions/download-artifact@v7
+        with:
+          name: kotlin-coverage-badge
+          path: site
+
+      - name: "Download Swift Coverage Badge"
+        uses: actions/download-artifact@v7
+        with:
+          name: swift-coverage-badge
           path: site
 
       - name: "Setup Pages"
