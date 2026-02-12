@@ -50,7 +50,7 @@ test-androidx-junit = "1.3.0"
 test-androidx-espresso = "3.7.0"
 
 # Navigation versions
-navigation3 = "1.0.0"              # Used in playground app
+navigation3 = "1.0.1"              # Used in playground app
 
 # Kotlin ecosystem
 kotlinx-serialization-json = "1.10.0"
