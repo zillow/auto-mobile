@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.ide.navigation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,13 +19,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Link
 import org.jetbrains.jewel.ui.component.Text
@@ -237,11 +248,28 @@ fun ScreenDetailView(
     transitions: List<ScreenTransition>,
     onBack: () -> Unit,
     onScreenSelected: (String) -> Unit,  // Navigate to another screen by name
+    screenshotLoader: ScreenshotLoader? = null,
 ) {
     val colors = JewelTheme.globalColors
     val scrollState = rememberScrollState()
     val outgoing = transitions.filter { it.fromScreen == screen.name }
     val incoming = transitions.filter { it.toScreen == screen.name }
+
+    // Screenshot loading state
+    var screenshotBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var isLoadingScreenshot by remember { mutableStateOf(false) }
+
+    LaunchedEffect(screen.screenshotUri) {
+        if (screen.screenshotUri != null && screenshotLoader != null) {
+            isLoadingScreenshot = true
+            screenshotBitmap = withContext(Dispatchers.IO) {
+                screenshotLoader.load(screen.screenshotUri)
+            }
+            isLoadingScreenshot = false
+        } else {
+            screenshotBitmap = null
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(16.dp)) {
         Link("← Flow Map", onClick = onBack)
@@ -271,15 +299,31 @@ fun ScreenDetailView(
 
         Spacer(Modifier.height(20.dp))
 
-        // Screenshot placeholder
+        // Screenshot
         Box(
             modifier =
             Modifier.width(120.dp)
                 .height(220.dp)
-                .background(colors.text.normal.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.text.normal.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Screenshot", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.3f))
+            when {
+                screenshotBitmap != null -> {
+                    Image(
+                        bitmap = screenshotBitmap!!,
+                        contentDescription = "Screenshot of ${screen.name}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                isLoadingScreenshot -> {
+                    Text("Loading...", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.3f))
+                }
+                else -> {
+                    Text("No screenshot", fontSize = 11.sp, color = colors.text.normal.copy(alpha = 0.3f))
+                }
+            }
         }
 
         Spacer(Modifier.height(20.dp))

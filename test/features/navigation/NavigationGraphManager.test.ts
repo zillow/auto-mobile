@@ -144,6 +144,30 @@ describe("NavigationGraphManager", () => {
       const edges = await manager.getEdgesFrom("Screen1");
       expect(edges).toHaveLength(0);
     });
+
+    test("should handle event with missing timestamp by using timer fallback", async () => {
+      // Simulate WebSocket message where timestamp is on the outer message, not the event
+      const event = {
+        destination: "HomeScreen",
+        source: "COMPOSE_NAVIGATION",
+        arguments: {},
+        metadata: {},
+        sequenceNumber: 0,
+      } as unknown as NavigationEvent;
+      // event.timestamp is undefined, simulating the real WebSocket scenario
+
+      await manager.recordNavigationEvent(event);
+
+      const screens = await manager.getKnownScreens();
+      expect(screens).toContain("HomeScreen");
+      expect(manager.getCurrentScreen()).toBe("HomeScreen");
+
+      const node = await manager.getNode("HomeScreen");
+      expect(node).toBeDefined();
+      expect(node!.visitCount).toBeGreaterThanOrEqual(1);
+      // Timestamp should be filled in by the timer fallback
+      expect(node!.firstSeenAt).toBeGreaterThan(0);
+    });
   });
 
   describe("recordToolCall", () => {

@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -61,6 +63,7 @@ import androidx.compose.ui.graphics.Brush
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
+import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -91,6 +94,7 @@ fun NavigationCanvasView(
     currentObservedScreen: String? = null,  // Current screen from device observation stream
     onFogModeToggled: (Boolean) -> Unit = {},  // Called when user toggles fog mode
     onAutoFocusToggled: (Boolean) -> Unit = {},  // Called when user toggles auto-focus
+    chromeAlpha: Float = 1f,  // Alpha for chrome elements (toggle/zoom controls)
 ) {
     val density = LocalDensity.current
     val colors = JewelTheme.globalColors
@@ -114,9 +118,11 @@ fun NavigationCanvasView(
     // Fog mode state - tracks which screen the fog is centered on
     var focusedScreenName by remember { mutableStateOf<String?>(null) }
 
-    // Animated offsets for smooth panning when focus changes
+    // Animated offsets and scale for smooth panning when focus changes
     val animatedOffsetX = remember { Animatable(0f) }
     val animatedOffsetY = remember { Animatable(0f) }
+    val animatedScale = remember { Animatable(1f) }
+    val animationScope = rememberCoroutineScope()
 
     // Compute highlighted elements based on hover state OR external highlights
     // Track hovered, source (came from), and target (could go to) screens separately
@@ -363,6 +369,9 @@ fun NavigationCanvasView(
                 scale = newScale
                 offsetX = newOffsetX
                 offsetY = newOffsetY
+                animatedScale.snapTo(newScale)
+                animatedOffsetX.snapTo(newOffsetX)
+                animatedOffsetY.snapTo(newOffsetY)
                 hasInitialFit = true
             }
         }
@@ -396,9 +405,10 @@ fun NavigationCanvasView(
                     val newOffsetX = viewportWidth / 2 - centerX * newScale
                     val newOffsetY = viewportHeight / 2 - centerY * newScale
 
-                    scale = newScale
-                    offsetX = newOffsetX
-                    offsetY = newOffsetY
+                    // Animate to new position smoothly
+                    launch { animatedScale.animateTo(newScale, tween(350, easing = FastOutSlowInEasing)) }
+                    launch { animatedOffsetX.animateTo(newOffsetX, tween(350, easing = FastOutSlowInEasing)) }
+                    launch { animatedOffsetY.animateTo(newOffsetY, tween(350, easing = FastOutSlowInEasing)) }
                     lastAutoPannedScreens = externalHighlightedScreens
                 }
             } else if (externalHighlightedScreens.isEmpty() && lastAutoPannedScreens.isNotEmpty()) {
@@ -436,23 +446,20 @@ fun NavigationCanvasView(
                         val targetOffsetX = viewportWidth / 2 - (targetPos.x + nodeWidthPx / 2) * newScale
                         val targetOffsetY = viewportHeight / 2 - (targetPos.y + nodeHeightPx / 2) * newScale
 
-                        // Update scale (not animated for simplicity)
-                        scale = newScale
-
-                        // Animate offset with 100ms ease-in-out
-                        launch { animatedOffsetX.animateTo(targetOffsetX, tween(100, easing = EaseInOut)) }
-                        launch { animatedOffsetY.animateTo(targetOffsetY, tween(100, easing = EaseInOut)) }
+                        // Animate scale and offset together with smooth easing
+                        launch { animatedScale.animateTo(newScale, tween(350, easing = FastOutSlowInEasing)) }
+                        launch { animatedOffsetX.animateTo(targetOffsetX, tween(350, easing = FastOutSlowInEasing)) }
+                        launch { animatedOffsetY.animateTo(targetOffsetY, tween(350, easing = FastOutSlowInEasing)) }
                     }
                 }
             }
         }
 
-        // Sync animated offsets to actual offsets when animation completes or fog mode is off
-        LaunchedEffect(animatedOffsetX.value, animatedOffsetY.value, fogModeEnabled) {
-            if (fogModeEnabled && focusedScreenName != null) {
-                offsetX = animatedOffsetX.value
-                offsetY = animatedOffsetY.value
-            }
+        // Sync animated values to actual values when animations drive position
+        LaunchedEffect(animatedOffsetX.value, animatedOffsetY.value, animatedScale.value) {
+            scale = animatedScale.value
+            offsetX = animatedOffsetX.value
+            offsetY = animatedOffsetY.value
         }
 
         // Detect focus mode: when canvas is hovered AND any node extends beyond visible bounds
@@ -514,6 +521,12 @@ fun NavigationCanvasView(
                         change.consume()
                         offsetX += dragAmount.x
                         offsetY += dragAmount.y
+                        // Snap animatables to prevent conflicts with manual drag
+                        animationScope.launch {
+                            animatedOffsetX.snapTo(offsetX)
+                            animatedOffsetY.snapTo(offsetY)
+                            animatedScale.snapTo(scale)
+                        }
                     }
                 }
                 .onPointerEvent(PointerEventType.Move) { event ->
@@ -524,12 +537,13 @@ fun NavigationCanvasView(
                     }
                 }
                 .onPointerEvent(PointerEventType.Exit) {
-                    // Clear edge hover when mouse leaves canvas
-                    if (hoveredScreenName == null) {
-                        hoveredTransitionId = null
-                    }
+                    // Deselect all elements when mouse leaves canvas
+                    hoveredScreenName = null
+                    hoveredTransitionId = null
                 }
                 .onPointerEvent(PointerEventType.Scroll) { event ->
+                    // Only allow scroll-to-zoom when a graph element is selected (hovered)
+                    if (hoveredScreenName == null && hoveredTransitionId == null) return@onPointerEvent
                     val change = event.changes.firstOrNull() ?: return@onPointerEvent
                     val scrollDelta = change.scrollDelta.y
                     if (scrollDelta != 0f) {
@@ -538,6 +552,12 @@ fun NavigationCanvasView(
                         val newScale = (scale * zoomFactor).coerceIn(0.05f, 3f)
                         // Zoom around cursor position
                         zoomAroundPoint(newScale, change.position.x, change.position.y)
+                        // Snap animatables to prevent conflicts with manual zoom
+                        animationScope.launch {
+                            animatedScale.snapTo(scale)
+                            animatedOffsetX.snapTo(offsetX)
+                            animatedOffsetY.snapTo(offsetY)
+                        }
                     }
                 }
                 .drawBehind {
@@ -731,7 +751,7 @@ fun NavigationCanvasView(
                     val surfaceColor = colors.text.normal.copy(alpha = 0f)
                     val fogColor = JewelTheme.globalColors.text.normal.copy(alpha = 0.5f)
 
-                    Canvas(modifier = Modifier.fillMaxSize()) {
+                    Canvas(modifier = Modifier.fillMaxSize().zIndex(1f)) {
                         val maxRadius = maxOf(size.width, size.height)
 
                         drawRect(
@@ -755,10 +775,12 @@ fun NavigationCanvasView(
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
+                    .zIndex(2f)
                     .offset(y = with(density) { headerHeightPx.toDp() } + 8.dp)
                     .padding(start = 12.dp)
                     .background(colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .graphicsLayer { alpha = chromeAlpha },
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -782,16 +804,37 @@ fun NavigationCanvasView(
             // Zoom controls in bottom right
             ZoomControls(
                 scale = scale,
-                onZoomIn = { zoomAroundCenter((scale * 1.2f).coerceAtMost(3f)) },
-                onZoomOut = { zoomAroundCenter((scale / 1.2f).coerceAtLeast(0.05f)) },
+                onZoomIn = {
+                    zoomAroundCenter((scale * 1.2f).coerceAtMost(3f))
+                    animationScope.launch {
+                        animatedScale.snapTo(scale)
+                        animatedOffsetX.snapTo(offsetX)
+                        animatedOffsetY.snapTo(offsetY)
+                    }
+                },
+                onZoomOut = {
+                    zoomAroundCenter((scale / 1.2f).coerceAtLeast(0.05f))
+                    animationScope.launch {
+                        animatedScale.snapTo(scale)
+                        animatedOffsetX.snapTo(offsetX)
+                        animatedOffsetY.snapTo(offsetY)
+                    }
+                },
                 onReset = {
                     scale = 1f
                     offsetX = 0f
                     offsetY = 0f
+                    animationScope.launch {
+                        animatedScale.snapTo(1f)
+                        animatedOffsetX.snapTo(0f)
+                        animatedOffsetY.snapTo(0f)
+                    }
                 },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp),
+                    .zIndex(2f)
+                    .padding(16.dp)
+                    .graphicsLayer { alpha = chromeAlpha },
             )
 
         }

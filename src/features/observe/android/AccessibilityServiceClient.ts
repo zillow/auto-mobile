@@ -1369,10 +1369,15 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
         const navMessage = message as any;
         const event = navMessage.event as NavigationEvent;
         if (event) {
+          // The WebSocket protocol puts timestamp on the outer message, not inside event.
+          // Ensure the event has a timestamp for the navigation graph manager.
+          if (event.timestamp === undefined && navMessage.timestamp !== undefined) {
+            event.timestamp = navMessage.timestamp;
+          }
           if (event.applicationId) {
             this.sdkNavigationAppIds.add(event.applicationId);
           }
-          logger.debug(`[ACCESSIBILITY_SERVICE] Navigation event: ${event.destination}`);
+          logger.info(`[ACCESSIBILITY_SERVICE] Navigation event: ${event.destination} (app: ${event.applicationId})`);
           await NavigationGraphManager.getInstance().recordNavigationEvent(event);
 
           if (event.applicationId && event.destination) {

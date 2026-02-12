@@ -298,7 +298,7 @@ export class NavigationGraphManager implements NavigationGraphService {
     }
 
     const screenName = event.destination;
-    const timestamp = event.timestamp;
+    const timestamp = event.timestamp ?? this.timer.now();
 
     // Get or create node and update visit count
     const node = await this.repository.getOrCreateNode(

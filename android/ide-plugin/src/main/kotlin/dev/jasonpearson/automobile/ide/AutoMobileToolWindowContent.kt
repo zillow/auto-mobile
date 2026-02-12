@@ -615,10 +615,11 @@ fun AutoMobileToolWindowContent() {
   val colors = JewelTheme.globalColors
   val isCurrentlyOnNavigation = selectedHorizontalTabId == "navigation"
 
-  // Header should fade when navigation nodes exceed bounds and user isn't hovering header
+  // Chrome should fade when navigation nodes exceed bounds and user isn't hovering chrome
   var isHeaderHovered by remember { mutableStateOf(false) }
-  val headerShouldFade = isNavigationFocused && isCurrentlyOnNavigation && !isHeaderHovered
-  val headerAlpha = if (headerShouldFade) 0.2f else 1f
+  var isTabBarHovered by remember { mutableStateOf(false) }
+  val chromeShouldFade = isNavigationFocused && isCurrentlyOnNavigation && !isHeaderHovered && !isTabBarHovered
+  val chromeAlpha = if (chromeShouldFade) 0.2f else 1f
 
   // Track header height for padding non-navigation content
   var headerHeight by remember { mutableStateOf(0) }
@@ -634,7 +635,7 @@ fun AutoMobileToolWindowContent() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer { alpha = headerAlpha }
+            .graphicsLayer { alpha = chromeAlpha }
             .onPointerEvent(PointerEventType.Enter) { isHeaderHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHeaderHovered = false }
             .onGloballyPositioned { coordinates ->
@@ -740,36 +741,39 @@ fun AutoMobileToolWindowContent() {
       BoxWithConstraints(
           modifier = Modifier.weight(1f)
       ) {
-        // Calculate height for main content so horizontal tabs are at bottom
-        // Subtract ~40dp for horizontal tab bar height
-        val horizontalTabBarHeight = 40.dp
-        val mainContentHeight = maxHeight - horizontalTabBarHeight
-
+        val containerHeight = maxHeight
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
         ) {
           // Main content: Layout Inspector (central) + Failures/Performance (right vertical panels)
           Row(
-              modifier = Modifier
-                  .fillMaxWidth()
-                  .height(mainContentHeight)  // Dynamic height based on window size
+              modifier = if (selectedHorizontalTabId != null) {
+                  Modifier.fillMaxWidth().height(250.dp).graphicsLayer { alpha = chromeAlpha }
+              } else {
+                  Modifier.fillMaxWidth().height(containerHeight).graphicsLayer { alpha = chromeAlpha }
+              }
           ) {
             // Central Layout Inspector (expands to fill available space)
-            // observationStreamClient is guaranteed non-null here because this block
-            // is only composed when activeDeviceId != null (see guard at line 711)
-            LayoutInspectorDashboard(
-                modifier = Modifier.weight(1f),
-                dataSourceMode = dataSourceMode,
-                clientProvider = clientProvider,
-                observationStreamClient = observationStreamClient!!,
-                platform = platformString,
-                onRestartDaemon = {
-                    activeDeviceId = null
-                    isDevicePanelExpanded = true
-                },
-            )
+            // observationStreamClient may be null briefly during initialization
+            val streamClient = observationStreamClient
+            if (streamClient != null) {
+                LayoutInspectorDashboard(
+                    modifier = Modifier.weight(1f),
+                    dataSourceMode = dataSourceMode,
+                    clientProvider = clientProvider,
+                    observationStreamClient = streamClient,
+                    platform = platformString,
+                    onRestartDaemon = {
+                        activeDeviceId = null
+                        isDevicePanelExpanded = true
+                    },
+                )
+            } else {
+                // Placeholder while stream client initializes
+                Box(modifier = Modifier.weight(1f))
+            }
 
             // Right vertical panels: Failures and Performance
             FailuresVerticalPanel(
@@ -873,6 +877,10 @@ fun AutoMobileToolWindowContent() {
               onTabSelected = { tabId ->
                   selectedHorizontalTabId = tabId
               },
+              modifier = Modifier
+                  .graphicsLayer { alpha = chromeAlpha }
+                  .onPointerEvent(PointerEventType.Enter) { isTabBarHovered = true }
+                  .onPointerEvent(PointerEventType.Exit) { isTabBarHovered = false },
           )
 
           // Expanded horizontal tab content
@@ -880,7 +888,7 @@ fun AutoMobileToolWindowContent() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(350.dp)  // Fixed height for horizontal tab content
+                    .height(containerHeight)
             ) {
               when (selectedHorizontalTabId) {
                 "navigation" -> NavigationDashboard(
@@ -893,6 +901,7 @@ fun AutoMobileToolWindowContent() {
                         isNavigationFocused = focused
                     },
                     headerHeightPx = headerHeight.toFloat(),
+                    chromeAlpha = chromeAlpha,
                     dataSourceMode = dataSourceMode,
                     clientProvider = clientProvider,
                     selectedAppId = selectedAppId,
@@ -926,23 +935,9 @@ fun AutoMobileToolWindowContent() {
                 )
               }
             }
-          } else {
-            // Empty state when no tab is selected
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-              Text(
-                  "Select a tab above to view content",
-                  fontSize = 12.sp,
-                  color = colors.text.normal.copy(alpha = 0.4f),
-              )
-            }
           }
         } // end scrollable Column
-      }
+      } // end BoxWithConstraints
     }
   }
 }

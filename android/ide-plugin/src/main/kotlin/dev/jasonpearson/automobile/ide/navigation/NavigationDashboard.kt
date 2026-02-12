@@ -30,6 +30,7 @@ fun NavigationDashboard(
     onHighlightCleared: () -> Unit = {},  // Called when user interacts to clear external highlights
     onFocusModeChanged: (Boolean) -> Unit = {},  // Called when zoom causes content to extend beyond canvas
     headerHeightPx: Float = 0f,  // Height of header area to check overlap against
+    chromeAlpha: Float = 1f,  // Alpha for chrome elements (toggle/zoom controls)
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
     selectedAppId: String? = null,  // App ID to filter navigation graph by (managed by parent)
@@ -164,6 +165,7 @@ fun NavigationDashboard(
                         autoFocusEnabled = enabled
                         settings.autoFocusEnabled = enabled
                     },
+                    chromeAlpha = chromeAlpha,
                 )
             }
 
@@ -178,6 +180,7 @@ fun NavigationDashboard(
                     transitions = transitions,
                     onBack = { currentSection = NavigationSection.FlowMap },
                     onScreenSelected = navigateToScreen,
+                    screenshotLoader = screenshotLoader,
                 )
             } else {
                 currentSection = NavigationSection.FlowMap
