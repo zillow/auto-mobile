@@ -85,7 +85,14 @@ interface PoolDeviceInfo {
  */
 export function setDeviceManager(manager: PlatformDeviceManager | null): void {
   PlatformDeviceManagerFactory.setInstance(manager);
+  // Disable service status queries when using a fake device manager,
+  // since the real queries require adb/simctl which aren't available in tests.
+  serviceStatusEnabled = manager === null;
 }
+
+// Controls whether service status is queried for each device.
+// Disabled automatically when a test device manager is injected.
+let serviceStatusEnabled = true;
 
 // Convert BootedDevice to BootedDeviceInfo
 function toBootedDeviceInfo(
@@ -270,30 +277,32 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
   }
 
   // Query service status for each device in parallel with per-device timeout
-  const SERVICE_STATUS_TIMEOUT_MS = 5000;
-  const serviceStatusResults = await Promise.allSettled(
-    devices.map(async device => {
-      try {
-        return await Promise.race([
-          queryDeviceServiceStatus(device),
-          new Promise<undefined>(resolve =>
-            defaultTimer.setTimeout(() => {
-              logger.warn(`[BootedDeviceResources] Service status timeout for ${device.deviceId}`);
-              resolve(undefined);
-            }, SERVICE_STATUS_TIMEOUT_MS)
-          ),
-        ]);
-      } catch (error) {
-        logger.warn(`[BootedDeviceResources] Failed to query service status for ${device.deviceId}: ${error}`);
-        return undefined;
-      }
-    })
-  );
+  if (serviceStatusEnabled) {
+    const SERVICE_STATUS_TIMEOUT_MS = 5000;
+    const serviceStatusResults = await Promise.allSettled(
+      devices.map(async device => {
+        try {
+          return await Promise.race([
+            queryDeviceServiceStatus(device),
+            new Promise<undefined>(resolve =>
+              defaultTimer.setTimeout(() => {
+                logger.warn(`[BootedDeviceResources] Service status timeout for ${device.deviceId}`);
+                resolve(undefined);
+              }, SERVICE_STATUS_TIMEOUT_MS)
+            ),
+          ]);
+        } catch (error) {
+          logger.warn(`[BootedDeviceResources] Failed to query service status for ${device.deviceId}: ${error}`);
+          return undefined;
+        }
+      })
+    );
 
-  for (let i = 0; i < devices.length; i++) {
-    const result = serviceStatusResults[i];
-    if (result.status === "fulfilled" && result.value) {
-      devices[i] = { ...devices[i], serviceStatus: result.value };
+    for (let i = 0; i < devices.length; i++) {
+      const result = serviceStatusResults[i];
+      if (result.status === "fulfilled" && result.value) {
+        devices[i] = { ...devices[i], serviceStatus: result.value };
+      }
     }
   }
 
