@@ -297,8 +297,8 @@ private fun TestDashboardHome(
 
     Spacer(Modifier.height(20.dp))
 
-    // Action button
-    DefaultButton(onClick = onRecordTest) { Text("Record Test") }
+    // TODO: Once we have a proper test recording flow, make this button available again
+    // DefaultButton(onClick = onRecordTest) { Text("Record Test") }
 
     Spacer(Modifier.height(24.dp))
 
