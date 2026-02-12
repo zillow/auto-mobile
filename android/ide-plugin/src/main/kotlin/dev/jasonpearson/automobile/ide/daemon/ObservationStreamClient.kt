@@ -292,11 +292,17 @@ class ObservationStreamClient {
                 val perfData = response.performanceData
                 log.info("Performance update received - deviceId=${response.deviceId}, fps=${perfData?.fps}, jankFrames=${perfData?.jankFrames}, touchLatencyMs=${perfData?.touchLatencyMs}, ttiMs=${perfData?.timeToInteractiveMs}")
                 if (perfData != null) {
+                    // When jank is 0 and FPS is below 60, the device is idle (no frames
+                    // being rendered). The reported FPS gets stuck at a stale value.
+                    // Assume 60 FPS / 16.67ms frame time since nothing is janking.
+                    val isIdle = perfData.jankFrames == 0 && perfData.fps < 60f
+                    val fps = if (isIdle) 60f else perfData.fps
+                    val frameTimeMs = if (isIdle) 16.67f else perfData.frameTimeMs
                     val update = PerformanceStreamUpdate(
                         deviceId = response.deviceId,
                         timestamp = response.timestamp ?: System.currentTimeMillis(),
-                        fps = perfData.fps,
-                        frameTimeMs = perfData.frameTimeMs,
+                        fps = fps,
+                        frameTimeMs = frameTimeMs,
                         jankFrames = perfData.jankFrames,
                         droppedFrames = perfData.droppedFrames,
                         memoryUsageMb = perfData.memoryUsageMb,
