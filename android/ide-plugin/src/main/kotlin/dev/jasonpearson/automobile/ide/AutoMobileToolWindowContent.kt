@@ -2013,25 +2013,28 @@ private fun McpProcessesPanel(
         killingDeviceIds = killingDeviceIds + device.deviceId
         killErrors = killErrors - device.deviceId
         scope.launch(Dispatchers.IO) {
+            var client: dev.jasonpearson.automobile.ide.daemon.AutoMobileClient? = null
             try {
-                LOG.debug("[AutoMobile IDE] Killing device: ${device.name}")
-                val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
+                LOG.warn("[AutoMobile IDE] Killing device: ${device.name} (${device.deviceId}, ${device.platform})")
+                client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
                 val result = client.killDevice(
                     name = device.name,
                     deviceId = device.deviceId,
                     platform = device.platform,
                 )
                 if (result.success) {
-                    LOG.debug("[AutoMobile IDE] Device killed successfully: ${device.name}")
+                    LOG.warn("[AutoMobile IDE] Device killed successfully: ${device.name}")
                     kotlinx.coroutines.delay(2000)
                     refreshCounter++
                 } else {
-                    LOG.debug("[AutoMobile IDE] Failed to kill device: ${result.message}")
+                    LOG.warn("[AutoMobile IDE] Failed to kill device: ${result.message}")
                     killErrors = killErrors + (device.deviceId to (result.message ?: "Failed to kill"))
                 }
             } catch (e: Exception) {
-                LOG.debug("[AutoMobile IDE] Exception killing device: ${e.message}")
+                LOG.warn("[AutoMobile IDE] Exception killing device: ${e.javaClass.name}: ${e.message}")
                 killErrors = killErrors + (device.deviceId to (e.message ?: "Error killing device"))
+            } finally {
+                client?.close()
             }
             killingDeviceIds = killingDeviceIds - device.deviceId
         }
@@ -2041,19 +2044,22 @@ private fun McpProcessesPanel(
     val onUpdateServiceAction: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit = { device ->
         updatingServiceDeviceIds = updatingServiceDeviceIds + device.deviceId
         scope.launch(Dispatchers.IO) {
+            var client: dev.jasonpearson.automobile.ide.daemon.AutoMobileClient? = null
             try {
-                LOG.debug("[AutoMobile IDE] Updating service for device: ${device.name}")
-                val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
+                LOG.warn("[AutoMobile IDE] Updating service for device: ${device.name} (${device.deviceId}, ${device.platform})")
+                client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
                 val result = client.updateService(device.deviceId, device.platform)
                 if (result.success) {
-                    LOG.debug("[AutoMobile IDE] Service updated successfully for: ${device.name}")
+                    LOG.warn("[AutoMobile IDE] Service updated successfully for: ${device.name}")
                     kotlinx.coroutines.delay(1000)
                     refreshCounter++
                 } else {
-                    LOG.debug("[AutoMobile IDE] Failed to update service: ${result.message}")
+                    LOG.warn("[AutoMobile IDE] Failed to update service: ${result.message}")
                 }
             } catch (e: Exception) {
-                LOG.debug("[AutoMobile IDE] Exception updating service: ${e.message}")
+                LOG.warn("[AutoMobile IDE] Exception updating service: ${e.javaClass.name}: ${e.message}")
+            } finally {
+                client?.close()
             }
             updatingServiceDeviceIds = updatingServiceDeviceIds - device.deviceId
         }
