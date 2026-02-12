@@ -1863,12 +1863,15 @@ private fun McpProcessesPanel(
                 client.close()
 
                 // Fetch daemon status in background (best-effort)
+                var statusClient: dev.jasonpearson.automobile.ide.daemon.AutoMobileClient? = null
                 try {
-                    val statusClient = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
+                    statusClient = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
                     daemonStatus = statusClient.getDaemonStatus()
                     LOG.debug("[AutoMobile IDE] Fetched daemon status: version=${daemonStatus?.version}")
                 } catch (e: Exception) {
                     LOG.debug("[AutoMobile IDE] Failed to fetch daemon status: ${e.message}")
+                } finally {
+                    statusClient?.close()
                 }
             } catch (e: Exception) {
                 val stackTrace = e.stackTraceToString()

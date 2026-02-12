@@ -268,11 +268,20 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
     logger.error(`[BootedDeviceResources] Error fetching booted devices: ${error}`);
   }
 
-  // Query service status for each device in parallel (best-effort, never blocks)
+  // Query service status for each device in parallel with per-device timeout
+  const SERVICE_STATUS_TIMEOUT_MS = 5000;
   const serviceStatusResults = await Promise.allSettled(
     devices.map(async (device) => {
       try {
-        return await queryDeviceServiceStatus(device);
+        return await Promise.race([
+          queryDeviceServiceStatus(device),
+          new Promise<undefined>((resolve) =>
+            setTimeout(() => {
+              logger.warn(`[BootedDeviceResources] Service status timeout for ${device.deviceId}`);
+              resolve(undefined);
+            }, SERVICE_STATUS_TIMEOUT_MS)
+          ),
+        ]);
       } catch (error) {
         logger.warn(`[BootedDeviceResources] Failed to query service status for ${device.deviceId}: ${error}`);
         return undefined;
