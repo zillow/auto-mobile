@@ -1,6 +1,7 @@
+import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import { getDatabase } from "./database";
-import type { NewTestExecution, NewTestExecutionStep, NewTestExecutionScreen } from "./types";
+import type { Database, NewTestExecution, NewTestExecutionStep, NewTestExecutionScreen } from "./types";
 import { logger } from "../utils/logger";
 import type { Timer } from "../utils/SystemTimer";
 import { defaultTimer } from "../utils/SystemTimer";
@@ -123,13 +124,22 @@ export interface TestRunQueryOptions {
 
 export class TestExecutionRepository {
   private timer: Timer;
+  private db: Kysely<Database> | null;
 
-  constructor(timer: Timer = defaultTimer) {
+  constructor(timer: Timer = defaultTimer, db?: Kysely<Database>) {
     this.timer = timer;
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
   }
 
   async recordExecution(record: TestExecutionRecord): Promise<number> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const entry: NewTestExecution = {
       test_class: record.testClass,
@@ -192,7 +202,7 @@ export class TestExecutionRepository {
   }
 
   async getTestRuns(options: TestRunQueryOptions = {}): Promise<TestRun[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     let query = db
       .selectFrom("test_executions")
@@ -298,7 +308,7 @@ export class TestExecutionRepository {
 
     cleanupInProgress = true;
     try {
-      const db = getDatabase();
+      const db = this.getDb();
       const cutoff = this.timer.now() - TEST_EXECUTION_RETENTION_MAX_DAYS * MS_PER_DAY;
 
       await db
@@ -337,7 +347,7 @@ export class TestExecutionRepository {
   }
 
   async getTimingStats(options: TestTimingQueryOptions): Promise<TestTimingStats[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     let query = db
       .selectFrom("test_executions")

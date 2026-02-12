@@ -1,13 +1,28 @@
+import type { Kysely } from "kysely";
 import { ensureMigrations, getDatabase } from "./database";
 import type { AppearanceConfig } from "../models";
+import type { Database } from "./types";
 import { logger } from "../utils/logger";
 
 const CONFIG_KEY = "global";
 
 export class AppearanceConfigRepository {
-  async getConfig(): Promise<AppearanceConfig | null> {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private async getDb(): Promise<Kysely<Database>> {
+    if (this.db) {
+      return this.db;
+    }
     await ensureMigrations();
-    const db = getDatabase();
+    return getDatabase();
+  }
+
+  async getConfig(): Promise<AppearanceConfig | null> {
+    const db = await this.getDb();
     const row = await db
       .selectFrom("appearance_configs")
       .select(["config_json"])
@@ -27,8 +42,7 @@ export class AppearanceConfigRepository {
   }
 
   async setConfig(config: AppearanceConfig): Promise<void> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const now = new Date().toISOString();
     const existing = await db
       .selectFrom("appearance_configs")
@@ -58,8 +72,7 @@ export class AppearanceConfigRepository {
   }
 
   async clearConfig(): Promise<void> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     await db
       .deleteFrom("appearance_configs")
       .where("key", "=", CONFIG_KEY)

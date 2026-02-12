@@ -1,5 +1,7 @@
+import type { Kysely } from "kysely";
 import { getDatabase } from "./database";
 import type {
+  Database,
   Crash,
   NewCrash,
   Anr,
@@ -68,16 +70,25 @@ export interface FailureRecord {
  */
 export class FailureEventRepository {
   private timer: Timer;
+  private db: Kysely<Database> | null;
 
-  constructor(timer: Timer = defaultTimer) {
+  constructor(timer: Timer = defaultTimer, db?: Kysely<Database>) {
     this.timer = timer;
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
   }
 
   /**
    * Save a crash event to the database
    */
   async saveCrash(event: CrashEvent): Promise<number> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const newCrash: NewCrash = {
       device_id: event.deviceId,
@@ -116,7 +127,7 @@ export class FailureEventRepository {
    * Save an ANR event to the database
    */
   async saveAnr(event: AnrEvent): Promise<number> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const newAnr: NewAnr = {
       device_id: event.deviceId,
@@ -166,7 +177,7 @@ export class FailureEventRepository {
       sessionUuid?: string;
     } = {}
   ): Promise<number> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const newToolCall: NewToolCall = {
       tool_name: toolName,
@@ -200,7 +211,7 @@ export class FailureEventRepository {
    * Get crashes matching the query options
    */
   async getCrashes(options: FailureQueryOptions = {}): Promise<Crash[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     let query = db.selectFrom("crashes").selectAll().orderBy("timestamp", "desc");
 
@@ -239,7 +250,7 @@ export class FailureEventRepository {
    * Get ANRs matching the query options
    */
   async getAnrs(options: FailureQueryOptions = {}): Promise<Anr[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     let query = db.selectFrom("anrs").selectAll().orderBy("timestamp", "desc");
 
@@ -278,7 +289,7 @@ export class FailureEventRepository {
    * Get failed tool calls matching the query options
    */
   async getToolCallFailures(options: FailureQueryOptions = {}): Promise<ToolCall[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     let query = db
       .selectFrom("tool_calls")
@@ -395,7 +406,7 @@ export class FailureEventRepository {
    * Get crash by ID
    */
   async getCrashById(id: number): Promise<Crash | null> {
-    const db = getDatabase();
+    const db = this.getDb();
     const result = await db
       .selectFrom("crashes")
       .selectAll()
@@ -409,7 +420,7 @@ export class FailureEventRepository {
    * Get ANR by ID
    */
   async getAnrById(id: number): Promise<Anr | null> {
-    const db = getDatabase();
+    const db = this.getDb();
     const result = await db
       .selectFrom("anrs")
       .selectAll()
@@ -423,7 +434,7 @@ export class FailureEventRepository {
    * Delete old failures (cleanup)
    */
   async deleteOldFailures(olderThanDays: number): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     const cutoffTimestamp = this.timer.now() - olderThanDays * 24 * 60 * 60 * 1000;
     const cutoffDate = new Date(cutoffTimestamp).toISOString();
 

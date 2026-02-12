@@ -1,5 +1,7 @@
+import type { Kysely } from "kysely";
 import { getDatabase } from "./database";
 import type {
+  Database,
   NewFailureGroup,
   NewFailureOccurrence,
   NewFailureOccurrenceScreen,
@@ -107,16 +109,25 @@ const STREAM_LIMIT_MAX = 500;
 
 export class FailureAnalyticsRepository {
   private timer: Timer;
+  private db: Kysely<Database> | null;
 
-  constructor(timer: Timer = defaultTimer) {
+  constructor(timer: Timer = defaultTimer, db?: Kysely<Database>) {
     this.timer = timer;
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
   }
 
   /**
    * Record a new failure occurrence, creating or updating the group as needed
    */
   async recordFailure(input: RecordFailureInput): Promise<string> {
-    const db = getDatabase();
+    const db = this.getDb();
     const now = this.timer.now();
     const occurrenceId = crypto.randomUUID();
 
@@ -258,7 +269,7 @@ export class FailureAnalyticsRepository {
    * Get all failure groups with aggregated data
    */
   async getFailureGroups(query: FailuresQuery = {}): Promise<FailureGroup[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     const limit = Math.max(1, query.limit ?? 100);
     const offset = Math.max(0, query.offset ?? 0);
 
@@ -341,7 +352,7 @@ export class FailureAnalyticsRepository {
     dataPoints: TimelineDataPoint[];
     previousPeriodTotals: PeriodTotals;
   }> {
-    const db = getDatabase();
+    const db = this.getDb();
     const { startTime, endTime, aggregation } = query;
 
     // Get bucket duration in ms
@@ -428,7 +439,7 @@ export class FailureAnalyticsRepository {
    * Get new failure notifications since a cursor (for streaming)
    */
   async getNotificationsSince(query: FailuresStreamQuery): Promise<FailuresStreamResponse> {
-    const db = getDatabase();
+    const db = this.getDb();
     const limit = Math.min(Math.max(1, query.limit ?? 50), STREAM_LIMIT_MAX);
 
     let builder = db
@@ -492,7 +503,7 @@ export class FailureAnalyticsRepository {
   async acknowledgeNotifications(ids: number[]): Promise<void> {
     if (ids.length === 0) {return;}
 
-    const db = getDatabase();
+    const db = this.getDb();
     await db
       .updateTable("failure_notifications")
       .set({ acknowledged: 1 })
@@ -527,7 +538,7 @@ export class FailureAnalyticsRepository {
   // Private helper methods
 
   private async getDeviceBreakdown(groupId: string): Promise<DeviceBreakdown[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const rows = await db
       .selectFrom("failure_occurrences")
@@ -550,7 +561,7 @@ export class FailureAnalyticsRepository {
   }
 
   private async getVersionBreakdown(groupId: string): Promise<VersionBreakdown[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const rows = await db
       .selectFrom("failure_occurrences")
@@ -572,7 +583,7 @@ export class FailureAnalyticsRepository {
   }
 
   private async getScreenBreakdown(groupId: string): Promise<ScreenBreakdown[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Get failure counts per screen
     const failureScreens = await db
@@ -635,7 +646,7 @@ export class FailureAnalyticsRepository {
   }
 
   private async getAffectedTests(groupId: string): Promise<Record<string, number>> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const rows = await db
       .selectFrom("failure_occurrences")
@@ -656,7 +667,7 @@ export class FailureAnalyticsRepository {
   }
 
   private async getRecentCaptures(groupId: string, limit: number): Promise<FailureCapture[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const rows = await db
       .selectFrom("failure_captures")
@@ -683,7 +694,7 @@ export class FailureAnalyticsRepository {
   }
 
   private async getSampleOccurrences(groupId: string, limit: number): Promise<FailureOccurrence[]> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const rows = await db
       .selectFrom("failure_occurrences")
@@ -843,7 +854,7 @@ export class FailureAnalyticsRepository {
 
     cleanupInProgress = true;
     try {
-      const db = getDatabase();
+      const db = this.getDb();
 
       // Find threshold occurrence
       const threshold = await db

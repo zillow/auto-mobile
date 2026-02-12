@@ -1,5 +1,8 @@
+import type { Kysely } from "kysely";
+import { sql } from "kysely";
 import { getDatabase } from "./database";
 import type {
+  Database,
   TestCoverageSession,
   NewTestCoverageSession,
   TestNodeCoverage,
@@ -12,7 +15,6 @@ import type {
 import { logger } from "../utils/logger";
 import type { Timer } from "../utils/SystemTimer";
 import { defaultTimer } from "../utils/SystemTimer";
-import { sql } from "kysely";
 
 /**
  * Repository for test coverage tracking database operations.
@@ -20,16 +22,25 @@ import { sql } from "kysely";
  */
 export class TestCoverageRepository {
   private timer: Timer;
+  private db: Kysely<Database> | null;
 
-  constructor(timer: Timer = defaultTimer) {
+  constructor(timer: Timer = defaultTimer, db?: Kysely<Database>) {
     this.timer = timer;
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
   }
 
   /**
    * Start a new test coverage session for an app.
    */
   async startSession(sessionUuid: string, appId: string): Promise<TestCoverageSession> {
-    const db = getDatabase();
+    const db = this.getDb();
     const now = this.timer.now();
 
     const newSession: NewTestCoverageSession = {
@@ -58,7 +69,7 @@ export class TestCoverageRepository {
    * Get or create a test coverage session.
    */
   async getOrCreateSession(sessionUuid: string, appId: string): Promise<TestCoverageSession> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const existing = await db
       .selectFrom("test_coverage_sessions")
@@ -77,7 +88,7 @@ export class TestCoverageRepository {
    * End a test coverage session.
    */
   async endSession(sessionUuid: string): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     const now = this.timer.now();
 
     await db
@@ -93,7 +104,7 @@ export class TestCoverageRepository {
    * Record a node visit during a test session.
    */
   async recordNodeVisit(sessionId: number, nodeId: number, timestamp: number): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Check if this node was already visited in this session
     const existing = await db
@@ -147,7 +158,7 @@ export class TestCoverageRepository {
     edgeId: number,
     timestamp: number
   ): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Check if this edge was already traversed in this session
     const existing = await db
@@ -197,7 +208,7 @@ export class TestCoverageRepository {
    * Get all covered nodes for a session.
    */
   async getCoveredNodes(sessionId: number): Promise<TestNodeCoverage[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("test_node_coverage")
       .selectAll()
@@ -209,7 +220,7 @@ export class TestCoverageRepository {
    * Get all covered edges for a session.
    */
   async getCoveredEdges(sessionId: number): Promise<TestEdgeCoverage[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("test_edge_coverage")
       .selectAll()
@@ -221,7 +232,7 @@ export class TestCoverageRepository {
    * Get test coverage session by UUID.
    */
   async getSession(sessionUuid: string): Promise<TestCoverageSession | undefined> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("test_coverage_sessions")
       .selectAll()
@@ -233,7 +244,7 @@ export class TestCoverageRepository {
    * Get all test coverage sessions for an app.
    */
   async getSessionsForApp(appId: string): Promise<TestCoverageSession[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("test_coverage_sessions")
       .selectAll()
@@ -254,7 +265,7 @@ export class TestCoverageRepository {
     uncoveredEdges: NavigationEdge[];
     coveragePercentage: number;
   }> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Get all nodes for the app
     const allNodes = await db
@@ -321,7 +332,7 @@ export class TestCoverageRepository {
    * Clear all test coverage data for an app.
    */
   async clearCoverageForApp(appId: string): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     await db
       .deleteFrom("test_coverage_sessions")
@@ -335,7 +346,7 @@ export class TestCoverageRepository {
    * Clear test coverage data for a specific session.
    */
   async clearSession(sessionUuid: string): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     await db
       .deleteFrom("test_coverage_sessions")

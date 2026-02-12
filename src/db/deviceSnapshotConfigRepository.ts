@@ -1,13 +1,28 @@
+import type { Kysely } from "kysely";
 import { ensureMigrations, getDatabase } from "./database";
 import type { DeviceSnapshotConfig } from "../models";
+import type { Database } from "./types";
 import { logger } from "../utils/logger";
 
 const CONFIG_KEY = "global";
 
 export class DeviceSnapshotConfigRepository {
-  async getConfig(): Promise<DeviceSnapshotConfig | null> {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private async getDb(): Promise<Kysely<Database>> {
+    if (this.db) {
+      return this.db;
+    }
     await ensureMigrations();
-    const db = getDatabase();
+    return getDatabase();
+  }
+
+  async getConfig(): Promise<DeviceSnapshotConfig | null> {
+    const db = await this.getDb();
     const row = await db
       .selectFrom("device_snapshot_configs")
       .select(["config_json"])
@@ -27,8 +42,7 @@ export class DeviceSnapshotConfigRepository {
   }
 
   async setConfig(config: DeviceSnapshotConfig): Promise<void> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const now = new Date().toISOString();
     const existing = await db
       .selectFrom("device_snapshot_configs")
@@ -58,8 +72,7 @@ export class DeviceSnapshotConfigRepository {
   }
 
   async clearConfig(): Promise<void> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     await db
       .deleteFrom("device_snapshot_configs")
       .where("key", "=", CONFIG_KEY)

@@ -1,5 +1,6 @@
+import type { Kysely } from "kysely";
 import { getDatabase } from "./database";
-import type { NewPerformanceAuditResult } from "./types";
+import type { Database, NewPerformanceAuditResult } from "./types";
 import { logger } from "../utils/logger";
 import type { Timer } from "../utils/SystemTimer";
 import { defaultTimer } from "../utils/SystemTimer";
@@ -79,14 +80,23 @@ const STREAM_LIMIT_MAX = 500;
 
 export class PerformanceAuditRepository {
   private timer: Timer;
+  private db: Kysely<Database> | null;
 
-  constructor(timer: Timer = defaultTimer) {
+  constructor(timer: Timer = defaultTimer, db?: Kysely<Database>) {
     this.timer = timer;
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
   }
 
   async recordAudit(record: PerformanceAuditRecord): Promise<void> {
     try {
-      const db = getDatabase();
+      const db = this.getDb();
       const entry: NewPerformanceAuditResult = {
         device_id: record.deviceId,
         session_id: record.sessionId,
@@ -119,7 +129,7 @@ export class PerformanceAuditRepository {
   }
 
   async listResults(query: PerformanceAuditQuery): Promise<PerformanceAuditHistoryPage> {
-    const db = getDatabase();
+    const db = this.getDb();
     const limit = Math.max(1, query.limit ?? 50);
     const offset = Math.max(0, query.offset ?? 0);
 
@@ -203,7 +213,7 @@ export class PerformanceAuditRepository {
   }
 
   async listResultsSince(query: PerformanceAuditStreamQuery): Promise<PerformanceAuditHistoryEntry[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     const limit = Math.min(Math.max(1, query.limit ?? 50), STREAM_LIMIT_MAX);
 
     let builder = db
@@ -298,7 +308,7 @@ export class PerformanceAuditRepository {
 
     cleanupInProgress = true;
     try {
-      const db = getDatabase();
+      const db = this.getDb();
 
       const threshold = await db
         .selectFrom("performance_audit_results")
@@ -336,7 +346,7 @@ export class PerformanceAuditRepository {
    */
   async pruneOldRecords(): Promise<number> {
     try {
-      const db = getDatabase();
+      const db = this.getDb();
       const cutoffDate = new Date(this.timer.now() - RETENTION_MAX_AGE_HOURS * 60 * 60 * 1000);
       const cutoffTimestamp = cutoffDate.toISOString();
 

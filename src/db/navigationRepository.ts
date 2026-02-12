@@ -1,5 +1,7 @@
+import type { Kysely } from "kysely";
 import { getDatabase } from "./database";
 import type {
+  Database,
   NewNavigationApp,
   NavigationApp,
   NewNavigationNode,
@@ -24,11 +26,23 @@ import { logger } from "../utils/logger";
  * Provides type-safe access to navigation data.
  */
 export class NavigationRepository {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
+  }
   /**
    * Get or create a navigation app record.
    */
   async getOrCreateApp(appId: string): Promise<NavigationApp> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Check if app exists
     const existing = await db
@@ -65,7 +79,7 @@ export class NavigationRepository {
    * Update app's updated_at timestamp.
    */
   async touchApp(appId: string): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     await db
       .updateTable("navigation_apps")
       .set({ updated_at: new Date().toISOString() })
@@ -81,7 +95,7 @@ export class NavigationRepository {
     screenName: string,
     timestamp: number
   ): Promise<NavigationNode> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Check if node exists
     const existing = await db
@@ -133,7 +147,7 @@ export class NavigationRepository {
    * Get a node by app and screen name.
    */
   async getNode(appId: string, screenName: string): Promise<NavigationNode | undefined> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_nodes")
       .selectAll()
@@ -146,7 +160,7 @@ export class NavigationRepository {
    * Get a node by app and node ID.
    */
   async getNodeById(appId: string, nodeId: number): Promise<NavigationNode | undefined> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_nodes")
       .selectAll()
@@ -164,7 +178,7 @@ export class NavigationRepository {
     backStackDepth: number,
     taskId: number
   ): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     await db
       .updateTable("navigation_nodes")
       .set({
@@ -184,7 +198,7 @@ export class NavigationRepository {
    * Get all nodes for an app.
    */
   async getNodes(appId: string): Promise<NavigationNode[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_nodes")
       .selectAll()
@@ -204,7 +218,7 @@ export class NavigationRepository {
       return [];
     }
 
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_nodes")
       .selectAll()
@@ -224,7 +238,7 @@ export class NavigationRepository {
     toolArgs: Record<string, any> | null,
     timestamp: number
   ): Promise<NavigationEdge> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const newEdge: NewNavigationEdge = {
       app_id: appId,
@@ -253,7 +267,7 @@ export class NavigationRepository {
    * Get all edges for an app.
    */
   async getEdges(appId: string): Promise<NavigationEdge[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_edges")
       .selectAll()
@@ -272,7 +286,7 @@ export class NavigationRepository {
       limit: number;
     }
   ): Promise<{ edges: NavigationEdge[]; hasMore: boolean }> {
-    const db = getDatabase();
+    const db = this.getDb();
     let query = db
       .selectFrom("navigation_edges")
       .selectAll()
@@ -306,7 +320,7 @@ export class NavigationRepository {
    * Get edges from a specific screen.
    */
   async getEdgesFrom(appId: string, fromScreen: string): Promise<NavigationEdge[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_edges")
       .selectAll()
@@ -319,7 +333,7 @@ export class NavigationRepository {
    * Get edges to a specific screen.
    */
   async getEdgesTo(appId: string, toScreen: string): Promise<NavigationEdge[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_edges")
       .selectAll()
@@ -344,7 +358,7 @@ export class NavigationRepository {
     },
     timestamp: number
   ): Promise<UIElement> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Try to find existing element with same properties
     let query = db
@@ -427,7 +441,7 @@ export class NavigationRepository {
   ): Promise<void> {
     if (uiElementIds.length === 0) {return;}
 
-    const db = getDatabase();
+    const db = this.getDb();
     const values: NewEdgeUIElement[] = uiElementIds.map((uiElementId, index) => ({
       edge_id: edgeId,
       ui_element_id: uiElementId,
@@ -441,7 +455,7 @@ export class NavigationRepository {
    * Get UI elements for an edge.
    */
   async getUIElementsForEdge(edgeId: number): Promise<UIElement[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("edge_ui_elements")
       .innerJoin("ui_elements", "ui_elements.id", "edge_ui_elements.ui_element_id")
@@ -455,7 +469,7 @@ export class NavigationRepository {
    * Set modal stack for a node.
    */
   async setNodeModals(nodeId: number, modalStack: string[]): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Delete existing modals
     await db
@@ -479,7 +493,7 @@ export class NavigationRepository {
    * Get modal stack for a node.
    */
   async getNodeModals(nodeId: number): Promise<string[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     const modals = await db
       .selectFrom("node_modals")
       .select("modal_identifier")
@@ -498,7 +512,7 @@ export class NavigationRepository {
     position: "from" | "to",
     modalStack: string[]
   ): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Delete existing modals for this position
     await db
@@ -524,7 +538,7 @@ export class NavigationRepository {
    * Get modal stack for an edge position.
    */
   async getEdgeModals(edgeId: number, position: "from" | "to"): Promise<string[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     const modals = await db
       .selectFrom("edge_modals")
       .select("modal_identifier")
@@ -547,7 +561,7 @@ export class NavigationRepository {
     speed?: string,
     swipeCount?: number
   ): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const scrollPos: NewScrollPosition = {
       edge_id: edgeId,
@@ -577,7 +591,7 @@ export class NavigationRepository {
     speed?: string;
     swipeCount?: number;
   } | null> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const result = await db
       .selectFrom("scroll_positions")
@@ -662,7 +676,7 @@ export class NavigationRepository {
     toolEdgeCount: number;
     unknownEdgeCount: number;
   }> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const nodes = await db
       .selectFrom("navigation_nodes")
@@ -702,7 +716,7 @@ export class NavigationRepository {
    * Clear all navigation data for an app.
    */
   async clearApp(appId: string): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Cascade deletes will handle related tables
     await db
@@ -721,7 +735,7 @@ export class NavigationRepository {
     screenName: string,
     screenshotPath: string | null
   ): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     await db
       .updateTable("navigation_nodes")
       .set({ screenshot_path: screenshotPath })
@@ -739,7 +753,7 @@ export class NavigationRepository {
     nodeId: number,
     screenshotPath: string | null
   ): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     await db
       .updateTable("navigation_nodes")
       .set({ screenshot_path: screenshotPath })
@@ -754,7 +768,7 @@ export class NavigationRepository {
    * Useful for tests that want to reset graph state without losing the app.
    */
   async clearAppGraph(appId: string): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Delete edges first (they reference nodes via screen names, not FK, so no cascade)
     await db
@@ -798,7 +812,7 @@ export class NavigationRepository {
     data: string,
     timestamp: number
   ): Promise<NavigationNodeFingerprint> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Check if fingerprint already exists for this app
     const existing = await db
@@ -855,7 +869,7 @@ export class NavigationRepository {
    * Fingerprints are scoped per app to prevent cross-app collisions.
    */
   async getNodeByFingerprint(appId: string, hash: string): Promise<NavigationNode | undefined> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     const fingerprint = await db
       .selectFrom("navigation_node_fingerprints")
@@ -879,7 +893,7 @@ export class NavigationRepository {
    * Get all fingerprints associated with a node.
    */
   async getFingerprintsForNode(nodeId: number): Promise<NavigationNodeFingerprint[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_node_fingerprints")
       .selectAll()
@@ -896,7 +910,7 @@ export class NavigationRepository {
     data: string,
     timestamp: number
   ): Promise<NavigationSuggestion> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Check if suggestion already exists for this app and hash
     const existing = await db
@@ -957,7 +971,7 @@ export class NavigationRepository {
     nodeId: number,
     timestamp: number
   ): Promise<NavigationNodeFingerprint> {
-    const db = getDatabase();
+    const db = this.getDb();
 
     // Get the suggestion
     const suggestion = await db
@@ -997,7 +1011,7 @@ export class NavigationRepository {
    * Check if an app has any named navigation nodes.
    */
   async hasNamedNodes(appId: string): Promise<boolean> {
-    const db = getDatabase();
+    const db = this.getDb();
     const result = await db
       .selectFrom("navigation_nodes")
       .select(db.fn.countAll<number>().as("count"))
@@ -1011,7 +1025,7 @@ export class NavigationRepository {
    * Get unpromoted suggestions for an app.
    */
   async getSuggestions(appId: string): Promise<NavigationSuggestion[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("navigation_suggestions")
       .selectAll()
@@ -1025,7 +1039,7 @@ export class NavigationRepository {
    * Update a node's visit count and last_seen_at without creating a new node.
    */
   async updateNodeVisit(nodeId: number, timestamp: number): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     await db
       .updateTable("navigation_nodes")
       .set(eb => ({

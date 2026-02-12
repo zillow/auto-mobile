@@ -1,5 +1,6 @@
+import type { Kysely } from "kysely";
 import { getDatabase } from "./database";
-import type { NewToolCall } from "./types";
+import type { Database, NewToolCall } from "./types";
 import { logger } from "../utils/logger";
 
 export interface ToolCallRecord {
@@ -9,9 +10,22 @@ export interface ToolCallRecord {
 }
 
 export class ToolCallRepository {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
+  }
+
   async recordToolCall(record: ToolCallRecord): Promise<void> {
     try {
-      const db = getDatabase();
+      const db = this.getDb();
       const entry: NewToolCall = {
         tool_name: record.toolName,
         timestamp: record.timestamp,
@@ -30,7 +44,7 @@ export class ToolCallRepository {
     excludeTools: string[] = []
   ): Promise<string[]> {
     try {
-      const db = getDatabase();
+      const db = this.getDb();
       const rows = await db
         .selectFrom("tool_calls")
         .select(["tool_name", "timestamp"])

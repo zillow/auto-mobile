@@ -1,5 +1,7 @@
+import type { Kysely } from "kysely";
 import { getDatabase } from "./database";
 import type {
+  Database,
   NewPredictionOutcome,
   NewPredictionTransitionStats,
   PredictionTransitionStats
@@ -36,8 +38,21 @@ export interface TransitionKey {
 }
 
 export class PredictionHistoryRepository {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private getDb(): Kysely<Database> {
+    if (this.db) {
+      return this.db;
+    }
+    return getDatabase();
+  }
+
   async recordOutcome(outcome: PredictionOutcomeRecord): Promise<void> {
-    const db = getDatabase();
+    const db = this.getDb();
     const now = new Date().toISOString();
     const toolArgs = normalizeToolArgs(outcome.toolArgs ?? undefined);
 
@@ -83,7 +98,7 @@ export class PredictionHistoryRepository {
     confidence: number,
     correct: boolean
   ): Promise<PredictionTransitionStats> {
-    const db = getDatabase();
+    const db = this.getDb();
     const now = new Date().toISOString();
     const toolArgs = normalizeToolArgs(transition.toolArgs ?? undefined);
     const brier = Math.pow(confidence - (correct ? 1 : 0), 2);
@@ -154,7 +169,7 @@ export class PredictionHistoryRepository {
     appId: string,
     fromScreen: string
   ): Promise<PredictionTransitionStats[]> {
-    const db = getDatabase();
+    const db = this.getDb();
     return db
       .selectFrom("prediction_transition_stats")
       .selectAll()
