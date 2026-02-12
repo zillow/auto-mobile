@@ -1,6 +1,8 @@
+import type { Kysely } from "kysely";
 import { ensureMigrations, getDatabase } from "./database";
 import type { DeviceSnapshotManifest, DeviceSnapshotMetadata, DeviceSnapshotType } from "../models";
 import type {
+  Database,
   DeviceSnapshot as DbDeviceSnapshot,
   NewDeviceSnapshot,
   DeviceSnapshotUpdate,
@@ -91,9 +93,22 @@ function buildUpdatePayload(update: Partial<DeviceSnapshotRecord>): DeviceSnapsh
 }
 
 export class DeviceSnapshotRepository {
-  async insertSnapshot(record: DeviceSnapshotRecord): Promise<void> {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private async getDb(): Promise<Kysely<Database>> {
+    if (this.db) {
+      return this.db;
+    }
     await ensureMigrations();
-    const db = getDatabase();
+    return getDatabase();
+  }
+
+  async insertSnapshot(record: DeviceSnapshotRecord): Promise<void> {
+    const db = await this.getDb();
     const row: NewDeviceSnapshot = {
       snapshot_name: record.snapshotName,
       device_id: record.deviceId,
@@ -115,8 +130,7 @@ export class DeviceSnapshotRepository {
     snapshotName: string,
     update: Partial<DeviceSnapshotRecord>
   ): Promise<void> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const payload = buildUpdatePayload(update);
     if (Object.keys(payload).length === 0) {
       return;
@@ -130,8 +144,7 @@ export class DeviceSnapshotRepository {
   }
 
   async getSnapshot(snapshotName: string): Promise<DeviceSnapshotRecord | null> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const row = await db
       .selectFrom("device_snapshots")
       .selectAll()
@@ -142,8 +155,7 @@ export class DeviceSnapshotRepository {
   }
 
   async listSnapshots(query: DeviceSnapshotQuery = {}): Promise<DeviceSnapshotRecord[]> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     let builder = db
       .selectFrom("device_snapshots")
       .selectAll();
@@ -178,8 +190,7 @@ export class DeviceSnapshotRepository {
   }
 
   async deleteSnapshot(snapshotName: string): Promise<boolean> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const result = await db
       .deleteFrom("device_snapshots")
       .where("snapshot_name", "=", snapshotName)

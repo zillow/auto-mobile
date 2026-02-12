@@ -1,3 +1,4 @@
+import type { Kysely } from "kysely";
 import { ensureMigrations, getDatabase } from "./database";
 import type {
   VideoFormat,
@@ -6,7 +7,7 @@ import type {
   VideoRecordingMetadata,
 } from "../models";
 import { parseVideoRecordingConfig } from "../features/video";
-import type { NewVideoRecording, VideoRecordingUpdate, VideoRecording as DbVideoRecording } from "./types";
+import type { Database, NewVideoRecording, VideoRecordingUpdate, VideoRecording as DbVideoRecording } from "./types";
 import { logger } from "../utils/logger";
 
 export type VideoRecordingStatus = "recording" | "completed" | "interrupted";
@@ -128,9 +129,22 @@ function buildUpdatePayload(update: Partial<VideoRecordingRecord>): VideoRecordi
 }
 
 export class VideoRecordingRepository {
-  async insertRecording(record: VideoRecordingRecord): Promise<void> {
+  private db: Kysely<Database> | null;
+
+  constructor(db?: Kysely<Database>) {
+    this.db = db ?? null;
+  }
+
+  private async getDb(): Promise<Kysely<Database>> {
+    if (this.db) {
+      return this.db;
+    }
     await ensureMigrations();
-    const db = getDatabase();
+    return getDatabase();
+  }
+
+  async insertRecording(record: VideoRecordingRecord): Promise<void> {
+    const db = await this.getDb();
     const row: NewVideoRecording = {
       recording_id: record.recordingId,
       device_id: record.deviceId,
@@ -158,8 +172,7 @@ export class VideoRecordingRepository {
     recordingId: string,
     update: Partial<VideoRecordingRecord>
   ): Promise<void> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const payload = buildUpdatePayload(update);
     if (Object.keys(payload).length === 0) {
       return;
@@ -172,8 +185,7 @@ export class VideoRecordingRepository {
   }
 
   async getRecording(recordingId: string): Promise<VideoRecordingRecord | null> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const row = await db
       .selectFrom("video_recordings")
       .selectAll()
@@ -184,8 +196,7 @@ export class VideoRecordingRepository {
   }
 
   async listRecordings(query: VideoRecordingQuery = {}): Promise<VideoRecordingRecord[]> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     let builder = db
       .selectFrom("video_recordings")
       .selectAll();
@@ -225,8 +236,7 @@ export class VideoRecordingRepository {
   }
 
   async deleteRecording(recordingId: string): Promise<boolean> {
-    await ensureMigrations();
-    const db = getDatabase();
+    const db = await this.getDb();
     const result = await db
       .deleteFrom("video_recordings")
       .where("recording_id", "=", recordingId)
