@@ -636,7 +636,7 @@ jobs:
 
       - uses: ./.github/actions/gradle-task-run
         with:
-          gradle-tasks: ":junit-runner:test :junit-runner:jacocoTestReport :accessibility-service:testDebugUnitTest :accessibility-service:createDebugUnitTestCoverageReport :test-plan-validation:test :test-plan-validation:jacocoTestReport :protocol:test :protocol:jacocoTestReport"
+          gradle-tasks: ":junit-runner:test :junit-runner:jacocoTestReport :accessibility-service:testDebugUnitTest :accessibility-service:createDebugUnitTestCoverageReport :auto-mobile-sdk:testDebugUnitTest :auto-mobile-sdk:createDebugUnitTestCoverageReport :test-plan-validation:test :test-plan-validation:jacocoTestReport :protocol:test :protocol:jacocoTestReport"
           gradle-project-directory: "android"
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
