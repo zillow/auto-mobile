@@ -148,12 +148,14 @@ export class DaemonManager {
 
     console.log("Starting AutoMobile daemon...");
 
-    // Use the installed auto-mobile command instead of current script path
-    // This ensures the daemon uses the same version as the CLI/MCP server
-    const autoMobileCmd = "auto-mobile";
+    // Resolve the current binary so the daemon uses the same version,
+    // even when invoked via npx (where "auto-mobile" may not be on PATH).
+    // process.argv[1] is the entry script (e.g. dist/src/index.js).
+    const entryScript = process.argv[1];
+    const autoMobileCmd = entryScript ? process.execPath : "auto-mobile";
 
     // Start daemon as detached process
-    const args = ["--daemon-mode"];
+    const args = entryScript ? [entryScript, "--daemon-mode"] : ["--daemon-mode"];
     if (options.port) {
       args.push("--port", options.port.toString());
     }
