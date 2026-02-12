@@ -28,7 +28,6 @@ import {
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
 import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
-import type { BootedDevice } from "../models";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server

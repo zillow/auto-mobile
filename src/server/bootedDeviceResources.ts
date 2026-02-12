@@ -9,6 +9,7 @@ import type { DevicePool } from "../daemon/devicePool";
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
 import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
 import { APK_SHA256_CHECKSUM, XCTESTSERVICE_SHA256_CHECKSUM } from "../constants/release";
+import { defaultTimer } from "../utils/SystemTimer";
 
 // Resource URIs
 export const BOOTED_DEVICE_RESOURCE_URIS = {
@@ -271,12 +272,12 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
   // Query service status for each device in parallel with per-device timeout
   const SERVICE_STATUS_TIMEOUT_MS = 5000;
   const serviceStatusResults = await Promise.allSettled(
-    devices.map(async (device) => {
+    devices.map(async device => {
       try {
         return await Promise.race([
           queryDeviceServiceStatus(device),
-          new Promise<undefined>((resolve) =>
-            setTimeout(() => {
+          new Promise<undefined>(resolve =>
+            defaultTimer.setTimeout(() => {
               logger.warn(`[BootedDeviceResources] Service status timeout for ${device.deviceId}`);
               resolve(undefined);
             }, SERVICE_STATUS_TIMEOUT_MS)
