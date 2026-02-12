@@ -11,6 +11,7 @@
   <depends>com.intellij.modules.compose</depends>
   <depends>org.jetbrains.plugins.yaml</depends>
   <extensions defaultExtensionNs="com.intellij">
+    <iconMapper mappingFile="AutoMobileIconMappings.json"/>
     <toolWindow id="AutoMobile" anchor="right" icon="/icons/toolWindow.svg" factoryClass="dev.jasonpearson.automobile.ide.AutoMobileToolWindowFactory"/>
     <notificationGroup id="AutoMobile" displayType="BALLOON"/>
     <applicationConfigurable id="automobile.settings" displayName="AutoMobile" instance="dev.jasonpearson.automobile.ide.settings.AutoMobileSettingsConfigurable"/>
