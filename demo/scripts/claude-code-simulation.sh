@@ -20,6 +20,47 @@ call_mcp_tool() {
   bun run "$PROJECT_ROOT/src/index.ts" --cli "$tool_name" "$@" > /dev/null 2>&1 || true
 }
 
+# Helper function for iOS simulator actions using direct simctl commands.
+# This produces identical visual results to call_mcp_tool but uses direct
+# simctl calls which generate display frames needed by simctl video recording.
+call_ios_tool() {
+  local tool_name="$1"
+  shift
+
+  case "$tool_name" in
+    launchApp)
+      local app_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --appId) app_id="$2"; shift 2 ;;
+          --platform|--clearAppData) shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      xcrun simctl launch booted "$app_id" > /dev/null 2>&1 || true
+      ;;
+    terminateApp)
+      local app_id=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --appId) app_id="$2"; shift 2 ;;
+          --platform) shift 2 ;;
+          *) shift ;;
+        esac
+      done
+      xcrun simctl terminate booted "$app_id" > /dev/null 2>&1 || true
+      ;;
+    tapOn|swipeOn|inputText|pressButton|pressKey|observe)
+      # Fall back to MCP tool for interaction commands
+      bun run "$PROJECT_ROOT/src/index.ts" --cli "$tool_name" "$@" > /dev/null 2>&1 || true
+      ;;
+    *)
+      # Default: use MCP tool
+      bun run "$PROJECT_ROOT/src/index.ts" --cli "$tool_name" "$@" > /dev/null 2>&1 || true
+      ;;
+  esac
+}
+
 # Helper function to show MCP tool call
 show_mcp_call() {
   local tool_name="$1"
