@@ -1,22 +1,4 @@
 import { ElementBounds } from "./ElementBounds";
-import { HighlightShape } from "./VisualHighlight";
-
-export interface BugReportHighlightNearbyElement {
-  resourceId?: string;
-  text?: string;
-  contentDesc?: string;
-  className?: string;
-  bounds: ElementBounds;
-  distance: number;
-  clickable?: boolean;
-  enabled?: boolean;
-}
-
-export interface BugReportHighlightEntry {
-  description?: string;
-  shape: HighlightShape;
-  nearbyElements?: BugReportHighlightNearbyElement[];
-}
 
 /**
  * Result from bug report generation
@@ -132,11 +114,6 @@ export interface BugReportResult {
   screenshot?: string;
 
   /**
-   * Active visual highlights when report was generated
-   */
-  highlights?: BugReportHighlightEntry[];
-
-  /**
    * System window state from dumpsys
    */
   windowState?: {
@@ -146,7 +123,7 @@ export interface BugReportResult {
   };
 
   /**
-   * File path where full report was saved (if requested)
+   * File path where full report was saved
    */
   savedTo?: string;
 
