@@ -6,12 +6,25 @@ import { BootedDevice, Platform } from "../models";
 import { DaemonState } from "../daemon/daemonState";
 import type { Session } from "../daemon/sessionManager";
 import type { DevicePool } from "../daemon/devicePool";
+import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
+import { APK_SHA256_CHECKSUM, XCTESTSERVICE_SHA256_CHECKSUM } from "../constants/release";
 
 // Resource URIs
 export const BOOTED_DEVICE_RESOURCE_URIS = {
   ALL_BOOTED: "automobile:devices/booted",
   PLATFORM_TEMPLATE: "automobile:devices/booted/{platform}"
 } as const;
+
+// Service status for a booted device
+export interface DeviceServiceStatus {
+  installed: boolean;
+  enabled: boolean;
+  running: boolean;
+  installedSha256: string | null;
+  expectedSha256: string;
+  isCompatible: boolean;
+}
 
 // Booted device info for resource response
 export interface BootedDeviceInfo {
@@ -24,6 +37,7 @@ export interface BootedDeviceInfo {
   poolStatus?: PoolDeviceStatus;
   assignedSession?: string;
   session?: DeviceSessionInfo;
+  serviceStatus?: DeviceServiceStatus;
 }
 
 // Resource content schema
@@ -254,6 +268,25 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
     logger.error(`[BootedDeviceResources] Error fetching booted devices: ${error}`);
   }
 
+  // Query service status for each device in parallel (best-effort, never blocks)
+  const serviceStatusResults = await Promise.allSettled(
+    devices.map(async (device) => {
+      try {
+        return await queryDeviceServiceStatus(device);
+      } catch (error) {
+        logger.warn(`[BootedDeviceResources] Failed to query service status for ${device.deviceId}: ${error}`);
+        return undefined;
+      }
+    })
+  );
+
+  for (let i = 0; i < devices.length; i++) {
+    const result = serviceStatusResults[i];
+    if (result.status === "fulfilled" && result.value) {
+      devices[i] = { ...devices[i], serviceStatus: result.value };
+    }
+  }
+
   const virtualCount = devices.filter(device => device.isVirtual).length;
   const physicalCount = devices.length - virtualCount;
 
@@ -267,6 +300,56 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
     poolStatus,
     devices
   };
+}
+
+// Query service status for a single booted device
+async function queryDeviceServiceStatus(device: BootedDeviceInfo): Promise<DeviceServiceStatus | undefined> {
+  const bootedDevice: BootedDevice = {
+    name: device.name,
+    platform: device.platform,
+    deviceId: device.deviceId,
+    source: device.source,
+  };
+
+  try {
+    if (device.platform === "android") {
+      const manager = AndroidAccessibilityServiceManager.getInstance(bootedDevice);
+      const [installed, enabled, installedSha256] = await Promise.all([
+        manager.isInstalled(),
+        manager.isEnabled(),
+        manager.getInstalledApkSha256(),
+      ]);
+      const expectedSha256 = APK_SHA256_CHECKSUM;
+      const isCompatible = expectedSha256.length === 0 ||
+        (installedSha256 !== null && installedSha256.toLowerCase() === expectedSha256.toLowerCase());
+      return {
+        installed,
+        enabled,
+        running: installed && enabled,
+        installedSha256,
+        expectedSha256,
+        isCompatible,
+      };
+    } else if (device.platform === "ios") {
+      const manager = IOSXCTestServiceManager.getInstance(bootedDevice);
+      const [installed, running] = await Promise.all([
+        manager.isInstalled(),
+        manager.isRunning(),
+      ]);
+      const expectedSha256 = XCTESTSERVICE_SHA256_CHECKSUM;
+      return {
+        installed,
+        enabled: running,
+        running,
+        installedSha256: null,
+        expectedSha256,
+        isCompatible: running,
+      };
+    }
+  } catch (error) {
+    logger.warn(`[BootedDeviceResources] Service status query failed for ${device.deviceId}: ${error}`);
+  }
+  return undefined;
 }
 
 // Register all booted device resources

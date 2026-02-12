@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
@@ -1794,6 +1796,18 @@ private fun McpProcessesPanel(
     var selectingDevice by remember { mutableStateOf<dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo?>(null) }
     var selectError by remember { mutableStateOf<String?>(null) }
 
+    // State for killing devices
+    var killingDeviceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var killErrors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    // State for daemon status
+    var daemonStatus by remember { mutableStateOf<dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse?>(null) }
+
+    // State for service updates
+    var updatingServiceDeviceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
     // State for devices (fetched from connected MCP server)
     var bootedDevices by remember { mutableStateOf<List<dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo>>(emptyList()) }
     var deviceImages by remember { mutableStateOf<List<dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo>>(emptyList()) }
@@ -1847,6 +1861,15 @@ private fun McpProcessesPanel(
                 }
 
                 client.close()
+
+                // Fetch daemon status in background (best-effort)
+                try {
+                    val statusClient = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
+                    daemonStatus = statusClient.getDaemonStatus()
+                    LOG.debug("[AutoMobile IDE] Fetched daemon status: version=${daemonStatus?.version}")
+                } catch (e: Exception) {
+                    LOG.debug("[AutoMobile IDE] Failed to fetch daemon status: ${e.message}")
+                }
             } catch (e: Exception) {
                 val stackTrace = e.stackTraceToString()
                 LOG.debug("[AutoMobile IDE] Exception fetching devices: ${e.javaClass.name}: ${e.message}")
@@ -1859,6 +1882,7 @@ private fun McpProcessesPanel(
             bootedDevices = emptyList()
             deviceImages = emptyList()
             devicesError = null
+            daemonStatus = null
         }
     }
 
@@ -1926,28 +1950,22 @@ private fun McpProcessesPanel(
         }
     }
 
-    // Boot devices when requested
-    LaunchedEffect(bootingDeviceIds.hashCode()) {
-        bootingDeviceIds.forEach { deviceKey ->
+    // Boot device action (non-blocking coroutine)
+    val onBootDeviceAction: (dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo) -> Unit = { image ->
+        val deviceKey = image.deviceId ?: image.name
+        bootingDeviceIds = bootingDeviceIds + deviceKey
+        bootErrors = bootErrors - deviceKey
+        scope.launch(Dispatchers.IO) {
             try {
-                val image = deviceImages.find { (it.deviceId ?: it.name) == deviceKey }
-                if (image == null || connectedProcess == null) {
-                    bootingDeviceIds = bootingDeviceIds - deviceKey
-                    return@forEach
-                }
-
                 LOG.debug("[AutoMobile IDE] Booting device: ${image.name}")
                 val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
-
                 val result = client.startDevice(
                     name = image.name,
                     platform = image.platform,
                     deviceId = image.deviceId,
                 )
-
                 if (result.success) {
                     LOG.debug("[AutoMobile IDE] Device booted successfully: ${image.name}")
-                    // Refresh device list after successful boot
                     kotlinx.coroutines.delay(3000)
                     refreshCounter++
                 } else {
@@ -1956,26 +1974,22 @@ private fun McpProcessesPanel(
                 }
             } catch (e: Exception) {
                 LOG.debug("[AutoMobile IDE] Exception booting device: ${e.message}")
-                e.printStackTrace()
                 bootErrors = bootErrors + (deviceKey to (e.message ?: "Error booting device"))
             }
             bootingDeviceIds = bootingDeviceIds - deviceKey
         }
     }
 
-    // Select device when requested
-    LaunchedEffect(selectingDevice) {
-        LOG.debug("[AutoMobile IDE] LaunchedEffect triggered. selectingDevice: ${selectingDevice?.name}, connectedProcess: ${connectedProcess?.name}")
-        val device = selectingDevice
-        if (device != null && connectedProcess != null) {
+    // Select device action (non-blocking coroutine)
+    val onSelectDeviceAction: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit = { device ->
+        LOG.debug("[AutoMobile IDE] Select clicked for device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
+        selectingDevice = device
+        selectError = null
+        onDeviceSelected(device.deviceId, device.name)
+        scope.launch(Dispatchers.IO) {
             try {
-                LOG.debug("[AutoMobile IDE] Selecting device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
                 val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
-                LOG.debug("[AutoMobile IDE] Created client: $client")
-
                 val result = client.setActiveDevice(device.deviceId, device.platform)
-                LOG.debug("[AutoMobile IDE] setActiveDevice result: success=${result.success}, message=${result.message}")
-
                 if (result.success) {
                     LOG.debug("[AutoMobile IDE] Device selected successfully: ${device.name}")
                     selectError = null
@@ -1985,13 +1999,60 @@ private fun McpProcessesPanel(
                 }
             } catch (e: Exception) {
                 LOG.debug("[AutoMobile IDE] Exception selecting device: ${e.message}")
-                e.printStackTrace()
                 selectError = e.message ?: "Error selecting device"
             }
             selectingDevice = null
-            LOG.debug("[AutoMobile IDE] Reset selectingDevice to null")
-        } else {
-            LOG.debug("[AutoMobile IDE] Skipping selection - device: ${device?.name}, connectedProcess: ${connectedProcess?.name}")
+        }
+    }
+
+    // Kill device action (non-blocking coroutine)
+    val onKillDeviceAction: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit = { device ->
+        killingDeviceIds = killingDeviceIds + device.deviceId
+        killErrors = killErrors - device.deviceId
+        scope.launch(Dispatchers.IO) {
+            try {
+                LOG.debug("[AutoMobile IDE] Killing device: ${device.name}")
+                val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
+                val result = client.killDevice(
+                    name = device.name,
+                    deviceId = device.deviceId,
+                    platform = device.platform,
+                )
+                if (result.success) {
+                    LOG.debug("[AutoMobile IDE] Device killed successfully: ${device.name}")
+                    kotlinx.coroutines.delay(2000)
+                    refreshCounter++
+                } else {
+                    LOG.debug("[AutoMobile IDE] Failed to kill device: ${result.message}")
+                    killErrors = killErrors + (device.deviceId to (result.message ?: "Failed to kill"))
+                }
+            } catch (e: Exception) {
+                LOG.debug("[AutoMobile IDE] Exception killing device: ${e.message}")
+                killErrors = killErrors + (device.deviceId to (e.message ?: "Error killing device"))
+            }
+            killingDeviceIds = killingDeviceIds - device.deviceId
+        }
+    }
+
+    // Update service action (non-blocking coroutine)
+    val onUpdateServiceAction: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit = { device ->
+        updatingServiceDeviceIds = updatingServiceDeviceIds + device.deviceId
+        scope.launch(Dispatchers.IO) {
+            try {
+                LOG.debug("[AutoMobile IDE] Updating service for device: ${device.name}")
+                val client = dev.jasonpearson.automobile.ide.daemon.McpClientFactory.createPreferred(null)
+                val result = client.updateService(device.deviceId, device.platform)
+                if (result.success) {
+                    LOG.debug("[AutoMobile IDE] Service updated successfully for: ${device.name}")
+                    kotlinx.coroutines.delay(1000)
+                    refreshCounter++
+                } else {
+                    LOG.debug("[AutoMobile IDE] Failed to update service: ${result.message}")
+                }
+            } catch (e: Exception) {
+                LOG.debug("[AutoMobile IDE] Exception updating service: ${e.message}")
+            }
+            updatingServiceDeviceIds = updatingServiceDeviceIds - device.deviceId
         }
     }
 
@@ -2208,20 +2269,15 @@ private fun McpProcessesPanel(
                     isLoading = devicesLoading,
                     error = devicesError,
                     bootingDeviceIds = bootingDeviceIds,
+                    killingDeviceIds = killingDeviceIds,
                     bootErrors = bootErrors,
-                    onSelectDevice = { device ->
-                        LOG.debug("[AutoMobile IDE] Select clicked for device: ${device.name}, deviceId: ${device.deviceId}, platform: ${device.platform}")
-                        selectingDevice = device
-                        selectError = null
-                        LOG.debug("[AutoMobile IDE] Set selectingDevice to: ${device.name}")
-                        // Notify parent to transition to dashboard view
-                        onDeviceSelected(device.deviceId, device.name)
-                    },
-                    onBootDevice = { image ->
-                        val deviceKey = image.deviceId ?: image.name
-                        bootingDeviceIds = bootingDeviceIds + deviceKey
-                        bootErrors = bootErrors - deviceKey
-                    },
+                    killErrors = killErrors,
+                    daemonStatus = daemonStatus,
+                    updatingServiceDeviceIds = updatingServiceDeviceIds,
+                    onSelectDevice = onSelectDeviceAction,
+                    onBootDevice = onBootDeviceAction,
+                    onKillDevice = onKillDeviceAction,
+                    onUpdateService = onUpdateServiceAction,
                 )
             }
 
@@ -2809,9 +2865,15 @@ private fun DevicesSection(
     isLoading: Boolean,
     error: String?,
     bootingDeviceIds: Set<String>,
+    killingDeviceIds: Set<String>,
     bootErrors: Map<String, String>,
+    killErrors: Map<String, String>,
+    daemonStatus: dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse?,
+    updatingServiceDeviceIds: Set<String>,
     onSelectDevice: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit,
     onBootDevice: (dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo) -> Unit,
+    onKillDevice: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit,
+    onUpdateService: (dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo) -> Unit,
 ) {
     val colors = JewelTheme.globalColors
 
@@ -2829,7 +2891,7 @@ private fun DevicesSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "📱 Devices",
+                "Devices",
                 fontSize = 12.sp,
                 maxLines = 1,
                 softWrap = false,
@@ -2847,9 +2909,14 @@ private fun DevicesSection(
             }
         }
 
+        // Daemon status info
+        if (daemonStatus != null) {
+            DaemonStatusInfo(daemonStatus = daemonStatus)
+        }
+
         if (error != null) {
             Text(
-                "⚠️ $error",
+                error,
                 fontSize = 10.sp,
                 color = Color(0xFFE53935),
             )
@@ -2867,39 +2934,25 @@ private fun DevicesSection(
                     bootedDevices.forEach { device ->
                         BootedDeviceRow(
                             device = device,
+                            isKilling = device.deviceId in killingDeviceIds,
+                            killError = killErrors[device.deviceId],
+                            isUpdatingService = device.deviceId in updatingServiceDeviceIds,
                             onSelect = { onSelectDevice(device) },
+                            onKill = { onKillDevice(device) },
+                            onUpdateService = { onUpdateService(device) },
                         )
                     }
                 }
             }
 
-            // Available images (only show first few to save space)
+            // Available images grouped by API level
             if (deviceImages.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        "Available to Boot (${deviceImages.size})",
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        softWrap = false,
-                        color = colors.text.normal.copy(alpha = 0.6f),
-                    )
-                    deviceImages.take(5).forEach { image ->
-                        val deviceKey = image.deviceId ?: image.name
-                        DeviceImageRow(
-                            image = image,
-                            isBooting = deviceKey in bootingDeviceIds,
-                            error = bootErrors[deviceKey],
-                            onBoot = { onBootDevice(image) },
-                        )
-                    }
-                    if (deviceImages.size > 5) {
-                        Text(
-                            "+${deviceImages.size - 5} more",
-                            fontSize = 9.sp,
-                            color = colors.text.normal.copy(alpha = 0.4f),
-                        )
-                    }
-                }
+                DeviceImagesGrouped(
+                    deviceImages = deviceImages,
+                    bootingDeviceIds = bootingDeviceIds,
+                    bootErrors = bootErrors,
+                    onBootDevice = onBootDevice,
+                )
             }
 
             if (bootedDevices.isEmpty() && deviceImages.isEmpty()) {
@@ -2916,56 +2969,352 @@ private fun DevicesSection(
 }
 
 @Composable
+private fun DaemonStatusInfo(
+    daemonStatus: dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse,
+) {
+    val colors = JewelTheme.globalColors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.text.normal.copy(alpha = 0.04f), RoundedCornerShape(4.dp))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "AutoMobile ${daemonStatus.version}",
+                fontSize = 9.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                color = colors.text.normal.copy(alpha = 0.7f),
+                maxLines = 1,
+            )
+            if (daemonStatus.releaseVersion.isNotEmpty()) {
+                Text(
+                    "(${daemonStatus.releaseVersion})",
+                    fontSize = 9.sp,
+                    color = colors.text.normal.copy(alpha = 0.4f),
+                    maxLines = 1,
+                )
+            }
+        }
+        val a11ySha = daemonStatus.android?.accessibilityService?.expectedSha256 ?: ""
+        if (a11ySha.isNotEmpty()) {
+            Text(
+                "A11y SHA: ${a11ySha.take(8)}...",
+                fontSize = 8.sp,
+                color = colors.text.normal.copy(alpha = 0.4f),
+                maxLines = 1,
+            )
+        }
+        val xcTestSha = daemonStatus.ios?.xcTestService?.expectedSha256 ?: ""
+        if (xcTestSha.isNotEmpty()) {
+            Text(
+                "XCTest SHA: ${xcTestSha.take(8)}...",
+                fontSize = 8.sp,
+                color = colors.text.normal.copy(alpha = 0.4f),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+private fun extractApiLevel(target: String?): Int? {
+    if (target == null) return null
+    val match = Regex("""android-(\d+)""").find(target)
+    return match?.groupValues?.get(1)?.toIntOrNull()
+}
+
+private fun extractIosVersion(iosVersion: String?): String? {
+    if (iosVersion == null) return null
+    val major = iosVersion.split(".").firstOrNull() ?: return null
+    return "iOS $major"
+}
+
+private data class DeviceGroup(
+    val label: String,
+    val sortKey: Int,
+    val images: List<dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo>,
+)
+
+@Composable
+private fun DeviceImagesGrouped(
+    deviceImages: List<dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo>,
+    bootingDeviceIds: Set<String>,
+    bootErrors: Map<String, String>,
+    onBootDevice: (dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo) -> Unit,
+) {
+    val colors = JewelTheme.globalColors
+
+    // Group images by API level / iOS version
+    val groups = deviceImages.groupBy { image ->
+        if (image.platform == "android") {
+            val api = extractApiLevel(image.target)
+            if (api != null) "API $api" else "Android (Unknown)"
+        } else {
+            extractIosVersion(image.iosVersion) ?: "iOS (Unknown)"
+        }
+    }.map { (label, images) ->
+        val sortKey = when {
+            label.startsWith("API ") -> label.removePrefix("API ").toIntOrNull() ?: 0
+            label.startsWith("iOS ") -> label.removePrefix("iOS ").toIntOrNull() ?: 0
+            else -> -1
+        }
+        DeviceGroup(label, sortKey, images)
+    }.sortedByDescending { it.sortKey }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "Available to Boot (${deviceImages.size})",
+            fontSize = 10.sp,
+            maxLines = 1,
+            softWrap = false,
+            color = colors.text.normal.copy(alpha = 0.6f),
+        )
+        groups.forEach { group ->
+            CollapsibleDeviceGroup(
+                group = group,
+                bootingDeviceIds = bootingDeviceIds,
+                bootErrors = bootErrors,
+                onBootDevice = onBootDevice,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CollapsibleDeviceGroup(
+    group: DeviceGroup,
+    bootingDeviceIds: Set<String>,
+    bootErrors: Map<String, String>,
+    onBootDevice: (dev.jasonpearson.automobile.ide.mcp.DeviceImageInfo) -> Unit,
+) {
+    val colors = JewelTheme.globalColors
+    var expanded by remember { mutableStateOf(false) }
+    val deviceCount = group.images.size
+    val deviceLabel = if (group.label.startsWith("iOS")) "simulator" else "device"
+    val countSuffix = if (deviceCount == 1) deviceLabel else "${deviceLabel}s"
+
+    Column {
+        // Collapsible header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                if (expanded) "v" else ">",
+                fontSize = 9.sp,
+                color = colors.text.normal.copy(alpha = 0.5f),
+            )
+            Text(
+                "${group.label} ($deviceCount $countSuffix)",
+                fontSize = 10.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                color = colors.text.normal.copy(alpha = 0.7f),
+                maxLines = 1,
+            )
+        }
+
+        if (expanded) {
+            Column(
+                modifier = Modifier.padding(start = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                group.images.forEach { image ->
+                    val deviceKey = image.deviceId ?: image.name
+                    DeviceImageRow(
+                        image = image,
+                        isBooting = deviceKey in bootingDeviceIds,
+                        error = bootErrors[deviceKey],
+                        onBoot = { onBootDevice(image) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun BootedDeviceRow(
     device: dev.jasonpearson.automobile.ide.mcp.BootedDeviceInfo,
+    isKilling: Boolean = false,
+    killError: String? = null,
+    isUpdatingService: Boolean = false,
     onSelect: () -> Unit,
+    onKill: () -> Unit,
+    onUpdateService: () -> Unit,
 ) {
     val colors = JewelTheme.globalColors
     val platformIcon = if (device.platform == "android") "🤖" else "🍎"
-    val typeIcon = if (device.isVirtual) "📱" else "📲"
+    val isPhysical = !device.isVirtual
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
+            .let { mod ->
+                if (isPhysical) {
+                    mod.border(1.dp, Color(0xFFFFA726).copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                } else {
+                    mod
+                }
+            }
             .background(Color(0xFF4CAF50).copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-            .clickable(onClick = {
-                LOG.debug("[AutoMobile IDE] BootedDeviceRow clicked for: ${device.name}")
-                onSelect()
-            })
-            .pointerHoverIcon(PointerIcon.Hand)
             .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("$platformIcon$typeIcon", fontSize = 12.sp)
-        Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(platformIcon, fontSize = 12.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        device.name,
+                        fontSize = 11.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (isPhysical) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFFFA726).copy(alpha = 0.2f), RoundedCornerShape(3.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp),
+                        ) {
+                            Text(
+                                "Physical",
+                                fontSize = 8.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                color = Color(0xFFFFA726),
+                            )
+                        }
+                    }
+                }
+                Text(
+                    device.deviceId,
+                    fontSize = 9.sp,
+                    color = colors.text.normal.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // Select button
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFF4CAF50).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                    .clickable(onClick = {
+                        LOG.debug("[AutoMobile IDE] BootedDeviceRow Select clicked for: ${device.name}")
+                        onSelect()
+                    })
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    "Select",
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    color = Color(0xFF4CAF50),
+                )
+            }
+            // Kill button
+            Box(
+                modifier = Modifier
+                    .background(
+                        if (killError != null) Color(0xFFE53935).copy(alpha = 0.15f)
+                        else Color(0xFFE53935).copy(alpha = 0.1f),
+                        RoundedCornerShape(4.dp),
+                    )
+                    .clickable(enabled = !isKilling, onClick = onKill)
+                    .pointerHoverIcon(if (isKilling) PointerIcon.Default else PointerIcon.Hand)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    when {
+                        isKilling -> "..."
+                        killError != null -> "Err"
+                        else -> "Kill"
+                    },
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    color = Color(0xFFE53935),
+                )
+            }
+        }
+
+        // Kill error
+        if (killError != null) {
             Text(
-                device.name,
-                fontSize = 11.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                device.deviceId,
-                fontSize = 9.sp,
-                color = colors.text.normal.copy(alpha = 0.5f),
+                killError,
+                fontSize = 8.sp,
+                color = Color(0xFFE53935),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Box(
-            modifier = Modifier
-                .background(Color(0xFF4CAF50).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-        ) {
-            Text(
-                "Select",
-                fontSize = 9.sp,
-                maxLines = 1,
-                softWrap = false,
-                color = Color(0xFF4CAF50),
-            )
+
+        // Service status row
+        val serviceStatus = device.serviceStatus
+        if (serviceStatus != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val statusOk = serviceStatus.isCompatible && serviceStatus.running
+                val statusIcon = if (statusOk) "+" else "x"
+                val statusColor = if (statusOk) Color(0xFF4CAF50) else Color(0xFFE53935)
+                val serviceName = if (device.platform == "android") "A11y" else "XCTest"
+                val statusLabel = if (statusOk) "$serviceName OK" else "$serviceName Mismatch"
+
+                Text(statusIcon, fontSize = 9.sp, color = statusColor)
+                Text(
+                    statusLabel,
+                    fontSize = 9.sp,
+                    color = statusColor,
+                    maxLines = 1,
+                )
+                val sha = serviceStatus.installedSha256
+                if (sha != null && sha.isNotEmpty()) {
+                    Text(
+                        sha.take(8),
+                        fontSize = 8.sp,
+                        color = colors.text.normal.copy(alpha = 0.4f),
+                        maxLines = 1,
+                    )
+                }
+                if (!serviceStatus.isCompatible) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFFFA726).copy(alpha = 0.2f), RoundedCornerShape(3.dp))
+                            .clickable(enabled = !isUpdatingService, onClick = onUpdateService)
+                            .pointerHoverIcon(if (isUpdatingService) PointerIcon.Default else PointerIcon.Hand)
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                    ) {
+                        Text(
+                            if (isUpdatingService) "..." else "Update",
+                            fontSize = 8.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            color = Color(0xFFFFA726),
+                        )
+                    }
+                }
+            }
         }
     }
 }

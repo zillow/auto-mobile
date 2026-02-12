@@ -273,6 +273,9 @@ class FakeAutoMobileClient : AutoMobileClient {
   override fun getTestRuns(query: dev.jasonpearson.automobile.ide.daemon.TestRunQuery) =
       notImplemented()
   override fun observe(platform: String) = notImplemented()
+  override fun killDevice(name: String, deviceId: String, platform: String) = notImplemented()
+  override fun getDaemonStatus() = notImplemented()
+  override fun updateService(deviceId: String, platform: String) = notImplemented()
 
   private fun notImplemented(): Nothing =
       throw NotImplementedError("FakeAutoMobileClient: method not implemented for testing")

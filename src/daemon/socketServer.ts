@@ -16,6 +16,19 @@ import { DaemonStateAccess, handleDaemonRequest } from "./daemonRequestHandlers"
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 import type { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import type { FeatureFlagKey } from "../features/featureFlags/FeatureFlagDefinitions";
+import { getMcpServerVersion } from "../utils/mcpVersion";
+import {
+  RELEASE_VERSION,
+  APK_SHA256_CHECKSUM,
+  APK_URL,
+  XCTESTSERVICE_SHA256_CHECKSUM,
+  XCTESTSERVICE_IPA_URL,
+  XCTESTSERVICE_APP_HASH,
+} from "../constants/release";
+import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
+import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
+import type { BootedDevice } from "../models";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server
@@ -236,6 +249,58 @@ export class UnixSocketServer {
       }
       case "ide/ping": {
         return { ok: true, timestamp: this.timer.now() };
+      }
+      case "ide/status": {
+        return {
+          version: getMcpServerVersion(),
+          releaseVersion: RELEASE_VERSION,
+          android: {
+            accessibilityService: {
+              expectedSha256: APK_SHA256_CHECKSUM,
+              url: APK_URL,
+            },
+          },
+          ios: {
+            xcTestService: {
+              expectedSha256: XCTESTSERVICE_SHA256_CHECKSUM,
+              expectedAppHash: XCTESTSERVICE_APP_HASH,
+              url: XCTESTSERVICE_IPA_URL,
+            },
+          },
+        };
+      }
+      case "ide/updateService": {
+        const args = request.params as { deviceId?: string; platform?: string };
+        if (!args.deviceId || !args.platform) {
+          throw new Error("updateService requires 'deviceId' (string) and 'platform' (string) params");
+        }
+        if (args.platform !== "android" && args.platform !== "ios") {
+          throw new Error(`Invalid platform: ${args.platform}. Must be 'android' or 'ios'.`);
+        }
+
+        // Find the booted device
+        const bootedDevices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices(args.platform);
+        const targetDevice = bootedDevices.find(d => d.deviceId === args.deviceId);
+        if (!targetDevice) {
+          throw new Error(`Device not found: ${args.deviceId}`);
+        }
+
+        if (args.platform === "android") {
+          const manager = AndroidAccessibilityServiceManager.getInstance(targetDevice);
+          const result = await manager.ensureCompatibleVersion();
+          return {
+            success: result.status !== "failed",
+            message: `Accessibility service ${result.status}`,
+            status: result,
+          };
+        } else {
+          const manager = IOSXCTestServiceManager.getInstance(targetDevice);
+          await manager.forceRestart();
+          return {
+            success: true,
+            message: "XCTestService restarted",
+          };
+        }
       }
       default:
         return undefined;

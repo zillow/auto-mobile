@@ -211,6 +211,61 @@ class McpStdioClient(
     }
   }
 
+  override fun killDevice(name: String, deviceId: String, platform: String): KillDeviceResult {
+    val response =
+        callTool(
+            "killDevice",
+            buildJsonObject {
+              put(
+                  "device",
+                  buildJsonObject {
+                    put("name", JsonPrimitive(name))
+                    put("deviceId", JsonPrimitive(deviceId))
+                    put("platform", JsonPrimitive(platform))
+                  },
+              )
+            },
+        )
+    return try {
+      decodeToolResponse(json, response, KillDeviceResult.serializer())
+    } catch (e: Exception) {
+      KillDeviceResult(success = false, message = e.message ?: "Failed to kill device")
+    }
+  }
+
+  override fun getDaemonStatus(): dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse {
+    val response =
+        callTool(
+            "getDaemonStatus",
+            JsonObject(emptyMap()),
+        )
+    return try {
+      decodeToolResponse(
+          json,
+          response,
+          dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse.serializer(),
+      )
+    } catch (e: Exception) {
+      dev.jasonpearson.automobile.ide.mcp.DaemonStatusResponse()
+    }
+  }
+
+  override fun updateService(deviceId: String, platform: String): UpdateServiceResult {
+    val response =
+        callTool(
+            "updateService",
+            buildJsonObject {
+              put("deviceId", JsonPrimitive(deviceId))
+              put("platform", JsonPrimitive(platform))
+            },
+        )
+    return try {
+      decodeToolResponse(json, response, UpdateServiceResult.serializer())
+    } catch (e: Exception) {
+      UpdateServiceResult(success = false, message = e.message ?: "Failed to update service")
+    }
+  }
+
   private fun callTool(name: String, arguments: JsonObject): JsonElement {
     ensureInitialized()
     val response =
