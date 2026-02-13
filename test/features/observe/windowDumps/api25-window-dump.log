@@ -1,0 +1,32 @@
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #6 Window{41de3b40 u0 com.android.systemui/com.android.systemui.statusbar.phone.StatusBarWindowView}:
+    mDisplayId=0 mSession=Session{41c92050 924:1000}
+    mOwnerUid=1000 mShowToOwnerOnly=false package=com.android.systemui appop=NONE
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) sim=#120 ty=2000 fl=#81840068 pfl=0x20000 wanim=0x1030056}
+    Requested w=1080 h=1920 mLayoutSeq=92
+    mHasSurface=true mShownFrame=[0.0,0.0][1080.0,72.0] isReadyForDisplay()=true
+    WindowStateAnimator{41de8a80 StatusBar}:
+      Surface: shown=true layer=161000 alpha=1.0 rect=(0.0,0.0) 1080.0 x 72.0
+  Window #7 Window{41e2a458 u0 com.example.testapp/com.example.testapp.MainActivity}:
+    mDisplayId=0 mSession=Session{41da5890 2456:u0a78}
+    mOwnerUid=10078 mShowToOwnerOnly=true package=com.example.testapp appop=NONE
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) sim=#120 ty=1 fl=#81810100 pfl=0x0 wanim=0x10302f8}
+    Requested w=1080 h=1776 mLayoutSeq=90
+    mHasSurface=true mShownFrame=[0.0,0.0][1080.0,1920.0] isReadyForDisplay()=true
+    WindowStateAnimator{41e30688 com.example.testapp/com.example.testapp.MainActivity}:
+      Surface: shown=true layer=21005 alpha=1.0 rect=(0.0,0.0) 1080.0 x 1920.0
+  Window #8 Window{41d85640 u0 com.android.systemui/com.android.systemui.recents.RecentsActivity}:
+    mDisplayId=0 mSession=Session{41c92050 924:1000}
+    mOwnerUid=1000 mShowToOwnerOnly=true package=com.android.systemui appop=NONE
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) sim=#120 ty=1 fl=#81910100 pfl=0x0 wanim=0x10302f8}
+    Requested w=1080 h=1776 mLayoutSeq=88
+    mHasSurface=false mShownFrame=[0.0,0.0][1080.0,1920.0] isReadyForDisplay()=false
+    WindowStateAnimator{41d8b420 com.android.systemui/com.android.systemui.recents.RecentsActivity}:
+  Window #9 Window{41d52b28 u0 com.android.launcher/com.android.launcher2.Launcher}:
+    mDisplayId=0 mSession=Session{41c8f510 1128:u0a8}
+    mOwnerUid=10008 mShowToOwnerOnly=true package=com.android.launcher appop=NONE
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) sim=#120 ty=1 fl=#81910100 pfl=0x0 wanim=0x10302f8}
+    Requested w=1080 h=1776 mLayoutSeq=85
+    mHasSurface=true mShownFrame=[0.0,0.0][1080.0,1920.0] isReadyForDisplay()=true
+    WindowStateAnimator{41d58040 com.android.launcher/com.android.launcher2.Launcher}:
+      Surface: shown=true layer=21000 alpha=1.0 rect=(0.0,0.0) 1080.0 x 1920.0

@@ -191,18 +191,19 @@ fun DeviceScreenView(
     }
 
     // Detect rotation needed to align the screenshot with the hierarchy coordinate system.
-    // iOS screenshots may arrive in native pixel orientation (portrait) even when
-    // the device is in landscape, while hierarchy bounds are in display orientation.
-    // We rotate the screenshot to match the hierarchy so text reads correctly.
-    val screenshotRotation = remember(rawBitmap, hierarchy, rotation) {
-        // If the server explicitly reports rotation, use that
-        if (rotation != 0) return@remember rotation
-
-        // Auto-detect from screenshot vs hierarchy dimension mismatch
+    // iOS screenshots arrive in native pixel orientation (portrait) even when the device
+    // is landscape, while hierarchy bounds are in display orientation — so we must rotate
+    // the screenshot to match. Some Android screenshots may also need rotation.
+    // We auto-detect by comparing screenshot image dimensions to the hierarchy coordinate
+    // space dimensions (root bounds, or screenWidth/screenHeight as fallback when the
+    // root node has no explicit bounds — common for Android accessibility service).
+    val screenshotRotation = remember(rawBitmap, hierarchy, screenWidth, screenHeight) {
         val imgW = rawBitmap?.width ?: 0
         val imgH = rawBitmap?.height ?: 0
-        val rootW = hierarchy?.bounds?.width ?: 0
-        val rootH = hierarchy?.bounds?.height ?: 0
+        // Prefer root bounds; fall back to screenWidth/screenHeight when root has no bounds
+        // (Android accessibility service root nodes typically have (0,0,0,0)).
+        val rootW = hierarchy?.bounds?.width?.takeIf { it > 0 } ?: screenWidth
+        val rootH = hierarchy?.bounds?.height?.takeIf { it > 0 } ?: screenHeight
         if (imgW <= 0 || imgH <= 0 || rootW <= 0 || rootH <= 0) return@remember 0
 
         val imageIsPortrait = imgH > imgW
@@ -343,11 +344,15 @@ fun DeviceScreenView(
             // Scale factor from frame pixels to device pixels (for aspect ratio calculations only)
             val frameToDeviceScale = if (frameWidthPx > 0) effectiveWidth.toFloat() / frameWidthPx else 1f
 
-            // When the image is rotated, the hierarchy's width/height are in the original
-            // (unrotated) coordinate system. After rotation, the frame width corresponds
-            // to the hierarchy's height (for rotation 1/3) or width (for rotation 0/2).
-            val rootBoundsWidth = hierarchy?.bounds?.width ?: effectiveWidth
-            val rootBoundsHeight = hierarchy?.bounds?.height ?: effectiveHeight
+            // The hierarchy coordinate space width/height, used for mapping overlays and hit testing.
+            // Prefer root element bounds; fall back to screenWidth/screenHeight when the root
+            // has no explicit bounds (common for Android), then to image dimensions.
+            val rootBoundsWidth = hierarchy?.bounds?.width?.takeIf { it > 0 }
+                ?: screenWidth.takeIf { it > 0 }
+                ?: effectiveWidth
+            val rootBoundsHeight = hierarchy?.bounds?.height?.takeIf { it > 0 }
+                ?: screenHeight.takeIf { it > 0 }
+                ?: effectiveHeight
             // The "rotated root width" is the root dimension that maps to the frame width
             val rotatedRootWidth = if (isLandscape) rootBoundsHeight else rootBoundsWidth
 

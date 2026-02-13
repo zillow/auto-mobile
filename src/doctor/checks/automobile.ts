@@ -164,7 +164,7 @@ export async function checkAccessibilityService(
       };
     }
 
-    if (isInstalled && isEnabled && (versionResult.status === "compatible" || versionResult.status === "upgraded" || versionResult.status === "reinstalled" || versionResult.status === "skipped")) {
+    if (isInstalled && isEnabled && (versionResult.status === "compatible" || versionResult.status === "upgraded" || versionResult.status === "installed" || versionResult.status === "reinstalled" || versionResult.status === "skipped")) {
       return {
         name: "Accessibility Service",
         status: "pass",

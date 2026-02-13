@@ -18,6 +18,7 @@ export class FakeAdbExecutor implements AdbExecutor {
   private users: AndroidUser[] = [{ userId: 0, name: "Owner", flags: 13, running: true }];
   private foregroundApp: { packageName: string; userId: number } | null = null;
   private deviceTimestampMs: number | null = null;
+  private androidApiLevel: number | null = null;
 
   /**
    * Create a proper ExecResult with all required methods
@@ -100,6 +101,18 @@ export class FakeAdbExecutor implements AdbExecutor {
    */
   setDeviceTimestampMs(timestampMs: number | null): void {
     this.deviceTimestampMs = timestampMs;
+  }
+
+  /**
+   * Configure Android API level for tests that depend on API level branching.
+   * @param level - API level (or null to simulate unknown)
+   */
+  setAndroidApiLevel(level: number | null): void {
+    this.androidApiLevel = level;
+  }
+
+  async getAndroidApiLevel(): Promise<number | null> {
+    return this.androidApiLevel;
   }
 
   /**

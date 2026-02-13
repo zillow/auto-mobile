@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { Window } from "../../../src/features/observe/Window";
+import { Window, parseActiveWindowModern, parseActiveWindowLegacy, parseDumpsysWindowFocus } from "../../../src/features/observe/Window";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ExecResult } from "../../../src/models/ExecResult";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
@@ -299,6 +299,388 @@ describe("Window", () => {
       expect(result.layoutSeqSum).toBe(123);
     });
 
+    test("should parse API 25 dumpsys window windows with ty=1 and isReadyForDisplay()=true", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api25-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(25);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.example.testapp");
+      expect(result.activityName).toBe("com.example.testapp.MainActivity");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 26 dumpsys output via legacy parser", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api26-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(26);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 27 dumpsys output via legacy parser", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api27-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(27);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 28 dumpsys output via modern parser", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api28-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(28);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 29 dumpsys output via modern parser", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api29-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(29);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 30 dumpsys output via modern parser", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api30-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(30);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 31 dumpsys output via modern parser with imeControlTarget", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api31-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(31);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 32 dumpsys output via modern parser with imeControlTarget", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api32-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(32);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 33 dumpsys output via modern parser with imeControlTarget", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api33-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(33);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 34 dumpsys output via modern parser with imeControlTarget", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api34-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(34);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 35 dumpsys output via modern parser with imeControlTarget", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api35-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(35);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should parse real API 36 dumpsys output via modern parser with imeControlTarget", async () => {
+      const dumpsysOutput = fs.readFileSync(
+        path.join(__dirname, "windowDumps", "api36-settings-window-dump.log"),
+        "utf8"
+      );
+
+      fakeAdb.setAndroidApiLevel(36);
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.android.settings");
+      expect(result.activityName).toBe("com.android.settings.Settings");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
+    });
+
+    test("should fall back to mCurrentFocus from same output when ty=1 parsing fails on legacy", async () => {
+      // dumpsys window windows output that has no ty=1 with isReadyForDisplay()=true
+      // but has mCurrentFocus at the bottom (like real API 26 output)
+      const windowWindowsOutput = `
+        WINDOW MANAGER WINDOWS (dumpsys window windows)
+          Window #1 Window{41de3b40 u0 com.android.systemui/com.android.systemui.statusbar.phone.StatusBarWindowView}:
+            ty=2000 isReadyForDisplay()=true
+            mLayoutSeq=50
+
+          mCurrentFocus=Window{41e2a458 u0 com.example.app/com.example.app.SomeActivity}
+          mFocusedApp=AppWindowToken{41d97f58 token=Token{41d8cd78 ActivityRecord{41d8cb10 u0 com.example.app/com.example.app.SomeActivity t5}}}
+      `;
+
+      fakeAdb.setAndroidApiLevel(26);
+      fakeAdb.setDefaultResponse({
+        stdout: windowWindowsOutput,
+        stderr: "",
+        toString: () => windowWindowsOutput,
+        trim: () => windowWindowsOutput.trim(),
+        includes: (str: string) => windowWindowsOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.example.app");
+      expect(result.activityName).toBe("com.example.app.SomeActivity");
+    });
+
+    test("should fall back to separate dumpsys window when mCurrentFocus missing from same output", async () => {
+      // dumpsys window windows with no app windows and no mCurrentFocus
+      const windowWindowsOutput = `
+        WINDOW MANAGER WINDOWS (dumpsys window windows)
+          Window #1 Window{41de3b40 u0 com.android.systemui/com.android.systemui.statusbar.phone.StatusBarWindowView}:
+            ty=2000 isReadyForDisplay()=true
+            mLayoutSeq=50
+      `;
+
+      // separate dumpsys window command output
+      const windowOutput = `
+        mCurrentFocus=Window{41e2a458 u0 com.example.app/com.example.app.FallbackActivity}
+      `;
+
+      fakeAdb.setAndroidApiLevel(26);
+      fakeAdb.setCommandResponse("dumpsys window windows", {
+        stdout: windowWindowsOutput,
+        stderr: "",
+        toString: () => windowWindowsOutput,
+        trim: () => windowWindowsOutput.trim(),
+        includes: (str: string) => windowWindowsOutput.includes(str)
+      } as ExecResult);
+      fakeAdb.setCommandResponse("dumpsys window\"", {
+        stdout: windowOutput,
+        stderr: "",
+        toString: () => windowOutput,
+        trim: () => windowOutput.trim(),
+        includes: (str: string) => windowOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.example.app");
+      expect(result.activityName).toBe("com.example.app.FallbackActivity");
+    });
+
+    test("should fall through from legacy to modern parser when legacy fails", async () => {
+      // Output that has modern format but not legacy
+      const dumpsysOutput = `
+        imeControlTarget in display# 0 Window{12345678 u0 com.modern.app/com.modern.app.ModernActivity}
+        mLayoutSeq=100
+      `;
+
+      // simpler dumpsys window output with no match either
+      const windowOutput = `no useful content here`;
+
+      fakeAdb.setAndroidApiLevel(27);
+      fakeAdb.setCommandResponse("dumpsys window windows", {
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+      fakeAdb.setCommandResponse("dumpsys window\"", {
+        stdout: windowOutput,
+        stderr: "",
+        toString: () => windowOutput,
+        trim: () => windowOutput.trim(),
+        includes: (str: string) => windowOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.modern.app");
+      expect(result.activityName).toBe("com.modern.app.ModernActivity");
+    });
+
+    test("should use modern parser when API level is null (no regression)", async () => {
+      const dumpsysOutput = `
+        imeControlTarget in display# 0 Window{12345678 u0 com.example.app/com.example.app.MainActivity}
+        mLayoutSeq=123
+      `;
+
+      // API level is null by default in FakeAdbExecutor
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.example.app");
+      expect(result.activityName).toBe("com.example.app.MainActivity");
+      expect(result.layoutSeqSum).toBe(123);
+    });
+
     test("should fall back to BASE_APPLICATION pattern when other methods fail", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{ddf8489 u0 Pop-Up Window}
@@ -496,6 +878,70 @@ describe("Window", () => {
 
       // MD5 hash should be 32 characters long and contain only hexadecimal characters
       expect(hash).toMatch(/^[a-f0-9]{32}$/);
+    });
+  });
+
+  describe("parseActiveWindowModern", () => {
+    test("should return null for empty output", () => {
+      expect(parseActiveWindowModern("")).toBeNull();
+    });
+
+    test("should parse imeControlTarget", () => {
+      const stdout = `imeControlTarget in display# 0 Window{abc u0 com.foo/com.foo.Bar}`;
+      expect(parseActiveWindowModern(stdout)).toEqual({ appId: "com.foo", activityName: "com.foo.Bar" });
+    });
+  });
+
+  describe("parseActiveWindowLegacy", () => {
+    test("should return null for empty output", () => {
+      expect(parseActiveWindowLegacy("")).toBeNull();
+    });
+
+    test("should parse window with ty=1 and isReadyForDisplay()=true", () => {
+      const stdout = `
+  Window #7 Window{41e2a458 u0 com.example.app/com.example.app.Main}:
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) ty=1 fl=#81810100}
+    mHasSurface=true isReadyForDisplay()=true
+    mLayoutSeq=90
+      `;
+      expect(parseActiveWindowLegacy(stdout)).toEqual({ appId: "com.example.app", activityName: "com.example.app.Main" });
+    });
+
+    test("should skip systemui windows", () => {
+      const stdout = `
+  Window #6 Window{41de3b40 u0 com.android.systemui/com.android.systemui.StatusBar}:
+    mAttrs=WM.LayoutParams{ty=1 fl=#81810100}
+    isReadyForDisplay()=true
+  Window #7 Window{41e2a458 u0 com.real.app/com.real.app.Main}:
+    mAttrs=WM.LayoutParams{ty=1 fl=#81810100}
+    isReadyForDisplay()=true
+      `;
+      expect(parseActiveWindowLegacy(stdout)).toEqual({ appId: "com.real.app", activityName: "com.real.app.Main" });
+    });
+
+    test("should return null when isReadyForDisplay is false", () => {
+      const stdout = `
+  Window #7 Window{41e2a458 u0 com.example.app/com.example.app.Main}:
+    mAttrs=WM.LayoutParams{ty=1 fl=#81810100}
+    isReadyForDisplay()=false
+      `;
+      expect(parseActiveWindowLegacy(stdout)).toBeNull();
+    });
+  });
+
+  describe("parseDumpsysWindowFocus", () => {
+    test("should return null for empty output", () => {
+      expect(parseDumpsysWindowFocus("")).toBeNull();
+    });
+
+    test("should parse mCurrentFocus", () => {
+      const stdout = `mCurrentFocus=Window{41e2a458 u0 com.example.app/com.example.app.SomeActivity}`;
+      expect(parseDumpsysWindowFocus(stdout)).toEqual({ appId: "com.example.app", activityName: "com.example.app.SomeActivity" });
+    });
+
+    test("should parse mFocusedApp when mCurrentFocus is missing", () => {
+      const stdout = `mFocusedApp=AppWindowToken{41d97f58 token=Token{41d8cd78 ActivityRecord{41d8cb10 u0 com.example.app/com.example.app.SomeActivity t5}}}`;
+      expect(parseDumpsysWindowFocus(stdout)).toEqual({ appId: "com.example.app", activityName: "com.example.app.SomeActivity" });
     });
   });
 });

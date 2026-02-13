@@ -183,7 +183,7 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   }
 
   async ensureCompatibleVersion(): Promise<{
-    status: "skipped" | "not_installed" | "compatible" | "upgraded" | "reinstalled" | "failed";
+    status: "skipped" | "not_installed" | "compatible" | "upgraded" | "installed" | "reinstalled" | "failed";
     expectedSha256?: string;
     installedSha256?: string | null;
     installedShaSource?: "device" | "host" | "none";

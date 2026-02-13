@@ -45,7 +45,7 @@ export interface AccessibilityServiceManager {
 }
 
 export interface AccessibilityVersionCheckResult {
-  status: "skipped" | "not_installed" | "compatible" | "upgraded" | "reinstalled" | "failed";
+  status: "skipped" | "not_installed" | "compatible" | "upgraded" | "installed" | "reinstalled" | "failed";
   expectedSha256?: string;
   installedSha256?: string | null;
   installedShaSource?: "device" | "host" | "none";
@@ -532,14 +532,8 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     }
 
     const isInstalled = await this.isInstalled();
-    if (!isInstalled) {
-      return {
-        status: "not_installed",
-        expectedSha256: expectedSha
-      };
-    }
 
-    if (this.shouldSkipDownloadIfInstalled()) {
+    if (isInstalled && this.shouldSkipDownloadIfInstalled()) {
       logger.warn("[ACCESSIBILITY_SERVICE] Skipping APK download/version check (preinstalled APK allowed)");
       return {
         status: "skipped",
@@ -547,35 +541,42 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       };
     }
 
-    const installedShaResult = await this.getInstalledApkSha256WithDetails();
     const result: AccessibilityVersionCheckResult = {
       status: "compatible",
       expectedSha256: expectedSha,
-      installedSha256: installedShaResult.sha256,
-      installedShaSource: installedShaResult.source,
-      installedApkPath: installedShaResult.apkPath
     };
 
-    const installedSha = installedShaResult.sha256;
-    const needsReinstallDueToUnknownSha = !installedSha;
+    let needsReinstallDueToUnknownSha = false;
 
-    if (!installedSha && installedShaResult.error) {
-      logger.warn("[ACCESSIBILITY_SERVICE] Unable to determine installed APK checksum, forcing reinstall", {
-        error: installedShaResult.error
-      });
-    }
+    if (isInstalled) {
+      const installedShaResult = await this.getInstalledApkSha256WithDetails();
+      result.installedSha256 = installedShaResult.sha256;
+      result.installedShaSource = installedShaResult.source;
+      result.installedApkPath = installedShaResult.apkPath;
 
-    if (installedSha && installedSha.toLowerCase() === expectedSha.toLowerCase()) {
-      return result;
-    }
+      const installedSha = installedShaResult.sha256;
+      needsReinstallDueToUnknownSha = !installedSha;
 
-    if (needsReinstallDueToUnknownSha) {
-      logger.warn("[ACCESSIBILITY_SERVICE] Installed APK checksum unavailable, forcing reinstall");
+      if (!installedSha && installedShaResult.error) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Unable to determine installed APK checksum, forcing reinstall", {
+          error: installedShaResult.error
+        });
+      }
+
+      if (installedSha && installedSha.toLowerCase() === expectedSha.toLowerCase()) {
+        return result;
+      }
+
+      if (needsReinstallDueToUnknownSha) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Installed APK checksum unavailable, forcing reinstall");
+      } else {
+        logger.info("[ACCESSIBILITY_SERVICE] Installed APK SHA mismatch, attempting upgrade", {
+          expected: expectedSha,
+          actual: installedSha
+        });
+      }
     } else {
-      logger.info("[ACCESSIBILITY_SERVICE] Installed APK SHA mismatch, attempting upgrade", {
-        expected: expectedSha,
-        actual: installedSha
-      });
+      logger.info("[ACCESSIBILITY_SERVICE] Service not installed, downloading and installing");
     }
 
     let apkPath: string | null = null;
@@ -583,7 +584,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       result.attemptedDownload = true;
       apkPath = await this.downloadApk();
 
-      if (!needsReinstallDueToUnknownSha) {
+      if (isInstalled && !needsReinstallDueToUnknownSha) {
         try {
           result.attemptedInstall = true;
           await this.adb.executeCommand(`install -r -d "${apkPath}"`);
@@ -602,14 +603,16 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
       try {
         result.attemptedReinstall = true;
-        await this.adb.executeCommand(`shell pm uninstall ${AndroidAccessibilityServiceManager.PACKAGE}`);
+        if (isInstalled) {
+          await this.adb.executeCommand(`shell pm uninstall ${AndroidAccessibilityServiceManager.PACKAGE}`);
+        }
         await this.install(apkPath);
         await this.enable();
-        logger.info("[ACCESSIBILITY_SERVICE] APK reinstalled and service re-enabled");
+        logger.info(`[ACCESSIBILITY_SERVICE] APK ${isInstalled ? "reinstalled" : "installed"} and service enabled`);
         this.clearAvailabilityCache();
         return {
           ...result,
-          status: "reinstalled"
+          status: isInstalled ? "reinstalled" : "installed"
         };
       } catch (reinstallError) {
         const reinstallMessage = reinstallError instanceof Error ? reinstallError.message : String(reinstallError);
@@ -1028,7 +1031,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
           perfTiming: perf.getTimings(),
         };
       }
-      if (compatibilityResult.status === "upgraded" || compatibilityResult.status === "reinstalled") {
+      if (compatibilityResult.status === "upgraded" || compatibilityResult.status === "installed" || compatibilityResult.status === "reinstalled") {
         perf.end();
         return {
           success: true,

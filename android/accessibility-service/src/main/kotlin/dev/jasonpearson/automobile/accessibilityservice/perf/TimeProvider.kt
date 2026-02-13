@@ -1,16 +1,14 @@
 package dev.jasonpearson.automobile.accessibilityservice.perf
 
-import java.time.Clock
-
-/** Interface for providing current time in milliseconds. Uses Clock injection for testability. */
+/** Interface for providing current time in milliseconds. */
 interface TimeProvider {
-  /** Get current time in milliseconds (epoch time with nanoseconds stripped). */
+  /** Get current time in milliseconds (epoch time). */
   fun currentTimeMillis(): Long
 }
 
-/** Default implementation using system clock. */
-class SystemTimeProvider(private val clock: Clock = Clock.systemUTC()) : TimeProvider {
+/** Default implementation using System.currentTimeMillis() (API 1+). */
+class SystemTimeProvider : TimeProvider {
   override fun currentTimeMillis(): Long {
-    return clock.millis()
+    return System.currentTimeMillis()
   }
 }

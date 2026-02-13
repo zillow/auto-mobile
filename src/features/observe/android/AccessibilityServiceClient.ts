@@ -374,6 +374,12 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   // Screenshot backoff scheduler
   private screenshotBackoffScheduler: ScreenshotBackoffScheduler | null = null;
   private cachedScreenDimensions: { width: number; height: number } | null = null;
+  // Track whether the device supports accessibility service screenshots (API 30+).
+  // null = unknown, true = supported, false = unsupported (fall back to ADB screencap).
+  // Only marked unsupported after consecutive failures to avoid disabling on transient timeouts.
+  private a11yScreenshotSupported: boolean | null = null;
+  private a11yScreenshotFailures: number = 0;
+  private static readonly A11Y_SCREENSHOT_MAX_FAILURES = 3;
 
   // Work profile monitor for polling profiles without accessibility service
   private workProfileMonitor: WorkProfileMonitor | null = null;
@@ -1584,13 +1590,18 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
   }
 
   private async captureScreenshotForBackoff(): Promise<ScreenshotCaptureResult> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return { success: false, error: "WebSocket not connected" };
-    }
-
     const server = getDeviceDataStreamServer();
     if (!server || server.getSubscriberCount() === 0) {
       return { success: false, error: "No subscribers" };
+    }
+
+    // If we know the device doesn't support a11y screenshots, go straight to ADB fallback
+    if (this.a11yScreenshotSupported === false) {
+      return this.captureScreenshotViaAdb();
+    }
+
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return this.captureScreenshotViaAdb();
     }
 
     const requestId = this.requestManager.generateId("screenshot-backoff");
@@ -1607,14 +1618,47 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
       const result = await screenshotPromise;
 
       if (!result.success || !result.data) {
-        return { success: false, error: result.error || "No data" };
+        this.a11yScreenshotFailures++;
+        if (this.a11yScreenshotSupported === null &&
+            this.a11yScreenshotFailures >= AccessibilityServiceClient.A11Y_SCREENSHOT_MAX_FAILURES) {
+          logger.info("[ACCESSIBILITY_SERVICE] Accessibility service screenshot not supported after " +
+            `${this.a11yScreenshotFailures} consecutive failures, falling back to ADB screencap`);
+          this.a11yScreenshotSupported = false;
+        }
+        return this.captureScreenshotViaAdb();
       }
 
+      this.a11yScreenshotFailures = 0;
+      this.a11yScreenshotSupported = true;
       const checksum = computeChecksum(result.data);
 
       return { success: true, data: result.data, checksum };
     } catch (error) {
-      return { success: false, error: `${error}` };
+      return this.captureScreenshotViaAdb();
+    }
+  }
+
+  /**
+   * Fallback screenshot capture via ADB screencap for devices that don't support
+   * accessibility service screenshots (API < 30).
+   */
+  private async captureScreenshotViaAdb(): Promise<ScreenshotCaptureResult> {
+    try {
+      const tempFile = "/sdcard/screenshot_stream.png";
+      const command = `shell "screencap -p ${tempFile} && base64 ${tempFile} && rm ${tempFile}"`;
+      const maxBuffer = 50 * 1024 * 1024;
+      const result = await this.adb.executeCommand(command, undefined, maxBuffer);
+
+      if (!result.stdout || result.stdout.trim().length === 0) {
+        return { success: false, error: "No data from ADB screencap" };
+      }
+
+      const data = result.stdout.replace(/[\r\n]/g, "");
+      const checksum = computeChecksum(data);
+
+      return { success: true, data, checksum };
+    } catch (error) {
+      return { success: false, error: `ADB screencap failed: ${error}` };
     }
   }
 

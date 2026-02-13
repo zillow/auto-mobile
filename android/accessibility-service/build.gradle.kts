@@ -86,9 +86,8 @@ android {
 
   packaging {
     resources {
-      // Exclude duplicate META-INF files from Netty/Ktor dependencies
+      // Exclude duplicate META-INF files from Ktor dependencies
       excludes += "/META-INF/INDEX.LIST"
-      excludes += "/META-INF/io.netty.versions.properties"
       excludes += "/META-INF/*.kotlin_module"
     }
   }
@@ -141,7 +140,7 @@ dependencies {
   // WebSocket server dependencies
   implementation(libs.ktor.server.core)
   implementation(libs.ktor.server.cors)
-  implementation(libs.ktor.server.netty)
+  // CIO engine used instead of Netty to support lower minSdk (Netty requires API 26+)
   implementation(libs.ktor.server.sse)
   implementation(libs.ktor.server.cio)
   implementation(libs.ktor.server.websockets)
