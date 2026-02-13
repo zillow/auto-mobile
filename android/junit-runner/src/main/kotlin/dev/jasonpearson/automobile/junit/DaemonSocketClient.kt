@@ -282,8 +282,29 @@ internal object DaemonSocketPaths {
   }
 
   private fun buildDaemonCommand(subCommand: String): List<String> {
-    // Use auto-mobile CLI directly - must be on PATH
-    return listOf("auto-mobile", "--daemon", subCommand)
+    // Prefer npx/bunx to avoid requiring a global npm install of auto-mobile.
+    // Fall back to the global binary if neither package runner is available.
+    val runner = resolvePackageRunner()
+    return if (runner != null) {
+      listOf(runner, "-y", "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
+    } else {
+      listOf("auto-mobile", "--daemon", subCommand)
+    }
+  }
+
+  private fun resolvePackageRunner(): String? {
+    for (cmd in listOf("npx", "bunx")) {
+      try {
+        val process = ProcessBuilder("which", cmd)
+          .redirectErrorStream(true)
+          .start()
+        val exited = process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+        if (exited && process.exitValue() == 0) return cmd
+      } catch (_: Exception) {
+        // ignore
+      }
+    }
+    return null
   }
 
   private fun getUserId(): String {
