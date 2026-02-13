@@ -23,6 +23,22 @@ import { DaemonState, type DaemonStateLike } from "./daemonState";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 
 /**
+ * Find the first available package runner (npx or bunx) on PATH.
+ * Returns the command name, or null if neither is found.
+ */
+function resolvePackageRunner(): string | null {
+  for (const cmd of ["npx", "bunx"]) {
+    try {
+      execSync(`which ${cmd}`, { stdio: "ignore" });
+      return cmd;
+    } catch {
+      // not found, try next
+    }
+  }
+  return null;
+}
+
+/**
  * Daemon Manager
  *
  * Handles daemon lifecycle:
@@ -151,12 +167,23 @@ export class DaemonManager {
     // Resolve the current binary so the daemon uses the same version,
     // even when invoked via npx (where "auto-mobile" may not be on PATH).
     // process.argv[1] is the entry script (e.g. dist/src/index.js).
-    // Falls back to npx to avoid requiring a global npm install.
+    // Falls back to npx/bunx to avoid requiring a global npm install.
     const entryScript = process.argv[1];
-    const autoMobileCmd = entryScript ? process.execPath : "npx";
-
-    // Start daemon as detached process
-    const args = entryScript ? [entryScript, "--daemon-mode"] : ["-y", "@kaeawc/auto-mobile@latest", "--daemon-mode"];
+    let autoMobileCmd: string;
+    let args: string[];
+    if (entryScript) {
+      autoMobileCmd = process.execPath;
+      args = [entryScript, "--daemon-mode"];
+    } else {
+      const runner = resolvePackageRunner();
+      if (runner) {
+        autoMobileCmd = runner;
+        args = ["-y", "@kaeawc/auto-mobile@latest", "--daemon-mode"];
+      } else {
+        autoMobileCmd = "auto-mobile";
+        args = ["--daemon-mode"];
+      }
+    }
     if (options.port) {
       args.push("--port", options.port.toString());
     }
