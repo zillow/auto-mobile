@@ -140,7 +140,7 @@ fun LayoutInspectorDashboard(
                 when (val result = dataSource.getObservation()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
                         val observation = result.data
-                        state.updateHierarchy(observation.hierarchy)
+                        state.updateHierarchy(observation.hierarchy, observation.rotation)
                         observation.screenshotData?.let { screenshot ->
                             state.updateScreenshot(
                                 data = screenshot,
@@ -206,6 +206,7 @@ fun LayoutInspectorDashboard(
                 screenshotData = state.screenshotData,
                 screenWidth = state.screenWidth,
                 screenHeight = state.screenHeight,
+                rotation = state.rotation,
                 hierarchy = state.hierarchy,
                 selectedElementId = state.selectedElementId,
                 hoveredElementId = state.hoveredElementId,

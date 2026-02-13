@@ -930,11 +930,14 @@ export class XCTestServiceClient extends DeviceServiceClient implements XCTestSe
         return { success: false, error: result.error || "No screenshot data" };
       }
 
-      // Cache screen dimensions from hierarchy if available
+      // Cache screen dimensions from hierarchy if available.
+      // screenWidth/screenHeight are in iOS points — multiply by screenScale to get pixels,
+      // matching the screenshot image resolution and the TakeScreenshot path (which reads PNG header pixels).
       if (this.cachedHierarchy?.hierarchy?.screenWidth && this.cachedHierarchy?.hierarchy?.screenHeight) {
+        const scale = this.cachedHierarchy.hierarchy.screenScale ?? 1;
         this.cachedScreenDimensions = {
-          width: this.cachedHierarchy.hierarchy.screenWidth,
-          height: this.cachedHierarchy.hierarchy.screenHeight
+          width: Math.round(this.cachedHierarchy.hierarchy.screenWidth * scale),
+          height: Math.round(this.cachedHierarchy.hierarchy.screenHeight * scale),
         };
       }
 

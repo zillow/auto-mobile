@@ -508,15 +508,21 @@ export class RealObserveScreen implements ObserveScreen {
         // Collect view hierarchy (fast via XCTestService WebSocket)
         await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
 
-        // Extract screen size from root node bounds (avoids slow axe describe-ui call ~187ms)
-        // Root XCUIApplication bounds like "[0,0][402,874]" give us width=402, height=874
+        // Extract screen size from hierarchy
         {
           const extractedSize = this.extractScreenSizeFromHierarchy(result.viewHierarchy);
           if (extractedSize) {
             result.screenSize = extractedSize;
             logger.debug(`[iOS] Extracted screen size from hierarchy: ${extractedSize.width}x${extractedSize.height}`);
+          } else if (result.viewHierarchy?.screenWidth && result.viewHierarchy?.screenHeight) {
+            // Fallback to screenWidth/screenHeight from XCTestService (logical points)
+            result.screenSize = {
+              width: result.viewHierarchy.screenWidth,
+              height: result.viewHierarchy.screenHeight
+            };
+            logger.debug(`[iOS] Using screen size from XCTestService: ${result.screenSize.width}x${result.screenSize.height}`);
           } else {
-            logger.warn("[iOS] Failed to extract screen size from hierarchy root bounds");
+            logger.warn("[iOS] Failed to extract screen size from hierarchy");
           }
         }
 
@@ -613,34 +619,36 @@ export class RealObserveScreen implements ObserveScreen {
 
   /**
    * Extract screen size from view hierarchy root node bounds.
-   * The root node (XCUIApplication) bounds represent the full screen dimensions.
-   * Format: "[left,top][right,bottom]" e.g., "[0,0][402,874]"
+   * Supports both Android format ("[left,top][right,bottom]") and iOS format ({left, top, right, bottom}).
    * @param viewHierarchy - View hierarchy result
    * @returns Screen size or null if unable to extract
    */
   private extractScreenSizeFromHierarchy(viewHierarchy: ObserveResult["viewHierarchy"]): { width: number; height: number } | null {
+    // Android format: hierarchy.node.$.bounds = "[0,0][402,874]"
     const rootNode = viewHierarchy?.hierarchy?.node;
-    if (!rootNode?.$?.bounds) {
-      return null;
+    if (rootNode?.$?.bounds) {
+      const boundsStr = rootNode.$.bounds;
+      const match = boundsStr.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
+      if (match) {
+        const width = parseInt(match[3], 10) - parseInt(match[1], 10);
+        const height = parseInt(match[4], 10) - parseInt(match[2], 10);
+        if (width > 0 && height > 0) {
+          return { width, height };
+        }
+      }
     }
 
-    const boundsStr = rootNode.$.bounds;
-    const match = boundsStr.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
-    if (!match) {
-      return null;
-    }
-
-    const left = parseInt(match[1], 10);
-    const top = parseInt(match[2], 10);
-    const right = parseInt(match[3], 10);
-    const bottom = parseInt(match[4], 10);
-
-    // Root should start at 0,0 - width and height are right-left, bottom-top
-    const width = right - left;
-    const height = bottom - top;
-
-    if (width > 0 && height > 0) {
-      return { width, height };
+    // iOS format: hierarchy is the root XCTestNode with bounds as {left, top, right, bottom}
+    const iosHierarchy = viewHierarchy?.hierarchy as any;
+    if (iosHierarchy?.bounds && typeof iosHierarchy.bounds === "object" && !Array.isArray(iosHierarchy.bounds)) {
+      const { left, top, right, bottom } = iosHierarchy.bounds;
+      if (typeof right === "number" && typeof bottom === "number") {
+        const width = right - (left ?? 0);
+        const height = bottom - (top ?? 0);
+        if (width > 0 && height > 0) {
+          return { width, height };
+        }
+      }
     }
 
     return null;

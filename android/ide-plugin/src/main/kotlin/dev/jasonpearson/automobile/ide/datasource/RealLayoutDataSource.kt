@@ -74,6 +74,7 @@ class RealLayoutDataSource(
                     screenWidth = observeResult.screenSize?.width ?: 1080,
                     screenHeight = observeResult.screenSize?.height ?: 2340,
                     timestamp = observeResult.updatedAt ?: System.currentTimeMillis(),
+                    rotation = observeResult.rotation ?: 0,
                 )
             )
         } catch (e: McpConnectionException) {

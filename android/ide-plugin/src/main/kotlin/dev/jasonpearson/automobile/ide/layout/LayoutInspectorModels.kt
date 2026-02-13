@@ -194,6 +194,8 @@ data class ParsedHierarchy(
     val root: UIElementInfo,
     val elementMap: Map<String, UIElementInfo>,
     val parentMap: Map<String, String>,
+    /** Display rotation: 0=portrait, 1=landscape 90deg, 2=reverse portrait, 3=reverse landscape */
+    val rotation: Int = 0,
 )
 
 /**

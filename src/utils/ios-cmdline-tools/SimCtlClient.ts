@@ -301,9 +301,9 @@ function normalizeIosVersion(runtimeId: string | undefined, osVersion: string | 
 
 export interface SimulatorList {
   devices: { [runtimeId: string]: AppleDevice[] };
-  pairs: any;
-  runtimes: AppleDeviceRuntime[];
-  devicetypes: AppleDeviceType[];
+  pairs?: any;
+  runtimes?: AppleDeviceRuntime[];
+  devicetypes?: AppleDeviceType[];
 }
 
 export class SimCtlClient implements SimCtl {
@@ -669,7 +669,7 @@ export class SimCtlClient implements SimCtl {
    */
   async getDeviceTypes(): Promise<AppleDeviceType[]> {
     const simulatorList = await this.listSimulators();
-    return simulatorList.devicetypes;
+    return simulatorList.devicetypes ?? [];
   }
 
   /**
@@ -678,7 +678,7 @@ export class SimCtlClient implements SimCtl {
    */
   async getRuntimes(): Promise<AppleDeviceRuntime[]> {
     const simulatorList = await this.listSimulators();
-    return simulatorList.runtimes.filter(runtime => runtime.isAvailable);
+    return (simulatorList.runtimes ?? []).filter(runtime => runtime.isAvailable);
   }
 
   /**

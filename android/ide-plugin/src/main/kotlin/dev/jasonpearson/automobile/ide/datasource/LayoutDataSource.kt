@@ -11,6 +11,8 @@ data class ObservationData(
     val screenWidth: Int = 1080,
     val screenHeight: Int = 2340,
     val timestamp: Long = System.currentTimeMillis(),
+    /** Display rotation: 0=portrait, 1=landscape 90deg, 2=reverse portrait, 3=reverse landscape */
+    val rotation: Int = 0,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -19,7 +21,8 @@ data class ObservationData(
             screenshotData.contentEquals(other.screenshotData) &&
             screenWidth == other.screenWidth &&
             screenHeight == other.screenHeight &&
-            timestamp == other.timestamp
+            timestamp == other.timestamp &&
+            rotation == other.rotation
     }
 
     override fun hashCode(): Int {
@@ -28,6 +31,7 @@ data class ObservationData(
         result = 31 * result + screenWidth
         result = 31 * result + screenHeight
         result = 31 * result + timestamp.hashCode()
+        result = 31 * result + rotation
         return result
     }
 }

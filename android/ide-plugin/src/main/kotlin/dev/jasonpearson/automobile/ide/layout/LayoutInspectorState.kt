@@ -36,6 +36,10 @@ class LayoutInspectorState {
     var screenHeight by mutableStateOf(2340)
         private set
 
+    /** Display rotation: 0=portrait, 1=landscape 90deg, 2=reverse portrait, 3=reverse landscape */
+    var rotation by mutableStateOf(0)
+        private set
+
     var lastScreenshotTimestamp by mutableStateOf(0L)
         private set
 
@@ -164,8 +168,8 @@ class LayoutInspectorState {
      * Builds indexes internally. For the streaming path, prefer
      * [applyHierarchyUpdate] with a pre-computed [ParsedHierarchy].
      */
-    fun updateHierarchy(newHierarchy: UIElementInfo) {
-        val parsed = buildParsedHierarchy(newHierarchy)
+    fun updateHierarchy(newHierarchy: UIElementInfo, newRotation: Int = 0) {
+        val parsed = buildParsedHierarchy(newHierarchy).copy(rotation = newRotation)
         val changedIds = computeChangedElements(currentElementMap, parsed.elementMap)
         applyHierarchyUpdate(parsed, changedIds)
     }
@@ -177,6 +181,7 @@ class LayoutInspectorState {
     fun applyHierarchyUpdate(parsed: ParsedHierarchy, changedIds: Set<String>) {
         changedElementIds = changedIds
         currentParsedHierarchy = parsed
+        rotation = parsed.rotation
 
         // Clear selection if the selected element no longer exists — O(1) map check
         val currentSelectedId = selectedElementId
@@ -264,6 +269,7 @@ class LayoutInspectorState {
         streamingMode = StreamingMode.Paused
         screenshotData = null
         currentParsedHierarchy = null
+        rotation = 0
         selectedElementId = null
         selectedElement = null
         hoveredElementId = null

@@ -104,6 +104,8 @@ data class ObserveResult(
     val updatedAt: Long? = null,
     val screenSize: ObserveScreenSize? = null,
     val viewHierarchy: JsonElement? = null,
+    /** Display rotation: 0=portrait, 1=landscape 90deg, 2=reverse portrait, 3=reverse landscape */
+    val rotation: Int? = null,
 )
 
 @Serializable

@@ -222,4 +222,44 @@ describe("Simctl", function() {
       expect(unavailable?.iosVersion).toBe("17.4");
     });
   });
+
+  describe("getRuntimes with missing runtimes field", function() {
+    test("should return empty array when simctl JSON has no runtimes field", async function() {
+      // Xcode 26.2 returns only {devices: {...}} from `xcrun simctl list devices --json`
+      mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
+        if (file === "xcrun" && args.includes("--json")) {
+          return createExecResult(JSON.stringify({
+            devices: {
+              "com.apple.CoreSimulator.SimRuntime.iOS-26-2": [
+                {
+                  name: "iPad Pro 13-inch (M5)",
+                  udid: "9C9EB557-D6B4-472E-8CF4-F1E0174A63C3",
+                  state: "Booted",
+                  isAvailable: true
+                }
+              ]
+            }
+          }), "");
+        }
+        return createExecResult("", "");
+      };
+
+      simctl = new Simctl(null, mockExecAsync);
+      const runtimes = await simctl.getRuntimes();
+      expect(runtimes).toEqual([]);
+    });
+
+    test("should return empty array from getDeviceTypes when field is missing", async function() {
+      mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
+        if (file === "xcrun" && args.includes("--json")) {
+          return createExecResult(JSON.stringify({ devices: {} }), "");
+        }
+        return createExecResult("", "");
+      };
+
+      simctl = new Simctl(null, mockExecAsync);
+      const types = await simctl.getDeviceTypes();
+      expect(types).toEqual([]);
+    });
+  });
 });

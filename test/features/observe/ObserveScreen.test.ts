@@ -448,4 +448,60 @@ describe("ObserveScreen", function() {
       expect(parsed.screenSize.height).toBe(result.screenSize.height);
     });
   });
+
+  describe("extractScreenSizeFromHierarchy", function() {
+    let observeScreen: RealObserveScreen;
+
+    beforeAll(function() {
+      RealObserveScreen.clearCache();
+      observeScreen = new RealObserveScreen(
+        { deviceId: "test", name: "Test", platform: "android" },
+        new FakeAdbExecutor()
+      );
+    });
+
+    const extract = (viewHierarchy: any) =>
+      (observeScreen as any).extractScreenSizeFromHierarchy(viewHierarchy);
+
+    test("should extract from Android-style bounds string", function() {
+      const result = extract({
+        hierarchy: {
+          node: { $: { bounds: "[0,0][1080,2400]" } }
+        }
+      });
+      expect(result).toEqual({ width: 1080, height: 2400 });
+    });
+
+    test("should extract from iOS-style bounds object", function() {
+      const result = extract({
+        hierarchy: {
+          bounds: { left: 0, top: 0, right: 1032, bottom: 1376 },
+          className: "XCUIApplication"
+        }
+      });
+      expect(result).toEqual({ width: 1032, height: 1376 });
+    });
+
+    test("should handle iOS bounds with non-zero origin", function() {
+      const result = extract({
+        hierarchy: {
+          bounds: { left: 10, top: 20, right: 410, bottom: 820 },
+          className: "XCUIApplication"
+        }
+      });
+      expect(result).toEqual({ width: 400, height: 800 });
+    });
+
+    test("should return null for missing hierarchy", function() {
+      expect(extract(undefined)).toBeNull();
+      expect(extract({})).toBeNull();
+      expect(extract({ hierarchy: {} })).toBeNull();
+    });
+
+    test("should return null for zero-dimension bounds", function() {
+      expect(extract({
+        hierarchy: { bounds: { left: 0, top: 0, right: 0, bottom: 0 } }
+      })).toBeNull();
+    });
+  });
 });

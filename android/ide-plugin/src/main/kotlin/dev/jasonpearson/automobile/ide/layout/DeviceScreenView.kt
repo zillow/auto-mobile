@@ -70,6 +70,65 @@ import kotlin.math.roundToInt
 
 private val IS_MAC = System.getProperty("os.name", "").contains("Mac", ignoreCase = true)
 
+/**
+ * Transform element bounds from the original (unrotated) hierarchy coordinate system
+ * to the rotated display coordinate system.
+ *
+ * @param bounds Original bounds in hierarchy coordinates
+ * @param rotation Device rotation (0=portrait, 1=landscape 270°CW, 2=reverse, 3=landscape 90°CW)
+ * @param rootWidth Width of the root element in hierarchy coordinates (unrotated)
+ * @param rootHeight Height of the root element in hierarchy coordinates (unrotated)
+ * @return Transformed bounds as (left, top, width, height) in rotated coordinates
+ */
+private fun transformBoundsForRotation(
+    bounds: ElementBounds,
+    rotation: Int,
+    rootWidth: Int,
+    rootHeight: Int,
+): FloatArray {
+    // Returns [left, top, width, height] in the rotated coordinate space
+    return when (rotation) {
+        1 -> {
+            // Landscape (home button on right): rotate 270° CW
+            // Original (x, y) -> rotated (y, rootWidth - x - width)
+            floatArrayOf(
+                bounds.top.toFloat(),
+                (rootWidth - bounds.right).toFloat(),
+                bounds.height.toFloat(),
+                bounds.width.toFloat(),
+            )
+        }
+        2 -> {
+            // Reverse portrait: rotate 180°
+            floatArrayOf(
+                (rootWidth - bounds.right).toFloat(),
+                (rootHeight - bounds.bottom).toFloat(),
+                bounds.width.toFloat(),
+                bounds.height.toFloat(),
+            )
+        }
+        3 -> {
+            // Reverse landscape (home button on left): rotate 90° CW
+            // Original (x, y) -> rotated (rootHeight - y - height, x)
+            floatArrayOf(
+                (rootHeight - bounds.bottom).toFloat(),
+                bounds.left.toFloat(),
+                bounds.height.toFloat(),
+                bounds.width.toFloat(),
+            )
+        }
+        else -> {
+            // No rotation
+            floatArrayOf(
+                bounds.left.toFloat(),
+                bounds.top.toFloat(),
+                bounds.width.toFloat(),
+                bounds.height.toFloat(),
+            )
+        }
+    }
+}
+
 private fun PointerEvent.isZoomModifierPressed(): Boolean =
     if (IS_MAC) keyboardModifiers.isMetaPressed else keyboardModifiers.isCtrlPressed
 
@@ -88,6 +147,7 @@ fun DeviceScreenView(
     screenshotData: ByteArray?,
     screenWidth: Int,
     screenHeight: Int,
+    rotation: Int = 0,
     hierarchy: UIElementInfo?,
     selectedElementId: String?,
     hoveredElementId: String?,
@@ -119,17 +179,84 @@ fun DeviceScreenView(
     var prevViewportWidth by remember { mutableFloatStateOf(0f) }
     var prevViewportHeight by remember { mutableFloatStateOf(0f) }
 
-    // Decode screenshot to ImageBitmap
-    val imageBitmap = remember(screenshotData) {
+    // Decode raw screenshot without rotation
+    val rawBitmap = remember(screenshotData) {
         screenshotData?.let {
             try {
-                val skiaImage = Image.makeFromEncoded(it)
-                skiaImage.toComposeImageBitmap()
+                Image.makeFromEncoded(it).toComposeImageBitmap()
             } catch (e: Exception) {
                 null
             }
         }
     }
+
+    // Detect rotation needed to align the screenshot with the hierarchy coordinate system.
+    // iOS screenshots may arrive in native pixel orientation (portrait) even when
+    // the device is in landscape, while hierarchy bounds are in display orientation.
+    // We rotate the screenshot to match the hierarchy so text reads correctly.
+    val screenshotRotation = remember(rawBitmap, hierarchy, rotation) {
+        // If the server explicitly reports rotation, use that
+        if (rotation != 0) return@remember rotation
+
+        // Auto-detect from screenshot vs hierarchy dimension mismatch
+        val imgW = rawBitmap?.width ?: 0
+        val imgH = rawBitmap?.height ?: 0
+        val rootW = hierarchy?.bounds?.width ?: 0
+        val rootH = hierarchy?.bounds?.height ?: 0
+        if (imgW <= 0 || imgH <= 0 || rootW <= 0 || rootH <= 0) return@remember 0
+
+        val imageIsPortrait = imgH > imgW
+        val boundsIsPortrait = rootH > rootW
+
+        if (imageIsPortrait && !boundsIsPortrait) {
+            // Portrait screenshot, landscape bounds → rotate 90° CW to landscape
+            3
+        } else if (!imageIsPortrait && boundsIsPortrait) {
+            // Landscape screenshot, portrait bounds → rotate 270° CW to portrait
+            1
+        } else {
+            0
+        }
+    }
+
+    // Apply rotation to align the screenshot with the hierarchy coordinate system.
+    // After this, the image orientation matches the hierarchy bounds so overlays
+    // and hit testing can use direct coordinate mapping without transformation.
+    val imageBitmap = remember(rawBitmap, screenshotRotation, screenshotData) {
+        val original = rawBitmap ?: return@remember null
+        if (screenshotRotation == 0) return@remember original
+
+        val angleDegrees = when (screenshotRotation) {
+            1 -> 270f
+            2 -> 180f
+            3 -> 90f
+            else -> return@remember original
+        }
+
+        try {
+            val w = original.width
+            val h = original.height
+            val swapDims = screenshotRotation == 1 || screenshotRotation == 3
+            val newW = if (swapDims) h else w
+            val newH = if (swapDims) w else h
+
+            val skiaImage = Image.makeFromEncoded(screenshotData!!)
+            val surface = org.jetbrains.skia.Surface.makeRasterN32Premul(newW, newH)
+            val canvas = surface.canvas
+            canvas.translate(newW / 2f, newH / 2f)
+            canvas.rotate(angleDegrees)
+            canvas.translate(-w / 2f, -h / 2f)
+            canvas.drawImage(skiaImage, 0f, 0f)
+            surface.makeImageSnapshot().toComposeImageBitmap()
+        } catch (e: Exception) {
+            original
+        }
+    }
+
+    // Screenshot has been rotated to match hierarchy, so no bounds rotation is needed.
+    // All overlay and hit testing code uses identity transforms (boundsRotation=0).
+    val boundsRotation = 0
+    val isLandscape = false
 
     // Find selected and hovered elements — O(1) map lookups instead of DFS
     val selectedElement = remember(elementMap, selectedElementId) {
@@ -216,11 +343,16 @@ fun DeviceScreenView(
             // Scale factor from frame pixels to device pixels (for aspect ratio calculations only)
             val frameToDeviceScale = if (frameWidthPx > 0) effectiveWidth.toFloat() / frameWidthPx else 1f
 
-            // Scale factor from frame pixels to hierarchy bounds coordinates (for hit testing).
-            // Hierarchy bounds may differ from image pixels (e.g. iOS points vs pixels),
-            // so we use the root element bounds width — matching the overlay drawing scale.
+            // When the image is rotated, the hierarchy's width/height are in the original
+            // (unrotated) coordinate system. After rotation, the frame width corresponds
+            // to the hierarchy's height (for rotation 1/3) or width (for rotation 0/2).
             val rootBoundsWidth = hierarchy?.bounds?.width ?: effectiveWidth
-            val frameToHierarchyScale = if (frameWidthPx > 0) rootBoundsWidth.toFloat() / frameWidthPx else 1f
+            val rootBoundsHeight = hierarchy?.bounds?.height ?: effectiveHeight
+            // The "rotated root width" is the root dimension that maps to the frame width
+            val rotatedRootWidth = if (isLandscape) rootBoundsHeight else rootBoundsWidth
+
+            // Scale factor from frame pixels to hierarchy bounds coordinates (for hit testing).
+            val frameToHierarchyScale = if (frameWidthPx > 0) rotatedRootWidth.toFloat() / frameWidthPx else 1f
 
             // Reset fit state when refitTrigger changes (e.g., panels toggled)
             LaunchedEffect(refitTrigger) {
@@ -286,11 +418,38 @@ fun DeviceScreenView(
 
             // Convert screen coordinates to hierarchy bounds coordinates (for hit testing).
             // Uses the same coordinate system as element.bounds so findElementAt works correctly.
+            // When the screenshot is rotated, we reverse the rotation to get back to
+            // the original hierarchy coordinate system.
             fun screenToHierarchyCoords(screenX: Float, screenY: Float): Pair<Int, Int> {
                 val frameX = (screenX - offsetX) / scale
                 val frameY = (screenY - offsetY) / scale
-                val hierX = (frameX * frameToHierarchyScale).roundToInt()
-                val hierY = (frameY * frameToHierarchyScale).roundToInt()
+                // frameX/frameY are in the rotated display space — convert back to hierarchy space
+                val hierX: Int
+                val hierY: Int
+                when (boundsRotation) {
+                    1 -> {
+                        // Reverse of: rotated(x,y) = (origY, rootW - origX)
+                        // So: origX = rootW - frameY*scale, origY = frameX*scale
+                        val s = frameToHierarchyScale
+                        hierX = (rootBoundsWidth - (frameY * s)).roundToInt()
+                        hierY = (frameX * s).roundToInt()
+                    }
+                    2 -> {
+                        val s = frameToHierarchyScale
+                        hierX = (rootBoundsWidth - (frameX * s)).roundToInt()
+                        hierY = (rootBoundsHeight - (frameY * s)).roundToInt()
+                    }
+                    3 -> {
+                        // Reverse of: rotated(x,y) = (rootH - origY, origX)
+                        val s = frameToHierarchyScale
+                        hierX = (frameY * s).roundToInt()
+                        hierY = (rootBoundsHeight - (frameX * s)).roundToInt()
+                    }
+                    else -> {
+                        hierX = (frameX * frameToHierarchyScale).roundToInt()
+                        hierY = (frameY * frameToHierarchyScale).roundToInt()
+                    }
+                }
                 return hierX to hierY
             }
 
@@ -391,93 +550,86 @@ fun DeviceScreenView(
                                     // - iOS points (logical pixels, need scaling by screen scale factor)
                                     // - Android pixels (device pixels, match screenshot directly)
                                     //
-                                    // We use the root element bounds to calculate the correct scale.
-                                    // The root bounds represent the full screen in the hierarchy's coordinate system,
-                                    // so scaling from root bounds to frame width handles both iOS and Android.
-                                    val imageWidth = imageBitmap.width
-                                    val rootBoundsWidth = hierarchy?.bounds?.width ?: imageWidth
-                                    val boundsToFrameScale = if (rootBoundsWidth > 0) size.width / rootBoundsWidth.toFloat() else 1f
+                                    // When rotated, the frame width corresponds to the rotated root dimension.
+                                    // We use rotatedRootWidth (computed above) so overlays align with the rotated screenshot.
+                                    val boundsToFrameScale = if (rotatedRootWidth > 0) size.width / rotatedRootWidth.toFloat() else 1f
+
+                                    // Helper to get scaled overlay rect from element bounds,
+                                    // applying rotation transform before scaling.
+                                    fun overlayRect(bounds: ElementBounds): FloatArray {
+                                        val t = transformBoundsForRotation(bounds, boundsRotation, rootBoundsWidth, rootBoundsHeight)
+                                        // t = [left, top, width, height] in rotated coords
+                                        return floatArrayOf(
+                                            t[0] * boundsToFrameScale,
+                                            t[1] * boundsToFrameScale,
+                                            t[2] * boundsToFrameScale,
+                                            t[3] * boundsToFrameScale,
+                                        )
+                                    }
 
                                     // Draw element overlays
                                     // Hovered element (gray)
                                     if (hoveredElement != null && hoveredElement.id != selectedElementId) {
-                                        val bounds = hoveredElement.bounds
-                                        val scaledLeft = bounds.left * boundsToFrameScale
-                                        val scaledTop = bounds.top * boundsToFrameScale
-                                        val scaledWidth = bounds.width * boundsToFrameScale
-                                        val scaledHeight = bounds.height * boundsToFrameScale
+                                        val r = overlayRect(hoveredElement.bounds)
                                         drawRect(
                                             color = Color.Gray.copy(alpha = 0.5f),
-                                            topLeft = Offset(scaledLeft, scaledTop),
-                                            size = Size(scaledWidth, scaledHeight),
+                                            topLeft = Offset(r[0], r[1]),
+                                            size = Size(r[2], r[3]),
                                             style = Stroke(width = 2f),
                                         )
                                     }
 
                                     // Selected element (blue)
                                     if (selectedElement != null) {
-                                        val bounds = selectedElement.bounds
-                                        val scaledLeft = bounds.left * boundsToFrameScale
-                                        val scaledTop = bounds.top * boundsToFrameScale
-                                        val scaledWidth = bounds.width * boundsToFrameScale
-                                        val scaledHeight = bounds.height * boundsToFrameScale
+                                        val r = overlayRect(selectedElement.bounds)
                                         drawRect(
                                             color = Color(0xFF2196F3),
-                                            topLeft = Offset(scaledLeft, scaledTop),
-                                            size = Size(scaledWidth, scaledHeight),
+                                            topLeft = Offset(r[0], r[1]),
+                                            size = Size(r[2], r[3]),
                                             style = Stroke(width = 3f),
                                         )
                                         // Fill with semi-transparent blue
                                         drawRect(
                                             color = Color(0xFF2196F3).copy(alpha = 0.1f),
-                                            topLeft = Offset(scaledLeft, scaledTop),
-                                            size = Size(scaledWidth, scaledHeight),
+                                            topLeft = Offset(r[0], r[1]),
+                                            size = Size(r[2], r[3]),
                                         )
                                     }
 
                                     // Flash element highlight (yellow/gold flash on double-click)
                                     if (flashElement != null && flashAlpha > 0f) {
-                                        val bounds = flashElement.bounds
-                                        val scaledLeft = bounds.left * boundsToFrameScale
-                                        val scaledTop = bounds.top * boundsToFrameScale
-                                        val scaledWidth = bounds.width * boundsToFrameScale
-                                        val scaledHeight = bounds.height * boundsToFrameScale
+                                        val r = overlayRect(flashElement.bounds)
                                         // Draw bright yellow border
                                         drawRect(
                                             color = Color(0xFFFFD700).copy(alpha = flashAlpha),
-                                            topLeft = Offset(scaledLeft, scaledTop),
-                                            size = Size(scaledWidth, scaledHeight),
+                                            topLeft = Offset(r[0], r[1]),
+                                            size = Size(r[2], r[3]),
                                             style = Stroke(width = 4f),
                                         )
                                         // Fill with semi-transparent yellow
                                         drawRect(
                                             color = Color(0xFFFFD700).copy(alpha = flashAlpha * 0.3f),
-                                            topLeft = Offset(scaledLeft, scaledTop),
-                                            size = Size(scaledWidth, scaledHeight),
+                                            topLeft = Offset(r[0], r[1]),
+                                            size = Size(r[2], r[3]),
                                         )
                                     }
 
                                     // Non-compliant tap targets (orange/red)
                                     if (showTapTargetIssues) {
                                         for (element in nonCompliantElements) {
-                                            val bounds = element.bounds
-                                            val scaledLeft = bounds.left * boundsToFrameScale
-                                            val scaledTop = bounds.top * boundsToFrameScale
-                                            val scaledWidth = bounds.width * boundsToFrameScale
-                                            val scaledHeight = bounds.height * boundsToFrameScale
-
+                                            val r = overlayRect(element.bounds)
                                             // Draw orange border
                                             drawRect(
                                                 color = Color(0xFFFF6B00),
-                                                topLeft = Offset(scaledLeft, scaledTop),
-                                                size = Size(scaledWidth, scaledHeight),
+                                                topLeft = Offset(r[0], r[1]),
+                                                size = Size(r[2], r[3]),
                                                 style = Stroke(width = 2f),
                                             )
                                             // Fill with semi-transparent orange
                                             drawRect(
                                                 color = Color(0xFFFF6B00).copy(alpha = 0.15f),
-                                                topLeft = Offset(scaledLeft, scaledTop),
-                                                size = Size(scaledWidth, scaledHeight),
+                                                topLeft = Offset(r[0], r[1]),
+                                                size = Size(r[2], r[3]),
                                             )
                                         }
                                     }

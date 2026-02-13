@@ -29,7 +29,11 @@ fun parseHierarchyFromJson(hierarchyJson: JsonElement): ParsedHierarchy? {
         val parentMap = mutableMapOf<String, String>()
 
         val root = parseNodeElement(nodeElement, 0, 0, elementMap, parentMap) ?: return null
-        ParsedHierarchy(root = root, elementMap = elementMap, parentMap = parentMap)
+
+        // Extract rotation from the ViewHierarchyResult data
+        val rotation = (jsonObj["rotation"] as? JsonPrimitive)?.intOrNull ?: 0
+
+        ParsedHierarchy(root = root, elementMap = elementMap, parentMap = parentMap, rotation = rotation)
     } catch (e: Exception) {
         log.warn("Failed to parse hierarchy JSON: ${e.message}", e)
         null
