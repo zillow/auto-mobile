@@ -60,7 +60,7 @@ export class DaemonManager {
     try {
       // Use ps to find all auto-mobile daemon processes for current user
       const psOutput = execSync(
-        `ps aux | grep -E "bun.*auto-mobile.*--daemon-mode|bun.*dist/src/index.js --daemon-mode" | grep -v grep`,
+        `ps aux | grep -E "auto-mobile.*--daemon-mode|dist/src/index.js --daemon-mode" | grep -v grep`,
         { encoding: "utf-8" }
       );
 
@@ -151,11 +151,12 @@ export class DaemonManager {
     // Resolve the current binary so the daemon uses the same version,
     // even when invoked via npx (where "auto-mobile" may not be on PATH).
     // process.argv[1] is the entry script (e.g. dist/src/index.js).
+    // Falls back to npx to avoid requiring a global npm install.
     const entryScript = process.argv[1];
-    const autoMobileCmd = entryScript ? process.execPath : "auto-mobile";
+    const autoMobileCmd = entryScript ? process.execPath : "npx";
 
     // Start daemon as detached process
-    const args = entryScript ? [entryScript, "--daemon-mode"] : ["--daemon-mode"];
+    const args = entryScript ? [entryScript, "--daemon-mode"] : ["-y", "@kaeawc/auto-mobile@latest", "--daemon-mode"];
     if (options.port) {
       args.push("--port", options.port.toString());
     }
@@ -482,7 +483,7 @@ export async function runDaemonCommand(
               console.log(`  - PID ${pid}`);
             }
             console.log(
-              `\nThese can cause device pool conflicts. Run 'auto-mobile --daemon restart' to stop them.`
+              `\nThese can cause device pool conflicts. Run 'npx -y @kaeawc/auto-mobile@latest --daemon restart' to stop them.`
             );
           }
         } else {

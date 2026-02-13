@@ -282,8 +282,8 @@ internal object DaemonSocketPaths {
   }
 
   private fun buildDaemonCommand(subCommand: String): List<String> {
-    // Use auto-mobile CLI directly - must be on PATH
-    return listOf("auto-mobile", "--daemon", subCommand)
+    // Use npx to avoid requiring a global npm install of auto-mobile
+    return listOf("npx", "-y", "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
   }
 
   private fun getUserId(): String {

@@ -47,14 +47,14 @@ export async function checkDaemonStatus(): Promise<CheckResult> {
       name: "Daemon Status",
       status: "warn",
       message: "Daemon is not running",
-      recommendation: "Start the daemon with: auto-mobile --daemon start",
+      recommendation: "Start the daemon with: npx -y @kaeawc/auto-mobile@latest --daemon start",
     };
   } catch (error) {
     return {
       name: "Daemon Status",
       status: "warn",
       message: `Could not check daemon: ${error instanceof Error ? error.message : String(error)}`,
-      recommendation: "Try: auto-mobile --daemon start",
+      recommendation: "Try: npx -y @kaeawc/auto-mobile@latest --daemon start",
     };
   }
 }
@@ -86,7 +86,7 @@ export async function checkDaemonConnectivity(): Promise<CheckResult> {
       name: "Daemon Connectivity",
       status: "warn",
       message: "Daemon running but not responding",
-      recommendation: report.recommendations.join("; ") || "Try: auto-mobile --daemon restart",
+      recommendation: report.recommendations.join("; ") || "Try: npx -y @kaeawc/auto-mobile@latest --daemon restart",
     };
   } catch (error) {
     return {
@@ -283,7 +283,7 @@ export async function checkWorkProfileAccessibility(
       name: "Work Profile Accessibility",
       status: "warn",
       message: `Accessibility service not enabled for work profile(s): ${profileList}`,
-      recommendation: "The accessibility service needs to be enabled in each work profile for full app install tracking. Run auto-mobile doctor or enable manually in Settings > Accessibility.",
+      recommendation: "The accessibility service needs to be enabled in each work profile for full app install tracking. Run npx -y @kaeawc/auto-mobile@latest --cli doctor or enable manually in Settings > Accessibility.",
     };
   } catch (error) {
     logger.debug(`Work profile accessibility check failed: ${error}`);

@@ -105,7 +105,7 @@ async function ensureDaemonRunning(timeout: number = 10000): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     throw new ActionableError(
       `Failed to start daemon: ${message}. ` +
-      `Try running: auto-mobile --daemon restart`
+      `Try running: npx -y @kaeawc/auto-mobile@latest --daemon restart`
     );
   }
 }
@@ -128,7 +128,7 @@ async function runToolViaDaemon(
     if (result === null) {
       throw new ActionableError(
         "Daemon returned null result. This may indicate a daemon connectivity issue. " +
-        "Try: auto-mobile --daemon restart"
+        "Try: npx -y @kaeawc/auto-mobile@latest --daemon restart"
       );
     }
     return result;
@@ -345,16 +345,16 @@ function showHelp(): void {
 AutoMobile CLI - Android Device Automation
 
 Usage:
-  auto-mobile --cli [--session-uuid <uuid>] <tool-name> [--param value ...]
-  auto-mobile --cli help [tool-name]
+  npx -y @kaeawc/auto-mobile@latest --cli [--session-uuid <uuid>] <tool-name> [--param value ...]
+  npx -y @kaeawc/auto-mobile@latest --cli help [tool-name]
 
 Examples:
-  auto-mobile --cli listDeviceImages
-  auto-mobile --cli observe
-  auto-mobile --cli tapOn --text "Submit"
-  auto-mobile --cli startDevice --avdName "pixel_7_api_34"
-  auto-mobile --cli --session-uuid abc-123-uuid observe
-  auto-mobile --cli --session-uuid $SESSION_UUID tapOn --text "Submit"
+  npx -y @kaeawc/auto-mobile@latest --cli listDeviceImages
+  npx -y @kaeawc/auto-mobile@latest --cli observe
+  npx -y @kaeawc/auto-mobile@latest --cli tapOn --text "Submit"
+  npx -y @kaeawc/auto-mobile@latest --cli startDevice --avdName "pixel_7_api_34"
+  npx -y @kaeawc/auto-mobile@latest --cli --session-uuid abc-123-uuid observe
+  npx -y @kaeawc/auto-mobile@latest --cli --session-uuid $SESSION_UUID tapOn --text "Submit"
 
 Options:
   help [tool-name]              Show help for a specific tool
@@ -426,7 +426,7 @@ Session-based Execution:
   });
 
   console.log(`\nTotal: ${tools.length} tools available`);
-  console.log("\nUse 'auto-mobile --cli help <tool-name>' for detailed information about a specific tool.");
+  console.log("\nUse 'npx -y @kaeawc/auto-mobile@latest --cli help <tool-name>' for detailed information about a specific tool.");
 }
 
 // Show help for a specific tool
@@ -434,7 +434,7 @@ function showToolHelp(toolName: string): void {
   const tool = ToolRegistry.getTool(toolName);
   if (!tool) {
     console.error(`Unknown tool: ${toolName}`);
-    console.log("\nUse 'auto-mobile --cli help' to see available tools.");
+    console.log("\nUse 'npx -y @kaeawc/auto-mobile@latest --cli help' to see available tools.");
     return;
   }
 
@@ -471,5 +471,5 @@ function showToolHelp(toolName: string): void {
   }
 
   console.log(`\nExample usage:`);
-  console.log(`  auto-mobile --cli ${toolName} [parameters...]`);
+  console.log(`  npx -y @kaeawc/auto-mobile@latest --cli ${toolName} [parameters...]`);
 }

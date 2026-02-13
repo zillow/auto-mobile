@@ -2167,18 +2167,14 @@ detect_ide_plugins_dir() {
 }
 
 resolve_auto_mobile_command() {
-    if command_exists auto-mobile; then
-        AUTO_MOBILE_CMD=("auto-mobile")
+    # Prefer npx/bunx over global install to avoid requiring npm install -g
+    if command_exists npx; then
+        AUTO_MOBILE_CMD=("npx" "-y" "@kaeawc/auto-mobile@latest")
         return 0
     fi
 
     if command_exists bunx; then
         AUTO_MOBILE_CMD=("bunx" "-y" "@kaeawc/auto-mobile@latest")
-        return 0
-    fi
-
-    if command_exists npx; then
-        AUTO_MOBILE_CMD=("npx" "-y" "@kaeawc/auto-mobile@latest")
         return 0
     fi
 
