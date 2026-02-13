@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.0.13] - 2026-02-13
+### Other
+- Add CI checks for host control Docker scripts across macOS/Linux/Windows ([#981](https://github.com/kaeawc/auto-mobile/issues/981)) (ci, env)
+- Publish to official MCP registry ([#26](https://github.com/kaeawc/auto-mobile/issues/26)) (release engineering)
+- Publish AutoMobile on Docker Hub ([#25](https://github.com/kaeawc/auto-mobile/issues/25)) (release engineering)
+
 ## [v0.0.12] - 2026-02-11
 ### Other
 - No changes.
