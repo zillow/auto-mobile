@@ -19,7 +19,7 @@ java {
 
 dependencies {
   // Shared validation module
-  implementation(project(":test-plan-validation"))
+  api(project(":test-plan-validation"))
 
   // JUnit dependencies
   implementation(libs.junit)
