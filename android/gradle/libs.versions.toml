@@ -8,7 +8,7 @@ build-android-buildTools = "35.0.0"        # Used in playground Android modules
 build-android-compileSdk = "36"            # Used in playground Android modules
 build-android-minSdk = "24"                # Used in playground Android modules
 build-android-targetSdk = "36"             # Used in playground Android modules
-build-android-agp = "9.0.0"
+build-android-agp = "9.0.1"
 
 # Kotlin versions
 build-kotlin = "2.3.10"
