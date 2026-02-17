@@ -32,7 +32,7 @@ dependencies {
   compileOnly(libs.kotlinx.serialization)
 
   // MCP Kotlin SDK for client communication
-  implementation("io.modelcontextprotocol:kotlin-sdk:0.8.3") {
+  implementation("io.modelcontextprotocol:kotlin-sdk:0.8.4") {
     // Exclude coroutines since IntelliJ provides them
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
   }
