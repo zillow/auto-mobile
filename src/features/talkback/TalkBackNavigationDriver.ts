@@ -1,5 +1,5 @@
 import type { BootedDevice } from "../../models";
-import type { A11yActionResult, A11yTapCoordinatesResult } from "../observe/accessibility/types";
+import type { A11yActionResult, A11yTapCoordinatesResult } from "../observe/android/types";
 import { AccessibilityServiceClient } from "../observe/android";
 import { GetScreenSize } from "../observe/GetScreenSize";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";

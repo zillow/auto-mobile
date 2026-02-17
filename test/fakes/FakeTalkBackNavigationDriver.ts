@@ -1,5 +1,5 @@
 import type { TalkBackNavigationDriver } from "../../src/features/talkback/TalkBackNavigationDriver";
-import type { A11yActionResult, A11yTapCoordinatesResult } from "../../src/features/observe/accessibility/types";
+import type { A11yActionResult, A11yTapCoordinatesResult } from "../../src/features/observe/android/types";
 import { FakeFocusNavigationDriver } from "./FakeFocusNavigationDriver";
 
 /**

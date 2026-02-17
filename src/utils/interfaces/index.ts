@@ -45,18 +45,6 @@ export { DefaultToolResponseFormatter, ToolResponseFormatter } from "../toolUtil
 export { NodeCryptoService, CryptoService } from "../crypto";
 // Re-export from co-located interfaces
 export { DeviceDetection, DevicePlatform } from "../DeviceDetection";
-export {
-  Axe,
-  AxeButton,
-  IdbAppInfo,
-  IdbTargetInfo,
-  IdbAccessibilityElement,
-  ScreenDimensions,
-  DomainSocketAddress,
-  CompanionInfo,
-  TargetDescription,
-  IdbLaunchResult,
-} from "./Axe";
 // Re-export from co-located interfaces
 export { DeviceSelector } from "../DeviceSelectorService";
 export { Logger, LogLevel } from "../logger";

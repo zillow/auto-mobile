@@ -1,17 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "entry": [
-    "src/index.ts",
-    "src/**/*.test.ts",
     "test/**/*.ts",
-    "scripts/**/*.ts",
-    "build.ts"
+    "scripts/**/*.ts"
   ],
   "project": [
     "src/**/*.ts",
     "test/**/*.ts",
-    "scripts/**/*.ts",
-    "build.ts"
+    "scripts/**/*.ts"
   ],
   "ignore": [
     "dist/**",
@@ -23,7 +19,7 @@
   "ignoreDependencies": ["@types/pixelmatch"],
   "ignoreBinaries": [],
   "ignoreExportsUsedInFile": true,
-  "includeEntryExports": false,
+  "includeEntryExports": true,
   "typescript": {
     "config": "tsconfig.dead-code.json"
   }
