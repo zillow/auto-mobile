@@ -30,7 +30,7 @@
     "profile:heap": "node --expose-gc --heap-prof --import tsx scripts/stress-test.ts",
     "validate:yaml": "bun scripts/validate-yaml.ts",
     "dead-code:ts": "bash scripts/detect-dead-code-ts.sh",
-    "dead-code:ts:prune": "npx ts-prune",
+    "dead-code:ts:prune": "bash -o pipefail -c 'npx ts-prune --project tsconfig.dead-code.json -i src/db/migrations | (grep -v \"(used in module)\" || true) | bash scripts/filter-ts-prune-allowlist.sh'",
     "dead-code:ts:knip": "npx knip",
     "prepublishOnly": "cp README.md README.md.backup && bun scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
