@@ -20,7 +20,7 @@
     "src/db/migrations/**",
     "**/*.d.ts"
   ],
-  "ignoreDependencies": [],
+  "ignoreDependencies": ["@types/pixelmatch"],
   "ignoreBinaries": [],
   "ignoreExportsUsedInFile": true,
   "includeEntryExports": false,
