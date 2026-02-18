@@ -230,6 +230,7 @@ fun AutoMobileToolWindowContent() {
   var currentJankFrames by remember { mutableStateOf<Int?>(null) }
   var currentMemoryMb by remember { mutableStateOf<Float?>(null) }
   var currentTouchLatencyMs by remember { mutableStateOf<Float?>(null) }
+  var currentRecompositionRate by remember { mutableStateOf<Float?>(null) }
   var perfUpdateCounter by remember { mutableIntStateOf(0) }
 
   // Track failure counts by type for collapsed Failures panel
@@ -462,6 +463,9 @@ fun AutoMobileToolWindowContent() {
           currentJankFrames = update.jankFrames
           currentMemoryMb = update.memoryUsageMb
           currentTouchLatencyMs = update.touchLatencyMs
+          if (update.recompositionRate != null) {
+              currentRecompositionRate = update.recompositionRate
+          }
           perfUpdateCounter++
       }
   }
@@ -476,6 +480,7 @@ fun AutoMobileToolWindowContent() {
               currentJankFrames = null
               currentMemoryMb = null
               currentTouchLatencyMs = null
+              currentRecompositionRate = null
           }
       }
   }
@@ -882,6 +887,7 @@ fun AutoMobileToolWindowContent() {
                 currentJankFrames = currentJankFrames,
                 currentMemoryMb = currentMemoryMb,
                 currentTouchLatencyMs = currentTouchLatencyMs,
+                currentRecompositionRate = currentRecompositionRate,
                 updateCounter = perfUpdateCounter,
                 onNavigateToScreen = { screenName ->
                     showNavigationView = true

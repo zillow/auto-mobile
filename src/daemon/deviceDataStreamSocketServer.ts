@@ -65,6 +65,10 @@ export interface PerformanceStreamData {
   screenName: string | null;
   /** Whether the app is considered responsive */
   isResponsive: boolean;
+  /** Total Compose recompositions since the last observation (null if no data) */
+  recompositionCount: number | null;
+  /** Compose recompositions per second rolling average (null if no data) */
+  recompositionRate: number | null;
 }
 
 /**

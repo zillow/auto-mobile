@@ -62,12 +62,13 @@ fun PerformanceDashboard(
     initialJankFrames: Int? = null,
     initialMemoryMb: Float? = null,
     initialTouchLatencyMs: Float? = null,
+    initialRecompositionRate: Float? = null,
 ) {
     var currentScreen by remember { mutableStateOf(PerformanceScreen.Overview) }
     var selectedMetric by remember { mutableStateOf<PerformanceMetric?>(null) }
 
     // Build initial run from passed metrics to avoid empty state flicker
-    val initialRun = remember(initialFps, initialFrameTimeMs, initialJankFrames, initialMemoryMb, initialTouchLatencyMs) {
+    val initialRun = remember(initialFps, initialFrameTimeMs, initialJankFrames, initialMemoryMb, initialTouchLatencyMs, initialRecompositionRate) {
         if (initialFps != null || initialMemoryMb != null) {
             val timestamp = System.currentTimeMillis()
             PerformanceRun(
@@ -141,6 +142,19 @@ fun PerformanceDashboard(
                             thresholdCritical = 200f,
                             trend = MetricTrend.Stable,
                             history = listOf(MetricDataPoint(timestamp, initialTouchLatencyMs, null)),
+                        ))
+                    }
+                    if (initialRecompositionRate != null) {
+                        add(PerformanceMetric(
+                            id = "recomposition",
+                            type = MetricType.RecompositionCount,
+                            name = "Recompositions",
+                            currentValue = initialRecompositionRate,
+                            unit = "recomp/s",
+                            thresholdWarning = 10f,
+                            thresholdCritical = 50f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(timestamp, initialRecompositionRate, null)),
                         ))
                     }
                 },
@@ -263,6 +277,20 @@ fun PerformanceDashboard(
                             history = listOf(MetricDataPoint(update.timestamp, tti, update.screenName)),
                         ))
                     }
+                    // Add recomposition rate if available
+                    update.recompositionRate?.let { rate ->
+                        add(PerformanceMetric(
+                            id = "recomposition",
+                            type = MetricType.RecompositionCount,
+                            name = "Recompositions",
+                            currentValue = rate,
+                            unit = "recomp/s",
+                            thresholdWarning = 10f,
+                            thresholdCritical = 50f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(update.timestamp, rate, update.screenName)),
+                        ))
+                    }
                 }
             } else {
                 // Update existing metrics
@@ -325,6 +353,18 @@ fun PerformanceDashboard(
                                 trend = calculateTrend(metric.currentValue, tti),
                             )
                         }
+                        MetricType.RecompositionCount -> {
+                            val rate = update.recompositionRate ?: metric.currentValue
+                            metric.copy(
+                                currentValue = rate,
+                                history = (metric.history + MetricDataPoint(
+                                    timestamp = update.timestamp,
+                                    value = rate,
+                                    screenName = update.screenName,
+                                )).takeLast(120),
+                                trend = calculateTrend(metric.currentValue, rate),
+                            )
+                        }
                         else -> metric
                     }
                 }
@@ -357,6 +397,20 @@ fun PerformanceDashboard(
                             thresholdCritical = 1500f,
                             trend = MetricTrend.Stable,
                             history = listOf(MetricDataPoint(update.timestamp, update.timeToInteractiveMs!!, update.screenName)),
+                        ))
+                    }
+                    // Add recomposition rate if it becomes available and doesn't exist
+                    if (!existingMetricTypes.contains(MetricType.RecompositionCount) && update.recompositionRate != null) {
+                        add(PerformanceMetric(
+                            id = "recomposition",
+                            type = MetricType.RecompositionCount,
+                            name = "Recompositions",
+                            currentValue = update.recompositionRate!!,
+                            unit = "recomp/s",
+                            thresholdWarning = 10f,
+                            thresholdCritical = 50f,
+                            trend = MetricTrend.Stable,
+                            history = listOf(MetricDataPoint(update.timestamp, update.recompositionRate!!, update.screenName)),
                         ))
                     }
                 }
@@ -661,6 +715,7 @@ private fun getFixedYAxisRange(metricType: MetricType): Pair<Float, Float> {
         MetricType.Jank -> 0f to 30f // 30 missed frames
         MetricType.TimeToInteractive -> 0f to 5000f // 5 seconds
         MetricType.TimeToFirstFrame -> 0f to 5000f // 5 seconds
+        MetricType.RecompositionCount -> 0f to 200f // 200 recomp/s
     }
 }
 

@@ -7,6 +7,7 @@ import {
   PerformancePushSocketServer,
 } from "../../daemon/performancePushSocketServer";
 import { getDeviceDataStreamServer, PerformanceStreamData } from "../../daemon/deviceDataStreamSocketServer";
+import { RecompositionTracker } from "./RecompositionTracker";
 import { defaultAdbClientFactory, AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient, SimCtl } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { execFile } from "child_process";
@@ -492,6 +493,7 @@ export class PerformanceMonitor {
 
     const observationServer = getDeviceDataStreamServer();
     if (observationServer) {
+      const recompositionSummary = RecompositionTracker.getInstance().getLatestSummary(device.packageName);
       const streamData: PerformanceStreamData = {
         fps: metrics.fps ?? 0,
         frameTimeMs: metrics.frameTimeMs ?? 0,
@@ -503,6 +505,8 @@ export class PerformanceMonitor {
         timeToInteractiveMs: metrics.ttiMs,
         screenName: null, // Could be enhanced with current activity
         isResponsive: data.health !== "critical",
+        recompositionCount: recompositionSummary?.totalRecompositions ?? null,
+        recompositionRate: recompositionSummary?.averagePerSecond ?? null,
       };
       observationServer.pushPerformanceUpdate(device.deviceId, streamData);
     }

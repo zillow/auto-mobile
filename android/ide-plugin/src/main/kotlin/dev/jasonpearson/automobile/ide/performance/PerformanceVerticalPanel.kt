@@ -25,6 +25,7 @@ fun PerformanceVerticalPanel(
     currentJankFrames: Int?,
     currentMemoryMb: Float?,
     currentTouchLatencyMs: Float?,
+    currentRecompositionRate: Float? = null,
     updateCounter: Int = 0,
     onNavigateToScreen: (String) -> Unit = {},
     onNavigateToTest: (String) -> Unit = {},
@@ -47,6 +48,7 @@ fun PerformanceVerticalPanel(
                 currentJankFrames = currentJankFrames,
                 currentMemoryMb = currentMemoryMb,
                 currentTouchLatencyMs = currentTouchLatencyMs,
+                currentRecompositionRate = currentRecompositionRate,
                 updateCounter = updateCounter,
             )
         },
@@ -67,6 +69,7 @@ fun PerformanceVerticalPanel(
                 initialJankFrames = currentJankFrames,
                 initialMemoryMb = currentMemoryMb,
                 initialTouchLatencyMs = currentTouchLatencyMs,
+                initialRecompositionRate = currentRecompositionRate,
             )
         }
     }

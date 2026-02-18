@@ -46,6 +46,7 @@ export class RecompositionTracker {
   private latestTotals = new Map<string, number>();
   private lastObservationAt: number | null = null;
   private lastInteractionAt: number | null = null;
+  private latestSummaryByPackage = new Map<string, RecompositionSummary>();
   private readonly parser = new DefaultElementParser();
   private timer: Timer;
 
@@ -58,6 +59,10 @@ export class RecompositionTracker {
       RecompositionTracker.instance = new RecompositionTracker();
     }
     return RecompositionTracker.instance;
+  }
+
+  getLatestSummary(packageName: string): RecompositionSummary | undefined {
+    return this.latestSummaryByPackage.get(packageName);
   }
 
   recordInteraction(): void {
@@ -89,6 +94,11 @@ export class RecompositionTracker {
 
     const summary = this.buildSummary(metrics, observationTimestamp);
     result.recompositionSummary = summary;
+
+    const packageName = result.activeWindow?.appId ?? result.viewHierarchy?.packageName;
+    if (packageName) {
+      this.latestSummaryByPackage.set(packageName, summary);
+    }
 
     this.latestTotals = new Map(metrics.map(entry => [entry.id, entry.total]));
     this.lastObservationTotals = new Map(this.latestTotals);

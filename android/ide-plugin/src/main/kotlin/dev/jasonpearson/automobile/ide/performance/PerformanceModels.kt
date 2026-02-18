@@ -5,13 +5,14 @@ enum class HealthStatus { Healthy, Warning, Critical }
 
 // Types of performance metrics
 enum class MetricType {
-    TouchLatency,      // Time from touch to first frame response
-    TimeToFirstFrame,  // How quickly the first screen renders
-    TimeToInteractive, // When the UI becomes responsive
-    Jank,              // Missed frames / UI stuttering
-    FPS,               // Frames per second time series
-    FrameTime,         // Time to render a single frame (ms)
-    Memory,            // Memory usage in MB
+    TouchLatency,       // Time from touch to first frame response
+    TimeToFirstFrame,   // How quickly the first screen renders
+    TimeToInteractive,  // When the UI becomes responsive
+    Jank,               // Missed frames / UI stuttering
+    FPS,                // Frames per second time series
+    FrameTime,          // Time to render a single frame (ms)
+    Memory,             // Memory usage in MB
+    RecompositionCount, // Compose recompositions per second
 }
 
 data class PerformanceMetric(
@@ -111,6 +112,10 @@ object PerformanceThresholds {
     // CPU usage thresholds in percent (higher is worse)
     const val CPU_WARNING_PERCENT = 50f
     const val CPU_CRITICAL_PERCENT = 80f
+
+    // Recomposition rate thresholds in recomp/s (higher is worse)
+    const val RECOMPOSITION_WARNING = 10f
+    const val RECOMPOSITION_CRITICAL = 50f
 }
 
 // Mock data for development

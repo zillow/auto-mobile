@@ -30,11 +30,13 @@ fun PerformanceSummary(
     currentJankFrames: Int?,
     currentMemoryMb: Float?,
     currentTouchLatencyMs: Float?,
+    currentRecompositionRate: Float? = null,
     updateCounter: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val hasAnyMetric = currentFps != null || currentFrameTimeMs != null ||
-        currentJankFrames != null || currentMemoryMb != null || currentTouchLatencyMs != null
+        currentJankFrames != null || currentMemoryMb != null || currentTouchLatencyMs != null ||
+        currentRecompositionRate != null
 
     // Flashing indicator color alternates between green and blue on each update
     val indicatorColor = if (updateCounter % 2 == 0) {
@@ -109,6 +111,16 @@ fun PerformanceSummary(
                 else -> Color(0xFFE53935) // Red
             }
             MetricItem(value = "${currentTouchLatencyMs.toInt()}", unit = "lat", color = latencyColor)
+        }
+
+        // Recomposition rate indicator
+        if (currentRecompositionRate != null) {
+            val recompColor = when {
+                currentRecompositionRate <= 10f -> Color(0xFF4CAF50) // Green
+                currentRecompositionRate <= 50f -> Color(0xFFFF9800) // Orange
+                else -> Color(0xFFE53935) // Red
+            }
+            MetricItem(value = "${currentRecompositionRate.toInt()}", unit = "r/s", color = recompColor)
         }
 
         // Fallback when no metrics

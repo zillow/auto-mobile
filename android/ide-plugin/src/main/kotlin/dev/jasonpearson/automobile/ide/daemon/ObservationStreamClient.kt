@@ -311,6 +311,8 @@ class ObservationStreamClient {
                         timeToInteractiveMs = perfData.timeToInteractiveMs,
                         screenName = perfData.screenName,
                         isResponsive = perfData.isResponsive,
+                        recompositionCount = perfData.recompositionCount,
+                        recompositionRate = perfData.recompositionRate,
                     )
                     _performanceUpdates.tryEmit(update)
                     log.info("Emitted performance update to flow")
@@ -456,6 +458,8 @@ data class PerformanceStreamData(
     val timeToInteractiveMs: Float? = null,
     val screenName: String? = null,
     val isResponsive: Boolean = true,
+    val recompositionCount: Int? = null,
+    val recompositionRate: Float? = null,
 )
 
 data class PerformanceStreamUpdate(
@@ -471,6 +475,8 @@ data class PerformanceStreamUpdate(
     val timeToInteractiveMs: Float?,
     val screenName: String?,
     val isResponsive: Boolean,
+    val recompositionCount: Int?,
+    val recompositionRate: Float?,
 )
 
 sealed class StreamConnectionState {
