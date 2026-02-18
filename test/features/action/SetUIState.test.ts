@@ -517,7 +517,15 @@ describe("SetUIState", () => {
           ]
         }
       };
-      const updatedHierarchy: ViewHierarchyResult = {
+      const afterTopFieldEdit: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,0][100,50]", "resource-id": "top_field", "text": "first", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,200][100,250]", "resource-id": "bottom_field", "text": "", "class": "android.widget.EditText" } }
+          ]
+        }
+      };
+      const afterBothEdits: ViewHierarchyResult = {
         hierarchy: {
           node: [
             { $: { "bounds": "[0,0][100,50]", "resource-id": "top_field", "text": "first", "class": "android.widget.EditText" } },
@@ -532,7 +540,12 @@ describe("SetUIState", () => {
         if (observeCallCount <= 1) {
           return createObserveResult(initialHierarchy);
         }
-        return createObserveResult(updatedHierarchy);
+        // After first edit (verification + refresh): top_field filled, bottom_field still empty
+        if (observeCallCount <= 3) {
+          return createObserveResult(afterTopFieldEdit);
+        }
+        // After second edit
+        return createObserveResult(afterBothEdits);
       });
 
       fakeFieldTypeDetector.setFieldType("top_field", "text");
@@ -558,26 +571,14 @@ describe("SetUIState", () => {
   });
 
   describe("text selector", () => {
-    test("finds element by text selector", async () => {
-      const initialHierarchy = createHierarchyWithElement({
+    test("finds element by text selector and skips verification", async () => {
+      // Text-only selectors on mutable fields skip verification because
+      // typing replaces the label text used as the selector
+      const hierarchy = createHierarchyWithElement({
         "text": "Username",
-        "content-desc": "Username",
         "class": "android.widget.EditText"
       });
-      const updatedHierarchy = createHierarchyWithElement({
-        "text": "john",
-        "content-desc": "Username",
-        "class": "android.widget.EditText"
-      });
-
-      let observeCallCount = 0;
-      fakeObserve.setResultFactory(() => {
-        observeCallCount++;
-        if (observeCallCount <= 1) {
-          return createObserveResult(initialHierarchy);
-        }
-        return createObserveResult(updatedHierarchy);
-      });
+      fakeObserve.setResult(createObserveResult(hierarchy));
       fakeFieldTypeDetector.setFieldType("Username", "text");
 
       const setUIState = createSetUIState();
@@ -587,6 +588,75 @@ describe("SetUIState", () => {
 
       expect(result.success).toBe(true);
       expect(result.fields[0].success).toBe(true);
+      // Verification should be skipped for text-only selector on text field
+      expect(result.fields[0].verified).toBeUndefined();
+    });
+  });
+
+  describe("re-evaluation after layout change", () => {
+    test("re-finds fields from fresh hierarchy after each edit", async () => {
+      // Simulate layout reflow: after editing the first field, the second field
+      // moves to a different position (e.g., keyboard appears, fields shift)
+      const initialHierarchy: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,100][100,150]", "resource-id": "field_a", "text": "", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,200][100,250]", "resource-id": "field_b", "text": "", "class": "android.widget.EditText" } }
+          ]
+        }
+      };
+      // After editing field_a, field_b shifts up (keyboard pushes layout)
+      const afterFirstEdit: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,100][100,150]", "resource-id": "field_a", "text": "aaa", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,160][100,210]", "resource-id": "field_b", "text": "", "class": "android.widget.EditText" } }
+          ]
+        }
+      };
+      const afterSecondEdit: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,100][100,150]", "resource-id": "field_a", "text": "aaa", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,160][100,210]", "resource-id": "field_b", "text": "bbb", "class": "android.widget.EditText" } }
+          ]
+        }
+      };
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        if (observeCallCount <= 3) {
+          return createObserveResult(afterFirstEdit);
+        }
+        return createObserveResult(afterSecondEdit);
+      });
+
+      fakeFieldTypeDetector.setFieldType("field_a", "text");
+      fakeFieldTypeDetector.setFieldType("field_b", "text");
+
+      const setUIState = createSetUIState();
+      const result = await setUIState.execute({
+        fields: [
+          { selector: { elementId: "field_a" }, value: "aaa" },
+          { selector: { elementId: "field_b" }, value: "bbb" }
+        ]
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.fields).toHaveLength(2);
+      expect(result.fields.every(f => f.success)).toBe(true);
+
+      // Both fields should have been filled
+      const inputCalls = fakeInput.getCalls();
+      expect(inputCalls[0].text).toBe("aaa");
+      expect(inputCalls[1].text).toBe("bbb");
+
+      // Multiple observations should have occurred (re-evaluation after each edit)
+      expect(observeCallCount).toBeGreaterThan(2);
     });
   });
 

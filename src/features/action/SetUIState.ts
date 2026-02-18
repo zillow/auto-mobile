@@ -130,37 +130,39 @@ export class SetUIState extends BaseVisualChange {
       if (visibleFields.length > 0) {
         scrollsWithoutProgress = 0;
 
-        for (const { fieldSpec, fieldIndex, element } of visibleFields) {
-          const result = await this.processField(
-            fieldSpec,
-            element,
-            progress,
-            signal
-          );
+        // Process only the topmost visible field, then re-evaluate.
+        // Each edit may change layout (keyboard, reflow, dynamic fields),
+        // so we re-find visible fields from a fresh observation each iteration.
+        const { fieldSpec, fieldIndex, element } = visibleFields[0];
+        const result = await this.processField(
+          fieldSpec,
+          element,
+          progress,
+          signal
+        );
 
-          fieldResults[fieldIndex] = result;
-          processed.add(fieldIndex);
-          totalAttempts += result.attempts;
+        fieldResults[fieldIndex] = result;
+        processed.add(fieldIndex);
+        totalAttempts += result.attempts;
 
-          // Refresh observation after each success
-          if (result.success) {
-            const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
-            if (freshObs) {
-              lastObservation = freshObs;
-            }
+        // Refresh observation after each success
+        if (result.success) {
+          const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+          if (freshObs) {
+            lastObservation = freshObs;
           }
+        }
 
-          // Fail fast on failure
-          if (!result.success) {
-            logger.warn(`[SetUIState] Field failed, stopping: ${this.describeSelector(fieldSpec.selector)}`);
-            return {
-              success: false,
-              fields: this.collectResults(fieldResults, options.fields, processed),
-              totalAttempts,
-              observation: lastObservation,
-              error: result.error ?? `Failed to set field: ${this.describeSelector(fieldSpec.selector)}`
-            };
-          }
+        // Fail fast on failure
+        if (!result.success) {
+          logger.warn(`[SetUIState] Field failed, stopping: ${this.describeSelector(fieldSpec.selector)}`);
+          return {
+            success: false,
+            fields: this.collectResults(fieldResults, options.fields, processed),
+            totalAttempts,
+            observation: lastObservation,
+            error: result.error ?? `Failed to set field: ${this.describeSelector(fieldSpec.selector)}`
+          };
         }
       } else {
         // No visible matches — scroll to find more
@@ -178,19 +180,13 @@ export class SetUIState extends BaseVisualChange {
           }
         }
 
-        // Scroll and look for any unprocessed field
-        const nextSelector = this.getNextUnprocessedSelector(options.fields, processed);
-        if (nextSelector) {
-          await this.getSwipeOn().execute(
-            { direction: currentDirection, lookFor: nextSelector },
-            progress
-          );
-        } else {
-          await this.getSwipeOn().execute(
-            { direction: currentDirection },
-            progress
-          );
-        }
+        // Scroll one step without lookFor to avoid jumping past intermediate fields.
+        // Using lookFor would enable scroll-until-visible mode which can skip over
+        // fields that need to be processed first in screen order.
+        await this.getSwipeOn().execute(
+          { direction: currentDirection },
+          progress
+        );
 
         // Re-observe after scroll
         const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
@@ -234,7 +230,7 @@ export class SetUIState extends BaseVisualChange {
     const matches: Array<{ fieldSpec: FieldSpec; fieldIndex: number; element: Element }> = [];
 
     for (let i = 0; i < fields.length; i++) {
-      if (processed.has(i)) continue;
+      if (processed.has(i)) {continue;}
 
       const element = this.findElement(fields[i].selector, viewHierarchy);
       if (element) {
@@ -246,22 +242,6 @@ export class SetUIState extends BaseVisualChange {
     matches.sort((a, b) => a.element.bounds.top - b.element.bounds.top);
 
     return matches;
-  }
-
-  /**
-   * Get a lookFor selector for the first unprocessed field
-   */
-  private getNextUnprocessedSelector(
-    fields: FieldSpec[],
-    processed: Set<number>
-  ): { text?: string; elementId?: string } | undefined {
-    for (let i = 0; i < fields.length; i++) {
-      if (processed.has(i)) continue;
-      const sel = fields[i].selector;
-      if (sel.text) return { text: sel.text };
-      if (sel.elementId) return { elementId: sel.elementId };
-    }
-    return undefined;
   }
 
   /**
@@ -349,10 +329,17 @@ export class SetUIState extends BaseVisualChange {
           continue;
         }
 
-        // Always verify unless password field or iOS skip applies
+        // Skip verification when:
+        // - Password field (value is masked)
+        // - iOS element without value attribute
+        // - Text-only selector on a mutable field type (typing replaces the label text
+        //   used as the selector, so re-lookup by original text fails)
         let verified: boolean | undefined;
+        const hasTextOnlySelector = fieldSpec.selector.text !== undefined && fieldSpec.selector.elementId === undefined;
+        const isMutableTextField = fieldType === "text" || fieldType === "dropdown";
         const shouldSkipVerify = this.fieldTypeDetector.isPasswordField(element) ||
-          this.fieldTypeDetector.shouldSkipVerification(element, fieldType);
+          this.fieldTypeDetector.shouldSkipVerification(element, fieldType) ||
+          (hasTextOnlySelector && isMutableTextField);
         if (!shouldSkipVerify) {
           verified = await this.verifyFieldValue(fieldSpec, fieldType, signal);
           if (!verified) {
