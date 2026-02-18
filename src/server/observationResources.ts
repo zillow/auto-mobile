@@ -3,7 +3,22 @@ import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { logger } from "../utils/logger";
 import { stringifyToolResponse } from "../utils/toolUtils";
 import { ScreenshotJobTracker } from "../utils/ScreenshotJobTracker";
-import * as fs from "fs/promises";
+import * as realFs from "fs/promises";
+
+export interface ScreenshotFileSystem {
+  stat(path: string): Promise<{ isFile(): boolean }>;
+  readFile(path: string): Promise<Buffer>;
+}
+
+let screenshotFileSystem: ScreenshotFileSystem = realFs;
+
+export function setScreenshotFileSystem(fs: ScreenshotFileSystem): void {
+  screenshotFileSystem = fs;
+}
+
+export function resetScreenshotFileSystem(): void {
+  screenshotFileSystem = realFs;
+}
 
 // Resource URIs
 export const RESOURCE_URIS = {
@@ -19,7 +34,7 @@ async function getLatestScreenshotPath(): Promise<string | undefined> {
       return undefined;
     }
 
-    const fileStat = await fs.stat(screenshotPath);
+    const fileStat = await screenshotFileSystem.stat(screenshotPath);
     if (!fileStat.isFile()) {
       return undefined;
     }
@@ -103,7 +118,7 @@ async function getLatestScreenshot(): Promise<ResourceContent> {
     }
 
     // Read the screenshot file and convert to base64
-    const imageBuffer = await fs.readFile(screenshotPath);
+    const imageBuffer = await screenshotFileSystem.readFile(screenshotPath);
     const base64Image = imageBuffer.toString("base64");
 
     // Determine mime type from file extension

@@ -5,6 +5,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { z } from "zod";
 import { ScreenshotJobTracker } from "../../../src/utils/ScreenshotJobTracker";
+import { setScreenshotFileSystem, resetScreenshotFileSystem } from "../../../src/server/observationResources";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { FakeTimer } from "../../fakes/FakeTimer";
@@ -71,6 +72,7 @@ describe("MCP Resources Read", () => {
   afterEach(() => {
     RealObserveScreen.clearCache();
     ScreenshotJobTracker.resetTimer();
+    resetScreenshotFileSystem();
   });
 
   afterAll(async () => {
@@ -167,6 +169,14 @@ describe("MCP Resources Read", () => {
     const fakeTimer = new FakeTimer();
     ScreenshotJobTracker.setTimer(fakeTimer);
 
+    const fakeImageData = Buffer.from("fake screenshot data");
+    const screenshotPath = path.join("/tmp/auto-mobile", "screenshots", `screenshot_fake.png`);
+
+    setScreenshotFileSystem({
+      stat: async (_p: string) => ({ isFile: () => true }),
+      readFile: async (_p: string) => fakeImageData
+    });
+
     const mockDevice: BootedDevice = {
       deviceId: "test-device",
       name: "Test Device",
@@ -178,11 +188,6 @@ describe("MCP Resources Read", () => {
     (RealObserveScreen as any).latestScreenshotPath = null;
     (RealObserveScreen as any).latestScreenshotError = null;
     (RealObserveScreen as any).latestScreenshotTimestamp = null;
-
-    const screenshotDir = path.join("/tmp/auto-mobile", "screenshots");
-    await fs.mkdir(screenshotDir, { recursive: true });
-    const screenshotPath = path.join(screenshotDir, `screenshot_${Date.now()}.png`);
-    await fs.writeFile(screenshotPath, Buffer.from("fake screenshot data"));
 
     ScreenshotJobTracker.startJob(mockDevice.deviceId, async signal => {
       return new Promise(resolve => {
@@ -222,8 +227,6 @@ describe("MCP Resources Read", () => {
     expect(content.mimeType).toBe("image/png");
     expect(content.blob).toBeDefined();
     expect(content.blob!.length).toBeGreaterThan(0);
-
-    await fs.unlink(screenshotPath);
   });
 
   test("reading non-existent resource should throw error", async function() {
