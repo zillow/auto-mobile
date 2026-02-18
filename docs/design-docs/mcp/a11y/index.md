@@ -27,9 +27,9 @@ flowchart LR
     Scroll --> Agent
     Input --> Agent
 
-    classDef detect fill:#FF3300,stroke-width:0px,color:white;
+    classDef detect fill:#CC2200,stroke-width:0px,color:white;
     classDef adapt fill:#525FE1,stroke-width:0px,color:white;
-    classDef result fill:#00AA55,stroke-width:0px,color:white;
+    classDef result fill:#007A3D,stroke-width:0px,color:white;
 
     class Auto,Cache detect;
     class Tap,Scroll,Input adapt;

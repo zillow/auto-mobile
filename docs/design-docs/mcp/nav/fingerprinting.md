@@ -206,7 +206,7 @@ flowchart LR
     B --> C["Filter keyboard elements<br/>from hierarchy"];
     C --> D["Attempt cached<br/>navigation ID"];
     D --> E["Degrade confidence level"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,E result;

@@ -25,7 +25,7 @@ flowchart LR
     C --> D{"Confidence high?"};
     D -->|"yes"| E["Return alternative selectors<br/>or navigation instructions"];
     D -->|"no"| F["Return detailed error<br/>with screen context"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,E,F result;

@@ -134,7 +134,7 @@ flowchart LR
     C --> D{"Thresholds exceeded?"};
     D -->|"yes"| E["Fail workflow"];
     D -->|"no"| F["Complete workflow"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,B,C logic;
@@ -162,7 +162,7 @@ flowchart LR
     B --> C["Update scripts/context-thresholds.json"];
     C --> D["Commit changes<br/>with PR justification"];
     D --> E["Ensure CI passes<br/>with new thresholds"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,B,C logic;

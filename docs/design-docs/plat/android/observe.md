@@ -20,7 +20,7 @@
     C -->|"❌"| E["uiautomator dump"];
     D --> I["Return"]
     E --> I;
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,G,I result;
@@ -50,7 +50,7 @@
     F -->|"❌"| E;
     E --> H["Cache"];
     H --> I["Return New Hierarchy"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,G,I result;

@@ -20,7 +20,7 @@ flowchart LR
     A["Start recording (IDE)"] --> B["Perform interactions in app"];
     B --> C["Stop recording"];
     C --> D["Review and edit generated YAML plan"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,B,C logic;

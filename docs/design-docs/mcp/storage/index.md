@@ -22,7 +22,7 @@ flowchart TB
     SQLite -.->|"schema updates"| Migrations
     SQLite -.->|"metadata"| Snapshots
 
-    classDef runtime fill:#FF3300,stroke-width:0px,color:white;
+    classDef runtime fill:#CC2200,stroke-width:0px,color:white;
     classDef storage fill:#525FE1,stroke-width:0px,color:white;
 
     class NavGraph,Sessions,Config runtime;

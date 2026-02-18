@@ -21,7 +21,7 @@ flowchart LR
     D -->|"no"| F{"src/db/migrations exists?"};
     F -->|"yes"| G["Use src/db/migrations<br/>(running from source)"];
     F -->|"no"| H["Throw error with checked paths"];
-    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef decision fill:#CC2200,stroke-width:0px,color:white;
     classDef logic fill:#525FE1,stroke-width:0px,color:white;
     classDef result stroke-width:0px;
     class A,H result;

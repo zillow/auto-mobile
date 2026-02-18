@@ -54,9 +54,9 @@ flowchart TB
     CLITools --> Android
     CLITools --> iOS
 
-    classDef client fill:#FF3300,stroke-width:0px,color:white;
+    classDef client fill:#CC2200,stroke-width:0px,color:white;
     classDef mcp fill:#525FE1,stroke-width:0px,color:white;
-    classDef external fill:#00AA55,stroke-width:0px,color:white;
+    classDef external fill:#007A3D,stroke-width:0px,color:white;
     classDef device fill:#666666,stroke-width:0px,color:white;
 
     class Agent,IDE,CLI client;
