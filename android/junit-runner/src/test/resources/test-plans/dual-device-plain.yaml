@@ -1,0 +1,38 @@
+---
+name: dual-device-plain
+description: Two-device test with independent steps on each device, no coordination required
+devices:
+  - A
+  - B
+steps:
+  - tool: launchApp
+    device: A
+    params:
+      appId: com.example.appA
+    label: Launch app on device A
+
+  - tool: launchApp
+    device: B
+    params:
+      appId: com.example.appB
+    label: Launch app on device B
+
+  - tool: observe
+    device: A
+    label: Observe state on device A
+
+  - tool: observe
+    device: B
+    label: Observe state on device B
+
+  - tool: terminateApp
+    device: A
+    params:
+      appId: com.example.appA
+    label: Terminate app on device A
+
+  - tool: terminateApp
+    device: B
+    params:
+      appId: com.example.appB
+    label: Terminate app on device B

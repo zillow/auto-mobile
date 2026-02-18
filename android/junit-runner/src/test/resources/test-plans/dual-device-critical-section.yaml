@@ -1,0 +1,44 @@
+---
+name: dual-device-critical-section
+description: Two-device test using criticalSection for inter-device coordination
+devices:
+  - A
+  - B
+steps:
+  - tool: launchApp
+    device: A
+    params:
+      appId: com.example.chat
+    label: Launch chat app on device A
+
+  - tool: launchApp
+    device: B
+    params:
+      appId: com.example.chat
+    label: Launch chat app on device B
+
+  - tool: criticalSection
+    params:
+      lock: chat-sync
+      deviceCount: 2
+      steps:
+        - tool: inputText
+          params:
+            device: A
+            text: Hello from Device A
+        - tool: observe
+          params:
+            device: B
+    label: Device A sends message, Device B observes
+
+  - tool: terminateApp
+    device: A
+    params:
+      appId: com.example.chat
+    label: Terminate app on device A
+
+  - tool: terminateApp
+    device: B
+    params:
+      appId: com.example.chat
+    label: Terminate app on device B
