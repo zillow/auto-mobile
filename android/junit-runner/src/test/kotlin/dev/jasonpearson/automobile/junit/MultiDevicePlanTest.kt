@@ -141,7 +141,7 @@ class TwoDevicePlainPlanTest {
                 mapOf(
                   "stepIndex" to JsonPrimitive(3),
                   "tool" to JsonPrimitive("observe"),
-                  "error" to JsonPrimitive("Screen state mismatch on device B"),
+                  "error" to JsonPrimitive("Assertion failed: expected content not visible"),
                   "device" to JsonPrimitive("B"),
                 )
               ),
@@ -155,10 +155,11 @@ class TwoDevicePlainPlanTest {
 
     assertEquals(1, notifier.failures.size)
     val failureMessage = notifier.failures[0].message
-    assertTrue("Failure should identify device B", failureMessage.contains("B"))
+    // "B" must come from failedStep.device, not from the error text (which is device-neutral).
+    assertTrue("Failure should identify device B via device field", failureMessage.contains("B"))
     assertTrue(
-      "Failure should describe the error",
-      failureMessage.contains("Screen state mismatch on device B"),
+      "Failure should include the error text",
+      failureMessage.contains("Assertion failed: expected content not visible"),
     )
   }
 
@@ -274,8 +275,23 @@ class TwoDeviceCriticalSectionPlanTest {
       decodePlanContent(
         capturingClient.capturedArguments!!["planContent"]!!.jsonPrimitive.content
       )
-    assertTrue("CriticalSection should have sub-step targeting device A", decoded.contains("device: A"))
-    assertTrue("CriticalSection should have sub-step targeting device B", decoded.contains("device: B"))
+    // Scope device assertions strictly to the criticalSection step's own params block.
+    // Search for "tool: criticalSection" (not just "criticalSection") to skip any occurrence
+    // in the plan name or description. Then trim at "\n\n  - tool:" which is the blank-line
+    // separator before the next top-level step, ensuring trailing terminateApp "device:" labels
+    // cannot satisfy the assertion if criticalSection sub-steps lose their device assignments.
+    val afterCriticalSection =
+      decoded.substringAfter("tool: criticalSection", missingDelimiterValue = "")
+    assertTrue("criticalSection tool step should be present", afterCriticalSection.isNotEmpty())
+    val criticalSectionBlock = afterCriticalSection.substringBefore("\n\n  - tool:")
+    assertTrue(
+      "CriticalSection sub-steps should target device A",
+      criticalSectionBlock.contains("device: A"),
+    )
+    assertTrue(
+      "CriticalSection sub-steps should target device B",
+      criticalSectionBlock.contains("device: B"),
+    )
   }
 
   @Test
@@ -331,7 +347,7 @@ class TwoDeviceCriticalSectionPlanTest {
                 mapOf(
                   "stepIndex" to JsonPrimitive(2),
                   "tool" to JsonPrimitive("inputText"),
-                  "error" to JsonPrimitive("Input field not found on device A"),
+                  "error" to JsonPrimitive("Timeout waiting for input element"),
                   "device" to JsonPrimitive("A"),
                 )
               ),
@@ -346,10 +362,11 @@ class TwoDeviceCriticalSectionPlanTest {
 
     assertEquals(1, notifier.failures.size)
     val failureMessage = notifier.failures[0].message
-    assertTrue("Failure should identify device A", failureMessage.contains("A"))
+    // "A" must come from failedStep.device, not from the error text (which is device-neutral).
+    assertTrue("Failure should identify device A via device field", failureMessage.contains("A"))
     assertTrue(
-      "Failure should describe the step error",
-      failureMessage.contains("Input field not found on device A"),
+      "Failure should include the error text",
+      failureMessage.contains("Timeout waiting for input element"),
     )
   }
 
