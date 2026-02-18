@@ -190,6 +190,33 @@ describe("FieldTypeDetector", () => {
     });
   });
 
+  describe("isPasswordField", () => {
+    test("returns true for password=true boolean", () => {
+      const element = createElement({ password: true });
+      expect(detector.isPasswordField(element)).toBe(true);
+    });
+
+    test("returns true for password='true' string", () => {
+      const element = createElement({ password: "true" });
+      expect(detector.isPasswordField(element)).toBe(true);
+    });
+
+    test("returns false for password=false", () => {
+      const element = createElement({ password: false });
+      expect(detector.isPasswordField(element)).toBe(false);
+    });
+
+    test("returns false for password='false' string", () => {
+      const element = createElement({ password: "false" });
+      expect(detector.isPasswordField(element)).toBe(false);
+    });
+
+    test("returns false for undefined password", () => {
+      const element = createElement({});
+      expect(detector.isPasswordField(element)).toBe(false);
+    });
+  });
+
   describe("isChecked", () => {
     test("returns true for checked=true boolean", () => {
       const element = createElement({ checked: true });

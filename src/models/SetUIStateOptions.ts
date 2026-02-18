@@ -18,8 +18,6 @@ export interface FieldSpec {
   value?: string;
   /** Target selection state (for checkboxes and toggles) */
   selected?: boolean;
-  /** Skip verification after setting (for sensitive fields like passwords) */
-  sensitive?: boolean;
 }
 
 /**
@@ -28,12 +26,6 @@ export interface FieldSpec {
 export interface SetUIStateOptions {
   /** List of fields to set */
   fields: FieldSpec[];
-  /** Maximum retry attempts per field (default: 3) */
-  maxRetries?: number;
-  /** Verify field values after setting (default: true) */
-  verifyAfter?: boolean;
-  /** Scroll to find fields that aren't visible (default: true) */
-  scrollToFind?: boolean;
   /** Initial scroll direction when searching (default: "down") */
   scrollDirection?: "up" | "down";
 }

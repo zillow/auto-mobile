@@ -64,9 +64,8 @@ export interface SetUIStateDependencies {
 }
 
 const DEFAULT_MAX_RETRIES = 3;
-const DEFAULT_VERIFY_AFTER = true;
-const DEFAULT_SCROLL_TO_FIND = true;
 const DEFAULT_SCROLL_DIRECTION = "down";
+const MAX_FUTILE_SCROLLS = 3;
 
 /**
  * SetUIState - Declarative form field population tool
@@ -74,6 +73,9 @@ const DEFAULT_SCROLL_DIRECTION = "down";
  * Populates form fields by specifying desired end-state rather than procedural steps.
  * Orchestrates existing tools (TapOnElement, InputText, ClearText, SwipeOn, ObserveScreen)
  * with automatic retry and verification.
+ *
+ * Fields are processed in screen order (top-to-bottom by bounds.top) as the form is scrolled,
+ * regardless of the order provided by the caller.
  */
 export class SetUIState extends BaseVisualChange {
   private fieldTypeDetector: FieldTypeDetector;
@@ -104,54 +106,113 @@ export class SetUIState extends BaseVisualChange {
     progress?: ProgressCallback,
     signal?: AbortSignal
   ): Promise<SetUIStateResult> {
-    const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-    const verifyAfter = options.verifyAfter ?? DEFAULT_VERIFY_AFTER;
-    const scrollToFind = options.scrollToFind ?? DEFAULT_SCROLL_TO_FIND;
     const scrollDirection = options.scrollDirection ?? DEFAULT_SCROLL_DIRECTION;
 
-    const fieldResults: FieldResult[] = [];
+    const fieldResults: FieldResult[] = new Array(options.fields.length);
+    const processed = new Set<number>();
     let totalAttempts = 0;
-    let lastObservation: ObserveResult | undefined;
 
     // Get initial observation
-    lastObservation = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+    let lastObservation = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
 
-    for (const fieldSpec of options.fields) {
-      const result = await this.processField(
-        fieldSpec,
-        {
-          maxRetries,
-          verifyAfter,
-          scrollToFind,
-          scrollDirection,
-          viewHierarchy: lastObservation?.viewHierarchy
-        },
-        progress,
-        signal
+    let scrollsWithoutProgress = 0;
+    let currentDirection: "up" | "down" = scrollDirection;
+    let triedReverse = false;
+
+    while (processed.size < options.fields.length) {
+      // Find all unprocessed fields visible in the current hierarchy, sorted by bounds.top
+      const visibleFields = this.findVisibleFieldsInScreenOrder(
+        options.fields,
+        processed,
+        lastObservation?.viewHierarchy
       );
 
-      fieldResults.push(result);
-      totalAttempts += result.attempts;
+      if (visibleFields.length > 0) {
+        scrollsWithoutProgress = 0;
 
-      // Update last observation if we got one
-      if (result.success) {
+        for (const { fieldSpec, fieldIndex, element } of visibleFields) {
+          const result = await this.processField(
+            fieldSpec,
+            element,
+            progress,
+            signal
+          );
+
+          fieldResults[fieldIndex] = result;
+          processed.add(fieldIndex);
+          totalAttempts += result.attempts;
+
+          // Refresh observation after each success
+          if (result.success) {
+            const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
+            if (freshObs) {
+              lastObservation = freshObs;
+            }
+          }
+
+          // Fail fast on failure
+          if (!result.success) {
+            logger.warn(`[SetUIState] Field failed, stopping: ${this.describeSelector(fieldSpec.selector)}`);
+            return {
+              success: false,
+              fields: this.collectResults(fieldResults, options.fields, processed),
+              totalAttempts,
+              observation: lastObservation,
+              error: result.error ?? `Failed to set field: ${this.describeSelector(fieldSpec.selector)}`
+            };
+          }
+        }
+      } else {
+        // No visible matches — scroll to find more
+        scrollsWithoutProgress++;
+
+        if (scrollsWithoutProgress > MAX_FUTILE_SCROLLS) {
+          if (!triedReverse) {
+            // Try reverse direction
+            currentDirection = currentDirection === "down" ? "up" : "down";
+            triedReverse = true;
+            scrollsWithoutProgress = 0;
+          } else {
+            // Exhausted both directions
+            break;
+          }
+        }
+
+        // Scroll and look for any unprocessed field
+        const nextSelector = this.getNextUnprocessedSelector(options.fields, processed);
+        if (nextSelector) {
+          await this.getSwipeOn().execute(
+            { direction: currentDirection, lookFor: nextSelector },
+            progress
+          );
+        } else {
+          await this.getSwipeOn().execute(
+            { direction: currentDirection },
+            progress
+          );
+        }
+
+        // Re-observe after scroll
         const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
         if (freshObs) {
           lastObservation = freshObs;
         }
       }
+    }
 
-      // Fail fast: stop on first field failure after retries
-      if (!result.success) {
-        logger.warn(`[SetUIState] Field failed, stopping: ${this.describeSelector(fieldSpec.selector)}`);
-        return {
-          success: false,
-          fields: fieldResults,
-          totalAttempts,
-          observation: lastObservation,
-          error: result.error ?? `Failed to set field: ${this.describeSelector(fieldSpec.selector)}`
-        };
-      }
+    // Check for any unprocessed fields
+    if (processed.size < options.fields.length) {
+      const missing = options.fields
+        .filter((_, i) => !processed.has(i))
+        .map(f => this.describeSelector(f.selector));
+
+      return {
+        success: false,
+        fields: this.collectResults(fieldResults, options.fields, processed),
+        totalAttempts,
+        observation: lastObservation,
+        error: `Fields not found after scrolling: ${missing.join(", ")}`
+      };
     }
 
     return {
@@ -163,69 +224,97 @@ export class SetUIState extends BaseVisualChange {
   }
 
   /**
-   * Process a single field
+   * Find all unprocessed fields visible in the current hierarchy, sorted by bounds.top ascending
+   */
+  private findVisibleFieldsInScreenOrder(
+    fields: FieldSpec[],
+    processed: Set<number>,
+    viewHierarchy?: ViewHierarchyResult
+  ): Array<{ fieldSpec: FieldSpec; fieldIndex: number; element: Element }> {
+    const matches: Array<{ fieldSpec: FieldSpec; fieldIndex: number; element: Element }> = [];
+
+    for (let i = 0; i < fields.length; i++) {
+      if (processed.has(i)) continue;
+
+      const element = this.findElement(fields[i].selector, viewHierarchy);
+      if (element) {
+        matches.push({ fieldSpec: fields[i], fieldIndex: i, element });
+      }
+    }
+
+    // Sort by bounds.top ascending (screen order)
+    matches.sort((a, b) => a.element.bounds.top - b.element.bounds.top);
+
+    return matches;
+  }
+
+  /**
+   * Get a lookFor selector for the first unprocessed field
+   */
+  private getNextUnprocessedSelector(
+    fields: FieldSpec[],
+    processed: Set<number>
+  ): { text?: string; elementId?: string } | undefined {
+    for (let i = 0; i < fields.length; i++) {
+      if (processed.has(i)) continue;
+      const sel = fields[i].selector;
+      if (sel.text) return { text: sel.text };
+      if (sel.elementId) return { elementId: sel.elementId };
+    }
+    return undefined;
+  }
+
+  /**
+   * Collect results array, filling in empty slots for unprocessed fields
+   */
+  private collectResults(
+    results: FieldResult[],
+    fields: FieldSpec[],
+    processed: Set<number>
+  ): FieldResult[] {
+    const out: FieldResult[] = [];
+    for (let i = 0; i < fields.length; i++) {
+      if (processed.has(i) && results[i]) {
+        out.push(results[i]);
+      } else {
+        out.push({
+          selector: fields[i].selector,
+          success: false,
+          attempts: 0,
+          error: `Element not found: ${this.describeSelector(fields[i].selector)}`
+        });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Process a single field that has already been found
    */
   private async processField(
     fieldSpec: FieldSpec,
-    context: {
-      maxRetries: number;
-      verifyAfter: boolean;
-      scrollToFind: boolean;
-      scrollDirection: "up" | "down";
-      viewHierarchy?: ViewHierarchyResult;
-    },
+    initialElement: Element,
     progress?: ProgressCallback,
     signal?: AbortSignal
   ): Promise<FieldResult> {
     let attempts = 0;
     let lastError: string | undefined;
     let fieldType: FieldType | undefined;
-    let currentViewHierarchy = context.viewHierarchy;
+    let element = initialElement;
 
-    while (attempts < context.maxRetries) {
+    while (attempts < DEFAULT_MAX_RETRIES) {
       attempts++;
 
       try {
-        // Find the element in current hierarchy
-        let element = this.findElement(fieldSpec.selector, currentViewHierarchy);
-
-        // If not found, refresh the view hierarchy before trying scroll
-        // This handles elements that appear after async load
-        if (!element && attempts > 1) {
-          logger.info(`[SetUIState] Element not found on attempt ${attempts}, refreshing view hierarchy`);
+        // On retry, re-find the element via scroll
+        if (attempts > 1) {
           const freshObs = await this.getObserveScreen().execute(undefined, undefined, false, 0, signal);
-          if (freshObs?.viewHierarchy) {
-            currentViewHierarchy = freshObs.viewHierarchy;
-            element = this.findElement(fieldSpec.selector, currentViewHierarchy);
+          const found = freshObs?.viewHierarchy
+            ? this.findElement(fieldSpec.selector, freshObs.viewHierarchy)
+            : null;
+          if (found) {
+            element = found;
           }
-        }
-
-        // If still not found and scroll enabled, try scrolling
-        if (!element && context.scrollToFind) {
-          const scrollResult = await this.scrollToFindElement(
-            fieldSpec.selector,
-            context.scrollDirection,
-            progress
-          );
-          if (scrollResult.found && scrollResult.element) {
-            element = scrollResult.element;
-          } else if (!scrollResult.found) {
-            // Try reverse direction
-            const reverseDirection = context.scrollDirection === "down" ? "up" : "down";
-            const reverseResult = await this.scrollToFindElement(
-              fieldSpec.selector,
-              reverseDirection,
-              progress
-            );
-            if (reverseResult.found && reverseResult.element) {
-              element = reverseResult.element;
-            }
-          }
-        }
-
-        if (!element) {
-          lastError = `Element not found: ${this.describeSelector(fieldSpec.selector)}`;
-          continue;
         }
 
         // Detect field type
@@ -260,12 +349,11 @@ export class SetUIState extends BaseVisualChange {
           continue;
         }
 
-        // Verify if requested (and not sensitive)
-        // Also skip verification for iOS text/dropdown fields when value attribute is unavailable
+        // Always verify unless password field or iOS skip applies
         let verified: boolean | undefined;
-        const shouldSkipVerify = fieldSpec.sensitive ||
+        const shouldSkipVerify = this.fieldTypeDetector.isPasswordField(element) ||
           this.fieldTypeDetector.shouldSkipVerification(element, fieldType);
-        if (context.verifyAfter && !shouldSkipVerify) {
+        if (!shouldSkipVerify) {
           verified = await this.verifyFieldValue(fieldSpec, fieldType, signal);
           if (!verified) {
             lastError = `Verification failed for ${this.describeSelector(fieldSpec.selector)}`;
@@ -312,30 +400,6 @@ export class SetUIState extends BaseVisualChange {
     }
 
     return null;
-  }
-
-  /**
-   * Scroll to find an element
-   */
-  private async scrollToFindElement(
-    selector: ElementSelector,
-    direction: "up" | "down",
-    progress?: ProgressCallback
-  ): Promise<{ found: boolean; element?: Element }> {
-    const swipeOn = this.getSwipeOn();
-    const lookFor = selector.text
-      ? { text: selector.text }
-      : { elementId: selector.elementId };
-
-    const result = await swipeOn.execute(
-      { direction, lookFor },
-      progress
-    );
-
-    return {
-      found: result.found ?? false,
-      element: result.element
-    };
   }
 
   /**

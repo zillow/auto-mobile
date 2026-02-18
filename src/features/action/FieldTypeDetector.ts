@@ -135,6 +135,16 @@ export class FieldTypeDetector {
   }
 
   /**
+   * Check if an element is a password field
+   * @param element - The element to check
+   * @returns true if the element is a password input
+   */
+  isPasswordField(element: Element): boolean {
+    const password = element.password;
+    return password === true || password === "true";
+  }
+
+  /**
    * Check if an element is currently checked/selected
    * @param element - The element to check
    * @returns true if the element is checked/selected

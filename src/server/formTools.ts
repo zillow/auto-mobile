@@ -18,8 +18,7 @@ const fieldSpecSchema = z.object({
     validateElementIdTextSelector(value, ctx, "Provide exactly one of elementId or text in selector");
   }).describe("Selector to find the field element"),
   value: z.string().optional().describe("Value to set (for text inputs and dropdowns)"),
-  selected: z.boolean().optional().describe("Target selection state (for checkboxes and toggles)"),
-  sensitive: z.boolean().optional().describe("Skip verification for sensitive fields like passwords")
+  selected: z.boolean().optional().describe("Target selection state (for checkboxes and toggles)")
 }).refine(
   data => data.value !== undefined || data.selected !== undefined,
   { message: "Provide either value (for text/dropdown) or selected (for checkbox/toggle)" }
@@ -32,12 +31,6 @@ const setUIStateSchema = z.object({
   fields: z.array(fieldSpecSchema)
     .min(1, "At least one field is required")
     .describe("List of fields to set"),
-  maxRetries: z.number().int().positive().optional()
-    .describe("Maximum retry attempts per field (default: 3)"),
-  verifyAfter: z.boolean().optional()
-    .describe("Verify field values after setting (default: true)"),
-  scrollToFind: z.boolean().optional()
-    .describe("Scroll to find fields that aren't visible (default: true)"),
   scrollDirection: z.enum(["up", "down"]).optional()
     .describe("Initial scroll direction when searching (default: down)")
 });
@@ -91,7 +84,7 @@ Example usage:
 {
   "fields": [
     { "selector": { "elementId": "username" }, "value": "john@example.com" },
-    { "selector": { "text": "Password" }, "value": "secret123", "sensitive": true },
+    { "selector": { "text": "Password" }, "value": "secret123" },
     { "selector": { "elementId": "remember_me" }, "selected": true }
   ]
 }
@@ -114,12 +107,8 @@ Example usage:
               elementId: f.selector.elementId
             },
             value: f.value,
-            selected: f.selected,
-            sensitive: f.sensitive
+            selected: f.selected
           })),
-          maxRetries: args.maxRetries,
-          verifyAfter: args.verifyAfter,
-          scrollToFind: args.scrollToFind,
           scrollDirection: args.scrollDirection
         },
         progress,

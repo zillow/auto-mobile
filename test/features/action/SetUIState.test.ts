@@ -69,18 +69,30 @@ describe("SetUIState", () => {
 
   describe("text field handling", () => {
     test("sets text field value with tap, clear, and input", async () => {
-      const hierarchy = createHierarchyWithElement({
+      const initialHierarchy = createHierarchyWithElement({
         "resource-id": "username",
         "text": "",
         "class": "android.widget.EditText"
       });
-      fakeObserve.setResult(createObserveResult(hierarchy));
+      const updatedHierarchy = createHierarchyWithElement({
+        "resource-id": "username",
+        "text": "john@example.com",
+        "class": "android.widget.EditText"
+      });
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
       fakeFieldTypeDetector.setFieldType("username", "text");
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "username" }, value: "john@example.com" }],
-        verifyAfter: false  // Disable verification for this test since fake doesn't update
+        fields: [{ selector: { elementId: "username" }, value: "john@example.com" }]
       });
 
       expect(result.success).toBe(true);
@@ -128,20 +140,32 @@ describe("SetUIState", () => {
 
   describe("checkbox handling", () => {
     test("taps checkbox when state needs to change", async () => {
-      const hierarchy = createHierarchyWithElement({
+      const initialHierarchy = createHierarchyWithElement({
         "resource-id": "remember_me",
         "class": "android.widget.CheckBox",
         "checkable": "true" as any,
         "checked": "false" as any
       });
-      fakeObserve.setResult(createObserveResult(hierarchy));
+      const updatedHierarchy = createHierarchyWithElement({
+        "resource-id": "remember_me",
+        "class": "android.widget.CheckBox",
+        "checkable": "true" as any,
+        "checked": "true" as any
+      });
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
       fakeFieldTypeDetector.setFieldType("remember_me", "checkbox");
-      fakeFieldTypeDetector.setChecked("remember_me", false);
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "remember_me" }, selected: true }],
-        verifyAfter: false
+        fields: [{ selector: { elementId: "remember_me" }, selected: true }]
       });
 
       expect(result.success).toBe(true);
@@ -179,20 +203,32 @@ describe("SetUIState", () => {
 
   describe("toggle handling", () => {
     test("taps toggle when state needs to change", async () => {
-      const hierarchy = createHierarchyWithElement({
+      const initialHierarchy = createHierarchyWithElement({
         "resource-id": "dark_mode",
         "class": "android.widget.Switch",
         "checkable": "true" as any,
         "checked": "true" as any
       });
-      fakeObserve.setResult(createObserveResult(hierarchy));
+      const updatedHierarchy = createHierarchyWithElement({
+        "resource-id": "dark_mode",
+        "class": "android.widget.Switch",
+        "checkable": "true" as any,
+        "checked": "false" as any
+      });
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
       fakeFieldTypeDetector.setFieldType("dark_mode", "toggle");
-      fakeFieldTypeDetector.setChecked("dark_mode", true);
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "dark_mode" }, selected: false }],
-        verifyAfter: false
+        fields: [{ selector: { elementId: "dark_mode" }, selected: false }]
       });
 
       expect(result.success).toBe(true);
@@ -206,19 +242,30 @@ describe("SetUIState", () => {
 
   describe("dropdown handling", () => {
     test("opens dropdown and selects value", async () => {
-      const hierarchy = createHierarchyWithElement({
+      const initialHierarchy = createHierarchyWithElement({
         "resource-id": "country",
         "text": "Select Country",
         "class": "android.widget.Spinner"
       });
-      fakeObserve.setResult(createObserveResult(hierarchy));
+      const updatedHierarchy = createHierarchyWithElement({
+        "resource-id": "country",
+        "text": "United States",
+        "class": "android.widget.Spinner"
+      });
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
       fakeFieldTypeDetector.setFieldType("country", "dropdown");
-      fakeFieldTypeDetector.setTextValue("country", "Select Country");
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "country" }, value: "United States" }],
-        verifyAfter: false
+        fields: [{ selector: { elementId: "country" }, value: "United States" }]
       });
 
       expect(result.success).toBe(true);
@@ -235,35 +282,26 @@ describe("SetUIState", () => {
 
   describe("scroll to find", () => {
     test("scrolls to find element when not visible", async () => {
-      // First observation has no element
+      // First observation has no element, after scroll it appears
       let callCount = 0;
       fakeObserve.setResultFactory(() => {
         callCount++;
-        if (callCount === 1) {
+        if (callCount <= 1) {
           return createObserveResult({ hierarchy: { node: [] } });
         }
         return createObserveResult(createHierarchyWithElement({
           "resource-id": "hidden_field",
-          "text": "",
+          "text": "found!",
           "class": "android.widget.EditText"
         }));
       });
 
       fakeFieldTypeDetector.setFieldType("hidden_field", "text");
-
-      // Configure swipe to find element
-      fakeSwipe.setElementAppearsAfterSwipe("hidden_field", {
-        "bounds": { left: 0, top: 0, right: 100, bottom: 50 },
-        "resource-id": "hidden_field",
-        "text": "",
-        "class": "android.widget.EditText"
-      });
+      fakeFieldTypeDetector.setTextValue("hidden_field", "found!");
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "hidden_field" }, value: "found!" }],
-        scrollToFind: true,
-        verifyAfter: false
+        fields: [{ selector: { elementId: "hidden_field" }, value: "found!" }]
       });
 
       expect(result.success).toBe(true);
@@ -271,20 +309,27 @@ describe("SetUIState", () => {
     });
 
     test("respects scrollDirection option", async () => {
-      fakeObserve.setResult(createObserveResult({ hierarchy: { node: [] } }));
-
-      fakeSwipe.setElementAppearsAfterSwipe("field", {
-        "bounds": { left: 0, top: 0, right: 100, bottom: 50 },
-        "resource-id": "field",
-        "class": "android.widget.EditText"
+      // First observation: empty, second: element appears after scroll
+      let callCount = 0;
+      fakeObserve.setResultFactory(() => {
+        callCount++;
+        if (callCount <= 1) {
+          return createObserveResult({ hierarchy: { node: [] } });
+        }
+        return createObserveResult(createHierarchyWithElement({
+          "resource-id": "field",
+          "text": "test",
+          "class": "android.widget.EditText"
+        }));
       });
+
+      fakeFieldTypeDetector.setFieldType("field", "text");
+      fakeFieldTypeDetector.setTextValue("field", "test");
 
       const setUIState = createSetUIState();
       await setUIState.execute({
         fields: [{ selector: { elementId: "field" }, value: "test" }],
-        scrollToFind: true,
-        scrollDirection: "up",
-        verifyAfter: false
+        scrollDirection: "up"
       });
 
       // First scroll should be in the specified direction
@@ -312,9 +357,7 @@ describe("SetUIState", () => {
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "field" }, value: "test" }],
-        maxRetries: 3,
-        verifyAfter: false
+        fields: [{ selector: { elementId: "field" }, value: "test" }]
       });
 
       expect(result.success).toBe(false);
@@ -323,7 +366,7 @@ describe("SetUIState", () => {
     });
 
     test("refreshes view hierarchy between retries when element not found", async () => {
-      // Element appears after first attempt (simulating async load)
+      // Element appears after first call (simulating async load)
       let observeCallCount = 0;
       fakeObserve.setResultFactory(() => {
         observeCallCount++;
@@ -334,25 +377,21 @@ describe("SetUIState", () => {
         // Subsequent calls: element appears
         return createObserveResult(createHierarchyWithElement({
           "resource-id": "async_field",
-          "text": "",
+          "text": "loaded!",
           "class": "android.widget.EditText"
         }));
       });
 
       fakeFieldTypeDetector.setFieldType("async_field", "text");
+      fakeFieldTypeDetector.setTextValue("async_field", "loaded!");
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "async_field" }, value: "loaded!" }],
-        maxRetries: 3,
-        scrollToFind: false,  // Disable scroll to test hierarchy refresh
-        verifyAfter: false
+        fields: [{ selector: { elementId: "async_field" }, value: "loaded!" }]
       });
 
       expect(result.success).toBe(true);
       expect(result.fields[0].success).toBe(true);
-      // Should have taken multiple attempts
-      expect(result.fields[0].attempts).toBeGreaterThan(1);
       // Observe should have been called multiple times to refresh hierarchy
       expect(observeCallCount).toBeGreaterThan(1);
     });
@@ -381,56 +420,74 @@ describe("SetUIState", () => {
         fields: [
           { selector: { elementId: "field1" }, value: "test1" },
           { selector: { elementId: "field2" }, value: "test2" }
-        ],
-        maxRetries: 1,
-        verifyAfter: false
+        ]
       });
 
       expect(result.success).toBe(false);
-      // Only first field should be processed
-      expect(result.fields).toHaveLength(1);
+      // field1 processed (failed after 3 retries)
+      expect(result.fields[0].success).toBe(false);
+      expect(result.fields[0].attempts).toBe(3);
       expect(result.error).toContain("Failed to tap");
     });
   });
 
-  describe("sensitive fields", () => {
-    test("skips verification for sensitive fields", async () => {
+  describe("password fields", () => {
+    test("auto-detects password fields and skips verification", async () => {
       fakeObserve.setResult(createObserveResult(createHierarchyWithElement({
         "resource-id": "password",
         "text": "",
-        "class": "android.widget.EditText"
+        "class": "android.widget.EditText",
+        "password": "true"
       })));
 
       fakeFieldTypeDetector.setFieldType("password", "text");
+      fakeFieldTypeDetector.setIsPasswordField("password", true);
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { elementId: "password" }, value: "secret123", sensitive: true }],
-        verifyAfter: true
+        fields: [{ selector: { elementId: "password" }, value: "secret123" }]
       });
 
       expect(result.success).toBe(true);
-      // The field should NOT have verified=true because it's sensitive
+      // The field should NOT have verified=true because it's a password
       expect(result.fields[0].verified).toBeUndefined();
     });
   });
 
   describe("multiple fields", () => {
-    test("processes multiple fields in order", async () => {
-      const hierarchy: ViewHierarchyResult = {
+    test("processes fields in screen order", async () => {
+      const initialHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: [
             { $: { "bounds": "[0,0][100,50]", "resource-id": "username", "text": "", "class": "android.widget.EditText" } },
-            { $: { "bounds": "[0,60][100,110]", "resource-id": "password", "text": "", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,60][100,110]", "resource-id": "password", "text": "", "class": "android.widget.EditText", "password": "true" } },
             { $: { "bounds": "[0,120][100,170]", "resource-id": "remember", "class": "android.widget.CheckBox", "checkable": "true", "checked": "false" } }
           ]
         }
       };
-      fakeObserve.setResult(createObserveResult(hierarchy));
+      const updatedHierarchy: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,0][100,50]", "resource-id": "username", "text": "user@test.com", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,60][100,110]", "resource-id": "password", "text": "", "class": "android.widget.EditText", "password": "true" } },
+            { $: { "bounds": "[0,120][100,170]", "resource-id": "remember", "class": "android.widget.CheckBox", "checkable": "true", "checked": "true" } }
+          ]
+        }
+      };
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
+
       fakeFieldTypeDetector.setFieldType("username", "text");
       fakeFieldTypeDetector.setFieldType("password", "text");
       fakeFieldTypeDetector.setFieldType("remember", "checkbox");
-      fakeFieldTypeDetector.setChecked("remember", false);
+      fakeFieldTypeDetector.setIsPasswordField("password", true);
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
@@ -438,8 +495,7 @@ describe("SetUIState", () => {
           { selector: { elementId: "username" }, value: "user@test.com" },
           { selector: { elementId: "password" }, value: "pass123" },
           { selector: { elementId: "remember" }, selected: true }
-        ],
-        verifyAfter: false
+        ]
       });
 
       expect(result.success).toBe(true);
@@ -451,25 +507,102 @@ describe("SetUIState", () => {
       expect(inputCalls[0].text).toBe("user@test.com");
       expect(inputCalls[1].text).toBe("pass123");
     });
+
+    test("processes fields in screen order regardless of provided order", async () => {
+      const initialHierarchy: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,0][100,50]", "resource-id": "top_field", "text": "", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,200][100,250]", "resource-id": "bottom_field", "text": "", "class": "android.widget.EditText" } }
+          ]
+        }
+      };
+      const updatedHierarchy: ViewHierarchyResult = {
+        hierarchy: {
+          node: [
+            { $: { "bounds": "[0,0][100,50]", "resource-id": "top_field", "text": "first", "class": "android.widget.EditText" } },
+            { $: { "bounds": "[0,200][100,250]", "resource-id": "bottom_field", "text": "second", "class": "android.widget.EditText" } }
+          ]
+        }
+      };
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
+
+      fakeFieldTypeDetector.setFieldType("top_field", "text");
+      fakeFieldTypeDetector.setFieldType("bottom_field", "text");
+
+      const setUIState = createSetUIState();
+      const result = await setUIState.execute({
+        fields: [
+          // Provided in reverse screen order
+          { selector: { elementId: "bottom_field" }, value: "second" },
+          { selector: { elementId: "top_field" }, value: "first" }
+        ]
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.fields).toHaveLength(2);
+
+      // Even though bottom_field was listed first, top_field (bounds.top=0) should be filled first
+      const inputCalls = fakeInput.getCalls();
+      expect(inputCalls[0].text).toBe("first");   // top_field processed first
+      expect(inputCalls[1].text).toBe("second");   // bottom_field processed second
+    });
   });
 
   describe("text selector", () => {
     test("finds element by text selector", async () => {
-      const hierarchy = createHierarchyWithElement({
+      const initialHierarchy = createHierarchyWithElement({
         "text": "Username",
+        "content-desc": "Username",
         "class": "android.widget.EditText"
       });
-      fakeObserve.setResult(createObserveResult(hierarchy));
+      const updatedHierarchy = createHierarchyWithElement({
+        "text": "john",
+        "content-desc": "Username",
+        "class": "android.widget.EditText"
+      });
+
+      let observeCallCount = 0;
+      fakeObserve.setResultFactory(() => {
+        observeCallCount++;
+        if (observeCallCount <= 1) {
+          return createObserveResult(initialHierarchy);
+        }
+        return createObserveResult(updatedHierarchy);
+      });
       fakeFieldTypeDetector.setFieldType("Username", "text");
 
       const setUIState = createSetUIState();
       const result = await setUIState.execute({
-        fields: [{ selector: { text: "Username" }, value: "john" }],
-        verifyAfter: false
+        fields: [{ selector: { text: "Username" }, value: "john" }]
       });
 
       expect(result.success).toBe(true);
       expect(result.fields[0].success).toBe(true);
+    });
+  });
+
+  describe("unprocessed fields", () => {
+    test("reports unprocessed fields when not found after scrolling", async () => {
+      // Element never appears
+      fakeObserve.setResult(createObserveResult({ hierarchy: { node: [] } }));
+
+      const setUIState = createSetUIState();
+      const result = await setUIState.execute({
+        fields: [{ selector: { elementId: "nonexistent" }, value: "test" }]
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Fields not found after scrolling");
+      expect(result.error).toContain("nonexistent");
     });
   });
 });
