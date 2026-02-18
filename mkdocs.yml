@@ -152,6 +152,7 @@ nav:
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
             - 'Managed Apple IDs': design-docs/plat/ios/managed-apple-ids.md
             - 'XCTest Runner': design-docs/plat/ios/xctestrunner.md
+            - 'testmanagerd': design-docs/plat/ios/testmanagerd.md
             - 'Xcode Integration':
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/ios/ide-plugin/test-recording.md

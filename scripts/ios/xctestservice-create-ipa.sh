@@ -168,27 +168,36 @@ cd "${DERIVED_DATA}"
 zip -r "${OUTPUT_PATH}" Build/Products/
 cd "${PROJECT_ROOT}"
 
-# Compute SHA256
+# Compute SHA256 of IPA
 IPA_SHA256=$(shasum -a 256 "${OUTPUT_PATH}" | cut -d' ' -f1)
 IPA_SIZE=$(stat -f%z "${OUTPUT_PATH}" 2>/dev/null || stat -c%s "${OUTPUT_PATH}" 2>/dev/null)
+
+# Compute SHA256 of runner binary
+RUNNER_BINARY="${SIM_DIR}/XCTestServiceUITests-Runner.app/XCTestServiceUITests-Runner"
+RUNNER_SHA256=$(shasum -a 256 "${RUNNER_BINARY}" | cut -d' ' -f1)
 
 echo ""
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  IPA Summary${NC}"
 echo -e "${CYAN}========================================${NC}"
-echo -e "  ${BLUE}Path:${NC}   ${OUTPUT_PATH}"
-echo -e "  ${BLUE}Size:${NC}   ${IPA_SIZE} bytes"
-echo -e "  ${BLUE}SHA256:${NC} ${IPA_SHA256}"
+echo -e "  ${BLUE}Path:${NC}          ${OUTPUT_PATH}"
+echo -e "  ${BLUE}Size:${NC}          ${IPA_SIZE} bytes"
+echo -e "  ${BLUE}SHA256:${NC}        ${IPA_SHA256}"
+echo -e "  ${BLUE}Runner SHA256:${NC} ${RUNNER_SHA256}"
 echo ""
 
 # Output for scripts and CI
 echo "ipa_path=${OUTPUT_PATH}"
 echo "ipa_sha256=${IPA_SHA256}"
+echo "runner_sha256=${RUNNER_SHA256}"
 
 # Output for GitHub Actions
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-    echo "ipa_path=${OUTPUT_PATH}" >> "${GITHUB_OUTPUT}"
-    echo "ipa_sha256=${IPA_SHA256}" >> "${GITHUB_OUTPUT}"
+    {
+        echo "ipa_path=${OUTPUT_PATH}"
+        echo "ipa_sha256=${IPA_SHA256}"
+        echo "runner_sha256=${RUNNER_SHA256}"
+    } >> "${GITHUB_OUTPUT}"
 fi
 
 # Clean up temporary derived data

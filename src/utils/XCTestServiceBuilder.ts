@@ -8,6 +8,7 @@ import {
   XCTESTSERVICE_APP_HASH,
   XCTESTSERVICE_IPA_URL,
   XCTESTSERVICE_RELEASE_VERSION,
+  XCTESTSERVICE_RUNNER_SHA256,
   XCTESTSERVICE_SHA256_CHECKSUM
 } from "../constants/release";
 import {
@@ -483,6 +484,24 @@ export class XCTestServiceBuilder {
     }
   }
 
+  /**
+   * Get the runner binary path for simctl spawn
+   * Returns: <buildPath>/XCTestServiceUITests-Runner.app/XCTestServiceUITests-Runner
+   */
+  public async getRunnerBinaryPath(platform: XCTestServicePlatform = "simulator"): Promise<string | null> {
+    const buildPath = await this.getBuildProductsPath(platform);
+    if (!buildPath) {
+      return null;
+    }
+    const runnerBinaryPath = path.join(buildPath, "XCTestServiceUITests-Runner.app", "XCTestServiceUITests-Runner");
+    try {
+      await fs.access(runnerBinaryPath);
+      return runnerBinaryPath;
+    } catch {
+      return null;
+    }
+  }
+
   private getBundlePath(): string {
     return path.join(this.config.bundleCacheDir, XCTestServiceBuilder.DEFAULT_BUNDLE_FILENAME);
   }
@@ -702,6 +721,24 @@ export class XCTestServiceBuilder {
       logger.info("[XCTestServiceBuilder] App bundle hash verified", { platform, hash: localHash });
     } else {
       logger.warn(`[XCTestServiceBuilder] App bundle hash verification skipped for ${platform} (no hash provided)`);
+    }
+
+    // Verify runner binary SHA256 for simulator (used by simctl spawn)
+    if (platform === "simulator") {
+      const expectedRunnerSha256 = XCTESTSERVICE_RUNNER_SHA256;
+      if (expectedRunnerSha256 && expectedRunnerSha256.length > 0) {
+        const runnerBinaryPath = await this.getRunnerBinaryPath(platform);
+        if (!runnerBinaryPath) {
+          throw new Error(`XCTestService runner binary missing for ${platform}`);
+        }
+        const { checksum } = await this.downloader.computeFileSha256(runnerBinaryPath);
+        if (checksum.toLowerCase() !== expectedRunnerSha256.toLowerCase()) {
+          throw new Error(`XCTestService runner binary SHA256 mismatch for ${platform}. Expected: ${expectedRunnerSha256}, Got: ${checksum}`);
+        }
+        logger.info("[XCTestServiceBuilder] Runner binary SHA256 verified", { platform, checksum });
+      } else {
+        logger.warn(`[XCTestServiceBuilder] Runner binary SHA256 verification skipped for ${platform} (no hash provided)`);
+      }
     }
   }
 

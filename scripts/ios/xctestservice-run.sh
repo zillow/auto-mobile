@@ -42,6 +42,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DERIVED_DATA="/tmp/automobile-xctestservice"
 PORT="${XCTESTSERVICE_PORT:-8765}"
 TIMEOUT="${XCTESTSERVICE_TIMEOUT:-3600}"
+RUNNER_BINARY="${DERIVED_DATA}/Build/Products/Debug-iphonesimulator/XCTestServiceUITests-Runner.app/XCTestServiceUITests-Runner"
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  XCTestService Run${NC}"
@@ -64,30 +65,25 @@ echo -e "${BLUE}Port:${NC} ${PORT}"
 echo ""
 
 # Check if build is needed
-XCTESTRUN_FILE=$(find "${DERIVED_DATA}/Build/Products" -name "*.xctestrun" -type f 2>/dev/null | head -1)
-
-if [ "${FORCE_REBUILD}" = true ] || [ -z "${XCTESTRUN_FILE}" ]; then
+if [ "${FORCE_REBUILD}" = true ] || [ ! -f "${RUNNER_BINARY}" ]; then
     echo -e "${BLUE}Building XCTestService...${NC}"
     "${SCRIPT_DIR}/xctestservice-build-for-testing.sh"
-    XCTESTRUN_FILE=$(find "${DERIVED_DATA}/Build/Products" -name "*.xctestrun" -type f 2>/dev/null | head -1)
 fi
 
-if [ -z "${XCTESTRUN_FILE}" ]; then
-    echo -e "${RED}Error: No .xctestrun file found after build.${NC}"
+if [ ! -f "${RUNNER_BINARY}" ]; then
+    echo -e "${RED}Error: Runner binary not found: ${RUNNER_BINARY}${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}Using xctestrun:${NC} ${XCTESTRUN_FILE}"
+echo -e "${GREEN}Using runner binary:${NC} ${RUNNER_BINARY}"
 echo ""
 
-# Run XCTestService
+# Run XCTestService via simctl spawn (lighter than xcodebuild test-without-building)
 echo -e "${BLUE}Starting XCTestService...${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
 echo ""
 
-xcodebuild test-without-building \
-    -xctestrun "${XCTESTRUN_FILE}" \
-    -destination "id=${SIMULATOR_ID}" \
-    -only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService \
-    "XCTESTSERVICE_PORT=${PORT}" \
-    "XCTESTSERVICE_TIMEOUT=${TIMEOUT}"
+xcrun simctl spawn "${SIMULATOR_ID}" \
+    --setenv XCTESTSERVICE_PORT="${PORT}" \
+    --setenv XCTESTSERVICE_TIMEOUT="${TIMEOUT}" \
+    "${RUNNER_BINARY}"

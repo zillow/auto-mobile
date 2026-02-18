@@ -107,27 +107,7 @@ public class XCTestService {
         print("[XCTestService] Service stopped")
     }
 
-    /// Keeps the service running indefinitely
-    public func runForever() {
-        print("[XCTestService] Running forever (Ctrl+C to stop)")
 
-        let runLoop = RunLoop.current
-        while server.isRunning {
-            runLoop.run(until: Date(timeIntervalSinceNow: 1.0))
-        }
-    }
-
-    /// Runs the service for a specified duration
-    public func run(for duration: TimeInterval) {
-        print("[XCTestService] Running for \(duration) seconds")
-
-        let endTime = Date(timeIntervalSinceNow: duration)
-        let runLoop = RunLoop.current
-
-        while server.isRunning, Date() < endTime {
-            runLoop.run(until: Date(timeIntervalSinceNow: 1.0))
-        }
-    }
 }
 
 // MARK: - Convenience Extensions

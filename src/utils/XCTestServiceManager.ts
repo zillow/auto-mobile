@@ -497,7 +497,14 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       this.xcTestProcess = null;
     }
 
-    // Also try to kill any lingering xcodebuild test processes
+    // Kill any lingering simulator runner processes (simctl spawn path)
+    try {
+      await this.processExecutor.exec("pkill -f 'XCTestServiceUITests-Runner'");
+    } catch {
+      // Ignore errors if no process found
+    }
+
+    // Kill any lingering xcodebuild test processes (physical device path)
     try {
       await this.processExecutor.exec("pkill -f 'xcodebuild.*XCTestServiceUITests'");
     } catch {
@@ -654,30 +661,28 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       return;
     }
 
-    // Try to get xctestrun path for faster test-without-building
-    const xctestrunPath = await this.builder.getXctestrunPath("simulator");
-
-    let command: string;
-    if (xctestrunPath) {
-      // Use test-without-building for faster startup
-      logger.info("[XCTestServiceManager] Using test-without-building with xctestrun file");
-      command = [
-        "xcodebuild",
-        "test-without-building",
-        `-xctestrun "${xctestrunPath}"`,
-        `-destination "id=${this.device.deviceId}"`,
-        `-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService`,
-        `XCTESTSERVICE_PORT=${this.servicePort}`,
-        "2>&1"
-      ].join(" ");
-    } else {
-      throw new Error("XCTestService xctestrun not found. Download the XCTestService bundle before starting.");
+    // Get runner binary path for simctl spawn (lighter than xcodebuild test-without-building)
+    const runnerBinaryPath = await this.builder.getRunnerBinaryPath("simulator");
+    if (!runnerBinaryPath) {
+      throw new Error("XCTestService runner binary not found. Download the XCTestService bundle before starting.");
     }
+
+    const timeout = process.env.XCTESTSERVICE_TIMEOUT || "86400";
+    const command = [
+      "xcrun simctl spawn",
+      `"${this.device.deviceId}"`,
+      `--setenv XCTESTSERVICE_PORT=${this.servicePort}`,
+      `--setenv XCTESTSERVICE_TIMEOUT=${timeout}`,
+      `"${runnerBinaryPath}"`,
+      "2>&1"
+    ].join(" ");
+
+    logger.info("[XCTestServiceManager] Using simctl spawn to start runner binary");
 
     // Start in background
     const child = exec(command, error => {
       if (error) {
-        logger.warn(`[XCTestServiceManager] xcodebuild test exited: ${error.message}`);
+        logger.warn(`[XCTestServiceManager] simctl spawn exited: ${error.message}`);
         this.handleProcessExit();
       }
     });
@@ -685,7 +690,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     if (child.pid) {
       this.xcTestProcessId = child.pid;
       this.xcTestProcess = child;
-      logger.info(`[XCTestServiceManager] Started xcodebuild test with PID ${child.pid}`);
+      logger.info(`[XCTestServiceManager] Started simctl spawn with PID ${child.pid}`);
 
       // Start process monitoring
       this.startProcessMonitoring();

@@ -6,6 +6,9 @@ on:
       sha256:
         description: "SHA256 checksum of the built IPA"
         value: ${{ jobs.build.outputs.sha256 }}
+      runner_sha256:
+        description: "SHA256 checksum of the XCTestServiceUITests-Runner binary"
+        value: ${{ jobs.build.outputs.runner_sha256 }}
 
 jobs:
   build:
@@ -13,6 +16,7 @@ jobs:
     runs-on: macos-26
     outputs:
       sha256: ${{ steps.checksum.outputs.ipa_sha256 }}
+      runner_sha256: ${{ steps.checksum.outputs.runner_sha256 }}
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v4
