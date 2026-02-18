@@ -19,7 +19,7 @@ export const RELEASE_VERSION: string = "latest";
 export const APK_URL: string = RELEASE_VERSION === "latest"
   ? `https://github.com/kaeawc/auto-mobile/releases/latest/download/accessibility-service-debug.apk`
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${RELEASE_VERSION}/accessibility-service-debug.apk`;
-export const APK_SHA256_CHECKSUM: string = "f03ab51aab50d08ed503a187e29f11659e0084edd58a824160b0ffa2ea200ae7"; // Empty = skip verification (local dev only)
+export const APK_SHA256_CHECKSUM: string = "10fb50381c703bef806a5b8ffdb5997052483ab2b1f29f8e6c3f883311b20a72"; // Empty = skip verification (local dev only)
 
 /**
  * iOS XCTestService Release Constants
@@ -31,5 +31,5 @@ export const XCTESTSERVICE_RELEASE_VERSION: string = "latest";
 export const XCTESTSERVICE_IPA_URL: string = XCTESTSERVICE_RELEASE_VERSION === "latest"
   ? "https://github.com/kaeawc/auto-mobile/releases/latest/download/XCTestService.ipa"
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${XCTESTSERVICE_RELEASE_VERSION}/XCTestService.ipa`;
-export const XCTESTSERVICE_SHA256_CHECKSUM: string = "06e148e3848a71296ba9ed1144f99804d0e432515416d2d4bc4b2687160223c7"; // Empty = skip verification (local dev only)
+export const XCTESTSERVICE_SHA256_CHECKSUM: string = "6dab359a6288e6af8c1f2abad5478ba876a2eae5075a5d9f3b3854a84de18c14"; // Empty = skip verification (local dev only)
 export const XCTESTSERVICE_APP_HASH: string = ""; // Hash of XCTestServiceApp.app (device build), empty = skip verification
