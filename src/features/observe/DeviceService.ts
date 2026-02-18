@@ -15,7 +15,7 @@ import type { PerformanceTracker } from "../../utils/PerformanceTracker";
 /**
  * Base result interface for all device operations.
  */
-export interface DeviceOperationResult {
+interface DeviceOperationResult {
   success: boolean;
   error?: string;
 }
@@ -293,41 +293,6 @@ export interface AndroidDeviceService extends DeviceService {
   requestTraversalOrder(timeoutMs?: number): Promise<TraversalResult>;
 }
 
-/**
- * iOS-specific device service operations.
- */
-export interface AppleDeviceService extends DeviceService {
-  /**
-   * Launch an app by bundle identifier.
-   * @param bundleId The app's bundle identifier
-   * @param timeoutMs Operation timeout in milliseconds
-   */
-  requestLaunchApp(
-    bundleId: string,
-    timeoutMs?: number
-  ): Promise<DeviceOperationResult>;
-
-  /**
-   * Terminate an app by bundle identifier.
-   * @param bundleId The app's bundle identifier
-   * @param timeoutMs Operation timeout in milliseconds
-   */
-  requestTerminateApp(
-    bundleId: string,
-    timeoutMs?: number
-  ): Promise<DeviceOperationResult>;
-
-  /**
-   * Press a hardware button.
-   * @param button The button to press (e.g., "home", "volumeUp")
-   * @param timeoutMs Operation timeout in milliseconds
-   */
-  requestPressButton(
-    button: string,
-    timeoutMs?: number
-  ): Promise<DeviceOperationResult>;
-}
-
 // =============================================================================
 // Additional Result Types for Platform-Specific Operations
 // =============================================================================
@@ -335,7 +300,7 @@ export interface AppleDeviceService extends DeviceService {
 /**
  * Result for clipboard operations (Android).
  */
-export interface ClipboardResult extends DeviceOperationResult {
+interface ClipboardResult extends DeviceOperationResult {
   totalTimeMs: number;
   /** The action that was performed */
   action: string;
@@ -355,7 +320,7 @@ export interface ActionResult extends DeviceOperationResult {
 /**
  * Result for focus query (Android).
  */
-export interface FocusResult extends DeviceOperationResult {
+interface FocusResult extends DeviceOperationResult {
   totalTimeMs: number;
   /** JSON string of focused element */
   focusedElement?: string;
@@ -364,7 +329,7 @@ export interface FocusResult extends DeviceOperationResult {
 /**
  * Result for traversal order query (Android).
  */
-export interface TraversalResult extends DeviceOperationResult {
+interface TraversalResult extends DeviceOperationResult {
   totalTimeMs: number;
   /** Traversal order data */
   result?: {

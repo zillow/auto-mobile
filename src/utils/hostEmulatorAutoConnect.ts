@@ -148,19 +148,6 @@ async function tryConnect(host: string, port: number): Promise<boolean> {
 }
 
 /**
- * Disconnect from a device
- */
-export async function disconnectDevice(target: string): Promise<void> {
-  try {
-    await execAdb(["disconnect", target], 2000);
-    connectedDevices.delete(target);
-    logger.debug(`Disconnected from ${target}`);
-  } catch (error) {
-    logger.debug(`Failed to disconnect from ${target}: ${error}`);
-  }
-}
-
-/**
  * Scan for and connect to host emulators
  */
 async function scanAndConnect(): Promise<void> {
@@ -284,42 +271,4 @@ export async function stopHostEmulatorAutoConnect(): Promise<void> {
   // Optionally disconnect from all devices
   // (Usually we want to leave connections intact for graceful shutdown)
   logger.debug("Host emulator auto-connect service stopped");
-}
-
-/**
- * Get the current status of auto-connect service
- */
-export function getAutoConnectStatus(): {
-  enabled: boolean;
-  running: boolean;
-  mode: "adb-server-tunnel" | "direct-connect" | "disabled";
-  connectedDevices: string[];
-  hostGateway: string;
-  adbServerHost: string | null;
-  adbServerPort: string | null;
-  scanIntervalMs: number;
-  } {
-  let mode: "adb-server-tunnel" | "direct-connect" | "disabled" = "disabled";
-  if (EXTERNAL_MODE) {
-    mode = USE_ADB_SERVER_TUNNEL ? "adb-server-tunnel" : "direct-connect";
-  }
-
-  return {
-    enabled: EXTERNAL_MODE,
-    running: scanInterval !== null || USE_ADB_SERVER_TUNNEL,
-    mode,
-    connectedDevices: Array.from(connectedDevices),
-    hostGateway: HOST_GATEWAY,
-    adbServerHost: ADB_SERVER_HOST || null,
-    adbServerPort: USE_ADB_SERVER_TUNNEL ? ADB_SERVER_PORT : null,
-    scanIntervalMs: SCAN_INTERVAL_MS
-  };
-}
-
-/**
- * Manually trigger a scan (useful for testing or on-demand refresh)
- */
-export async function triggerScan(): Promise<string[]> {
-  await scanAndConnect();
-  return Array.from(connectedDevices);
 }

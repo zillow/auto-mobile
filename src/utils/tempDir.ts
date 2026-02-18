@@ -13,13 +13,13 @@ import path from "path";
  * Base directory for all auto-mobile temp files.
  * Uses os.tmpdir() for portability (works on macOS, Linux, Windows).
  */
-export const AUTO_MOBILE_TEMP_BASE = path.join(os.tmpdir(), "auto-mobile");
+const AUTO_MOBILE_TEMP_BASE = path.join(os.tmpdir(), "auto-mobile");
 
 /**
  * Restrictive directory permissions (owner read/write/execute only).
  * Prevents other users from accessing temp files.
  */
-export const SECURE_DIR_MODE = 0o700;
+const SECURE_DIR_MODE = 0o700;
 
 /**
  * Get a secure temp directory path for a given subdirectory.
@@ -30,19 +30,6 @@ export const SECURE_DIR_MODE = 0o700;
  */
 export function getTempDir(subdirectory: string): string {
   return path.join(AUTO_MOBILE_TEMP_BASE, subdirectory);
-}
-
-/**
- * Ensure a secure temp directory exists with restrictive permissions.
- * Creates the directory if it doesn't exist, with mode 0o700 (owner-only access).
- *
- * @param subdirectory - Subdirectory name under auto-mobile temp base
- * @returns Full path to the created/existing temp directory
- */
-export async function ensureSecureTempDir(subdirectory: string): Promise<string> {
-  const dir = getTempDir(subdirectory);
-  await fs.ensureDir(dir, { mode: SECURE_DIR_MODE });
-  return dir;
 }
 
 /**

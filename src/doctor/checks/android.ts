@@ -130,7 +130,7 @@ export async function checkAndroidCommandLineTools(
 /**
  * Check ANDROID_HOME environment variable
  */
-export async function checkAndroidHome(): Promise<CheckResult> {
+async function checkAndroidHome(): Promise<CheckResult> {
   const androidHome = getAndroidSdkFromEnvironment();
 
   if (androidHome) {
@@ -243,7 +243,7 @@ export async function checkAdbVersion(
 /**
  * Check Android emulator availability
  */
-export async function checkEmulator(): Promise<CheckResult> {
+async function checkEmulator(): Promise<CheckResult> {
   try {
     const emulator = new AndroidEmulatorClient();
     // Try to list AVDs - this will fail if emulator is not available
@@ -316,7 +316,7 @@ export async function checkConnectedDevices(
 /**
  * Check available AVDs
  */
-export async function checkAvailableAvds(): Promise<CheckResult> {
+async function checkAvailableAvds(): Promise<CheckResult> {
   try {
     const emulator = new AndroidEmulatorClient();
     const avds = await emulator.listAvds();

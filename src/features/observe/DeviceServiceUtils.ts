@@ -6,7 +6,6 @@
  */
 
 import type { Timer } from "../../utils/SystemTimer";
-import type { RequestManager } from "../../utils/RequestManager";
 import type { GestureResult, TextResult, ScreenshotResult } from "./DeviceService";
 import type { BaseResult, GestureTimingResult, ActionTimingResult } from "./shared/types";
 
@@ -17,7 +16,7 @@ import type { BaseResult, GestureTimingResult, ActionTimingResult } from "./shar
 /**
  * Options for WebSocket connection management.
  */
-export interface ConnectionOptions {
+interface ConnectionOptions {
   /** Maximum connection attempts */
   maxAttempts: number;
   /** Delay between attempts in ms */
@@ -122,35 +121,6 @@ export function createScreenshotNotConnectedResult(): ScreenshotResult {
     success: false,
     error: "Not connected",
   };
-}
-
-// =============================================================================
-// Request Helpers
-// =============================================================================
-
-/**
- * Options for creating a request.
- */
-export interface RequestOptions<T> {
-  requestManager: RequestManager;
-  requestType: string;
-  timeoutMs: number;
-  createTimeoutResult: (id: string, type: string, timeout: number) => T;
-}
-
-/**
- * Create and register a request with the RequestManager.
- * Returns [requestId, promise] tuple.
- */
-export function createRequest<T>(options: RequestOptions<T>): [string, Promise<T>] {
-  const requestId = options.requestManager.generateId(options.requestType);
-  const promise = options.requestManager.register<T>(
-    requestId,
-    options.requestType,
-    options.timeoutMs,
-    options.createTimeoutResult
-  );
-  return [requestId, promise];
 }
 
 // =============================================================================

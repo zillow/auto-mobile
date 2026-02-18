@@ -359,28 +359,6 @@ export async function notifyDatabaseChanged(
 }
 
 /**
- * Invalidate all database caches for a device
- */
-export function invalidateDatabaseCache(deviceId?: string): void {
-  if (deviceId) {
-    // Remove entries for specific device
-    for (const key of cache.byApp.keys()) {
-      if (key.startsWith(`${deviceId}:`)) {
-        cache.byApp.delete(key);
-      }
-    }
-    for (const key of cache.tableSchemas.keys()) {
-      if (key.startsWith(`${deviceId}:`)) {
-        cache.tableSchemas.delete(key);
-      }
-    }
-  } else {
-    cache.byApp.clear();
-    cache.tableSchemas.clear();
-  }
-}
-
-/**
  * Register database resources
  */
 export function registerDatabaseResources(): void {

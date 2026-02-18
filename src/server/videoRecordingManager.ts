@@ -33,7 +33,7 @@ const MAX_DURATION_SECONDS = 300;
 // Keep in sync with HighlightAnimator's total fade-in + display + fade-out duration.
 const HIGHLIGHT_ANIMATION_DURATION_MS = 6000;
 
-export interface StartVideoRecordingRequest {
+interface StartVideoRecordingRequest {
   device: BootedDevice;
   configOverrides?: VideoRecordingConfigInput;
   outputName?: string;
@@ -41,17 +41,17 @@ export interface StartVideoRecordingRequest {
   highlights?: VideoRecordingHighlightInput[];
 }
 
-export interface StopVideoRecordingResult {
+interface StopVideoRecordingResult {
   metadata: VideoRecordingMetadata;
   evictedRecordingIds: string[];
 }
 
-export interface VideoRecordingConfigUpdateResult {
+interface VideoRecordingConfigUpdateResult {
   config: VideoRecordingConfig;
   evictedRecordingIds: string[];
 }
 
-export interface VideoArchiveEvictionResult {
+interface VideoArchiveEvictionResult {
   evictedRecordingIds: string[];
   currentSizeBytes: number;
   maxSizeBytes: number;
@@ -170,7 +170,7 @@ export async function setVideoRecordingManagerDependencies(
   resetVideoRecordingManagerState();
 }
 
-export function resetVideoRecordingManagerState(): void {
+function resetVideoRecordingManagerState(): void {
   for (const { timer, handle } of autoStopTimers.values()) {
     timer.clearTimeout(handle);
   }
@@ -492,10 +492,6 @@ async function notifyVideoRecordingResources(recordingIds: string[]): Promise<vo
   await ResourceRegistry.notifyResourcesUpdated(Array.from(uris));
 }
 
-export async function getVideoRecorderService(): Promise<VideoRecorderService> {
-  return (await getVideoRecordingDependencies()).videoRecorderService;
-}
-
 export async function getVideoRecordingConfig(): Promise<VideoRecordingConfig> {
   const { configRepository } = await getVideoRecordingDependencies();
   const stored = await configRepository.getConfig();
@@ -698,7 +694,7 @@ export async function getLatestVideoRecordingMetadata(): Promise<VideoRecordingM
   return latest ? toMetadata(latest) : null;
 }
 
-export async function deleteVideoRecording(recordingId: string): Promise<boolean> {
+async function deleteVideoRecording(recordingId: string): Promise<boolean> {
   const { recordingRepository } = await getVideoRecordingDependencies();
   const record = await recordingRepository.getRecording(recordingId);
 
@@ -722,7 +718,7 @@ export async function deleteVideoRecording(recordingId: string): Promise<boolean
   return deleted;
 }
 
-export async function enforceArchiveLimit(
+async function enforceArchiveLimit(
   maxArchiveSizeMb: number
 ): Promise<VideoArchiveEvictionResult> {
   const maxSizeBytes = Math.max(0, Math.floor(maxArchiveSizeMb * 1024 * 1024));

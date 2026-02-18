@@ -13,8 +13,8 @@ import { throwIfAborted } from "../../utils/toolUtils";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
-// Re-export all types for backward compatibility
-export * from "./ExploreTypes";
+// Re-export consumed types
+export type { ExploreOptions } from "./ExploreTypes";
 
 // Import types
 import type {

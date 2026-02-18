@@ -16,7 +16,7 @@ import { registerVideoRecordingTools } from "../server/videoRecordingTools";
 import { registerNotificationTools } from "../server/notificationTools";
 
 // Initialize tool registry for CLI mode
-export function initializeCliTools(): void {
+function initializeCliTools(): void {
 
   // Register all tool categories
   registerObserveTools();

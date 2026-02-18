@@ -1,4 +1,4 @@
-export function stableStringify(value: unknown): string {
+function stableStringify(value: unknown): string {
   return JSON.stringify(sortValue(value));
 }
 

@@ -18,7 +18,6 @@ export { ScreenshotUtils as ScreenshotUtilsImpl } from "../screenshot/Screenshot
 export type { ScreenshotUtils } from "./ScreenshotUtils";
 export { screenshotUtilsAdapter } from "../ScreenshotUtilsAdapter";
 export { ImageUtils } from "./ImageUtils";
-export { PlanUtils } from "./PlanUtils";
 export { PlanSerializer } from "./PlanSerializer";
 export { PlanExecutor } from "./PlanExecutor";
 export { Timer } from "./Timer";
@@ -26,13 +25,6 @@ export { SystemDetection } from "../system/SystemDetection";
 export { AppleSimulatorInfo, AppleSimulatorManager } from "./Simulator";
 export { FileSystem } from "../filesystem/DefaultFileSystem";
 export { ToolRegistry, RegisteredTool } from "../server/ToolRegistry";
-export { AndroidEmulator } from "./AndroidEmulator";
-export {
-  AndroidDetection,
-  AndroidToolsLocation,
-  AndroidToolInfo,
-  AndroidToolsSource
-} from "./AndroidDetection";
 export {
   SimCtl,
   AppleDevice,
@@ -45,8 +37,6 @@ export { DefaultToolResponseFormatter, ToolResponseFormatter } from "../toolUtil
 export { NodeCryptoService, CryptoService } from "../crypto";
 // Re-export from co-located interfaces
 export { DeviceDetection, DevicePlatform } from "../DeviceDetection";
-// Re-export from co-located interfaces
-export { DeviceSelector } from "../DeviceSelectorService";
 export { Logger, LogLevel } from "../logger";
 // Element utility interfaces
 export type { ElementFinder } from "./ElementFinder";

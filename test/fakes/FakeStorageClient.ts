@@ -10,7 +10,7 @@ import type {
 /**
  * Recorded operation for verification in tests.
  */
-export interface RecordedStorageOperation {
+interface RecordedStorageOperation {
   method: string;
   args: Record<string, unknown>;
   timestamp: number;
@@ -19,7 +19,7 @@ export interface RecordedStorageOperation {
 /**
  * Mock preference file data for testing.
  */
-export interface MockPreferenceData {
+interface MockPreferenceData {
   file: PreferenceFile;
   entries: KeyValueEntry[];
 }

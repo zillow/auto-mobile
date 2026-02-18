@@ -94,25 +94,6 @@ import type {
   AndroidPerfTiming,
 } from "./types";
 
-// Re-export types for backward compatibility
-export type {
-  AccessibilityHierarchy,
-  AccessibilityHierarchyResponse,
-  ScreenshotResult,
-  A11ySwipeResult,
-  A11yTapCoordinatesResult,
-  A11yDragResult,
-  A11yPinchResult,
-  A11ySetTextResult,
-  A11yImeActionResult,
-  A11ySelectAllResult,
-  A11yActionResult,
-  A11yClipboardResult,
-  A11yCaCertResult,
-  A11yDeviceOwnerStatusResult,
-  A11yPermissionResult,
-  AndroidPerfTiming,
-};
 
 /**
  * Interface for interaction event from accessibility service

@@ -8,12 +8,12 @@ export type WcagLevel = "A" | "AA" | "AAA";
 /**
  * Violation severity levels
  */
-export type ViolationSeverity = "error" | "warning" | "info";
+type ViolationSeverity = "error" | "warning" | "info";
 
 /**
  * Failure mode for accessibility audits
  */
-export type FailureMode = "report" | "threshold" | "strict";
+type FailureMode = "report" | "threshold" | "strict";
 
 /**
  * Types of WCAG violations that can be detected

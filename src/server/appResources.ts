@@ -18,9 +18,9 @@ export const APPS_RESOURCE_URIS = {
 
 const APPS_QUERY_KEYS = ["deviceId", "platform", "search", "type", "profile"] as const;
 type AppsQueryKey = typeof APPS_QUERY_KEYS[number];
-export type AppsQueryType = "user" | "system";
+type AppsQueryType = "user" | "system";
 
-export interface AppsQueryOptions {
+interface AppsQueryOptions {
   platform?: Platform;
   search?: string;
   type?: AppsQueryType;
@@ -28,7 +28,7 @@ export interface AppsQueryOptions {
   deviceId?: string;
 }
 
-export interface AppsQueryAppInfo {
+interface AppsQueryAppInfo {
   packageName: string;
   type: AppsQueryType;
   foreground: boolean;
@@ -39,7 +39,7 @@ export interface AppsQueryAppInfo {
   displayName?: string;
 }
 
-export interface AppsQueryDeviceContent {
+interface AppsQueryDeviceContent {
   deviceId: string;
   platform: Platform;
   totalCount: number;
@@ -47,7 +47,7 @@ export interface AppsQueryDeviceContent {
   apps: AppsQueryAppInfo[];
 }
 
-export interface AppsQueryResourceContent {
+interface AppsQueryResourceContent {
   query: AppsQueryOptions;
   totalCount: number;
   deviceCount: number;
@@ -56,7 +56,7 @@ export interface AppsQueryResourceContent {
 }
 
 // Resource content schema
-export interface AppsResourceContent {
+interface AppsResourceContent {
   deviceId: string;
   platform: Platform;
   apps: InstalledAppInfo[];
@@ -66,7 +66,7 @@ export interface AppsResourceContent {
   message?: string;
 }
 
-export interface AndroidInstalledAppInfo {
+interface AndroidInstalledAppInfo {
   packageName: string;
   userId: number;
   userProfile: "personal" | "work";
@@ -74,14 +74,14 @@ export interface AndroidInstalledAppInfo {
   recent: boolean;
 }
 
-export interface IosInstalledAppInfo {
+interface IosInstalledAppInfo {
   bundleId: string;
   displayName?: string;
   version?: string;
   path?: string;
 }
 
-export type InstalledAppInfo = AndroidInstalledAppInfo | IosInstalledAppInfo;
+type InstalledAppInfo = AndroidInstalledAppInfo | IosInstalledAppInfo;
 
 interface AppsCacheEntry {
   expiresAt: number;

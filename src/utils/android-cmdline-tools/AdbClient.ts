@@ -13,7 +13,7 @@ import { Timer, defaultTimer } from "../SystemTimer";
 type ExecFileAsync = (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
 
 // Module-level cache configuration and instances
-let moduleTimer: Timer = defaultTimer;
+const moduleTimer: Timer = defaultTimer;
 let deviceListCache: TTLCache<string, BootedDevice[]> | null = null;
 let adbPathCache: TTLCache<string, string> | null = null;
 
@@ -34,25 +34,6 @@ function getAdbPathCache(): TTLCache<string, string> {
   return adbPathCache;
 }
 
-/**
- * Reset all AdbClient module-level caches.
- * Useful for testing and cleanup.
- */
-export function resetAdbClientCaches(): void {
-  deviceListCache?.clear();
-  adbPathCache?.clear();
-}
-
-/**
- * Set the timer used by AdbClient module-level caches.
- * This resets existing caches to use the new timer.
- * Primarily for testing with FakeTimer.
- */
-export function setAdbClientTimer(timer: Timer): void {
-  deviceListCache = null;
-  adbPathCache = null;
-  moduleTimer = timer;
-}
 
 // Enhance the standard execFileAsync result to implement the ExecResult interface
 const execFileAsync: ExecFileAsync = async (
@@ -282,10 +263,6 @@ export class AdbClient implements AdbExecutor {
     }
 
     return { adbPath, baseArgs };
-  }
-
-  async getAdbPathOnly(): Promise<string> {
-    return this.ensureAdbPath();
   }
 
   /**
@@ -889,6 +866,3 @@ export class AdbClient implements AdbExecutor {
     }
   }
 }
-
-// Backward compatibility export
-export const AdbUtils = AdbClient;

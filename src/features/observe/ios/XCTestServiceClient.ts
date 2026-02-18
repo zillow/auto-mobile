@@ -102,23 +102,6 @@ import type {
   WebSocketMessage,
 } from "./types";
 
-// Re-export types for backward compatibility
-export type {
-  XCTestNode,
-  XCTestHierarchy,
-  XCTestHierarchyResponse,
-  XCTestScreenshotResult,
-  XCTestSwipeResult,
-  XCTestTapResult,
-  XCTestDragResult,
-  XCTestPinchResult,
-  XCTestSetTextResult,
-  XCTestImeActionResult,
-  XCTestSelectAllResult,
-  XCTestPressHomeResult,
-  XCTestLaunchAppResult,
-  XCTestPerfTiming,
-};
 
 /**
  * Interface for XCTestService providing iOS UI hierarchy and interaction capabilities

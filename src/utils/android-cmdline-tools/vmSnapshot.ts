@@ -1,6 +1,6 @@
 import { ExecResult } from "../../models";
 
-export type VmSnapshotAction = "save" | "load";
+type VmSnapshotAction = "save" | "load";
 
 const OK_TOKEN = /\bOK\b/;
 const KO_TOKEN = /\bKO\b/;
@@ -37,7 +37,7 @@ export function formatVmSnapshotExecutionError(
   return buildVmSnapshotErrorMessage(action, snapshotName, detail);
 }
 
-export function buildVmSnapshotErrorMessage(
+function buildVmSnapshotErrorMessage(
   action: VmSnapshotAction,
   snapshotName: string,
   detail: string

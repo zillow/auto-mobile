@@ -1,4 +1,4 @@
-import { getDatabase, ensureMigrations as ensureDbMigrations } from "../../src/db/database";
+import { ensureMigrations as ensureDbMigrations } from "../../src/db/database";
 
 /**
  * Run all database migrations for testing.
@@ -7,19 +7,4 @@ import { getDatabase, ensureMigrations as ensureDbMigrations } from "../../src/d
  */
 export async function runMigrations(): Promise<void> {
   await ensureDbMigrations();
-}
-
-/**
- * Check if a table exists in the database.
- */
-export async function tableExists(tableName: string): Promise<boolean> {
-  const db = getDatabase();
-  const result = await db
-    .selectFrom("sqlite_master" as any)
-    .select("name")
-    .where("type", "=", "table")
-    .where("name", "=", tableName)
-    .executeTakeFirst();
-
-  return result !== undefined;
 }

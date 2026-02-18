@@ -101,17 +101,6 @@ export const registerDeviceLabelMap = async (
   return deviceLabelMap;
 };
 
-export const resolveDeviceLabel = (
-  baseSessionUuid: string,
-  label: string
-): string | null => {
-  const map = getDeviceLabelMap(baseSessionUuid);
-  if (!map) {
-    return null;
-  }
-  return map[label] ?? null;
-};
-
 export const releaseDeviceLabelSessions = async (baseSessionUuid: string): Promise<string[]> => {
   if (!DaemonState.getInstance().isInitialized()) {
     return [];

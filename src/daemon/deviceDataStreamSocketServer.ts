@@ -391,11 +391,3 @@ export async function stopDeviceDataStreamSocketServer(): Promise<void> {
   await socketServer.close();
   socketServer = null;
 }
-
-// Legacy exports for backward compatibility during migration
-export {
-  DeviceDataStreamSocketServer as ObservationStreamSocketServer,
-  getDeviceDataStreamServer as getObservationStreamServer,
-  startDeviceDataStreamSocketServer as startObservationStreamSocketServer,
-  stopDeviceDataStreamSocketServer as stopObservationStreamSocketServer,
-};

@@ -113,7 +113,7 @@ export async function handlePermissionDialog(
 /**
  * Dismiss dialog by clicking dismiss/close/later buttons
  */
-export async function dismissDialog(
+async function dismissDialog(
   elements: Element[],
   device: BootedDevice,
   adb: AdbClient | null,
@@ -162,7 +162,7 @@ export async function dismissDialog(
 /**
  * Handler for dead end situations
  */
-export type DeadEndHandler = (progress?: ProgressCallback) => Promise<void>;
+type DeadEndHandler = (progress?: ProgressCallback) => Promise<void>;
 
 /**
  * Detect and handle blocker screens (login, permissions, dialogs)

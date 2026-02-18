@@ -20,13 +20,6 @@ export type { DelegateContext } from "../shared/types";
 export type { PerfTiming, BaseResult, GestureTimingResult, ActionTimingResult } from "../shared/types";
 
 /**
- * Generate a cryptographically secure random suffix for request IDs.
- * Uses crypto.randomBytes which is much more secure than Math.random().
- * @returns 8-character hex string
- */
-export { randomBytes } from "crypto";
-
-/**
  * Generate a secure ID for request IDs.
  */
 export function generateSecureId(): string {

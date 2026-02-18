@@ -2,9 +2,9 @@ import { performance } from "node:perf_hooks";
 import fs from "node:fs";
 import path from "node:path";
 
-export const STARTUP_BENCHMARK_PREFIX = "STARTUP_BENCHMARK";
+const STARTUP_BENCHMARK_PREFIX = "STARTUP_BENCHMARK";
 
-export interface StartupBenchmarkReport {
+interface StartupBenchmarkReport {
   type: string;
   timestamp: string;
   pid: number;

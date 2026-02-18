@@ -10,7 +10,7 @@ import type { ObserveScreen } from "../../src/features/observe/interfaces/Observ
 /**
  * Interface for TapOnElement dependency
  */
-export interface TapOnElementLike {
+interface TapOnElementLike {
   execute(
     options: { text?: string; elementId?: string; action: string },
     progress?: any,
@@ -21,21 +21,21 @@ export interface TapOnElementLike {
 /**
  * Interface for InputText dependency
  */
-export interface InputTextLike {
+interface InputTextLike {
   execute(text: string, imeAction?: string): Promise<SendTextResult>;
 }
 
 /**
  * Interface for ClearText dependency
  */
-export interface ClearTextLike {
+interface ClearTextLike {
   execute(progress?: any): Promise<ClearTextResult>;
 }
 
 /**
  * Interface for SwipeOn dependency
  */
-export interface SwipeOnLike {
+interface SwipeOnLike {
   execute(
     options: { direction: string; lookFor?: { text?: string; elementId?: string } },
     progress?: any
@@ -45,14 +45,14 @@ export interface SwipeOnLike {
 /**
  * Recorded tap call for assertions
  */
-export interface TapCall {
+interface TapCall {
   options: { text?: string; elementId?: string; action: string };
 }
 
 /**
  * Recorded input text call for assertions
  */
-export interface InputTextCall {
+interface InputTextCall {
   text: string;
   imeAction?: string;
 }
@@ -60,7 +60,7 @@ export interface InputTextCall {
 /**
  * Recorded swipe call for assertions
  */
-export interface SwipeCall {
+interface SwipeCall {
   options: { direction: string; lookFor?: { text?: string; elementId?: string } };
 }
 

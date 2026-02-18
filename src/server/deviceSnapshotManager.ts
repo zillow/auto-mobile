@@ -16,7 +16,7 @@ import { RestoreSnapshotIos } from "../features/action/RestoreSnapshotIos";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import { logger } from "../utils/logger";
 
-export interface DeviceSnapshotCaptureArgs {
+interface DeviceSnapshotCaptureArgs {
   snapshotName?: string;
   includeAppData?: boolean;
   includeSettings?: boolean;
@@ -28,28 +28,28 @@ export interface DeviceSnapshotCaptureArgs {
   appBundleIds?: string[];
 }
 
-export interface DeviceSnapshotRestoreArgs {
+interface DeviceSnapshotRestoreArgs {
   snapshotName: string;
   useVmSnapshot?: boolean;
   vmSnapshotTimeoutMs?: number;
 }
 
-export interface DeviceSnapshotConfigUpdateResult {
+interface DeviceSnapshotConfigUpdateResult {
   config: DeviceSnapshotConfig;
   evictedSnapshotNames: string[];
 }
 
-export interface SnapshotArchiveEvictionResult {
+interface SnapshotArchiveEvictionResult {
   evictedSnapshotNames: string[];
   currentSizeBytes: number;
   maxSizeBytes: number;
 }
 
-export interface SnapshotCaptureAction {
+interface SnapshotCaptureAction {
   execute(args: CaptureSnapshotArgs): Promise<CaptureSnapshotResult>;
 }
 
-export interface SnapshotRestoreAction {
+interface SnapshotRestoreAction {
   execute(args: RestoreSnapshotArgs): Promise<RestoreSnapshotResult>;
 }
 
@@ -386,7 +386,7 @@ async function deleteDeviceSnapshotRecord(
   return deleted;
 }
 
-export async function enforceDeviceSnapshotArchiveLimit(
+async function enforceDeviceSnapshotArchiveLimit(
   maxArchiveSizeMb: number
 ): Promise<SnapshotArchiveEvictionResult> {
   const maxSizeBytes = Math.max(0, Math.floor(maxArchiveSizeMb * 1024 * 1024));

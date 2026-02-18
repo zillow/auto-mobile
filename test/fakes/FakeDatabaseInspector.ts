@@ -9,7 +9,7 @@ import type {
 /**
  * Mock table definition for testing
  */
-export interface MockTable {
+interface MockTable {
   columns: ColumnInfo[];
   rows: any[][];
 }
@@ -26,7 +26,7 @@ export interface MockDatabase {
 /**
  * Recorded operation for verification in tests
  */
-export interface RecordedOperation {
+interface RecordedOperation {
   method: string;
   appId: string;
   args: Record<string, any>;

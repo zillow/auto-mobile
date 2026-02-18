@@ -1,7 +1,6 @@
 {
   "ignorePaths": [
     "src/daemon/socketServer/index.ts",
-    "src/daemon/unified/index.ts",
     "src/db/index.ts",
     "src/features/accessibility/index.ts",
     "src/features/action/Fling.ts",
@@ -28,12 +27,25 @@
     "src/utils/screenshot-utils.ts",
     "src/vision/index.ts"
   ],
-  "ignorePathPatterns": [],
+  "ignorePathPatterns": [
+    "src/daemon/",
+    "scripts/memory/"
+  ],
   "ignoreEntries": [
     {
       "file": "src/features/action/UninstallApp.ts",
       "name": "UninstallApp",
       "reason": "TODO: planned usage in future PR"
+    },
+    {
+      "file": "src/utils/android-cmdline-tools/avdmanager.ts",
+      "name": "COMMON_SYSTEM_IMAGES",
+      "reason": "Used via namespace import in tests (import * as avdmanager)"
+    },
+    {
+      "file": "src/utils/android-cmdline-tools/avdmanager.ts",
+      "name": "COMMON_DEVICES",
+      "reason": "Used via namespace import in tests (import * as avdmanager)"
     }
   ]
 }

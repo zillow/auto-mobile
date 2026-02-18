@@ -23,31 +23,6 @@ export interface DaemonMcpProxyConfig {
 }
 
 /**
- * Result of a proxied tool call
- */
-export interface ProxiedToolResult {
-  content: Array<{
-    type: "text" | "image";
-    text?: string;
-    data?: string;
-    mimeType?: string;
-  }>;
-  isError?: boolean;
-}
-
-/**
- * Result of a proxied resource read
- */
-export interface ProxiedResourceResult {
-  contents: Array<{
-    uri: string;
-    mimeType?: string;
-    text?: string;
-    blob?: string;
-  }>;
-}
-
-/**
  * Tool definition from daemon
  */
 export interface ProxiedToolDefinition {
@@ -320,30 +295,5 @@ export class DaemonMcpProxy {
     this.connected = false;
     this.invalidateCache();
     logger.info("[DaemonMcpProxy] Disconnected from daemon");
-  }
-}
-
-/**
- * Singleton instance for shared proxy access
- */
-let sharedProxy: DaemonMcpProxy | null = null;
-
-/**
- * Get or create a shared DaemonMcpProxy instance
- */
-export function getSharedDaemonProxy(config?: DaemonMcpProxyConfig): DaemonMcpProxy {
-  if (!sharedProxy) {
-    sharedProxy = new DaemonMcpProxy(config);
-  }
-  return sharedProxy;
-}
-
-/**
- * Reset the shared proxy (for testing)
- */
-export function resetSharedDaemonProxy(): void {
-  if (sharedProxy) {
-    sharedProxy.close().catch(() => {});
-    sharedProxy = null;
   }
 }

@@ -207,63 +207,6 @@ async function getStorageEntriesResource(params: Record<string, string>): Promis
 }
 
 /**
- * Notify that storage data has changed
- */
-export async function notifyStorageChanged(
-  deviceId: string,
-  packageName: string,
-  fileName?: string
-): Promise<void> {
-  // Notify files resource
-  await ResourceRegistry.notifyResourceUpdated(buildFilesUri(deviceId, packageName));
-
-  // If we know which file changed, notify that specifically
-  if (fileName) {
-    await ResourceRegistry.notifyResourceUpdated(
-      buildEntriesUri(deviceId, packageName, fileName)
-    );
-  }
-
-  // Invalidate relevant cache entries
-  const filesCacheKey = getFilesCacheKey(deviceId, packageName);
-  cache.files.delete(filesCacheKey);
-
-  if (fileName) {
-    const entriesCacheKey = getEntriesCacheKey(deviceId, packageName, fileName);
-    cache.entries.delete(entriesCacheKey);
-  } else {
-    // Clear all entries cache for this package
-    for (const key of cache.entries.keys()) {
-      if (key.startsWith(`${deviceId}:${packageName}:`)) {
-        cache.entries.delete(key);
-      }
-    }
-  }
-}
-
-/**
- * Invalidate all storage caches for a device
- */
-export function invalidateStorageCache(deviceId?: string): void {
-  if (deviceId) {
-    // Remove entries for specific device
-    for (const key of cache.files.keys()) {
-      if (key.startsWith(`${deviceId}:`)) {
-        cache.files.delete(key);
-      }
-    }
-    for (const key of cache.entries.keys()) {
-      if (key.startsWith(`${deviceId}:`)) {
-        cache.entries.delete(key);
-      }
-    }
-  } else {
-    cache.files.clear();
-    cache.entries.clear();
-  }
-}
-
-/**
  * Register storage resources
  */
 export function registerStorageResources(): void {

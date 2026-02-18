@@ -125,29 +125,5 @@ class ReplayToolsService {
   }
 }
 
-// Export singleton instance
-const replayToolsService = new ReplayToolsService();
-
-/**
- * Replays a single tool call from a log file
- */
-export const replayToolCall = (server: McpServer, logFilePath: string): Promise<boolean> => {
-  return replayToolsService.replayToolCall(server, logFilePath);
-};
-
-/**
- * Replays all tool calls from a session log file
- */
-export const replayToolSession = (server: McpServer, sessionId: string): Promise<boolean> => {
-  return replayToolsService.replayToolSession(server, sessionId);
-};
-
-/**
- * Lists all available tool call logs
- */
-export const listToolLogs = (): Promise<string[]> => {
-  return replayToolsService.listToolLogs();
-};
-
 // Export the service class for testing
 export { ReplayToolsService };

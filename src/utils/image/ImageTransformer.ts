@@ -6,8 +6,7 @@ import { defaultTimer, type Timer } from "../SystemTimer";
 
 const DEFAULT_JPEG_QUALITY = 75;
 
-// Note: These interfaces are re-exported from image-utils.ts
-export interface ImageOptions {
+interface ImageOptions {
   format?: "jpg" | "png" | "webp";
   quality?: number; // 1-100, for jpg and webp
   lossless?: boolean;
@@ -38,7 +37,7 @@ export interface ImageMetadata {
   exif?: Record<string, any>;
 }
 
-export class SharpImageTransformer {
+class SharpImageTransformer {
   private sharpInstance: sharp.Sharp;
   private options: ImageOptions = {};
   private cacheKey: string | null = null;
@@ -331,33 +330,5 @@ export class Image {
 
   public static setCacheSize(megabytes: number): void {
     ImageCache.getInstance().setMaxSize(megabytes * 1024 * 1024);
-  }
-}
-
-/**
- * Batch process multiple images with the same transformations
- */
-export class ImageBatch {
-  private buffers: Buffer[] = [];
-  private timer: Timer;
-
-  constructor(buffers: Buffer[] = [], timer: Timer = defaultTimer) {
-    this.buffers = buffers;
-    this.timer = timer;
-  }
-
-  public add(buffer: Buffer): ImageBatch {
-    this.buffers.push(buffer);
-    return this;
-  }
-
-  public async process(transform: (image: Image) => SharpImageTransformer): Promise<Buffer[]> {
-    const tasks = this.buffers.map(async buffer => {
-      const image = new Image(buffer, this.timer);
-      const transformer = transform(image);
-      return transformer.toBuffer();
-    });
-
-    return Promise.all(tasks);
   }
 }

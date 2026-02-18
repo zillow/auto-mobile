@@ -8,7 +8,7 @@ import type {
 /**
  * Recorded failure for testing.
  */
-export interface RecordedFailure {
+interface RecordedFailure {
   type: "tool_failure" | "crash" | "anr";
   input: RecordToolFailureInput | RecordCrashInput | RecordAnrInput;
   occurrenceId: string;

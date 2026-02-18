@@ -6,7 +6,7 @@ import { FakeAdbClient } from "./FakeAdbClient";
 /**
  * Recorded factory call for testing.
  */
-export interface RecordedFactoryCall {
+interface RecordedFactoryCall {
   device: BootedDevice | null | undefined;
   timestamp: number;
 }

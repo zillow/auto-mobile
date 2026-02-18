@@ -252,7 +252,7 @@ const getHierarchyRoots = (viewHierarchy: ViewHierarchyResult): any[] => {
   return [hierarchy];
 };
 
-export const isSystemTrayOpen = (viewHierarchy?: ViewHierarchyResult): boolean => {
+const isSystemTrayOpen = (viewHierarchy?: ViewHierarchyResult): boolean => {
   if (!viewHierarchy) {
     return false;
   }
@@ -300,7 +300,7 @@ const expandSystemTray = async (device: BootedDevice): Promise<void> => {
   }
 };
 
-export const parseAppLabelFromDumpsys = (stdout: string): string | null => {
+const parseAppLabelFromDumpsys = (stdout: string): string | null => {
   const lines = stdout.split("\n").map(line => line.trim()).filter(Boolean);
   const parseLine = (line: string): string | null => {
     const match = line.match(/application-label(?:-[^:]+)?:\s*(?:'([^']+)'|"([^"]+)"|(.+))/);

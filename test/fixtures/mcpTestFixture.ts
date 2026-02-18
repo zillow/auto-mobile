@@ -2,7 +2,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { createMcpServer } from "../../src/server/index";
 
-export interface McpTestContext {
+interface McpTestContext {
   server: ReturnType<typeof createMcpServer>;
   client: Client;
   serverTransport: any;

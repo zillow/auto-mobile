@@ -29,7 +29,7 @@ export function checkVersion(): CheckResult {
 /**
  * Check daemon status
  */
-export async function checkDaemonStatus(): Promise<CheckResult> {
+async function checkDaemonStatus(): Promise<CheckResult> {
   try {
     const manager = new DaemonManager();
     const status = await manager.status();
@@ -62,7 +62,7 @@ export async function checkDaemonStatus(): Promise<CheckResult> {
 /**
  * Check daemon connectivity
  */
-export async function checkDaemonConnectivity(): Promise<CheckResult> {
+async function checkDaemonConnectivity(): Promise<CheckResult> {
   try {
     const report = await getDaemonHealthReport();
 

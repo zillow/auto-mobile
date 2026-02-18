@@ -17,7 +17,7 @@ export interface DeviceConfigTable {
 }
 
 // Installed apps cache table
-export interface InstalledAppsTable {
+interface InstalledAppsTable {
   device_id: string;
   user_id: number;
   package_name: string;
@@ -155,7 +155,7 @@ export interface ScrollPositionsTable {
 }
 
 // Navigation node fingerprints table - tracks fingerprints associated with named nodes
-export interface NavigationNodeFingerprintsTable {
+interface NavigationNodeFingerprintsTable {
   id: Generated<number>;
   app_id: string; // Scoped per app to prevent cross-app collisions
   node_id: number;
@@ -168,7 +168,7 @@ export interface NavigationNodeFingerprintsTable {
 }
 
 // Navigation suggestions table - uncorrelated fingerprints waiting for promotion
-export interface NavigationSuggestionsTable {
+interface NavigationSuggestionsTable {
   id: Generated<number>;
   app_id: string;
   fingerprint_hash: string;
@@ -233,7 +233,7 @@ export interface ToolCallsTable {
 }
 
 // Crash tracking table
-export interface CrashesTable {
+interface CrashesTable {
   id: Generated<number>;
   device_id: string;
   package_name: string;
@@ -256,7 +256,7 @@ export interface CrashesTable {
 }
 
 // ANR tracking table
-export interface AnrsTable {
+interface AnrsTable {
   id: Generated<number>;
   device_id: string;
   package_name: string;
@@ -278,7 +278,7 @@ export interface AnrsTable {
 }
 
 // Accessibility baseline tables
-export interface AccessibilityBaselinesTable {
+interface AccessibilityBaselinesTable {
   id: Generated<number>;
   screen_id: string;
   violations_json: string; // JSON blob of WcagViolation[]
@@ -287,7 +287,7 @@ export interface AccessibilityBaselinesTable {
 }
 
 // Memory audit tables
-export interface MemoryThresholdsTable {
+interface MemoryThresholdsTable {
   id: Generated<number>;
   device_id: string;
   package_name: string;
@@ -301,7 +301,7 @@ export interface MemoryThresholdsTable {
   ttl_hours: number;
 }
 
-export interface MemoryBaselinesTable {
+interface MemoryBaselinesTable {
   id: Generated<number>;
   device_id: string;
   package_name: string;
@@ -316,7 +316,7 @@ export interface MemoryBaselinesTable {
   created_at: Generated<string>;
 }
 
-export interface MemoryAuditResultsTable {
+interface MemoryAuditResultsTable {
   id: Generated<number>;
   device_id: string;
   session_id: string;
@@ -343,7 +343,7 @@ export interface MemoryAuditResultsTable {
 }
 
 // Recomposition metrics tables
-export interface RecompositionMetricsTable {
+interface RecompositionMetricsTable {
   id: Generated<number>;
   device_id: string;
   session_id: string;
@@ -365,7 +365,7 @@ export interface RecompositionMetricsTable {
 }
 
 // Test execution timing table
-export interface TestExecutionsTable {
+interface TestExecutionsTable {
   id: Generated<number>;
   test_class: string;
   test_method: string;
@@ -391,7 +391,7 @@ export interface TestExecutionsTable {
 }
 
 // Test execution step details
-export interface TestExecutionStepsTable {
+interface TestExecutionStepsTable {
   id: Generated<number>;
   execution_id: number;
   step_index: number;
@@ -407,7 +407,7 @@ export interface TestExecutionStepsTable {
 }
 
 // Screens visited during test execution
-export interface TestExecutionScreensTable {
+interface TestExecutionScreensTable {
   id: Generated<number>;
   execution_id: number;
   screen_name: string;
@@ -417,7 +417,7 @@ export interface TestExecutionScreensTable {
 }
 
 // Test coverage tables
-export interface TestCoverageSessionsTable {
+interface TestCoverageSessionsTable {
   id: Generated<number>;
   session_uuid: string;
   app_id: string;
@@ -428,7 +428,7 @@ export interface TestCoverageSessionsTable {
   created_at: Generated<string>;
 }
 
-export interface TestNodeCoverageTable {
+interface TestNodeCoverageTable {
   id: Generated<number>;
   session_id: number;
   node_id: number;
@@ -438,7 +438,7 @@ export interface TestNodeCoverageTable {
   created_at: Generated<string>;
 }
 
-export interface TestEdgeCoverageTable {
+interface TestEdgeCoverageTable {
   id: Generated<number>;
   session_id: number;
   edge_id: number;
@@ -560,116 +560,69 @@ export interface Database {
 }
 
 // Convenience types for each table
-export type DeviceConfig = Selectable<DeviceConfigTable>;
-export type NewDeviceConfig = Insertable<DeviceConfigTable>;
-export type DeviceConfigUpdate = Updateable<DeviceConfigTable>;
-
 export type InstalledApp = Selectable<InstalledAppsTable>;
 export type NewInstalledApp = Insertable<InstalledAppsTable>;
-export type InstalledAppUpdate = Updateable<InstalledAppsTable>;
 
 export type PerformanceThresholds = Selectable<PerformanceThresholdsTable>;
 export type NewPerformanceThresholds = Insertable<PerformanceThresholdsTable>;
-export type PerformanceThresholdsUpdate = Updateable<PerformanceThresholdsTable>;
 
-export type PerformanceAuditResult = Selectable<PerformanceAuditResultsTable>;
 export type NewPerformanceAuditResult = Insertable<PerformanceAuditResultsTable>;
-export type PerformanceAuditResultUpdate = Updateable<PerformanceAuditResultsTable>;
 
 export type NavigationApp = Selectable<NavigationAppsTable>;
 export type NewNavigationApp = Insertable<NavigationAppsTable>;
-export type NavigationAppUpdate = Updateable<NavigationAppsTable>;
 
 export type NavigationNode = Selectable<NavigationNodesTable>;
 export type NewNavigationNode = Insertable<NavigationNodesTable>;
-export type NavigationNodeUpdate = Updateable<NavigationNodesTable>;
 
 export type NavigationEdge = Selectable<NavigationEdgesTable>;
 export type NewNavigationEdge = Insertable<NavigationEdgesTable>;
-export type NavigationEdgeUpdate = Updateable<NavigationEdgesTable>;
 
 export type UIElement = Selectable<UIElementsTable>;
 export type NewUIElement = Insertable<UIElementsTable>;
-export type UIElementUpdate = Updateable<UIElementsTable>;
 
-export type EdgeUIElement = Selectable<EdgeUIElementsTable>;
 export type NewEdgeUIElement = Insertable<EdgeUIElementsTable>;
 
-export type NodeModal = Selectable<NodeModalsTable>;
 export type NewNodeModal = Insertable<NodeModalsTable>;
 
-export type EdgeModal = Selectable<EdgeModalsTable>;
 export type NewEdgeModal = Insertable<EdgeModalsTable>;
 
-export type ScrollPosition = Selectable<ScrollPositionsTable>;
 export type NewScrollPosition = Insertable<ScrollPositionsTable>;
 
-export type PredictionOutcome = Selectable<PredictionOutcomesTable>;
 export type NewPredictionOutcome = Insertable<PredictionOutcomesTable>;
 
 export type PredictionTransitionStats = Selectable<PredictionTransitionStatsTable>;
 export type NewPredictionTransitionStats = Insertable<PredictionTransitionStatsTable>;
-export type PredictionTransitionStatsUpdate = Updateable<PredictionTransitionStatsTable>;
 
 export type ToolCall = Selectable<ToolCallsTable>;
 export type NewToolCall = Insertable<ToolCallsTable>;
 
-export type AccessibilityBaseline = Selectable<AccessibilityBaselinesTable>;
-export type NewAccessibilityBaseline = Insertable<AccessibilityBaselinesTable>;
-export type AccessibilityBaselineUpdate = Updateable<AccessibilityBaselinesTable>;
-
 export type MemoryThresholds = Selectable<MemoryThresholdsTable>;
 export type NewMemoryThresholds = Insertable<MemoryThresholdsTable>;
-export type MemoryThresholdsUpdate = Updateable<MemoryThresholdsTable>;
 
 export type MemoryBaseline = Selectable<MemoryBaselinesTable>;
 export type NewMemoryBaseline = Insertable<MemoryBaselinesTable>;
 export type MemoryBaselineUpdate = Updateable<MemoryBaselinesTable>;
 
-export type MemoryAuditResult = Selectable<MemoryAuditResultsTable>;
 export type NewMemoryAuditResult = Insertable<MemoryAuditResultsTable>;
-export type MemoryAuditResultUpdate = Updateable<MemoryAuditResultsTable>;
 
-export type RecompositionMetrics = Selectable<RecompositionMetricsTable>;
 export type NewRecompositionMetrics = Insertable<RecompositionMetricsTable>;
-export type RecompositionMetricsUpdate = Updateable<RecompositionMetricsTable>;
-
-export type FeatureFlag = Selectable<FeatureFlagsTable>;
-export type NewFeatureFlag = Insertable<FeatureFlagsTable>;
-export type FeatureFlagUpdate = Updateable<FeatureFlagsTable>;
 
 export type DeviceSnapshot = Selectable<DeviceSnapshotsTable>;
 export type NewDeviceSnapshot = Insertable<DeviceSnapshotsTable>;
 export type DeviceSnapshotUpdate = Updateable<DeviceSnapshotsTable>;
 
-export type DeviceSnapshotConfig = Selectable<DeviceSnapshotConfigsTable>;
-export type NewDeviceSnapshotConfig = Insertable<DeviceSnapshotConfigsTable>;
-export type DeviceSnapshotConfigUpdate = Updateable<DeviceSnapshotConfigsTable>;
-
 export type VideoRecording = Selectable<VideoRecordingsTable>;
 export type NewVideoRecording = Insertable<VideoRecordingsTable>;
 export type VideoRecordingUpdate = Updateable<VideoRecordingsTable>;
 
-export type VideoRecordingConfig = Selectable<VideoRecordingConfigsTable>;
-export type NewVideoRecordingConfig = Insertable<VideoRecordingConfigsTable>;
-export type VideoRecordingConfigUpdate = Updateable<VideoRecordingConfigsTable>;
-
-export type AppearanceConfig = Selectable<AppearanceConfigsTable>;
-export type NewAppearanceConfig = Insertable<AppearanceConfigsTable>;
-export type AppearanceConfigUpdate = Updateable<AppearanceConfigsTable>;
-export type TestExecution = Selectable<TestExecutionsTable>;
 export type NewTestExecution = Insertable<TestExecutionsTable>;
-export type TestExecutionUpdate = Updateable<TestExecutionsTable>;
 
-export type TestExecutionStep = Selectable<TestExecutionStepsTable>;
 export type NewTestExecutionStep = Insertable<TestExecutionStepsTable>;
 
-export type TestExecutionScreen = Selectable<TestExecutionScreensTable>;
 export type NewTestExecutionScreen = Insertable<TestExecutionScreensTable>;
 
 export type TestCoverageSession = Selectable<TestCoverageSessionsTable>;
 export type NewTestCoverageSession = Insertable<TestCoverageSessionsTable>;
-export type TestCoverageSessionUpdate = Updateable<TestCoverageSessionsTable>;
 
 export type TestNodeCoverage = Selectable<TestNodeCoverageTable>;
 export type NewTestNodeCoverage = Insertable<TestNodeCoverageTable>;
@@ -678,7 +631,7 @@ export type TestEdgeCoverage = Selectable<TestEdgeCoverageTable>;
 export type NewTestEdgeCoverage = Insertable<TestEdgeCoverageTable>;
 
 // Failure tracking tables
-export interface FailureGroupsTable {
+interface FailureGroupsTable {
   id: string;
   type: "crash" | "anr" | "tool_failure";
   signature: string;
@@ -695,7 +648,7 @@ export interface FailureGroupsTable {
   updated_at: string;
 }
 
-export interface FailureOccurrencesTable {
+interface FailureOccurrencesTable {
   id: string;
   group_id: string;
   timestamp: number;
@@ -713,7 +666,7 @@ export interface FailureOccurrencesTable {
   created_at: Generated<string>;
 }
 
-export interface FailureOccurrenceScreensTable {
+interface FailureOccurrenceScreensTable {
   id: Generated<number>;
   occurrence_id: string;
   screen_name: string;
@@ -721,7 +674,7 @@ export interface FailureOccurrenceScreensTable {
   created_at: Generated<string>;
 }
 
-export interface FailureCapturesTable {
+interface FailureCapturesTable {
   id: string;
   occurrence_id: string;
   type: "screenshot" | "video";
@@ -731,7 +684,7 @@ export interface FailureCapturesTable {
   created_at: Generated<string>;
 }
 
-export interface FailureNotificationsTable {
+interface FailureNotificationsTable {
   id: Generated<number>;
   occurrence_id: string;
   group_id: string;
@@ -743,35 +696,25 @@ export interface FailureNotificationsTable {
   created_at: Generated<string>;
 }
 
-export type FailureGroup = Selectable<FailureGroupsTable>;
 export type NewFailureGroup = Insertable<FailureGroupsTable>;
 export type FailureGroupUpdate = Updateable<FailureGroupsTable>;
 
-export type FailureOccurrence = Selectable<FailureOccurrencesTable>;
 export type NewFailureOccurrence = Insertable<FailureOccurrencesTable>;
 
-export type FailureOccurrenceScreen = Selectable<FailureOccurrenceScreensTable>;
 export type NewFailureOccurrenceScreen = Insertable<FailureOccurrenceScreensTable>;
 
-export type FailureCapture = Selectable<FailureCapturesTable>;
 export type NewFailureCapture = Insertable<FailureCapturesTable>;
 
-export type FailureNotification = Selectable<FailureNotificationsTable>;
 export type NewFailureNotification = Insertable<FailureNotificationsTable>;
-export type FailureNotificationUpdate = Updateable<FailureNotificationsTable>;
 
 export type Crash = Selectable<CrashesTable>;
 export type NewCrash = Insertable<CrashesTable>;
-export type CrashUpdate = Updateable<CrashesTable>;
 
 export type Anr = Selectable<AnrsTable>;
 export type NewAnr = Insertable<AnrsTable>;
-export type AnrUpdate = Updateable<AnrsTable>;
 
 export type NavigationNodeFingerprint = Selectable<NavigationNodeFingerprintsTable>;
 export type NewNavigationNodeFingerprint = Insertable<NavigationNodeFingerprintsTable>;
-export type NavigationNodeFingerprintUpdate = Updateable<NavigationNodeFingerprintsTable>;
 
 export type NavigationSuggestion = Selectable<NavigationSuggestionsTable>;
 export type NewNavigationSuggestion = Insertable<NavigationSuggestionsTable>;
-export type NavigationSuggestionUpdate = Updateable<NavigationSuggestionsTable>;

@@ -1,11 +1,5 @@
 // Re-export from new location for backward compatibility
-export {
-  Image,
-  ImageBatch,
-  SharpImageTransformer,
-} from "./image/ImageTransformer";
-export type { ImageOptions, ImageMetadata } from "./image/ImageTransformer";
-export { ImageCache } from "./image/ImageCache";
+export { Image } from "./image/ImageTransformer";
 
 // Import for the interface implementation
 import { Image, ImageMetadata } from "./image/ImageTransformer";

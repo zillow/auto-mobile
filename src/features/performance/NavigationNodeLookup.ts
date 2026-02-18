@@ -66,16 +66,6 @@ export class NavigationNodeLookup {
   }
 }
 
-// Singleton instance
-let instance: NavigationNodeLookup | null = null;
-
-export function getNavigationNodeLookup(): NavigationNodeLookup {
-  if (!instance) {
-    instance = new NavigationNodeLookup();
-  }
-  return instance;
-}
-
 export function resetNavigationNodeLookup(): void {
-  instance = null;
+  // No-op: retained for test compatibility
 }
