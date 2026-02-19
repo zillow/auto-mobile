@@ -279,6 +279,7 @@ class FakeAutoMobileClient : AutoMobileClient {
   override fun setKeyValue(deviceId: String, appId: String, fileName: String, key: String, value: String?, type: String) = notImplemented()
   override fun removeKeyValue(deviceId: String, appId: String, fileName: String, key: String) = notImplemented()
   override fun clearKeyValueFile(deviceId: String, appId: String, fileName: String) = notImplemented()
+  override fun callTool(name: String, arguments: kotlinx.serialization.json.JsonObject) = notImplemented()
 
   private fun notImplemented(): Nothing =
       throw NotImplementedError("FakeAutoMobileClient: method not implemented for testing")

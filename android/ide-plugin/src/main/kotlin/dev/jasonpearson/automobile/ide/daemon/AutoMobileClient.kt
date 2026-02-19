@@ -93,6 +93,8 @@ interface AutoMobileClient {
       fileName: String,
   ): ClearKeyValueResult
 
+  fun callTool(name: String, arguments: JsonObject): JsonElement
+
   fun close() {}
 }
 

@@ -11,6 +11,7 @@ import dev.jasonpearson.automobile.ide.daemon.TestTimingQuery
 import dev.jasonpearson.automobile.ide.storage.KeyValueType
 import dev.jasonpearson.automobile.ide.storage.StoragePlatform
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -251,13 +252,100 @@ class RealStorageDataSourceTest {
     }
 
     @Test
-    fun `getDatabases returns empty list`() = runBlocking {
+    fun `getDatabases returns error when no clientProvider`() = runBlocking {
         val dataSource = RealStorageDataSource()
 
         val result = dataSource.getDatabases()
 
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Not connected"))
+    }
+
+    @Test
+    fun `getDatabases returns error when no deviceId`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = null,
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.getDatabases()
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("device"))
+    }
+
+    @Test
+    fun `getDatabases returns error when no packageName`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = null
+        )
+
+        val result = dataSource.getDatabases()
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("package"))
+    }
+
+    @Test
+    fun `getDatabases successfully parses MCP databases response`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+
+        val dbsUri = "automobile:devices/emulator-5554/databases?appId=com.example.app"
+        client.setResourceResponseWithText(dbsUri, """
+            {
+                "deviceId": "emulator-5554",
+                "appId": "com.example.app",
+                "databases": [
+                    {"name": "sessions.db", "path": "/data/data/com.example.app/databases/sessions.db"}
+                ],
+                "totalCount": 1
+            }
+        """.trimIndent())
+
+        val tablesUri = "automobile:devices/emulator-5554/databases/%2Fdata%2Fdata%2Fcom.example.app%2Fdatabases%2Fsessions.db/tables?appId=com.example.app"
+        client.setResourceResponseWithText(tablesUri, """
+            {
+                "tables": ["sessions"],
+                "totalCount": 1
+            }
+        """.trimIndent())
+
+        val structUri = "automobile:devices/emulator-5554/databases/%2Fdata%2Fdata%2Fcom.example.app%2Fdatabases%2Fsessions.db/tables/sessions/structure?appId=com.example.app"
+        client.setResourceResponseWithText(structUri, """
+            {
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "nullable": false, "primaryKey": true, "defaultValue": null},
+                    {"name": "session_id", "type": "TEXT", "nullable": false, "primaryKey": false, "defaultValue": null}
+                ]
+            }
+        """.trimIndent())
+
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.getDatabases()
+
         assertTrue(result is Result.Success)
-        assertEquals(emptyList<Any>(), (result as Result.Success).data)
+        val databases = (result as Result.Success).data
+        assertEquals(1, databases.size)
+        val db = databases[0]
+        assertEquals("sessions.db", db.name)
+        assertEquals(1, db.tables.size)
+        val table = db.tables[0]
+        assertEquals("sessions", table.name)
+        assertEquals(2, table.columns.size)
+        val idCol = table.columns[0]
+        assertEquals("id", idCol.name)
+        assertEquals("INTEGER", idCol.type)
+        assertTrue(idCol.isPrimaryKey)
     }
 
     // --- setKeyValue tests ---
@@ -523,6 +611,7 @@ class FakeStorageAutoMobileClient : AutoMobileClient {
     override fun killDevice(name: String, deviceId: String, platform: String) = notImplemented()
     override fun getDaemonStatus() = notImplemented()
     override fun updateService(deviceId: String, platform: String) = notImplemented()
+    override fun callTool(name: String, arguments: JsonObject): JsonElement = notImplemented()
 
     private fun notImplemented(): Nothing =
         throw NotImplementedError("FakeStorageAutoMobileClient: method not implemented for testing")

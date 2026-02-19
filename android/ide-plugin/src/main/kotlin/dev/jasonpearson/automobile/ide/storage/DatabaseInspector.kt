@@ -28,10 +28,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,9 +72,12 @@ import org.jetbrains.jewel.ui.component.Text
 @Composable
 fun DatabaseInspector(
     databases: List<DatabaseInfo> = StorageMockData.databases,
+    onFetchTableData: (suspend (databasePath: String, table: String) -> QueryResult)? = null,
+    onExecuteSQL: (suspend (databasePath: String, query: String) -> QueryResult)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
+    val coroutineScope = rememberCoroutineScope()
 
     // State
     var selectedDatabase by remember(databases) { mutableStateOf(databases.firstOrNull()) }
@@ -79,6 +87,25 @@ fun DatabaseInspector(
     var queryResult by remember { mutableStateOf<QueryResult?>(null) }
     var savedQueries by remember { mutableStateOf(StorageMockData.savedQueries) }
     var queryHistory by remember { mutableStateOf(StorageMockData.queryHistory) }
+    var tableData by remember { mutableStateOf<QueryResult?>(null) }
+    var isLoadingData by remember { mutableStateOf(false) }
+
+    // Fetch table data when selection changes
+    LaunchedEffect(selectedTable, selectedDatabase, onFetchTableData) {
+        val db = selectedDatabase
+        val tbl = selectedTable
+        if (db != null && tbl != null && onFetchTableData != null) {
+            isLoadingData = true
+            tableData = null
+            try {
+                tableData = withContext(Dispatchers.IO) { onFetchTableData(db.path, tbl.name) }
+            } catch (_: Exception) {
+                // tableData stays null; DataView will show fallback mock
+            } finally {
+                isLoadingData = false
+            }
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Database and Table selectors
@@ -166,10 +193,23 @@ fun DatabaseInspector(
         when (viewMode) {
             DatabaseViewMode.Data -> {
                 if (selectedTable != null) {
-                    DataView(
-                        table = selectedTable!!,
-                        result = StorageMockData.mockQueryResult,
-                    )
+                    if (isLoadingData) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "Loading…",
+                                fontSize = 12.sp,
+                                color = colors.text.normal.copy(alpha = 0.5f),
+                            )
+                        }
+                    } else {
+                        DataView(
+                            table = selectedTable!!,
+                            result = tableData ?: StorageMockData.mockQueryResult,
+                        )
+                    }
                 } else {
                     EmptyState("Select a table to view data")
                 }
@@ -189,19 +229,46 @@ fun DatabaseInspector(
                     queryResult = queryResult,
                     savedQueries = savedQueries,
                     onExecute = {
-                        // Mock execution
-                        queryResult = StorageMockData.mockQueryResult
-                        queryHistory = listOf(
-                            QueryHistoryEntry(
-                                id = "h${System.currentTimeMillis()}",
-                                sql = queryText,
-                                databaseName = selectedDatabase?.name ?: "",
-                                executedAt = System.currentTimeMillis(),
-                                executionTimeMs = 15,
-                                rowsAffected = StorageMockData.mockQueryResult.rowCount,
-                                success = true,
-                            )
-                        ) + queryHistory
+                        if (onExecuteSQL != null && selectedDatabase != null) {
+                            coroutineScope.launch {
+                                val db = selectedDatabase ?: return@launch
+                                val result = try {
+                                    withContext(Dispatchers.IO) { onExecuteSQL(db.path, queryText) }
+                                } catch (e: Exception) {
+                                    QueryResult(
+                                        emptyList(), emptyList(), 0, 0,
+                                        error = e.message ?: "Execution failed",
+                                    )
+                                }
+                                queryResult = result
+                                queryHistory = listOf(
+                                    QueryHistoryEntry(
+                                        id = "h${System.currentTimeMillis()}",
+                                        sql = queryText,
+                                        databaseName = db.name,
+                                        executedAt = System.currentTimeMillis(),
+                                        executionTimeMs = result.executionTimeMs,
+                                        rowsAffected = result.rowCount,
+                                        success = result.error == null,
+                                        error = result.error,
+                                    )
+                                ) + queryHistory
+                            }
+                        } else {
+                            // Fallback mock execution
+                            queryResult = StorageMockData.mockQueryResult
+                            queryHistory = listOf(
+                                QueryHistoryEntry(
+                                    id = "h${System.currentTimeMillis()}",
+                                    sql = queryText,
+                                    databaseName = selectedDatabase?.name ?: "",
+                                    executedAt = System.currentTimeMillis(),
+                                    executionTimeMs = 15,
+                                    rowsAffected = StorageMockData.mockQueryResult.rowCount,
+                                    success = true,
+                                )
+                            ) + queryHistory
+                        }
                     },
                     onSaveQuery = { name ->
                         savedQueries = savedQueries + SavedQuery(

@@ -16,6 +16,7 @@ import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.EnableComposeObservableApi
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
+import dev.jasonpearson.automobile.storage.session.SessionRepository
 
 class MainActivity : ComponentActivity() {
   private var pendingDeepLink: Uri? = null
@@ -38,6 +39,9 @@ class MainActivity : ComponentActivity() {
     // Enable SharedPreferences inspection in debug builds
     SharedPreferencesInspector.setEnabled(true)
     Log.d(TAG, "AutoMobileSDK initialized")
+
+    // Record session start in background
+    Thread { SessionRepository(applicationContext).recordSessionStart() }.start()
 
     // Initialize analytics tracking
     val analyticsTracker = AnalyticsTracker.getInstance()

@@ -339,7 +339,7 @@ class McpDaemonClient(
     }
   }
 
-  private fun callTool(name: String, arguments: JsonObject): JsonElement {
+  override fun callTool(name: String, arguments: JsonObject): JsonElement {
     val response =
         sendRequest(
             "tools/call",

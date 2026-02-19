@@ -29,6 +29,8 @@ import org.jetbrains.jewel.ui.component.Text
 import com.intellij.openapi.diagnostic.Logger
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
+import dev.jasonpearson.automobile.ide.datasource.Result
+import dev.jasonpearson.automobile.ide.datasource.StorageDataSource
 
 private val LOG = Logger.getInstance("StorageDashboard")
 
@@ -56,7 +58,7 @@ fun StorageDashboard(
     var selectedTab by remember { mutableStateOf(StorageTab.Database) }
 
     // Fetch storage data from data source
-    var dataSource by remember { mutableStateOf<dev.jasonpearson.automobile.ide.datasource.StorageDataSource?>(null) }
+    var dataSource by remember { mutableStateOf<StorageDataSource?>(null) }
     var databases by remember { mutableStateOf<List<DatabaseInfo>>(emptyList()) }
     var keyValueFiles by remember { mutableStateOf<List<KeyValueFile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -68,35 +70,35 @@ fun StorageDashboard(
         error = null
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val createdDataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createStorageDataSource(
+                val newDataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createStorageDataSource(
                     dataSourceMode,
                     clientProvider,
                     deviceId,
                     packageName,
                     platform
                 )
-                dataSource = createdDataSource
-                LOG.info("StorageDashboard: Created data source: ${createdDataSource::class.simpleName}")
+                dataSource = newDataSource
+                LOG.info("StorageDashboard: Created data source: ${newDataSource::class.simpleName}")
 
                 // Fetch databases
-                when (val result = createdDataSource.getDatabases()) {
-                    is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
+                when (val result = newDataSource.getDatabases()) {
+                    is Result.Success -> {
                         LOG.info("StorageDashboard: getDatabases success, count=${result.data.size}")
                         databases = result.data
                     }
-                    is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {
+                    is Result.Error -> {
                         LOG.warn("StorageDashboard: getDatabases error: ${result.message}")
                         error = result.message
                     }
-                    is dev.jasonpearson.automobile.ide.datasource.Result.Loading -> {
+                    is Result.Loading -> {
                         // Keep loading state
                     }
                 }
 
                 // Fetch key-value files
                 LOG.info("StorageDashboard: Calling getKeyValueFiles...")
-                when (val result = createdDataSource.getKeyValueFiles()) {
-                    is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
+                when (val result = newDataSource.getKeyValueFiles()) {
+                    is Result.Success -> {
                         LOG.info("StorageDashboard: getKeyValueFiles success, count=${result.data.size}")
                         result.data.forEach { file ->
                             LOG.info("StorageDashboard:   File: ${file.name}, entries=${file.entries.size}")
@@ -104,12 +106,12 @@ fun StorageDashboard(
                         keyValueFiles = result.data
                         isLoading = false
                     }
-                    is dev.jasonpearson.automobile.ide.datasource.Result.Error -> {
+                    is Result.Error -> {
                         LOG.warn("StorageDashboard: getKeyValueFiles error: ${result.message}")
                         if (error == null) error = result.message
                         isLoading = false
                     }
-                    is dev.jasonpearson.automobile.ide.datasource.Result.Loading -> {
+                    is Result.Loading -> {
                         // Keep loading state
                     }
                 }
@@ -119,6 +121,30 @@ fun StorageDashboard(
                 isLoading = false
             }
         }
+    }
+
+    val onFetchTableData: (suspend (String, String) -> QueryResult)? = remember(dataSource) {
+        val ds = dataSource ?: return@remember null
+        val callback: suspend (String, String) -> QueryResult = { databasePath, table ->
+            when (val r = ds.getTableData(databasePath, table)) {
+                is Result.Success -> r.data
+                is Result.Error -> QueryResult(emptyList(), emptyList(), 0, 0, error = r.message)
+                else -> QueryResult(emptyList(), emptyList(), 0, 0, error = "Failed to load data")
+            }
+        }
+        callback
+    }
+
+    val onExecuteSQL: (suspend (String, String) -> QueryResult)? = remember(dataSource) {
+        val ds = dataSource ?: return@remember null
+        val callback: suspend (String, String) -> QueryResult = { databasePath, query ->
+            when (val r = ds.executeSQL(databasePath, query)) {
+                is Result.Success -> r.data
+                is Result.Error -> QueryResult(emptyList(), emptyList(), 0, 0, error = r.message)
+                else -> QueryResult(emptyList(), emptyList(), 0, 0, error = "Failed to execute query")
+            }
+        }
+        callback
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -163,7 +189,9 @@ fun StorageDashboard(
         when (selectedTab) {
             StorageTab.Database -> DatabaseInspector(
                 databases = databases,
-                modifier = Modifier.fillMaxSize()
+                onFetchTableData = onFetchTableData,
+                onExecuteSQL = onExecuteSQL,
+                modifier = Modifier.fillMaxSize(),
             )
             StorageTab.KeyValue -> KeyValueInspector(
                 keyValueFiles = keyValueFiles,

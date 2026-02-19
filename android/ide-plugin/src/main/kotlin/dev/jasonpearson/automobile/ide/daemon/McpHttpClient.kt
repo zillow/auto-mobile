@@ -343,7 +343,7 @@ class McpHttpClient(
     }
   }
 
-  private fun callTool(name: String, arguments: JsonObject): JsonElement {
+  override fun callTool(name: String, arguments: JsonObject): JsonElement {
     ensureInitialized()
     val response =
         sendRequest(
