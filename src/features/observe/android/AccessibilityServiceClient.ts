@@ -948,6 +948,16 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
     };
   }
 
+  /** Tell the Kotlin service that recording has started (enables interaction event emission). */
+  notifyRecordingStarted(): void {
+    this.sendMessage(JSON.stringify({ type: "start_recording" }));
+  }
+
+  /** Tell the Kotlin service that recording has stopped (disables interaction event emission). */
+  notifyRecordingStopped(): void {
+    this.sendMessage(JSON.stringify({ type: "stop_recording" }));
+  }
+
   // ===========================================================================
   // Hierarchy Navigation Detector
   // ===========================================================================
