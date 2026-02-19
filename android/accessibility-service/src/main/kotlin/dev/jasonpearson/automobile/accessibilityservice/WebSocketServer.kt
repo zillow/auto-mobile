@@ -198,6 +198,8 @@ class WebSocketServer(
     private val onClearPreferences:
         ((requestId: String?, packageName: String, fileName: String) -> Unit)? =
         null,
+    private val onStartRecording: (() -> Unit)? = null,
+    private val onStopRecording: (() -> Unit)? = null,
 ) {
   companion object {
     private const val TAG = "WebSocketServer"
@@ -792,6 +794,14 @@ class WebSocketServer(
           } else {
             Log.w(TAG, "clear_preferences request missing packageName or fileName")
           }
+        }
+        "start_recording" -> {
+          Log.d(TAG, "Received start_recording request")
+          onStartRecording?.invoke()
+        }
+        "stop_recording" -> {
+          Log.d(TAG, "Received stop_recording request")
+          onStopRecording?.invoke()
         }
         else -> {
           Log.d(TAG, "Unknown message type: ${request.type}")

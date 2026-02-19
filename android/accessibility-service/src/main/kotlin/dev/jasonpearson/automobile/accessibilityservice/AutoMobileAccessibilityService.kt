@@ -115,6 +115,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
   private var lastWindowClassName: String? = null
 
+  @Volatile
+  private var isRecording: Boolean = false
+
   // Job for collecting hierarchy flow results
   private var hierarchyFlowJob: Job? = null
 
@@ -786,6 +789,14 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onClearPreferences = { requestId, packageName, fileName ->
                 handleClearPreferences(requestId, packageName, fileName)
               },
+              onStartRecording = {
+                isRecording = true
+                Log.d(TAG, "Recording started")
+              },
+              onStopRecording = {
+                isRecording = false
+                Log.d(TAG, "Recording stopped")
+              },
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -914,13 +925,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
       if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
         lastWindowClassName = event.className?.toString()
+        if (isRecording) recordInteractionEvent(event, "windowChange")
       }
 
       when (event.eventType) {
-        AccessibilityEvent.TYPE_VIEW_CLICKED -> recordInteractionEvent(event, "tap")
-        AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> recordInteractionEvent(event, "longPress")
-        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> recordInteractionEvent(event, "inputText")
-        AccessibilityEvent.TYPE_VIEW_SCROLLED -> recordInteractionEvent(event, "swipe")
+        AccessibilityEvent.TYPE_VIEW_CLICKED ->
+          if (isRecording) recordInteractionEvent(event, "tap")
+        AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ->
+          if (isRecording) recordInteractionEvent(event, "longPress")
+        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ->
+          if (isRecording) recordInteractionEvent(event, "inputText")
+        AccessibilityEvent.TYPE_VIEW_SCROLLED ->
+          if (isRecording) recordInteractionEvent(event, "swipe")
       }
 
       // Delegate to the smart debouncer for content/window changes
