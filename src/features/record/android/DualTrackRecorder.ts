@@ -4,7 +4,7 @@ import type { GestureEmitter, GestureEvent, A11ySource } from "./types";
 import { AccessibilityServiceClient } from "../../observe/android";
 import { defaultAdbClientFactory } from "../../../utils/android-cmdline-tools/AdbClientFactory";
 import { discoverTouchNode } from "./TouchNodeDiscovery";
-import { buildAxisRanges, buildScaler, queryDensity } from "./AxisRanges";
+import { buildAxisRanges, buildScaler, queryDensity, queryRotation } from "./AxisRanges";
 import { GetEventReader } from "./GetEventReader";
 import { defaultTimer, type Timer } from "../../../utils/SystemTimer";
 
@@ -45,12 +45,13 @@ export const MERGE_WINDOW_MS = 100;
 export class DualTrackRecorder {
   private steps: PlanStep[] = [];
   private pendingGestures: PendingGesture[] = [];
-  private bufferedInteractions: ReceivedInteraction[] = [];
+  private bufferedInteractions: (ReceivedInteraction & { receivedAt: number })[] = [];
   private lastInputText: { elementKey: string; text: string; stepIndex: number } | null = null;
   private activeEmitter: GestureEmitter | null = null;
   private unsubscribeA11y: (() => void) | null = null;
   /** Reference to the real AccessibilityServiceClient when not in test mode */
   private activeA11y: AccessibilityServiceClient | null = null;
+  private stopped = false;
 
   get stepCount(): number {
     return this.steps.length;
@@ -74,9 +75,9 @@ export class DualTrackRecorder {
       a11yClient = AccessibilityServiceClient.getInstance(this.device);
     }
 
-    const a11y = this.a11ySource ?? a11yClient!;
+    const a11y: A11ySource = this.a11ySource ?? a11yClient!;
 
-    const connected = await (a11y as { ensureConnected(): Promise<boolean> }).ensureConnected();
+    const connected = await a11y.ensureConnected();
     if (!connected) {
       throw new Error(
         "[DualTrackRecorder] Unable to connect to the accessibility service."
@@ -96,7 +97,7 @@ export class DualTrackRecorder {
       e => logger.warn(`[DualTrackRecorder] GetEventReader error: ${e.message}`)
     );
 
-    this.unsubscribeA11y = (a11y as AccessibilityServiceClient).onInteraction(
+    this.unsubscribeA11y = a11y.onInteraction(
       e => this.handleInteractionEvent(e as unknown as ReceivedInteraction)
     );
 
@@ -104,6 +105,11 @@ export class DualTrackRecorder {
   }
 
   async stop(): Promise<{ steps: PlanStep[]; stepCount: number }> {
+    if (this.stopped) {
+      return { steps: this.steps, stepCount: this.steps.length };
+    }
+    this.stopped = true;
+
     // Notify Kotlin service that recording is stopping before unsubscribing
     this.activeA11y?.notifyRecordingStopped();
     this.activeA11y = null;
@@ -133,6 +139,8 @@ export class DualTrackRecorder {
   // -------------------------------------------------------------------------
 
   private handleGestureEvent(gesture: GestureEvent): void {
+    if (this.stopped) {return;}
+
     if (gesture.type === "pressButton") {
       this.steps.push(buildPressButtonStep(gesture));
       return;
@@ -146,7 +154,7 @@ export class DualTrackRecorder {
     // tap / doubleTap / longPress / swipe → hold for merge window
     const pending: PendingGesture = {
       gesture,
-      arrivedAt: Date.now(),
+      arrivedAt: this.timer.now(),
       resolved: false,
     };
     this.pendingGestures.push(pending);
@@ -155,6 +163,8 @@ export class DualTrackRecorder {
   }
 
   private handleInteractionEvent(event: ReceivedInteraction): void {
+    if (this.stopped) {return;}
+
     if (event.type === "windowChange") {
       // Screen navigation metadata — not a plan step
       return;
@@ -170,7 +180,7 @@ export class DualTrackRecorder {
       p =>
         !p.resolved &&
         isCompatibleType(p.gesture.type, event.type) &&
-        Date.now() - p.arrivedAt <= MERGE_WINDOW_MS &&
+        this.timer.now() - p.arrivedAt <= MERGE_WINDOW_MS &&
         gestureHitsElement(p.gesture, event.element)
     );
 
@@ -179,7 +189,7 @@ export class DualTrackRecorder {
       const step = buildMergedStep(matched.gesture, event);
       if (step) {this.steps.push(step);}
     } else {
-      this.bufferedInteractions.push(event);
+      this.bufferedInteractions.push({ ...event, receivedAt: this.timer.now() });
     }
   }
 
@@ -187,9 +197,18 @@ export class DualTrackRecorder {
     if (pending.resolved) {return;}
     pending.resolved = true;
 
-    // Try to match against a buffered A11y interaction
+    // Prune stale buffered interactions using host receipt time, not device timestamp,
+    // to avoid false drops/retains caused by host-device clock skew.
+    const now = this.timer.now();
+    const MAX_BUFFER_AGE_MS = MERGE_WINDOW_MS * 2;
+    this.bufferedInteractions = this.bufferedInteractions.filter(
+      e => now - e.receivedAt <= MAX_BUFFER_AGE_MS
+    );
+
+    // Try to match against a buffered A11y interaction — require type + hit-test
     const idx = this.bufferedInteractions.findIndex(e =>
-      isCompatibleType(pending.gesture.type, e.type)
+      isCompatibleType(pending.gesture.type, e.type) &&
+      gestureHitsElement(pending.gesture, e.element)
     );
 
     if (idx >= 0) {
@@ -208,12 +227,13 @@ export class DualTrackRecorder {
     const elementKey = buildElementKey(event);
     if (event.text === undefined) {return;}
 
-    // Coalesce consecutive inputText events on the same element
+    // Coalesce consecutive inputText events on the same element only when the
+    // previous inputText is still the most recent step (no intervening actions)
     if (
       this.lastInputText &&
       elementKey &&
       this.lastInputText.elementKey === elementKey &&
-      this.lastInputText.stepIndex < this.steps.length
+      this.lastInputText.stepIndex === this.steps.length - 1
     ) {
       const existing = this.steps[this.lastInputText.stepIndex];
       if (existing && existing.tool === "inputText") {
@@ -240,7 +260,7 @@ export class DualTrackRecorder {
       throw new Error("[DualTrackRecorder] No multitouch input device found on this device");
     }
     const density = await queryDensity(adb);
-    const rotation = 0; // portrait fallback; will be overridden when A11y provides rotation
+    const rotation = await queryRotation(adb);
     const ranges = await buildAxisRanges(adb, node, rotation);
     const scaler = buildScaler(ranges);
 
@@ -271,13 +291,17 @@ function gestureHitsElement(
   element?: Partial<Element>
 ): boolean {
   const bounds = element?.bounds;
-  if (!bounds || gesture.screenX === null || gesture.screenX === undefined || gesture.screenY === null || gesture.screenY === undefined) {return false;}
+  if (!bounds) {return false;}
+  // Swipes use startX/startY; taps/longPress/doubleTap use screenX/screenY
+  const x = gesture.screenX ?? gesture.startX;
+  const y = gesture.screenY ?? gesture.startY;
+  if (x === null || x === undefined || y === null || y === undefined) {return false;}
   const PAD = 20;
   return (
-    gesture.screenX >= bounds.left - PAD &&
-    gesture.screenX <= bounds.right + PAD &&
-    gesture.screenY >= bounds.top - PAD &&
-    gesture.screenY <= bounds.bottom + PAD
+    x >= bounds.left - PAD &&
+    x <= bounds.right + PAD &&
+    y >= bounds.top - PAD &&
+    y <= bounds.bottom + PAD
   );
 }
 

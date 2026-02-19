@@ -206,6 +206,29 @@ describe("GestureClassifier", () => {
     expect(result?.scale).toBeLessThan(1);
   });
 
+  test("staggered finger release emits pinch only on final lift", () => {
+    // Both fingers down, diverging
+    c.feedFrame(makeFrame(0, [
+      { slotId: 0, trackingId: 1, x: 450, y: 500 },
+      { slotId: 1, trackingId: 2, x: 550, y: 500 },
+    ]));
+    c.feedFrame(makeFrame(100, [
+      { slotId: 0, trackingId: 1, x: 300, y: 500 },
+      { slotId: 1, trackingId: 2, x: 700, y: 500 },
+    ]));
+
+    // First finger lifts (slot 0), slot 1 still active
+    const firstRelease = c.feedFrame(makeFrame(200, [
+      { slotId: 1, trackingId: 2, x: 700, y: 500 },
+    ], [0]));
+    expect(firstRelease).toBeNull(); // no pinch yet
+
+    // Second finger lifts
+    const secondRelease = c.feedFrame(makeFrame(250, [], [1]));
+    expect(secondRelease?.type).toBe("pinch");
+    expect(secondRelease?.pinchDirection).toBe("out");
+  });
+
   test("two-finger scale change < PINCH_MIN_SCALE_DELTA → no pinch emitted", () => {
     // Barely any movement: distance 100 → 105 (scale ~1.05 < 1.1 threshold)
     c.feedFrame(makeFrame(0, [

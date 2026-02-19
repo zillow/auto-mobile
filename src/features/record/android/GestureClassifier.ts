@@ -92,18 +92,19 @@ export class GestureClassifier {
 
     // 4. Handle pinch completion
     if (this.inTwoFingerMode && this.pinchState) {
-      // One or both fingers just lifted
-      const result = this.maybeEmitPinch(frame.arrivedAt);
       // Clean up released contacts
       for (const slotId of frame.releasedSlots) {
         this.contacts.delete(slotId);
       }
-      // If all fingers are now up, exit two-finger mode
+      // Only emit once ALL fingers are up to avoid duplicate pinch on staggered release
       if (activeCount === 0) {
+        const result = this.maybeEmitPinch(frame.arrivedAt);
         this.inTwoFingerMode = false;
         this.pinchState = null;
+        return result;
       }
-      return result;
+      // One finger still active; finalDist will keep updating in step 2
+      return null;
     }
 
     // 5. Single-finger gesture: exactly 1 slot released, 0 remaining
