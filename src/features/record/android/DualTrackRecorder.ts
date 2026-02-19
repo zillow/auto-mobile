@@ -45,7 +45,7 @@ export const MERGE_WINDOW_MS = 100;
 export class DualTrackRecorder {
   private steps: PlanStep[] = [];
   private pendingGestures: PendingGesture[] = [];
-  private bufferedInteractions: ReceivedInteraction[] = [];
+  private bufferedInteractions: (ReceivedInteraction & { receivedAt: number })[] = [];
   private lastInputText: { elementKey: string; text: string; stepIndex: number } | null = null;
   private activeEmitter: GestureEmitter | null = null;
   private unsubscribeA11y: (() => void) | null = null;
@@ -189,7 +189,7 @@ export class DualTrackRecorder {
       const step = buildMergedStep(matched.gesture, event);
       if (step) {this.steps.push(step);}
     } else {
-      this.bufferedInteractions.push(event);
+      this.bufferedInteractions.push({ ...event, receivedAt: this.timer.now() });
     }
   }
 
@@ -197,11 +197,12 @@ export class DualTrackRecorder {
     if (pending.resolved) {return;}
     pending.resolved = true;
 
-    // Prune stale buffered interactions (older than 2× merge window)
+    // Prune stale buffered interactions using host receipt time, not device timestamp,
+    // to avoid false drops/retains caused by host-device clock skew.
     const now = this.timer.now();
     const MAX_BUFFER_AGE_MS = MERGE_WINDOW_MS * 2;
     this.bufferedInteractions = this.bufferedInteractions.filter(
-      e => now - e.timestamp <= MAX_BUFFER_AGE_MS
+      e => now - e.receivedAt <= MAX_BUFFER_AGE_MS
     );
 
     // Try to match against a buffered A11y interaction — require type + hit-test

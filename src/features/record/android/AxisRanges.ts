@@ -55,16 +55,33 @@ export async function queryDisplaySize(
 /**
  * Query the current display rotation from `adb shell dumpsys window displays`.
  * Returns 0 (portrait) if the rotation cannot be determined.
+ *
+ * Android reports rotation as named constants whose suffix is either the
+ * 0-3 index (older devices/emulators) or the degree value (90/180/270).
+ * Both forms are normalized to the 0-3 index expected by buildScaler.
  */
 export async function queryRotation(adb: AdbExecutor): Promise<number> {
   try {
     const { stdout } = await adb.executeCommand("shell dumpsys window displays");
     const match = stdout.match(/mCurrentRotation=ROTATION_(\d+)/);
-    if (match) {return parseInt(match[1], 10);}
+    if (match) {return normalizeDumpsysRotation(parseInt(match[1], 10));}
   } catch {
     // fall through to default
   }
   return 0;
+}
+
+/**
+ * Maps dumpsys rotation suffix to a 0-3 index.
+ * Handles both index form (0/1/2/3) and degree form (0/90/180/270).
+ */
+function normalizeDumpsysRotation(value: number): number {
+  switch (value) {
+    case 90: return 1;
+    case 180: return 2;
+    case 270: return 3;
+    default: return value <= 3 ? value : 0;
+  }
 }
 
 /**
