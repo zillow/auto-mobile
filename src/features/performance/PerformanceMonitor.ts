@@ -493,7 +493,7 @@ export class PerformanceMonitor {
 
     const observationServer = getDeviceDataStreamServer();
     if (observationServer) {
-      const recompositionSummary = RecompositionTracker.getInstance().getLatestSummary(device.packageName);
+      const recompositionSummary = RecompositionTracker.getInstance().getLatestSummary(device.deviceId, device.packageName);
       const streamData: PerformanceStreamData = {
         fps: metrics.fps ?? 0,
         frameTimeMs: metrics.frameTimeMs ?? 0,

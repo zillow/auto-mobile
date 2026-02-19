@@ -463,9 +463,7 @@ fun AutoMobileToolWindowContent() {
           currentJankFrames = update.jankFrames
           currentMemoryMb = update.memoryUsageMb
           currentTouchLatencyMs = update.touchLatencyMs
-          if (update.recompositionRate != null) {
-              currentRecompositionRate = update.recompositionRate
-          }
+          currentRecompositionRate = update.recompositionRate
           perfUpdateCounter++
       }
   }
