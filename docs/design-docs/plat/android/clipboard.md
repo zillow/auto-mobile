@@ -1,11 +1,15 @@
 # Clipboard tool
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `clipboard` MCP tool is fully implemented. On API 35, `cmd clipboard` returns "No shell command implementation", so the implementation routes through the AutoMobile Accessibility Service. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Provide clipboard copy/paste/clear/get for Android 29/35 emulators and
 best-effort support on devices.
 
-## Proposed MCP tool
+## MCP tool
 
 ```typescript
 clipboard({

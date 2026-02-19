@@ -1,11 +1,15 @@
-# Notification triggering
+# Notification Triggering
+
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `postNotification` MCP tool is fully implemented. The AutoMobile SDK `AutoMobileNotifications.post()` hook is implemented in `android/auto-mobile-sdk/`. Apps without SDK integration cannot post notifications that appear as the app-under-test (third-party app limitation). See the [Status Glossary](../../status-glossary.md) for chip definitions.
 
 ## Goal
 
 Trigger notifications that appear as the app-under-test. Provide
 rich content (title, body, big text, big image, actions).
 
-## Proposed MCP tool
+## MCP tool
 
 ```typescript
 postNotification({

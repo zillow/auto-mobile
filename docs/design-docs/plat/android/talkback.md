@@ -1,4 +1,10 @@
-# TalkBack simulation
+# TalkBack Simulation
+
+<kbd>❌ Not Implemented</kbd> *(MCP tools)* · <kbd>✅ Implemented</kbd> *(ADB commands, validated)*
+
+> **Current state:** The ADB commands for enabling/disabling real TalkBack are validated on API 35. The three proposed MCP tools (`setTalkBackEnabled`, `setA11yFocus`, `announce`) have **not been built** — they are design proposals. The AccessibilityService infrastructure needed by simulated mode is available.
+>
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
 
 For the overall accessibility adaptation design (detection strategy, gesture adaptations, and tool-level changes), see [TalkBack/VoiceOver Adaptation](../../mcp/a11y/talkback-voiceover.md). This document covers Android-specific ADB commands and simulation details.
 
@@ -8,7 +14,7 @@ Support TalkBack testing on emulator images (API 29/35) either by
 best-effort enabling real TalkBack or by simulating key behaviors via
 AutoMobile's AccessibilityService.
 
-## Proposed MCP tools
+## Proposed MCP tools <kbd>❌ Not Implemented</kbd>
 
 ```typescript
 setTalkBackEnabled({ enabled: boolean })

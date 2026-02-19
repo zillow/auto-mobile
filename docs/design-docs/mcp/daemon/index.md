@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Daemon mode is fully implemented. Device pool management, session allocation, Unix socket communication, and test timing tracking are all active. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Background daemon service for device pooling and parallel test execution.
 The AutoMobile daemon:
 

@@ -1,5 +1,9 @@
 # Video Recording
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `videoRecording` MCP tool is fully implemented. Supports Android (via `automobile-video.dex` VirtualDisplay + MediaCodec H.264) and iOS simulator (via `simctl io recordVideo`). Highlights, archive management, and Unix socket config are all implemented. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Optional screen recording for debugging, performance analysis, and CI artifacts. Recording is off by default
 and optimized for low overhead with a low-quality default preset.
 

@@ -1,5 +1,9 @@
 # Navigation Graph Render
 
+<kbd>⚠️ Partial</kbd>
+
+> **Current state:** Navigation graph data is produced by the MCP server and streamed. The IDE plugin tab for rendering the graph is implemented in the Android Studio plugin, though display completeness varies. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Render the current navigation graph inside the Android Studio plugin so

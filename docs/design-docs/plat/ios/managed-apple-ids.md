@@ -1,5 +1,9 @@
 # Managed Apple IDs
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** This page provides guidance for testing in enterprise environments with Managed Apple IDs. AutoMobile has no specific implementation for detecting or surfacing managed account restrictions. Physical devices are required; simulators do not reproduce profile policies. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Managed Apple IDs and configuration profiles are common in enterprise deployments.
 They can impose restrictions that affect app installation, network access, and
 system behavior.

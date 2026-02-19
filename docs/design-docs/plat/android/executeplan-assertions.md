@@ -1,11 +1,15 @@
 # executePlan assertions
 
+<kbd>⚠️ Partial</kbd>
+
+> **Current state:** `await` behavior exists in the `observe` tool (via `waitFor` parameters) and `swipeOn` (via `lookFor`). The standalone `await` YAML step type and `assert` step type described below are **not implemented**. In-plan assertions are available via `expectations` in step params. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Add native assertion and await steps to `executePlan`, with fail-fast
 behavior by default and idling support from accessibility events.
 
-## Proposed YAML extensions
+## Proposed YAML extensions <kbd>🚧 Design Only</kbd>
 
 ```text
 - await:

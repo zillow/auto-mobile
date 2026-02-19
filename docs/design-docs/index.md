@@ -86,22 +86,26 @@ High quality, performant, and accessible workflows are necessary to creating goo
 4. **CI/CD Ready** - Built for automated testing pipelines, dogfooding the tool to test itself.
 5. **Accessible** - You shouldn't need to be a build engineer or AI expert to use AutoMobile.
 
+## Status
+
+Feature implementation status is indicated throughout these docs using chips. See the [Status Glossary](status-glossary.md) for chip definitions and the master list of unimplemented and partially-implemented features.
+
 ## Platform Support
 
 ### Android
 
-| Component | Purpose |
-|-----------|---------|
-| [Accessibility Service](plat/android/accessibility-service.md) | Real-time view hierarchy access |
-| [JUnitRunner](plat/android/junitrunner.md) | Test execution framework |
-| [IDE Plugin](plat/android/ide-plugin/overview.md) | Android Studio integration |
-| [Work Profiles](plat/android/work-profiles.md) | Enterprise device support |
+| Component | Purpose | Status |
+|-----------|---------|--------|
+| [Accessibility Service](plat/android/accessibility-service.md) | Real-time view hierarchy access | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [JUnitRunner](plat/android/junitrunner.md) | Test execution framework | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [IDE Plugin](plat/android/ide-plugin/overview.md) | Android Studio integration | <kbd>✅ Implemented</kbd> |
+| [Work Profiles](plat/android/work-profiles.md) | Enterprise device support | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
 
-### iOS (Planned)
+### iOS
 
-| Component | Purpose |
-|-----------|---------|
-| [iOS Overview](plat/ios/index.md) | Architecture and roadmap |
-| [XCTestService](plat/ios/xctestservice.md) | WebSocket automation server |
-| [XCTestRunner](plat/ios/xctestrunner.md) | Test execution framework |
-| [Xcode Integration](plat/ios/ide-plugin/overview.md) | Editor extension |
+| Component | Purpose | Status |
+|-----------|---------|--------|
+| [iOS Overview](plat/ios/index.md) | Architecture and status | <kbd>📱 Simulator Only</kbd> |
+| [XCTestService](plat/ios/xctestservice.md) | WebSocket automation server | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [XCTestRunner](plat/ios/xctestrunner.md) | Test execution framework | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [Xcode Integration](plat/ios/ide-plugin/overview.md) | Companion app + editor extension | <kbd>⚠️ Partial</kbd> |

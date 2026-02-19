@@ -1,11 +1,15 @@
 # System tray lookFor
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `systemTray` MCP tool is fully implemented with open/find/tap/dismiss/clearAll actions. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Enable agents to open the notification shade and wait for a matching
 notification by text.
 
-## Proposed MCP tool
+## MCP tool
 
 ```typescript
 systemTray({

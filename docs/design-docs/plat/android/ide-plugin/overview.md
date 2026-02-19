@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** The Android Studio/IntelliJ plugin is implemented in `android/ide-plugin/`. Supports MCP over HTTP (streamable) and STDIO, daemon socket fallback, worktree-aware dev server discovery, and device pool display. Sub-features (navigation graph render, test recording, feature flags UI) have varying completeness — see their individual docs. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 The AutoMobile IntelliJ/Android Studio plugin attaches to a running MCP server to render navigation data and
 manage development workflows. It supports MCP over HTTP (streamable) and STDIO, and falls back to the
 local daemon socket when needed.

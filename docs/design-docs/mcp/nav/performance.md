@@ -1,5 +1,9 @@
 # Performance
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Benchmarked. Navigation ID path ~1ms, Shallow Scrollable ~5–10ms. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ### Performance
 
 - **Navigation ID**: ~1ms (simple extraction + hash)

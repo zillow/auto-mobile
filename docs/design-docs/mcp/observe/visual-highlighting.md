@@ -1,6 +1,10 @@
 # Visual Highlighting
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>🤖 Android Only</kbd>
+
 Expose visual highlight overlays (box or circle) as an MCP tool for debugging UI layout and state.
+
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
 
 ## MCP Tool
 

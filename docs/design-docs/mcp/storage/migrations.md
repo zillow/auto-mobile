@@ -1,5 +1,9 @@
 # Migrations
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Migration system with Kysely `FileMigrationProvider` is fully implemented. 32+ migrations run automatically on server startup. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile uses SQLite migrations to keep the MCP server schema up to date across releases.
 Migrations run on server startup and are managed with Kysely's `Migrator` + `FileMigrationProvider`.
 

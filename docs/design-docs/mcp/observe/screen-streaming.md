@@ -1,5 +1,14 @@
 # Real-Time Screen Streaming Architecture
 
+<kbd>⚠️ Partial</kbd>
+
+> **Note:** This document covers the **live IDE screen mirroring** feature (continuous streaming to the Android Studio / Xcode plugin). This is distinct from the `videoRecording` MCP tool (which records a clip to a file) — that tool is <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>.
+>
+> The Android `video-server` JAR (H.264, VirtualDisplay) is fully built and used by `videoRecording`. The end-to-end live mirroring pipeline (MCP relay → IDE DeviceScreenView) is in progress.
+> iOS live streaming is <kbd>🚧 Design Only</kbd> — see [iOS Screen Streaming](../../plat/ios/screen-streaming.md).
+>
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Real-time screen streaming from mobile devices to the IDE plugin, enabling interactive device mirroring at up to 60fps with <100ms latency.
 
 ## Goals

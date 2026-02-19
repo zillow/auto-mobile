@@ -1,5 +1,9 @@
 # Device State Snapshots
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `deviceSnapshot` MCP tool is fully implemented. VM snapshots (emulators), ADB snapshots (all Android devices), and iOS simulator app container backups are all supported. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Overview
 
 The snapshot feature provides deterministic device state management for mobile testing. It supports Android device/emulator snapshots and iOS simulator app container backups to enable reproducible test environments and efficient parallel testing.

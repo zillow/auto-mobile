@@ -1,5 +1,13 @@
 # Real-Time Screen Streaming Architecture
 
+<kbd>⚠️ Partial</kbd>
+
+> **Current state:** The Android `video-server` module (`android/video-server/`) is fully implemented — `VideoServer.kt` captures via VirtualDisplay, encodes H.264 with MediaCodec, and streams over a LocalSocket. The `videoRecording` MCP tool (record-to-file) uses this server and is <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>.
+>
+> The **live IDE screen mirroring** pipeline (MCP video-stream relay → IDE DeviceScreenView with Klarity decoder) is in progress. Milestone 1 (video-server JAR) is complete; Milestones 2–5 are ongoing. See implementation plan below.
+>
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Research and design for real-time screen streaming from Android devices to the IDE plugin, enabling interactive device mirroring at up to 60fps with <100ms latency.
 
 See [Screen Streaming Overview](../../mcp/observe/screen-streaming.md) for the cross-platform architecture, video stream socket protocol, and quality presets.

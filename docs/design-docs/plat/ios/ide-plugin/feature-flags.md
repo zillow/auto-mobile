@@ -1,5 +1,9 @@
 # Control Feature Flags
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** This feature depends on XcodeExtension/XcodeCompanion which are scaffolded but not feature-complete. Feature flag UI for the Xcode IDE is **not yet implemented**. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Provide a dedicated UI in the Xcode extension to view and toggle

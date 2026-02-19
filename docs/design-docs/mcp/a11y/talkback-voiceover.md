@@ -1,5 +1,9 @@
 # TalkBack/VoiceOver
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** This document describes the full 4-phase implementation plan. Phase 1 detection infrastructure (TalkBack state via ADB secure settings) is partially implemented. Phases 2–4 (tool adaptations, focus tracking, advanced features) are **not yet implemented**. iOS VoiceOver support is planned. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Overview
 
 When TalkBack (Android) or VoiceOver (iOS) is enabled, mobile UX fundamentally changes:

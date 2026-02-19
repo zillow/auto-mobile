@@ -1,5 +1,9 @@
 # testmanagerd — Why XCUITest Is the Only Viable Path
 
+<kbd>✅ Implemented</kbd>
+
+> **Current state:** This document explains why `XCTestService` uses XCUITest (the only sanctioned path to cross-process accessibility on iOS). The `simctl spawn` approach replacing `xcodebuild` is implemented. This is a reference/architecture doc, not a feature to implement. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## What Is testmanagerd?
 
 `testmanagerd` is a privileged system daemon that ships on every iOS device and simulator. It is responsible for:

@@ -1,5 +1,9 @@
 # iOS Real-Time Screen Streaming Architecture
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** This document is a research and design proposal. None of the milestones have been implemented. iOS automation currently uses on-demand screenshots via `xcrun simctl io booted screenshot`. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Research and design for real-time screen streaming from iOS devices/simulators to the IDE plugin.
 
 ## Goals

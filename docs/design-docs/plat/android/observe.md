@@ -1,5 +1,9 @@
 # Observe
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Fully implemented. The tiered observation pipeline (Accessibility Service → uiautomator fallback with perceptual hash caching) is active. WebSocket freshness after interactions with a 5-second timeout is implemented. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## UIAutomator Fallback
 
 - `dumpsys window` is fetched (with a short-lived memory/disk cache) and used to compute rotation and system insets.

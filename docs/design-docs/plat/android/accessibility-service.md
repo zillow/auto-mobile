@@ -1,5 +1,9 @@
 # Accessibility Service
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 The Android Accessibility Service provides real-time access to view hierarchy data and user interface
 elements without requiring device rooting or special permissions beyond accessibility service enablement.
 This service acts as a bridge between the Android system's accessibility framework and AutoMobile's

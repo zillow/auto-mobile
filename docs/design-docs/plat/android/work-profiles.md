@@ -1,5 +1,9 @@
 # Work Profiles
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Work profile auto-detection is fully implemented — `installApp`, `launchApp`, `terminateApp`, and the `automobile:apps` resource all detect and respect the active user profile. A manual `userId` override in MCP tool schemas is <kbd>❌ Not Implemented</kbd>; profile selection is automatic only. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 This guide explains how to set up and test Android work profiles with AutoMobile.
 
 ## What is a Work Profile?

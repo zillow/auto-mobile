@@ -1,5 +1,9 @@
 # Graph Structure
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Nodes, edges, and history are all persisted in SQLite. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 The navigation graph captures:
 
 - **Nodes**: Unique UI states identified by AutoMobile SDK navigation events + view hierarchy hashing

@@ -1,5 +1,9 @@
 # XCTest Runner
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `XCTestRunner` is a fully implemented Swift package (`ios/XCTestRunner/`) with `AutoMobileTestCase`, `AutoMobilePlanExecutor`, `AutoMobileTestObserver`, `TestTimingCache`, and `AutoMobileSession`. Unit tests cover plan execution, test ordering, and environment variable parsing. Integration tests run against the system Reminders app. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 The iOS test execution layer mirrors the Android JUnitRunner by providing a structured
 way to execute AutoMobile plans within XCTest and collect timing data for optimization.
 

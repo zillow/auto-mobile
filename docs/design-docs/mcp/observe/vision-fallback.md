@@ -1,6 +1,10 @@
 # Vision Fallback
 
+<kbd>⚠️ Partial</kbd> <kbd>🔒 Internal</kbd> <kbd>🤖 Android Only</kbd>
+
 Vision fallback uses Claude's vision API to help locate UI elements when traditional element finding methods fail.
+
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
 
 ## Current Implementation
 
@@ -132,6 +136,8 @@ Get an API key at: https://console.anthropic.com/
 - Dynamic content that changes rapidly
 
 ## Proposed Future Architecture
+
+<kbd>🚧 Design Only</kbd>
 
 The following hybrid vision approach is **not implemented** - it is a design proposal for future enhancement.
 

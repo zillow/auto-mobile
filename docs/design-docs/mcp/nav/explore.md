@@ -1,5 +1,9 @@
 # Explore
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** All three modes (discover, validate, hybrid) are implemented. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Exploration Modes
 
 The `explore` tool supports three modes for different use cases:

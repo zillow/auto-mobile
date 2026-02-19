@@ -1,5 +1,9 @@
 # Critical Section
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `criticalSection` MCP tool is fully implemented in daemon mode. Barrier synchronization, serial execution, timeout/nesting/abort handling are all active. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Overview
 
 The 🔒 [`criticalSection`](../tools.md) tool provides multi-device synchronization for serialized execution of steps. It implements a barrier synchronization pattern where all devices must arrive at the critical section before any can proceed, and then executes steps one device at a time.

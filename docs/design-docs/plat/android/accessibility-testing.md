@@ -1,11 +1,15 @@
 # Accessibility testing
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Implemented as the `auditAccessibility` MCP tool (not `runA11yChecks` as originally proposed). Supports `auditType: contrast` (WCAG contrast ratio checks) and `auditType: tapTargets` (minimum touch target size checks). ATF integration is not implemented. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Expose an MCP tool that runs fast a11y checks using the existing
 AccessibilityService, with optional deeper checks via ATF.
 
-## Proposed MCP tool
+## MCP tool (`auditAccessibility`)
 
 ```typescript
 runA11yChecks({

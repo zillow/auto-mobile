@@ -1,5 +1,9 @@
 # Resources
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** All resources listed here are implemented. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 AutoMobile exposes resources through the Model Context Protocol for AI agents to access.
 
 

@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>📱 Simulator Only</kbd>
+
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile iOS automation uses native XCTest APIs for both observations and touch injection.
 The XCTestService provides a WebSocket server that exposes XCUITest capabilities, while
 simctl handles simulator lifecycle management.
@@ -32,18 +36,23 @@ flowchart TB
 
 ## Components
 
-- [XCTestService](xctestrunner.md) - WebSocket server using native XCUITest APIs for element location and touch injection.
-- [simctl integration](simctl.md) - simulator lifecycle and app management.
-- [Managed App Configuration](managed-app-config.md) - MDM policies and app config payloads.
-- [Managed Apple IDs](managed-apple-ids.md) - account policies and device profiles.
-- [Xcode integration](ide-plugin/overview.md) - companion app + source editor extension.
+| Component | Description | Status |
+|-----------|-------------|--------|
+| [XCTestService](xctestservice.md) | WebSocket server using native XCUITest APIs for element location and touch injection. | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>📱 Simulator Only</kbd> |
+| [XCTestRunner](xctestrunner.md) | Test execution framework (plan execution, test ordering, retries). | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [simctl integration](simctl.md) | Simulator lifecycle and app management. | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [Managed App Configuration](managed-app-config.md) | MDM policies and app config payloads. | <kbd>🚧 Design Only</kbd> |
+| [Managed Apple IDs](managed-apple-ids.md) | Account policies and device profiles. | <kbd>🚧 Design Only</kbd> |
+| [Xcode integration](ide-plugin/overview.md) | Companion macOS app + source editor extension. | <kbd>⚠️ Partial</kbd> |
+| [Screen Streaming](screen-streaming.md) | AVFoundation/ScreenCaptureKit live mirroring. | <kbd>🚧 Design Only</kbd> |
 
 ## Status
 
-- Architecture design complete.
-- XCTestService with WebSocket server and native XCUITest touch injection implemented.
-- Xcode companion app scaffolded.
-- Physical device support tracked in GitHub issues #912, #913, #914.
+- XCTestService fully implemented: WebSocket server, XCUITest element location, gesture injection, hierarchy debouncing, FPS monitoring.
+- XCTestRunner fully implemented: `AutoMobileTestCase` base class, plan execution, retry, test ordering by timing, CI/local modes.
+- Xcode Companion app (macOS): scaffolded with all views; feature completeness ongoing.
+- Xcode Source Editor Extension: scaffolded with 5 registered commands; implementations are minimal stubs.
+- Physical device support tracked in GitHub issues [#912](https://github.com/jasonpearson/auto-mobile/issues/912), [#913](https://github.com/jasonpearson/auto-mobile/issues/913), [#914](https://github.com/jasonpearson/auto-mobile/issues/914).
 
 ## Parity goal
 

@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** All capabilities described below are implemented and tested. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 The MCP server exposes AutoMobile's capabilities as tool calls, resources, and real-time observations.
 
 ## Core Capabilities

@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Navigation graph is fully implemented. Screen fingerprinting (4-tier strategy), `navigateTo` smart routing, `explore` (discover/validate/hybrid modes), and graph persistence in SQLite are all active. Benchmarked at ≤1ms. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 As AutoMobile explores an app it automatically maps what it observes into a [navigation graph](graph-structure.md).
 
 ```mermaid

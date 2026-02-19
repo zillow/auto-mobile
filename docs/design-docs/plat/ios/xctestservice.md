@@ -1,5 +1,9 @@
 # Accessibility Bridge
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>📱 Simulator Only</kbd>
+
+> **Current state:** `XCTestService` is a fully implemented Swift package (`ios/XCTestService/`) with WebSocket server, `ElementLocator`, `GesturePerformer`, `CommandHandler`, `HierarchyDebouncer`, and `DisplayLinkFPSMonitor`. Tests cover command handling, hierarchy debouncing, perf timing, and model serialization. Physical device support requires provisioning (issues [#912–914](https://github.com/jasonpearson/auto-mobile/issues/912)). See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 The iOS automation server is a native iOS app that exposes the accessibility tree and element
 queries over a WebSocket connection. It is the iOS counterpart to the Android accessibility
 service and focuses on reliable observation delivery.

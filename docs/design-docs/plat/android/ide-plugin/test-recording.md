@@ -1,5 +1,9 @@
 # Test Recording
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Test recording is implemented in the Android Studio/IntelliJ plugin. Recording control uses the Unix socket (`~/.auto-mobile/test-recording.sock`). Plan generation, review, and execution via `executePlan` are all supported. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 The AutoMobile IDE Plugin includes test recording capabilities to capture user interactions and generate executable test plans.
 
 

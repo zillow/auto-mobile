@@ -1,5 +1,9 @@
 # Overview
 
+> This page links to design docs with status chips indicating whether each feature is <kbd>✅ Implemented</kbd>, <kbd>⚠️ Partial</kbd>, or <kbd>🚧 Design Only</kbd>. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
+> This page links to design docs for features that are unimplemented or only partially implemented. Each linked doc has its own status chip. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 This page summarizes Android-specific MCP feature ideas and links to the
 per-feature design notes.
 

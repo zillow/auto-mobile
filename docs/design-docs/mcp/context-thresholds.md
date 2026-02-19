@@ -1,5 +1,9 @@
 # Context Thresholds
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Context threshold benchmarking is fully implemented with CI integration. Runs on every PR/push to main. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 ## Overview
 
 The MCP context threshold system enforces limits on the token count of tool definitions, resources, and resource templates to prevent context bloat and ensure the MCP server remains efficient.

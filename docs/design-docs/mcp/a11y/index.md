@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>⚠️ Partial</kbd>
+
+> **Current state:** TalkBack/VoiceOver auto-detection is implemented (via ADB secure settings query, cached with 60s TTL). Tool adaptations for TalkBack mode (ACTION_CLICK, two-finger scroll, etc.) are designed but not yet fully built — see [TalkBack/VoiceOver design](talkback-voiceover.md). iOS VoiceOver support is planned. The `auditAccessibility` MCP tool for contrast/tap target checks is ✅ Implemented separately. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile supports accessibility testing by detecting and adapting to screen readers like TalkBack (Android) and VoiceOver (iOS).
 
 ```mermaid
@@ -62,6 +66,6 @@ flowchart LR
 
 | Platform | Screen Reader | Status |
 |----------|---------------|--------|
-| Android | TalkBack | Primary focus |
-| iOS | VoiceOver | Planned |
+| Android | TalkBack | <kbd>⚠️ Partial</kbd> — detection implemented, tool adaptations in progress |
+| iOS | VoiceOver | <kbd>🚧 Design Only</kbd> — planned |
 

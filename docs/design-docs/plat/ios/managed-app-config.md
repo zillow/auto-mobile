@@ -1,5 +1,9 @@
 # Managed App Configuration
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** This page provides guidance for testing in MDM-managed environments. AutoMobile has no specific implementation for detecting or surfacing Managed App Configuration state. Physical devices are required; simulators do not reproduce MDM behavior. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 MDM-managed devices can deliver Managed App Configuration values to apps. These
 settings are surfaced through `UserDefaults` under `com.apple.configuration.managed`.
 AutoMobile should behave predictably when managed configuration is present.

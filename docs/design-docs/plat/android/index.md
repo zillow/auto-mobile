@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile's Android stack spans the MCP server, daemon, IDE plugin, JUnitRunner, and device-side services.
 
 ## Test Execution

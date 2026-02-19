@@ -1,4 +1,8 @@
-# Biometrics stubbing
+# Biometrics Stubbing
+
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>🤖 Emulator Only</kbd>
+
+> **Current state:** The `biometricAuth` MCP tool is fully implemented and tested for Android emulators via `adb emu finger touch/remove`. Physical Android devices and face/iris modalities are not supported. The optional SDK hook (`AutoMobileBiometrics.overrideResult()`) is <kbd>❌ Not Implemented</kbd>. See the [Status Glossary](../../status-glossary.md) for chip definitions.
 
 ## Goal
 
@@ -6,7 +10,7 @@ Allow tests and agents to trigger biometric success/failure/cancel on
 emulators (API 29/35) and provide a path for app-under-test integration
 when emulator support is not sufficient.
 
-## Proposed MCP tool
+## MCP tool
 
 ```typescript
 biometricAuth({

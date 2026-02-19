@@ -1,5 +1,9 @@
 # simctl Integration
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>📱 Simulator Only</kbd>
+
+> **Current state:** `simctl` integration is fully implemented for simulator lifecycle, app management, device discovery, and demo mode. macOS only. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile uses `simctl` for iOS simulator lifecycle and app management. This layer is
 responsible for booting simulators, installing apps, launching processes, and controlling
 system-level simulator behaviors.

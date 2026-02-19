@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** SQLite persistence with Drizzle/Kysely, 32+ migrations, snapshot storage, and Unix socket configuration are all implemented. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile persists state across sessions using SQLite for metadata and the filesystem for larger payloads.
 
 ```mermaid

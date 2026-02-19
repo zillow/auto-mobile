@@ -1,5 +1,9 @@
 # Overview
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Fully implemented. All described fields (`viewHierarchy`, `screenSize`, `systemInsets`, `rotation`, `activeWindow`, `accessibilityAudit`, `performanceAudit`, etc.) are collected during observation. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 Each observation captures a snapshot of the current state of a device's screen and UI. When executed, it
 collects multiple data points in parallel to minimize observation latency. These operations are incredibly platform
 specific and will likely require a different ordering of steps per platform. All of this is to drive the

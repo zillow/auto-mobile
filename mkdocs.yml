@@ -86,6 +86,7 @@ nav:
       - 'Accessibility': using/a11y.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
+      - 'Status Glossary': design-docs/status-glossary.md
       - 'MCP':
           - 'Overview': design-docs/mcp/index.md
           - 'Tools': design-docs/mcp/tools.md

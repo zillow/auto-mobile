@@ -11,6 +11,8 @@ exclude = [
     "^http://127\\.0\\.0\\.1",
     # Ignore example domains
     "^https?://example\\.com",
+    # Ignore links to private fork repos (issues may not be publicly accessible)
+    "^https://github\\.com/jasonpearson/",
 ]
 
 # Exclude specific paths

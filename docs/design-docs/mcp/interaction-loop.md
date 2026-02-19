@@ -1,5 +1,9 @@
 # Interaction Loop
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** The full interaction loop (observe → execute → observe) is implemented with gfxinfo-based idle detection. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 ![Interaction loop demo - setting an alarm](../../img/clock-app.gif)
 
 This interaction loop is supported by comprehensive [observation](observe/index.md) of UI state and UI stability checks

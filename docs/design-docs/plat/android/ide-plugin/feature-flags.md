@@ -1,5 +1,9 @@
 # Control Feature Flags
 
+<kbd>⚠️ Partial</kbd>
+
+> **Current state:** Feature flag data is available via the daemon Unix socket. The IDE plugin tab UI for viewing and toggling flags is implemented in the plugin infrastructure but may not be fully feature-complete. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Provide a dedicated UI in the Android Studio plugin to view and toggle

@@ -1,5 +1,7 @@
 # Tools
 
+> All tools listed here are <kbd>✅ Implemented</kbd> and <kbd>🧪 Tested</kbd> unless noted otherwise. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 #### Observe
 
 Almost all other tool calls have built-in observation via the [interaction loop](interaction-loop.md), but we also have a standalone [observe](observe/index.md) tool that specifically performs just that action to get the AI agent up to speed.
@@ -55,7 +57,7 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 - 🐛 `bugReport` generates a comprehensive bug report including screen state, view hierarchy, logcat, screenshot, and optional highlight metadata.
 - 🔍 `debugSearch` debugs element search operations to understand why elements aren't found or wrong elements are selected.
 - 📸 `rawViewHierarchy` gets raw view hierarchy data (XML/JSON) without parsing for debugging.
-- 🖍️ `highlight` draws visual overlays to highlight areas of the screen during debugging (Android only).
+- 🖍️ `highlight` draws visual overlays to highlight areas of the screen during debugging. <kbd>🤖 Android Only</kbd>
 - 🔗 `identifyInteractions` suggests likely interactions with ready-to-use tool calls (debug-only; enable the debug feature flag).
 
 #### Performance & Monitoring
@@ -63,6 +65,14 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 - 🚩 `listFeatureFlags` lists all available feature flags and their current states.
 - ⚙️ `setFeatureFlag` enables/disables feature flags for experimental features and performance tuning.
 - 🎬 `demoMode` enables or disables demo mode with consistent status bar indicators for screenshots (`action: "enable" | "disable"`).
+
+#### Network & Connectivity
+
+- `setNetworkState` — Wi-Fi, cellular, and airplane mode control. ADB commands validated on API 35. <kbd>❌ Not Implemented</kbd> *(MCP tool not yet built; see [network-state.md](../plat/android/network-state.md))*
+
+#### Accessibility
+
+- `setTalkBackEnabled`, `setA11yFocus`, `announce` — TalkBack simulation and enablement. ADB commands validated. <kbd>❌ Not Implemented</kbd> *(MCP tools not yet built; see [talkback.md](../plat/android/talkback.md))*
 
 #### Daemon & Session Management
 

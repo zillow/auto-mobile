@@ -1,12 +1,16 @@
 # takeScreenshot fallback
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** The `takeScreenshot` MCP tool with server-side "fallback ticket" gating described here has **not been implemented**. Screenshots are captured as part of `observe` result. The underlying ADB screencap paths described here are used by the `observe` implementation. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Provide a screenshot tool that is explicitly a visual fallback when element
 lookup fails. The tool should be gated by server-side checks so agents
 cannot treat it as a primary discovery method.
 
-## Proposed MCP tool
+## Proposed MCP tool (Not Implemented)
 
 ```typescript
 takeScreenshot({

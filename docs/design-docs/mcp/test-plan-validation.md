@@ -1,5 +1,9 @@
 # Test Plan Validation
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** YAML test plan validation is fully implemented in TypeScript (AJV) and Kotlin (networknt json-schema-validator). CI runs validation on every PR. YAML anchors and merge keys are supported. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 AutoMobile includes comprehensive YAML validation for test plans to catch syntax errors and schema violations early in the development process.
 
 ## Overview

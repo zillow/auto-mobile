@@ -1,5 +1,13 @@
 # Overview
 
+<kbd>⚠️ Partial</kbd>
+
+> **Current state:**
+> - **XcodeCompanion** (`ios/XcodeCompanion/`) — Scaffolded macOS executable app. All major views are defined (DevicesView, RecordingView, ExecutionView, PerformanceView, SettingsView, MenuBarView, FeatureFlagsView) and `MCPConnectionManager` is wired up. Feature completeness is ongoing.
+> - **XcodeExtension** (`ios/XcodeExtension/`) — Scaffolded Xcode Source Editor Extension. 5 commands registered; command implementations are minimal stubs.
+>
+> See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 Xcode does not support the rich plugin APIs available in Android Studio. The closest
 parity is a companion macOS app plus an Xcode Source Editor Extension (XcodeKit).
 This approach provides UI parity with the Android IDE plugin while staying within

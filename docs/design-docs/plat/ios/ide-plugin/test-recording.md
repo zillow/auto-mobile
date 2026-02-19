@@ -1,5 +1,9 @@
 # Test Recording
 
+<kbd>🚧 Design Only</kbd>
+
+> **Current state:** This workflow depends on the XcodeCompanion app which is currently scaffolded (views and navigation defined, MCPConnectionManager wired up) but feature-complete recording is **not yet implemented**. See [iOS IDE Plugin Overview](overview.md) and the [Status Glossary](../../../status-glossary.md) for chip definitions.
+
 The AutoMobile Xcode companion app can record interactions on an iOS simulator and
 generate executable YAML plans. This mirrors the Android IDE plugin recording workflow
 while adapting to Xcode constraints.

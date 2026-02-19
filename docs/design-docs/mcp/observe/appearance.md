@@ -1,5 +1,9 @@
 # Appearance Sync
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Fully implemented via Unix socket at `~/.auto-mobile/appearance.sock`. Supports Android and iOS simulator. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 AutoMobile can align device appearance (light/dark mode) with the host system.
 Configuration is managed through a Unix socket (not MCP tools).
 

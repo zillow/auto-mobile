@@ -1,5 +1,9 @@
 # JUnitRunner
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** `android/junit-runner/` is fully implemented. Includes `@AutoMobileTest` annotation, YAML plan execution via daemon socket, AI-assisted failure recovery using the [Koog framework](https://github.com/JetBrains/koog) (OpenAI, Anthropic, Google), parallel multi-device execution, and memory diagnostics. Published to Maven Central. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+
 ## Installation
 
 Add this test Gradle dependency to all Android apps and libraries in your codebase. You can also add it only to the

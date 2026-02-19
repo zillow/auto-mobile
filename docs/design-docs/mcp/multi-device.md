@@ -1,5 +1,9 @@
 # Multi-device
 
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
+
+> **Current state:** Fully implemented. Parallel device execution, `criticalSection` synchronization, per-device abort strategies, and YAML anchor support are all active. See the [Status Glossary](../status-glossary.md) for chip definitions.
+
 ## Goal
 
 Enable true parallel steps in `executePlan`, while supporting critical
