@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
-import { DualTrackRecorder } from "../../../../src/features/record/android/DualTrackRecorder";
+import { DualTrackRecorder, MERGE_WINDOW_MS } from "../../../../src/features/record/android/DualTrackRecorder";
 import type { GestureEmitter, GestureEvent, A11ySource } from "../../../../src/features/record/android/types";
 import type { BootedDevice } from "../../../../src/models";
 import { FakeTimer } from "../../../fakes/FakeTimer";
@@ -203,6 +203,37 @@ describe("DualTrackRecorder", () => {
     expect(steps[0].params.text).toBe("hel");
   });
 
+  test("buffered A11y event is rejected when gesture does not hit element bounds", async () => {
+    await recorder.start();
+
+    // A11y event arrives first (goes into buffer), then gesture arrives at a far-away coord
+    fakeA11y.emit({ type: "tap", timestamp: Date.now(), element: TAP_ELEMENT });
+    fakeGestures.emit({ type: "tap", arrivedAt: Date.now(), screenX: 10, screenY: 10 }); // far from TAP_ELEMENT bounds
+
+    await new Promise<void>(r => setImmediate(r));
+    const { steps } = await recorder.stop();
+
+    // Step should be dropped: gesture coords don't hit element bounds even though types match
+    expect(steps).toHaveLength(0);
+  });
+
+  test("buffered A11y event older than 2×MERGE_WINDOW_MS is pruned and not matched", async () => {
+    // Advance fake timer to well past the staleness window so timestamp:0 is considered stale
+    fakeTimer.setCurrentTime(MERGE_WINDOW_MS * 3);
+    await recorder.start();
+
+    // Emit A11y event with timestamp: 0 — very old relative to current fake time
+    fakeA11y.emit({ type: "tap", timestamp: 0, element: TAP_ELEMENT });
+    // Gesture arrives at the "current" fake time
+    fakeGestures.emit({ type: "tap", arrivedAt: fakeTimer.now(), screenX: 342, screenY: 891 });
+
+    await new Promise<void>(r => setImmediate(r));
+    const { steps } = await recorder.stop();
+
+    // Stale buffered event should be pruned; step dropped
+    expect(steps).toHaveLength(0);
+  });
+
   test("tap with no matching A11y element is skipped", async () => {
     await recorder.start();
 
@@ -214,6 +245,25 @@ describe("DualTrackRecorder", () => {
 
     // Step is dropped because no element identity
     expect(steps).toHaveLength(0);
+  });
+
+  test("inputText coalescing skipped when intervening step exists", async () => {
+    await recorder.start();
+
+    const element = { "resource-id": "com.example:id/search" };
+    fakeA11y.emit({ type: "inputText", timestamp: 100, text: "hello", element });
+    // Intervening tap
+    fakeGestures.emit({ type: "pressButton", arrivedAt: Date.now(), button: "back" });
+    // Second edit on the same field — must NOT coalesce with first
+    fakeA11y.emit({ type: "inputText", timestamp: 200, text: "world", element });
+
+    const { steps } = await recorder.stop();
+    expect(steps).toHaveLength(3);
+    expect(steps[0].tool).toBe("inputText");
+    expect(steps[0].params.text).toBe("hello");
+    expect(steps[1].tool).toBe("pressButton");
+    expect(steps[2].tool).toBe("inputText");
+    expect(steps[2].params.text).toBe("world");
   });
 
   test("windowChange A11y events are not emitted as steps", async () => {

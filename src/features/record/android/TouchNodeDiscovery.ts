@@ -88,7 +88,7 @@ export function parseTouchNodes(output: string): TouchInputNode[] {
     //   getevent -p:  "    0035  : value 0, min 0, max 1079, ..."
     //   getevent -pl: "    ABS_MT_POSITION_X (0035): value 0, min 0, max 1079, ..."
     if (
-      (line.includes("0035") || line.includes("ABS_MT_POSITION_X")) &&
+      (/\b0035\b/.test(line) || line.includes("ABS_MT_POSITION_X")) &&
       line.includes("min") &&
       line.includes("max")
     ) {
@@ -103,7 +103,7 @@ export function parseTouchNodes(output: string): TouchInputNode[] {
 
     // Y axis
     if (
-      (line.includes("0036") || line.includes("ABS_MT_POSITION_Y")) &&
+      (/\b0036\b/.test(line) || line.includes("ABS_MT_POSITION_Y")) &&
       line.includes("min") &&
       line.includes("max")
     ) {

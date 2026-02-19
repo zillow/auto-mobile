@@ -53,6 +53,21 @@ export async function queryDisplaySize(
 }
 
 /**
+ * Query the current display rotation from `adb shell dumpsys window displays`.
+ * Returns 0 (portrait) if the rotation cannot be determined.
+ */
+export async function queryRotation(adb: AdbExecutor): Promise<number> {
+  try {
+    const { stdout } = await adb.executeCommand("shell dumpsys window displays");
+    const match = stdout.match(/mCurrentRotation=ROTATION_(\d+)/);
+    if (match) {return parseInt(match[1], 10);}
+  } catch {
+    // fall through to default
+  }
+  return 0;
+}
+
+/**
  * Parse display density from `adb shell wm density` and return dp multiplier.
  * Falls back to 2.75 (440 dpi) if parsing fails.
  */
