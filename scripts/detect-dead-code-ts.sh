@@ -286,7 +286,7 @@ jq --argjson allow "$ALLOWLIST_JSON" --argjson bashUsed "$BASH_USED_JSON" '
   | map(
       . as $issue
       | ($ignorePaths | index($issue.file)) as $pathIndex
-      | ($ignorePathPatterns | map($issue.file | test(.)) | any) as $patternMatch
+      | ($ignorePathPatterns | map(. as $pat | $issue.file | test($pat)) | any) as $patternMatch
       | ($ignoreEntries | map(select(.file == $issue.file and (.name == null or .name == $issue.name))) | length) as $entryMatch
       | select($pathIndex == null and ($patternMatch | not) and $entryMatch == 0)
     )
