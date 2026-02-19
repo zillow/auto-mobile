@@ -56,6 +56,7 @@ fun StorageDashboard(
     var selectedTab by remember { mutableStateOf(StorageTab.Database) }
 
     // Fetch storage data from data source
+    var dataSource by remember { mutableStateOf<dev.jasonpearson.automobile.ide.datasource.StorageDataSource?>(null) }
     var databases by remember { mutableStateOf<List<DatabaseInfo>>(emptyList()) }
     var keyValueFiles by remember { mutableStateOf<List<KeyValueFile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -67,17 +68,18 @@ fun StorageDashboard(
         error = null
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val dataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createStorageDataSource(
+                val createdDataSource = dev.jasonpearson.automobile.ide.datasource.DataSourceFactory.createStorageDataSource(
                     dataSourceMode,
                     clientProvider,
                     deviceId,
                     packageName,
                     platform
                 )
-                LOG.info("StorageDashboard: Created data source: ${dataSource::class.simpleName}")
+                dataSource = createdDataSource
+                LOG.info("StorageDashboard: Created data source: ${createdDataSource::class.simpleName}")
 
                 // Fetch databases
-                when (val result = dataSource.getDatabases()) {
+                when (val result = createdDataSource.getDatabases()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
                         LOG.info("StorageDashboard: getDatabases success, count=${result.data.size}")
                         databases = result.data
@@ -93,7 +95,7 @@ fun StorageDashboard(
 
                 // Fetch key-value files
                 LOG.info("StorageDashboard: Calling getKeyValueFiles...")
-                when (val result = dataSource.getKeyValueFiles()) {
+                when (val result = createdDataSource.getKeyValueFiles()) {
                     is dev.jasonpearson.automobile.ide.datasource.Result.Success -> {
                         LOG.info("StorageDashboard: getKeyValueFiles success, count=${result.data.size}")
                         result.data.forEach { file ->
@@ -165,6 +167,9 @@ fun StorageDashboard(
             )
             StorageTab.KeyValue -> KeyValueInspector(
                 keyValueFiles = keyValueFiles,
+                onSetValue = dataSource?.let { ds ->
+                    { fileName, key, value, type -> ds.setKeyValue(fileName, key, value, type) }
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }

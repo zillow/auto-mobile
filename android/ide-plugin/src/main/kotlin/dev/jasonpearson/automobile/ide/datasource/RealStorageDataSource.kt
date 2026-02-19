@@ -8,6 +8,8 @@ import dev.jasonpearson.automobile.ide.storage.KeyValueEntry
 import dev.jasonpearson.automobile.ide.storage.KeyValueFile
 import dev.jasonpearson.automobile.ide.storage.KeyValueType
 import dev.jasonpearson.automobile.ide.storage.StoragePlatform
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -118,6 +120,68 @@ class RealStorageDataSource(
         } catch (e: Exception) {
             LOG.warn("getKeyValueFiles: Exception during fetch: ${e.message}")
             Result.Error("Failed to load storage data: ${e.message}")
+        }
+    }
+
+    override suspend fun setKeyValue(
+        fileName: String,
+        key: String,
+        value: String?,
+        type: KeyValueType,
+    ): Result<Unit> {
+        val provider = clientProvider ?: return Result.Error("Not connected to MCP server.")
+        val device = deviceId ?: return Result.Error("No device ID provided")
+        val pkg = packageName ?: return Result.Error("No package name provided")
+
+        return try {
+            val client = provider()
+            withContext(Dispatchers.IO) {
+                val result = client.setKeyValue(device, pkg, fileName, key, value, type.protocolName)
+                if (result.success) Result.Success(Unit)
+                else Result.Error(result.message ?: "Failed to set key value")
+            }
+        } catch (e: McpConnectionException) {
+            Result.Error("MCP server not available: ${e.message}")
+        } catch (e: Exception) {
+            Result.Error("Failed to set key value: ${e.message}")
+        }
+    }
+
+    override suspend fun removeKeyValue(fileName: String, key: String): Result<Unit> {
+        val provider = clientProvider ?: return Result.Error("Not connected to MCP server.")
+        val device = deviceId ?: return Result.Error("No device ID provided")
+        val pkg = packageName ?: return Result.Error("No package name provided")
+
+        return try {
+            val client = provider()
+            withContext(Dispatchers.IO) {
+                val result = client.removeKeyValue(device, pkg, fileName, key)
+                if (result.success) Result.Success(Unit)
+                else Result.Error(result.message ?: "Failed to remove key value")
+            }
+        } catch (e: McpConnectionException) {
+            Result.Error("MCP server not available: ${e.message}")
+        } catch (e: Exception) {
+            Result.Error("Failed to remove key value: ${e.message}")
+        }
+    }
+
+    override suspend fun clearKeyValueFile(fileName: String): Result<Unit> {
+        val provider = clientProvider ?: return Result.Error("Not connected to MCP server.")
+        val device = deviceId ?: return Result.Error("No device ID provided")
+        val pkg = packageName ?: return Result.Error("No package name provided")
+
+        return try {
+            val client = provider()
+            withContext(Dispatchers.IO) {
+                val result = client.clearKeyValueFile(device, pkg, fileName)
+                if (result.success) Result.Success(Unit)
+                else Result.Error(result.message ?: "Failed to clear key value file")
+            }
+        } catch (e: McpConnectionException) {
+            Result.Error("MCP server not available: ${e.message}")
+        } catch (e: Exception) {
+            Result.Error("Failed to clear key value file: ${e.message}")
         }
     }
 

@@ -16,6 +16,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -262,6 +263,80 @@ class McpDaemonClient(
         )
     ensureSuccess(response)
     return json.decodeFromJsonElement(UpdateServiceResult.serializer(), response.result!!)
+  }
+
+  override fun setKeyValue(
+      deviceId: String,
+      appId: String,
+      fileName: String,
+      key: String,
+      value: String?,
+      type: String,
+  ): SetKeyValueResult {
+    val response =
+        sendRequest(
+            "ide/setKeyValue",
+            buildJsonObject {
+              put("deviceId", JsonPrimitive(deviceId))
+              put("appId", JsonPrimitive(appId))
+              put("fileName", JsonPrimitive(fileName))
+              put("key", JsonPrimitive(key))
+              put("value", if (value != null) JsonPrimitive(value) else JsonNull)
+              put("type", JsonPrimitive(type))
+            },
+        )
+    ensureSuccess(response)
+    return try {
+      json.decodeFromJsonElement(SetKeyValueResult.serializer(), response.result!!)
+    } catch (e: Exception) {
+      SetKeyValueResult(success = false, message = e.message ?: "Failed to set key value")
+    }
+  }
+
+  override fun removeKeyValue(
+      deviceId: String,
+      appId: String,
+      fileName: String,
+      key: String,
+  ): RemoveKeyValueResult {
+    val response =
+        sendRequest(
+            "ide/removeKeyValue",
+            buildJsonObject {
+              put("deviceId", JsonPrimitive(deviceId))
+              put("appId", JsonPrimitive(appId))
+              put("fileName", JsonPrimitive(fileName))
+              put("key", JsonPrimitive(key))
+            },
+        )
+    ensureSuccess(response)
+    return try {
+      json.decodeFromJsonElement(RemoveKeyValueResult.serializer(), response.result!!)
+    } catch (e: Exception) {
+      RemoveKeyValueResult(success = false, message = e.message ?: "Failed to remove key value")
+    }
+  }
+
+  override fun clearKeyValueFile(
+      deviceId: String,
+      appId: String,
+      fileName: String,
+  ): ClearKeyValueResult {
+    val response =
+        sendRequest(
+            "ide/clearKeyValueFile",
+            buildJsonObject {
+              put("deviceId", JsonPrimitive(deviceId))
+              put("appId", JsonPrimitive(appId))
+              put("fileName", JsonPrimitive(fileName))
+            },
+        )
+    ensureSuccess(response)
+    return try {
+      json.decodeFromJsonElement(ClearKeyValueResult.serializer(), response.result!!)
+    } catch (e: Exception) {
+      ClearKeyValueResult(success = false, message = e.message ?: "Failed to clear key value file")
+    }
   }
 
   private fun callTool(name: String, arguments: JsonObject): JsonElement {

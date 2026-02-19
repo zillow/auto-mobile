@@ -51,6 +51,7 @@ import type { StackTraceElement } from "../../../server/failuresResources";
 import type {
   PreferenceFile,
   KeyValueEntry,
+  KeyValueType,
   StorageSubscription,
   StorageChangedEvent,
 } from "../../storage/storageTypes";
@@ -712,6 +713,22 @@ export class AccessibilityServiceClient extends DeviceServiceClient implements A
 
   async getPreferenceEntries(packageName: string, fileName: string, timeoutMs: number = 5000): Promise<KeyValueEntry[]> {
     return this.storage.getPreferenceEntries(packageName, fileName, timeoutMs);
+  }
+
+  async getPreference(packageName: string, fileName: string, key: string, timeoutMs: number = 5000): Promise<KeyValueEntry | null> {
+    return this.storage.getPreference(packageName, fileName, key, timeoutMs);
+  }
+
+  async setPreference(packageName: string, fileName: string, key: string, value: string | null, type: KeyValueType, timeoutMs: number = 5000): Promise<void> {
+    return this.storage.setPreference(packageName, fileName, key, value, type, timeoutMs);
+  }
+
+  async removePreference(packageName: string, fileName: string, key: string, timeoutMs: number = 5000): Promise<void> {
+    return this.storage.removePreference(packageName, fileName, key, timeoutMs);
+  }
+
+  async clearPreferenceStore(packageName: string, fileName: string, timeoutMs: number = 5000): Promise<void> {
+    return this.storage.clearPreferenceStore(packageName, fileName, timeoutMs);
   }
 
   async subscribeStorage(packageName: string, fileName: string, timeoutMs: number = 5000): Promise<StorageSubscription> {

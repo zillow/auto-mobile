@@ -85,14 +85,14 @@ data class KeyValueEntry(
     val type: KeyValueType,
 )
 
-enum class KeyValueType {
-    String,
-    Int,
-    Long,
-    Float,
-    Boolean,
-    StringSet,
-    Unknown,
+enum class KeyValueType(val protocolName: kotlin.String) {
+    String("STRING"),
+    Int("INT"),
+    Long("LONG"),
+    Float("FLOAT"),
+    Boolean("BOOLEAN"),
+    StringSet("STRING_SET"),
+    Unknown("UNKNOWN"),
 }
 
 enum class StoragePlatform {

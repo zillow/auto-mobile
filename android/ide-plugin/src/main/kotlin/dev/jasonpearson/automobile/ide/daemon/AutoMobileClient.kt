@@ -71,6 +71,28 @@ interface AutoMobileClient {
 
   fun updateService(deviceId: String, platform: String): UpdateServiceResult
 
+  fun setKeyValue(
+      deviceId: String,
+      appId: String,
+      fileName: String,
+      key: String,
+      value: String?,
+      type: String,
+  ): SetKeyValueResult
+
+  fun removeKeyValue(
+      deviceId: String,
+      appId: String,
+      fileName: String,
+      key: String,
+  ): RemoveKeyValueResult
+
+  fun clearKeyValueFile(
+      deviceId: String,
+      appId: String,
+      fileName: String,
+  ): ClearKeyValueResult
+
   fun close() {}
 }
 
@@ -82,6 +104,24 @@ data class KillDeviceResult(
 
 @Serializable
 data class UpdateServiceResult(
+    val success: Boolean = true,
+    val message: String? = null,
+)
+
+@Serializable
+data class SetKeyValueResult(
+    val success: Boolean = true,
+    val message: String? = null,
+)
+
+@Serializable
+data class RemoveKeyValueResult(
+    val success: Boolean = true,
+    val message: String? = null,
+)
+
+@Serializable
+data class ClearKeyValueResult(
     val success: Boolean = true,
     val message: String? = null,
 )

@@ -276,6 +276,9 @@ class FakeAutoMobileClient : AutoMobileClient {
   override fun killDevice(name: String, deviceId: String, platform: String) = notImplemented()
   override fun getDaemonStatus() = notImplemented()
   override fun updateService(deviceId: String, platform: String) = notImplemented()
+  override fun setKeyValue(deviceId: String, appId: String, fileName: String, key: String, value: String?, type: String) = notImplemented()
+  override fun removeKeyValue(deviceId: String, appId: String, fileName: String, key: String) = notImplemented()
+  override fun clearKeyValueFile(deviceId: String, appId: String, fileName: String) = notImplemented()
 
   private fun notImplemented(): Nothing =
       throw NotImplementedError("FakeAutoMobileClient: method not implemented for testing")

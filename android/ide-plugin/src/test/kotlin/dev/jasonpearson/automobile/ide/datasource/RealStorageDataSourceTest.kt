@@ -1,8 +1,11 @@
 package dev.jasonpearson.automobile.ide.datasource
 
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
+import dev.jasonpearson.automobile.ide.daemon.ClearKeyValueResult
 import dev.jasonpearson.automobile.ide.daemon.McpConnectionException
 import dev.jasonpearson.automobile.ide.daemon.McpResourceContent
+import dev.jasonpearson.automobile.ide.daemon.RemoveKeyValueResult
+import dev.jasonpearson.automobile.ide.daemon.SetKeyValueResult
 import dev.jasonpearson.automobile.ide.daemon.TestRunQuery
 import dev.jasonpearson.automobile.ide.daemon.TestTimingQuery
 import dev.jasonpearson.automobile.ide.storage.KeyValueType
@@ -10,6 +13,7 @@ import dev.jasonpearson.automobile.ide.storage.StoragePlatform
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -255,17 +259,217 @@ class RealStorageDataSourceTest {
         assertTrue(result is Result.Success)
         assertEquals(emptyList<Any>(), (result as Result.Success).data)
     }
+
+    // --- setKeyValue tests ---
+
+    @Test
+    fun `setKeyValue returns error when no clientProvider`() = runBlocking {
+        val dataSource = RealStorageDataSource()
+
+        val result = dataSource.setKeyValue("prefs", "key1", "value1", KeyValueType.String)
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Not connected"))
+    }
+
+    @Test
+    fun `setKeyValue returns error when no deviceId`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = null,
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.setKeyValue("prefs", "key1", "value1", KeyValueType.String)
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("device"))
+    }
+
+    @Test
+    fun `setKeyValue returns error when no packageName`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = null
+        )
+
+        val result = dataSource.setKeyValue("prefs", "key1", "value1", KeyValueType.String)
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("package"))
+    }
+
+    @Test
+    fun `setKeyValue succeeds and passes correct arguments`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.setKeyValue("app_prefs", "theme", "dark", KeyValueType.String)
+
+        assertTrue(result is Result.Success)
+        val call = client.setKeyValueCalls.single()
+        assertEquals("emulator-5554", call.deviceId)
+        assertEquals("com.example.app", call.appId)
+        assertEquals("app_prefs", call.fileName)
+        assertEquals("theme", call.key)
+        assertEquals("dark", call.value)
+        assertEquals("STRING", call.type)
+    }
+
+    @Test
+    fun `setKeyValue passes null value correctly`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.setKeyValue("app_prefs", "theme", null, KeyValueType.String)
+
+        assertTrue(result is Result.Success)
+        assertNull(client.setKeyValueCalls.single().value)
+    }
+
+    @Test
+    fun `setKeyValue returns error when client reports failure`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        client.setKeyValueResult = SetKeyValueResult(success = false, message = "Write failed")
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.setKeyValue("app_prefs", "key", "val", KeyValueType.String)
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Write failed"))
+    }
+
+    // --- removeKeyValue tests ---
+
+    @Test
+    fun `removeKeyValue returns error when no clientProvider`() = runBlocking {
+        val dataSource = RealStorageDataSource()
+
+        val result = dataSource.removeKeyValue("prefs", "key1")
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Not connected"))
+    }
+
+    @Test
+    fun `removeKeyValue succeeds and passes correct arguments`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.removeKeyValue("app_prefs", "old_key")
+
+        assertTrue(result is Result.Success)
+        val call = client.removeKeyValueCalls.single()
+        assertEquals("emulator-5554", call.deviceId)
+        assertEquals("com.example.app", call.appId)
+        assertEquals("app_prefs", call.fileName)
+        assertEquals("old_key", call.key)
+    }
+
+    @Test
+    fun `removeKeyValue returns error when client reports failure`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        client.removeKeyValueResult = RemoveKeyValueResult(success = false, message = "Key not found")
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.removeKeyValue("app_prefs", "missing_key")
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Key not found"))
+    }
+
+    // --- clearKeyValueFile tests ---
+
+    @Test
+    fun `clearKeyValueFile returns error when no clientProvider`() = runBlocking {
+        val dataSource = RealStorageDataSource()
+
+        val result = dataSource.clearKeyValueFile("prefs")
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Not connected"))
+    }
+
+    @Test
+    fun `clearKeyValueFile succeeds and passes correct arguments`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.clearKeyValueFile("app_prefs")
+
+        assertTrue(result is Result.Success)
+        val call = client.clearKeyValueFileCalls.single()
+        assertEquals("emulator-5554", call.deviceId)
+        assertEquals("com.example.app", call.appId)
+        assertEquals("app_prefs", call.fileName)
+    }
+
+    @Test
+    fun `clearKeyValueFile returns error when client reports failure`() = runBlocking {
+        val client = FakeStorageAutoMobileClient()
+        client.clearKeyValueFileResult = ClearKeyValueResult(success = false, message = "Permission denied")
+        val dataSource = RealStorageDataSource(
+            clientProvider = { client },
+            deviceId = "emulator-5554",
+            packageName = "com.example.app"
+        )
+
+        val result = dataSource.clearKeyValueFile("app_prefs")
+
+        assertTrue(result is Result.Error)
+        assertTrue((result as Result.Error).message.contains("Permission denied"))
+    }
 }
 
 /**
  * Fake AutoMobileClient for storage tests.
- * Only implements readResource() as that's the only method used.
  */
 class FakeStorageAutoMobileClient : AutoMobileClient {
     private val resourceResponses = mutableMapOf<String, McpResourceContent>()
     var throwOnReadResource: McpConnectionException? = null
     var readResourceCallCount = 0
         private set
+
+    // Write operation results (configurable per test)
+    var setKeyValueResult = SetKeyValueResult(success = true)
+    var removeKeyValueResult = RemoveKeyValueResult(success = true)
+    var clearKeyValueFileResult = ClearKeyValueResult(success = true)
+
+    // Recorded write calls for assertion
+    data class SetKeyValueCall(val deviceId: String, val appId: String, val fileName: String, val key: String, val value: String?, val type: String)
+    data class RemoveKeyValueCall(val deviceId: String, val appId: String, val fileName: String, val key: String)
+    data class ClearKeyValueFileCall(val deviceId: String, val appId: String, val fileName: String)
+
+    val setKeyValueCalls = mutableListOf<SetKeyValueCall>()
+    val removeKeyValueCalls = mutableListOf<RemoveKeyValueCall>()
+    val clearKeyValueFileCalls = mutableListOf<ClearKeyValueFileCall>()
 
     override val transportName: String = "fake"
     override val connectionDescription: String = "Fake client for storage testing"
@@ -282,6 +486,21 @@ class FakeStorageAutoMobileClient : AutoMobileClient {
         readResourceCallCount++
         throwOnReadResource?.let { throw it }
         return listOfNotNull(resourceResponses[uri])
+    }
+
+    override fun setKeyValue(deviceId: String, appId: String, fileName: String, key: String, value: String?, type: String): SetKeyValueResult {
+        setKeyValueCalls.add(SetKeyValueCall(deviceId, appId, fileName, key, value, type))
+        return setKeyValueResult
+    }
+
+    override fun removeKeyValue(deviceId: String, appId: String, fileName: String, key: String): RemoveKeyValueResult {
+        removeKeyValueCalls.add(RemoveKeyValueCall(deviceId, appId, fileName, key))
+        return removeKeyValueResult
+    }
+
+    override fun clearKeyValueFile(deviceId: String, appId: String, fileName: String): ClearKeyValueResult {
+        clearKeyValueFileCalls.add(ClearKeyValueFileCall(deviceId, appId, fileName))
+        return clearKeyValueFileResult
     }
 
     // Unused methods - throw to ensure they're not called unexpectedly

@@ -36,6 +36,7 @@ import { registerSnapshotTools } from "./snapshotTools";
 import { registerBiometricTools } from "./biometricTools";
 import { registerHighlightTools } from "./highlightTools";
 import { registerDatabaseTools } from "./databaseTools";
+import { registerStorageTools } from "./storageTools";
 import { registerFormTools } from "./formTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
@@ -146,6 +147,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerBiometricTools();
   registerHighlightTools();
   registerDatabaseTools();
+  registerStorageTools();
   registerFormTools();
   registerDebugTools();
   startupBenchmark.endPhase("toolRegistration");

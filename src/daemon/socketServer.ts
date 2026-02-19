@@ -28,6 +28,9 @@ import {
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
 import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
+import { AccessibilityServiceClient } from "../features/observe/android";
+import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
+import type { KeyValueType } from "../features/storage/storageTypes";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server
@@ -301,6 +304,74 @@ export class UnixSocketServer {
             message: "XCTestService restarted",
           };
         }
+      }
+      case "ide/setKeyValue": {
+        const args = request.params as {
+          deviceId?: string;
+          appId?: string;
+          fileName?: string;
+          key?: string;
+          value?: string | null;
+          type?: string;
+        };
+        if (!args.deviceId || !args.appId || !args.fileName || !args.key || !args.type) {
+          throw new Error("setKeyValue requires deviceId, appId, fileName, key, and type params");
+        }
+        const bootedDevices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("android");
+        const targetDevice = bootedDevices.find(d => d.deviceId === args.deviceId);
+        if (!targetDevice) {
+          throw new Error(`Device not found: ${args.deviceId}`);
+        }
+        const client = AccessibilityServiceClient.getInstance(targetDevice, defaultAdbClientFactory);
+        if (args.value === null || args.value === undefined) {
+          await client.removePreference(args.appId, args.fileName, args.key);
+        } else {
+          await client.setPreference(
+            args.appId,
+            args.fileName,
+            args.key,
+            args.value,
+            args.type as KeyValueType
+          );
+        }
+        return { success: true };
+      }
+      case "ide/removeKeyValue": {
+        const args = request.params as {
+          deviceId?: string;
+          appId?: string;
+          fileName?: string;
+          key?: string;
+        };
+        if (!args.deviceId || !args.appId || !args.fileName || !args.key) {
+          throw new Error("removeKeyValue requires deviceId, appId, fileName, and key params");
+        }
+        const bootedDevices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("android");
+        const targetDevice = bootedDevices.find(d => d.deviceId === args.deviceId);
+        if (!targetDevice) {
+          throw new Error(`Device not found: ${args.deviceId}`);
+        }
+        const client = AccessibilityServiceClient.getInstance(targetDevice, defaultAdbClientFactory);
+        await client.removePreference(args.appId, args.fileName, args.key);
+        return { success: true };
+      }
+      case "ide/clearKeyValueFile": {
+        const args = request.params as {
+          deviceId?: string;
+          appId?: string;
+          fileName?: string;
+        };
+        if (!args.deviceId || !args.appId || !args.fileName) {
+          throw new Error("clearKeyValueFile requires deviceId, appId, and fileName params");
+        }
+        const bootedDevices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("android");
+        const targetDevice = bootedDevices.find(d => d.deviceId === args.deviceId);
+        if (!targetDevice) {
+          throw new Error(`Device not found: ${args.deviceId}`);
+        }
+        const client = AccessibilityServiceClient.getInstance(targetDevice, defaultAdbClientFactory);
+        await client.clearPreferenceStore(args.appId, args.fileName);
+        return { success: true };
       }
       default:
         return undefined;

@@ -2,6 +2,7 @@ package dev.jasonpearson.automobile.ide.datasource
 
 import dev.jasonpearson.automobile.ide.storage.DatabaseInfo
 import dev.jasonpearson.automobile.ide.storage.KeyValueFile
+import dev.jasonpearson.automobile.ide.storage.KeyValueType
 import dev.jasonpearson.automobile.ide.storage.StorageMockData
 import kotlinx.coroutines.delay
 
@@ -21,5 +22,25 @@ class FakeStorageDataSource : StorageDataSource {
         delay(100)
 
         return Result.Success(StorageMockData.keyValueFiles)
+    }
+
+    override suspend fun setKeyValue(
+        fileName: String,
+        key: String,
+        value: String?,
+        type: KeyValueType,
+    ): Result<Unit> {
+        delay(100)
+        return Result.Success(Unit)
+    }
+
+    override suspend fun removeKeyValue(fileName: String, key: String): Result<Unit> {
+        delay(100)
+        return Result.Success(Unit)
+    }
+
+    override suspend fun clearKeyValueFile(fileName: String): Result<Unit> {
+        delay(100)
+        return Result.Success(Unit)
     }
 }

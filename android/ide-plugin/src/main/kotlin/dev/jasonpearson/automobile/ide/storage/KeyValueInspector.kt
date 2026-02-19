@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.ide.socket.StorageChangeListener
 import dev.jasonpearson.automobile.ide.socket.StorageSocketClient
+import dev.jasonpearson.automobile.ide.datasource.Result
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 
@@ -59,15 +62,18 @@ private val HIGHLIGHT_COLOR = Color(0xFF4CAF50).copy(alpha = 0.3f)
  *
  * @param keyValueFiles List of key-value storage files to display
  * @param storageSocketClient Optional socket client for real-time change updates
+ * @param onSetValue Optional callback to persist a value change. Receives (fileName, key, value, type).
  * @param modifier Modifier for the composable
  */
 @Composable
 fun KeyValueInspector(
     keyValueFiles: List<KeyValueFile>,
     storageSocketClient: StorageSocketClient? = null,
+    onSetValue: (suspend (fileName: String, key: String, value: String, type: KeyValueType) -> Result<Unit>)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = JewelTheme.globalColors
+    val scope = rememberCoroutineScope()
 
     // State
     var selectedFile by remember(keyValueFiles) { mutableStateOf(keyValueFiles.firstOrNull()) }
@@ -75,6 +81,8 @@ fun KeyValueInspector(
     var selectedEntry by remember { mutableStateOf<KeyValueEntry?>(null) }
     var editingEntry by remember { mutableStateOf<KeyValueEntry?>(null) }
     var editValue by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
 
     // Track recently changed keys for highlight animation
     // Key format: "fileName:key" to uniquely identify entries across files
@@ -334,21 +342,82 @@ fun KeyValueInspector(
                             // Value (editable if selected)
                             Box(modifier = Modifier.weight(0.45f)) {
                                 if (isEditing) {
-                                    BasicTextField(
-                                        value = editValue,
-                                        onValueChange = { editValue = it },
-                                        textStyle = TextStyle(
-                                            fontSize = 11.sp,
-                                            color = colors.text.normal,
-                                            fontFamily = FontFamily.Monospace,
-                                        ),
-                                        cursorBrush = SolidColor(colors.text.normal),
-                                        singleLine = true,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(2.dp))
-                                            .padding(4.dp),
-                                    )
+                                    Column {
+                                        BasicTextField(
+                                            value = editValue,
+                                            onValueChange = { editValue = it },
+                                            textStyle = TextStyle(
+                                                fontSize = 11.sp,
+                                                color = colors.text.normal,
+                                                fontFamily = FontFamily.Monospace,
+                                            ),
+                                            cursorBrush = SolidColor(colors.text.normal),
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(2.dp))
+                                                .padding(4.dp),
+                                        )
+                                        Row(
+                                            modifier = Modifier.padding(top = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            if (onSetValue != null) {
+                                                Text(
+                                                    if (isSaving) "..." else "Save",
+                                                    fontSize = 10.sp,
+                                                    color = if (isSaving) colors.text.normal.copy(alpha = 0.4f)
+                                                            else Color(0xFF4CAF50),
+                                                    modifier = if (!isSaving) Modifier
+                                                        .clickable {
+                                                            val entryToSave = editingEntry ?: return@clickable
+                                                            val file = selectedFile ?: return@clickable
+                                                            scope.launch {
+                                                                isSaving = true
+                                                                saveError = null
+                                                                val result = onSetValue(
+                                                                    file.name,
+                                                                    entryToSave.key,
+                                                                    editValue,
+                                                                    entryToSave.type,
+                                                                )
+                                                                isSaving = false
+                                                                when (result) {
+                                                                    is Result.Success -> {
+                                                                        editingEntry = null
+                                                                    }
+                                                                    is Result.Error -> {
+                                                                        saveError = result.message
+                                                                    }
+                                                                    is Result.Loading -> Unit
+                                                                }
+                                                            }
+                                                        }
+                                                        .pointerHoverIcon(PointerIcon.Hand)
+                                                    else Modifier,
+                                                )
+                                            }
+                                            Text(
+                                                "Cancel",
+                                                fontSize = 10.sp,
+                                                color = colors.text.normal.copy(alpha = 0.5f),
+                                                modifier = Modifier
+                                                    .clickable {
+                                                        editingEntry = null
+                                                        saveError = null
+                                                    }
+                                                    .pointerHoverIcon(PointerIcon.Hand),
+                                            )
+                                        }
+                                        if (saveError != null) {
+                                            Text(
+                                                saveError!!,
+                                                fontSize = 9.sp,
+                                                color = Color(0xFFE57373),
+                                                modifier = Modifier.padding(top = 2.dp),
+                                            )
+                                        }
+                                    }
                                 } else {
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
