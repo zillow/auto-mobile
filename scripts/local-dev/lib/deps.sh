@@ -229,11 +229,6 @@ ensure_dev_tools() {
     bash "${PROJECT_ROOT}/scripts/ktfmt/install_ktfmt.sh" || ((missing++)) || true
   fi
 
-  if ! command -v xcpretty >/dev/null 2>&1; then
-    log_info "Installing xcpretty..."
-    gem install xcpretty 2>/dev/null || ((missing++)) || true
-  fi
-
   if [[ "${missing}" -gt 0 ]]; then
     log_warn "${missing} tool(s) could not be installed — some features may be unavailable"
   else
