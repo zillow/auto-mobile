@@ -16,7 +16,6 @@ export type PlanExecutionLockScope = "session" | "global";
 class ServerConfig {
   private static instance: ServerConfig;
   private _uiPerfModeEnabled: boolean = true;
-  private _uiPerfDebugEnabled: boolean = false;
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
   private _memPerfAuditEnabled: boolean = false;
   private _predictiveUiEnabled: boolean = false;
@@ -42,14 +41,6 @@ class ServerConfig {
 
   isUiPerfModeEnabled(): boolean {
     return this._uiPerfModeEnabled;
-  }
-
-  setUiPerfDebugMode(enabled: boolean): void {
-    this._uiPerfDebugEnabled = enabled;
-  }
-
-  isUiPerfDebugModeEnabled(): boolean {
-    return this._uiPerfDebugEnabled;
   }
 
   setAccessibilityAuditConfig(config: AccessibilityAuditConfig | null): void {

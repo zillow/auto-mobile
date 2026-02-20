@@ -34,9 +34,6 @@ export class DefaultFeatureFlagApplier implements FeatureFlagApplier {
       case "ui-perf-mode":
         serverConfig.setUiPerfMode(enabled);
         break;
-      case "ui-perf-debug":
-        serverConfig.setUiPerfDebugMode(enabled);
-        break;
       case "mem-perf-audit":
         serverConfig.setMemPerfAuditMode(enabled);
         break;

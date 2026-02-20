@@ -2,7 +2,6 @@ export type FeatureFlagKey =
   | "debug"
   | "debug-perf"
   | "ui-perf-mode"
-  | "ui-perf-debug"
   | "mem-perf-audit"
   | "accessibility-audit"
   | "predictive-ui"
@@ -37,12 +36,6 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     key: "ui-perf-mode",
     label: "UI performance audit",
     description: "Run UI performance audits during observe.",
-    defaultValue: false,
-  },
-  {
-    key: "ui-perf-debug",
-    label: "UI performance debug",
-    description: "Capture recomposition summaries and store recomposition metrics.",
     defaultValue: false,
   },
   {

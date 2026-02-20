@@ -12,9 +12,9 @@ const TEST_DEFINITIONS: FeatureFlagDefinition[] = [
     defaultValue: false,
   },
   {
-    key: "ui-perf-debug",
-    label: "UI perf debug",
-    description: "ui debug",
+    key: "ui-perf-mode",
+    label: "UI perf mode",
+    description: "ui perf",
     defaultValue: true,
   },
 ];
@@ -29,9 +29,9 @@ describe("FeatureFlagService", () => {
 
     expect(flags).toHaveLength(2);
     expect(flags.find(flag => flag.key === "debug")?.enabled).toBe(false);
-    expect(flags.find(flag => flag.key === "ui-perf-debug")?.enabled).toBe(true);
+    expect(flags.find(flag => flag.key === "ui-perf-mode")?.enabled).toBe(true);
     expect(applier.applied).toContainEqual({ key: "debug", enabled: false, config: null });
-    expect(applier.applied).toContainEqual({ key: "ui-perf-debug", enabled: true, config: null });
+    expect(applier.applied).toContainEqual({ key: "ui-perf-mode", enabled: true, config: null });
   });
 
   test("updates flags and reapplies", async () => {

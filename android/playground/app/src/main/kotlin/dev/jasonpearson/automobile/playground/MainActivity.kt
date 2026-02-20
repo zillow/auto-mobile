@@ -14,6 +14,7 @@ import dev.jasonpearson.automobile.playground.navigation.AppNavigation
 import dev.jasonpearson.automobile.playground.navigation.DeepLinkManager
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.EnableComposeObservableApi
+import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 import dev.jasonpearson.automobile.storage.session.SessionRepository
@@ -36,8 +37,9 @@ class MainActivity : ComponentActivity() {
 
     // Initialize AutoMobile SDK for navigation tracking
     AutoMobileSDK.initialize(applicationContext)
-    // Enable SharedPreferences inspection in debug builds
+    // Enable storage and database inspection in debug builds
     SharedPreferencesInspector.setEnabled(true)
+    DatabaseInspector.setEnabled(true)
     Log.d(TAG, "AutoMobileSDK initialized")
 
     // Record session start in background

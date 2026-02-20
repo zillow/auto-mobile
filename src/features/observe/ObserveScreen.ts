@@ -328,7 +328,7 @@ export class RealObserveScreen implements ObserveScreen {
   ): Promise<void> {
     try {
       if (this.device.platform === "android") {
-        await this.viewHierarchy.configureRecompositionTracking(serverConfig.isUiPerfDebugModeEnabled(), perf);
+        await this.viewHierarchy.configureRecompositionTracking(true, perf);
       }
 
       const viewHierarchyStart = this.timer.now();

@@ -84,7 +84,6 @@ function parseArgs(): {
   debugPerf: boolean;
   debug: boolean;
   uiPerfMode: boolean;
-  uiPerfDebug: boolean;
   memPerfAuditMode: boolean;
   a11yAuditMode: boolean;
   a11yLevel?: string;
@@ -144,7 +143,6 @@ function parseArgs(): {
   // UI performance mode is enabled by default (captures TTI, displayed metrics)
   // Use --no-ui-perf-mode to disable
   const uiPerfMode = !args.includes("--no-ui-perf-mode");
-  const uiPerfDebug = args.includes("--ui-perf-debug");
 
   // Detect memory performance audit mode
   const memPerfAuditMode = args.includes("--mem-perf-audit");
@@ -343,7 +341,6 @@ function parseArgs(): {
     debugPerf,
     debug,
     uiPerfMode,
-    uiPerfDebug,
     memPerfAuditMode,
     a11yAuditMode,
     a11yLevel,
@@ -1097,7 +1094,6 @@ async function main() {
       debugPerf,
       debug,
       uiPerfMode,
-      uiPerfDebug,
       memPerfAuditMode,
       a11yAuditMode,
       a11yLevel,
@@ -1150,7 +1146,6 @@ async function main() {
       ["debug", debug, "--debug"],
       ["debug-perf", debugPerf, "--debug-perf"],
       ["ui-perf-mode", uiPerfMode, "--ui-perf-mode"],
-      ["ui-perf-debug", uiPerfDebug, "--ui-perf-debug"],
       ["mem-perf-audit", memPerfAuditMode, "--mem-perf-audit"],
       ["accessibility-audit", a11yAuditMode, "--accessibility-audit", accessibilityConfig],
       ["predictive-ui", predictiveUi, "--predictive/--predictive-ui"],

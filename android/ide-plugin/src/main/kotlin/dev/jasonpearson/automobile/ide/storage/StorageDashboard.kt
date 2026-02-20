@@ -189,6 +189,7 @@ fun StorageDashboard(
         when (selectedTab) {
             StorageTab.Database -> DatabaseInspector(
                 databases = databases,
+                loadError = if (databases.isEmpty()) error else null,
                 onFetchTableData = onFetchTableData,
                 onExecuteSQL = onExecuteSQL,
                 modifier = Modifier.fillMaxSize(),

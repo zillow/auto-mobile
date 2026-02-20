@@ -186,7 +186,7 @@ export interface ObserveResult {
   };
 
   /**
-   * Compose recomposition summary (when ui-perf-debug is enabled)
+   * Compose recomposition summary (populated when SDK is integrated in the target app)
    */
   recompositionSummary?: RecompositionSummary;
 

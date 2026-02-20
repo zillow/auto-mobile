@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -65,6 +66,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
+import com.intellij.openapi.diagnostic.Logger
+
+private val LOG = Logger.getInstance("DatabaseInspector")
 
 /**
  * Database Inspector with tabs for Data, Structure, SQL, and Query History.
@@ -72,6 +76,7 @@ import org.jetbrains.jewel.ui.component.Text
 @Composable
 fun DatabaseInspector(
     databases: List<DatabaseInfo> = StorageMockData.databases,
+    loadError: String? = null,
     onFetchTableData: (suspend (databasePath: String, table: String) -> QueryResult)? = null,
     onExecuteSQL: (suspend (databasePath: String, query: String) -> QueryResult)? = null,
     modifier: Modifier = Modifier,
@@ -83,10 +88,10 @@ fun DatabaseInspector(
     var selectedDatabase by remember(databases) { mutableStateOf(databases.firstOrNull()) }
     var selectedTable by remember(selectedDatabase) { mutableStateOf(selectedDatabase?.tables?.firstOrNull()) }
     var viewMode by remember { mutableStateOf(DatabaseViewMode.Data) }
-    var queryText by remember { mutableStateOf("SELECT * FROM users WHERE is_active = 1") }
+    var queryText by remember { mutableStateOf("") }
     var queryResult by remember { mutableStateOf<QueryResult?>(null) }
-    var savedQueries by remember { mutableStateOf(StorageMockData.savedQueries) }
-    var queryHistory by remember { mutableStateOf(StorageMockData.queryHistory) }
+    var savedQueries by remember { mutableStateOf(emptyList<SavedQuery>()) }
+    var queryHistory by remember { mutableStateOf(emptyList<QueryHistoryEntry>()) }
     var tableData by remember { mutableStateOf<QueryResult?>(null) }
     var isLoadingData by remember { mutableStateOf(false) }
 
@@ -159,25 +164,30 @@ fun DatabaseInspector(
             }
         }
 
-        // Show info banner when no databases are available
+        // Show info/error banner when no databases are available
         if (databases.isEmpty()) {
+            val isError = loadError != null
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF2196F3).copy(alpha = 0.1f))
+                    .background(
+                        if (isError) Color(0xFFFF5722).copy(alpha = 0.1f)
+                        else Color(0xFF2196F3).copy(alpha = 0.1f)
+                    )
                     .padding(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "No databases detected",
+                        if (isError) "Failed to load databases" else "No databases detected",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF2196F3),
+                        color = if (isError) Color(0xFFFF5722) else Color(0xFF2196F3),
                     )
                     Text(
-                        "AutoMobile can inspect databases via adb shell for debuggable apps. The SDK provides a richer inspection experience with live updates.",
+                        loadError ?: "AutoMobile can inspect databases via adb shell for debuggable apps. The SDK provides a richer inspection experience with live updates.",
                         fontSize = 11.sp,
                         color = colors.text.normal.copy(alpha = 0.7f),
+                        fontFamily = if (isError) androidx.compose.ui.text.font.FontFamily.Monospace else androidx.compose.ui.text.font.FontFamily.Default,
                     )
                 }
             }
@@ -208,6 +218,39 @@ fun DatabaseInspector(
                         DataView(
                             table = selectedTable!!,
                             result = tableData ?: StorageMockData.mockQueryResult,
+                            onUpdateCell = if (onExecuteSQL != null && onFetchTableData != null) {
+                                { tableName, columnName, newValue, pkValues ->
+                                    val db = selectedDatabase
+                                    if (db == null) {
+                                        "No database selected"
+                                    } else {
+                                        val set = "\"${columnName.replace("\"", "\"\"")}\" = ${formatSqlValue(newValue)}"
+                                        val where = pkValues.entries.joinToString(" AND ") { (col, v) ->
+                                            "\"${col.replace("\"", "\"\"")}\" = ${formatSqlValue(v?.toString())}"
+                                        }
+                                        val sql = "UPDATE \"${tableName.replace("\"", "\"\"")}\" SET $set WHERE $where"
+                                        LOG.info("onUpdateCell: executing SQL: $sql")
+                                        val updateResult = withContext(Dispatchers.IO) { onExecuteSQL(db.path, sql) }
+                                        if (updateResult.error == null) {
+                                            // Refresh table data in-place — do NOT touch isLoadingData,
+                                            // because that unmounts DataView (cancelling this coroutine
+                                            // and leaving updatingCell set forever).
+                                            val tbl = selectedTable
+                                            if (tbl != null) {
+                                                val newData = try {
+                                                    withContext(Dispatchers.IO) { onFetchTableData(db.path, tbl.name) }
+                                                } catch (_: Exception) { null }
+                                                if (newData != null) tableData = newData
+                                            }
+                                            null
+                                        } else {
+                                            val errMsg = enrichSqlError(updateResult, db).error ?: "Unknown error"
+                                            LOG.warn("onUpdateCell: update failed: $errMsg\nSQL: $sql")
+                                            "$errMsg\n\nSQL: $sql"
+                                        }
+                                    }
+                                }
+                            } else null,
                         )
                     }
                 } else {
@@ -240,19 +283,20 @@ fun DatabaseInspector(
                                         error = e.message ?: "Execution failed",
                                     )
                                 }
-                                queryResult = result
-                                queryHistory = listOf(
-                                    QueryHistoryEntry(
-                                        id = "h${System.currentTimeMillis()}",
-                                        sql = queryText,
-                                        databaseName = db.name,
-                                        executedAt = System.currentTimeMillis(),
-                                        executionTimeMs = result.executionTimeMs,
-                                        rowsAffected = result.rowCount,
-                                        success = result.error == null,
-                                        error = result.error,
-                                    )
-                                ) + queryHistory
+                                val enrichedResult = enrichSqlError(result, db)
+                                queryResult = enrichedResult
+                                val newEntry = QueryHistoryEntry(
+                                    id = "h${System.currentTimeMillis()}",
+                                    sql = queryText,
+                                    databaseName = db.name,
+                                    executedAt = System.currentTimeMillis(),
+                                    executionTimeMs = enrichedResult.executionTimeMs,
+                                    rowsAffected = enrichedResult.rowCount,
+                                    success = enrichedResult.error == null,
+                                    error = enrichedResult.error,
+                                )
+                                queryHistory = listOf(newEntry) +
+                                    queryHistory.filter { it.sql != queryText || it.databaseName != db.name }
                             }
                         } else {
                             // Fallback mock execution
@@ -425,9 +469,26 @@ private fun ViewModeTabs(
 private fun DataView(
     table: TableInfo,
     result: QueryResult,
+    onUpdateCell: (suspend (tableName: String, columnName: String, newValue: String?, pkValues: Map<String, Any?>) -> String?)? = null,
 ) {
     val colors = JewelTheme.globalColors
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+
+    var editingCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var editText by remember { mutableStateOf("") }
+    var updatingCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    // Triple: (rowIndex, colIndex, errorMessage)
+    var cellUpdateError by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
+
+    // Determine which column indices are primary keys
+    val pkColIndices = remember(table.columns, result.columns) {
+        table.columns
+            .filter { it.isPrimaryKey }
+            .mapNotNull { pk -> result.columns.indexOf(pk.name).takeIf { it >= 0 } }
+            .toSet()
+    }
+    val canEdit = onUpdateCell != null && pkColIndices.isNotEmpty()
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Table header
@@ -438,53 +499,117 @@ private fun DataView(
                 .horizontalScroll(scrollState)
                 .padding(vertical = 8.dp),
         ) {
-            result.columns.forEach { column ->
-                Box(
-                    modifier = Modifier
-                        .width(150.dp)
-                        .padding(horizontal = 8.dp),
-                ) {
-                    Text(
-                        column,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.text.normal,
-                    )
+            result.columns.forEachIndexed { colIndex, column ->
+                Box(modifier = Modifier.width(150.dp).padding(horizontal = 8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (colIndex in pkColIndices) {
+                            Text("\uD83D\uDD11", fontSize = 9.sp)
+                        }
+                        Text(
+                            column,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.text.normal,
+                        )
+                    }
                 }
             }
         }
 
-        // Divider
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(colors.text.normal.copy(alpha = 0.1f))
-        )
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.text.normal.copy(alpha = 0.1f)))
 
         // Table rows
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(result.rows) { row ->
+            itemsIndexed(result.rows) { rowIndex, row ->
+                val pkValues = pkColIndices.associate { pkIdx ->
+                    (result.columns.getOrNull(pkIdx) ?: "") to row.getOrNull(pkIdx)
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(scrollState)
-                        .clickable { }
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 4.dp),
                 ) {
-                    row.forEach { cell ->
-                        Box(
-                            modifier = Modifier
-                                .width(150.dp)
-                                .padding(horizontal = 8.dp),
-                        ) {
-                            Text(
-                                cell?.toString() ?: "NULL",
-                                fontSize = 11.sp,
-                                color = if (cell == null) colors.text.normal.copy(alpha = 0.4f) else colors.text.normal,
-                                fontFamily = FontFamily.Monospace,
-                            )
+                    row.forEachIndexed { colIndex, cell ->
+                        val isEditing = editingCell == Pair(rowIndex, colIndex)
+                        val isUpdating = updatingCell == Pair(rowIndex, colIndex)
+                        val isPk = colIndex in pkColIndices
+                        val isEditable = canEdit && !isPk
+                        val hasError = cellUpdateError?.let { it.first == rowIndex && it.second == colIndex } == true
+
+                        Box(modifier = Modifier.width(150.dp).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                            if (isEditing) {
+                                BasicTextField(
+                                    value = editText,
+                                    onValueChange = { editText = it },
+                                    textStyle = TextStyle(
+                                        fontSize = 11.sp,
+                                        color = colors.text.normal,
+                                        fontFamily = FontFamily.Monospace,
+                                    ),
+                                    cursorBrush = SolidColor(colors.text.normal),
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF2196F3).copy(alpha = 0.1f), RoundedCornerShape(2.dp))
+                                        .border(1.dp, Color(0xFF2196F3).copy(alpha = 0.6f), RoundedCornerShape(2.dp))
+                                        .padding(2.dp)
+                                        .onKeyEvent { event ->
+                                            when {
+                                                event.type == KeyEventType.KeyDown && event.key == Key.Enter -> {
+                                                    val colName = result.columns.getOrNull(colIndex)
+                                                        ?: return@onKeyEvent false
+                                                    val newVal = editText.takeUnless {
+                                                        it.equals("NULL", ignoreCase = true)
+                                                    }
+                                                    editingCell = null
+                                                    coroutineScope.launch {
+                                                        updatingCell = Pair(rowIndex, colIndex)
+                                                        cellUpdateError = null
+                                                        val errorMsg = try {
+                                                            onUpdateCell!!(table.name, colName, newVal, pkValues)
+                                                        } catch (e: Exception) { e.message ?: "Unknown error" }
+                                                        updatingCell = null
+                                                        if (errorMsg != null) cellUpdateError = Triple(rowIndex, colIndex, errorMsg)
+                                                    }
+                                                    true
+                                                }
+                                                event.type == KeyEventType.KeyDown && event.key == Key.Escape -> {
+                                                    editingCell = null
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        },
+                                )
+                            } else {
+                                Text(
+                                    text = if (isUpdating) "…" else cell?.toString() ?: "NULL",
+                                    fontSize = 11.sp,
+                                    color = when {
+                                        isUpdating -> Color(0xFF2196F3).copy(alpha = 0.7f)
+                                        hasError -> Color(0xFFFF5722)
+                                        cell == null -> colors.text.normal.copy(alpha = 0.4f)
+                                        isPk -> colors.text.normal.copy(alpha = 0.6f)
+                                        else -> colors.text.normal
+                                    },
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = if (isEditable) {
+                                        Modifier
+                                            .clickable {
+                                                editText = cell?.toString() ?: ""
+                                                editingCell = Pair(rowIndex, colIndex)
+                                                if (cellUpdateError?.let { it.first == rowIndex && it.second == colIndex } == true) {
+                                                    cellUpdateError = null
+                                                }
+                                            }
+                                            .pointerHoverIcon(PointerIcon.Text)
+                                    } else Modifier,
+                                )
+                            }
                         }
                     }
                 }
@@ -497,7 +622,37 @@ private fun DataView(
             }
         }
 
-        // Footer with row count
+        // Error banner
+        val currentError = cellUpdateError
+        if (currentError != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFF5722).copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Update failed: ${currentError.third}",
+                    fontSize = 11.sp,
+                    color = Color(0xFFFF5722),
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "\u2715",
+                    fontSize = 12.sp,
+                    color = Color(0xFFFF5722).copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .clickable { cellUpdateError = null }
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .padding(4.dp),
+                )
+            }
+        }
+
+        // Footer
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -506,7 +661,10 @@ private fun DataView(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                "${result.rowCount} rows",
+                buildString {
+                    append("${result.rowCount} rows")
+                    if (canEdit) append("  •  Click cell to edit, Enter to save, Esc to cancel")
+                },
                 fontSize = 10.sp,
                 color = colors.text.normal.copy(alpha = 0.5f),
             )
@@ -881,6 +1039,63 @@ private fun EmptyState(message: String) {
             color = colors.text.normal.copy(alpha = 0.5f),
         )
     }
+}
+
+/**
+ * Format a value for use in a SQL literal.
+ * Strings are single-quoted with internal quotes escaped; numbers are unquoted; null becomes NULL.
+ */
+private fun formatSqlValue(value: String?): String {
+    if (value == null) return "NULL"
+    val asLong = value.toLongOrNull()
+    val asDouble = value.toDoubleOrNull()
+    return when {
+        asLong != null -> asLong.toString()
+        asDouble != null -> asDouble.toString()
+        else -> "'${value.replace("'", "''")}'"
+    }
+}
+
+/**
+ * Strip the MCP error wrapper from a database error message.
+ *
+ * Converts "MCP server not available: MCP error -32603: Database error (SqlError): SQL error: ..."
+ * into just "SQL error: ..."
+ */
+private fun stripMcpWrapper(error: String): String {
+    val marker = "Database error ("
+    val idx = error.indexOf(marker)
+    if (idx >= 0) {
+        val closeParen = error.indexOf("):", idx)
+        if (closeParen >= 0) {
+            return error.substring(closeParen + 2).trim().trimEnd(':').trim()
+        }
+    }
+    return error
+}
+
+/**
+ * Enrich a SQL error result with schema context (available tables or columns).
+ */
+private fun enrichSqlError(result: QueryResult, database: DatabaseInfo): QueryResult {
+    val error = result.error ?: return result
+    val cleaned = stripMcpWrapper(error)
+    val enriched = when {
+        cleaned.contains("no such table", ignoreCase = true) -> {
+            val tables = database.tables.map { it.name }
+            if (tables.isNotEmpty()) "$cleaned\nAvailable tables: ${tables.joinToString(", ")}"
+            else cleaned
+        }
+        cleaned.contains("no such column", ignoreCase = true) -> {
+            val columns = database.tables.flatMap { table ->
+                table.columns.map { col -> "${table.name}.${col.name}" }
+            }
+            if (columns.isNotEmpty()) "$cleaned\nAvailable columns: ${columns.joinToString(", ")}"
+            else cleaned
+        }
+        else -> cleaned
+    }
+    return result.copy(error = enriched)
 }
 
 /**

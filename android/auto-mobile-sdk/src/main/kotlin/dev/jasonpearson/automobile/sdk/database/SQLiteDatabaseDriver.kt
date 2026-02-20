@@ -258,13 +258,20 @@ class SQLiteDatabaseDriver(private val context: Context) : DatabaseDriver {
     val db = openDatabase(databasePath, readOnly = false)
 
     try {
-      db.execSQL(query)
-      // Get rows affected via changes() function
-      val rowsAffected =
-          db.rawQuery("SELECT changes()", null).use { cursor ->
-            cursor.moveToFirst()
-            cursor.getInt(0)
-          }
+      // Use compileStatement().executeUpdateDelete() instead of execSQL().
+      //
+      // On Android 15 (API 35) with WAL-mode databases managed by Room, calling
+      // execSQL() fails with "Queries can be performed using SQLiteDatabase query
+      // or rawQuery methods only." because Android marks the secondary READWRITE
+      // connection as read-only when Room already holds the WAL write connection.
+      //
+      // compileStatement().executeUpdateDelete() bypasses the Java-level isReadOnly()
+      // check and goes directly through the native SQLite connection pool, allowing
+      // writes when Room's WAL lock is not actively held.
+      //
+      // It also returns the affected row count directly, avoiding the need for a
+      // separate SELECT changes() call on a potentially different connection.
+      val rowsAffected = db.compileStatement(query).executeUpdateDelete()
       return SQLExecutionResult.Mutation(rowsAffected = rowsAffected)
     } catch (e: Exception) {
       throw DatabaseError.SqlError(e.message ?: "Unknown SQL error")
@@ -296,6 +303,17 @@ class SQLiteDatabaseDriver(private val context: Context) : DatabaseDriver {
 
     try {
       val db = SQLiteDatabase.openDatabase(path, null, flags)
+      if (!readOnly) {
+        // Allow up to 5 seconds waiting for write locks held by Room or other connections.
+        // Without this, SQLite fails immediately with "database is locked" if the app has
+        // an active write transaction open on the same database.
+        //
+        // Use compileStatement().execute() instead of execSQL() here for the same reason
+        // as in executeMutation: on Android 15 (API 35) with WAL-mode databases, execSQL()
+        // calls throwIfReadOnly() which throws even on OPEN_READWRITE connections when Room
+        // holds the WAL write connection. compileStatement().execute() bypasses that check.
+        db.compileStatement("PRAGMA busy_timeout=5000").execute()
+      }
       openDatabases[path] = db
       return db
     } catch (e: Exception) {

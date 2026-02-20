@@ -12,7 +12,6 @@ import {
 } from "../../models";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
-import { serverConfig } from "../../utils/ServerConfig";
 import { DefaultElementParser } from "../utility/ElementParser";
 
 const MAX_RECOMPOSITION_RECORDS = 10000;
@@ -66,18 +65,11 @@ export class RecompositionTracker {
   }
 
   recordInteraction(): void {
-    if (!serverConfig.isUiPerfDebugModeEnabled()) {
-      return;
-    }
     this.lastInteractionTotals = new Map(this.latestTotals);
     this.lastInteractionAt = this.timer.now();
   }
 
   async processObservation(result: ObserveResult, device: BootedDevice): Promise<void> {
-    if (!serverConfig.isUiPerfDebugModeEnabled()) {
-      return;
-    }
-
     if (!result.viewHierarchy?.hierarchy) {
       return;
     }
