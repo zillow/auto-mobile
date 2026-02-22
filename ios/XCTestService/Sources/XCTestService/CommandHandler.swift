@@ -333,6 +333,7 @@ public class CommandHandler: CommandHandling {
         }
 
         try gesturePerformer.launchApp(bundleId: bundleId)
+        elementLocator.trackObservedBundleId(bundleId)
 
         return WebSocketResponse.success(
             type: ResponseType.launchAppResult.rawValue,

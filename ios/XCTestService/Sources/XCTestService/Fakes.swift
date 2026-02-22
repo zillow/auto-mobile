@@ -89,6 +89,10 @@ public class FakeElementLocator: ElementLocating {
         findByTextHistory.append(text)
         return elements.values.first
     }
+
+    public func trackObservedBundleId(_ bundleId: String) {
+        // no-op for tests
+    }
 }
 
 // MARK: - FakeGesturePerformer

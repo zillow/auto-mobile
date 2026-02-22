@@ -97,6 +97,10 @@ public class ElementLocator: ElementLocating {
             elementCache.removeAll()
         }
 
+        public func trackObservedBundleId(_ bundleId: String) {
+            observedBundleIds.insert(bundleId)
+        }
+
         /// Set the application to observe with its bundle ID
         public func setApplication(_ app: XCUIApplication, bundleId: String) {
             // Release old app reference before setting new one
@@ -988,6 +992,10 @@ public class ElementLocator: ElementLocating {
 
         public func findElement(byText _: String) -> Any? {
             return nil
+        }
+
+        public func trackObservedBundleId(_ bundleId: String) {
+            // no-op on non-iOS
         }
     #endif
 }
