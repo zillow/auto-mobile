@@ -22,11 +22,8 @@ The MCP server exposes AutoMobile's capabilities as tool calls, resources, and r
 - ⚙️ **[Feature flags](feature-flags.md)** to gate debug or advanced features to be toggled at runtime in IDE integrations.
 - 🦆 **[Migrations](storage/migrations.md)** Database & test plan schema management
 
-## Transport Modes
+## Transport
 
-| Mode | Use Case |
-|------|----------|
-| 💻 **STDIO** (default) | Workstations, CI automation |
-| 🌐 **Streamable HTTP** | Hot reload development, HTTP-only clients |
+The MCP server uses **STDIO** transport (default). For hot reload development and IDE plugin integration, a background daemon process accepts connections via a Unix socket.
 
 See [installation](../../install.md) for detailed configuration options.

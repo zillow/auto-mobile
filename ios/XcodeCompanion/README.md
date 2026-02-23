@@ -49,10 +49,8 @@ Based on the design documented in `docs/design-docs/plat/ios/ide-plugin/overview
 
 ### MCP Transport
 Transport priority order:
-1. HTTP dev server (localhost:3000)
-2. Environment variables
-3. stdio
-4. Unix socket fallback
+1. `AUTOMOBILE_MCP_STDIO_COMMAND` environment variable (stdio)
+2. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`
 
 ## Building
 

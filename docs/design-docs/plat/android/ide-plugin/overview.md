@@ -2,39 +2,18 @@
 
 <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
 
-> **Current state:** The Android Studio/IntelliJ plugin is implemented in `android/ide-plugin/`. Supports MCP over HTTP (streamable) and STDIO, daemon socket fallback, worktree-aware dev server discovery, and device pool display. Sub-features (navigation graph render, test recording, feature flags UI) have varying completeness — see their individual docs. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
+> **Current state:** The Android Studio/IntelliJ plugin is implemented in `android/ide-plugin/`. Supports MCP over STDIO and daemon socket, and device pool display. Sub-features (navigation graph render, test recording, feature flags UI) have varying completeness — see their individual docs. See the [Status Glossary](../../../status-glossary.md) for chip definitions.
 
 The AutoMobile IntelliJ/Android Studio plugin attaches to a running MCP server to render navigation data and
-manage development workflows. It supports MCP over HTTP (streamable) and STDIO, and falls back to the
-local daemon socket when needed.
+manage development workflows. It connects via STDIO or the local daemon socket.
 
 ## Transport selection
 The plugin resolves a transport when the user clicks "Attach to MCP":
 
-1. MCP dev server discovered via HTTP health checks on localhost.
-2. `AUTOMOBILE_MCP_HTTP_URL` / `-Dautomobile.mcp.httpUrl` (streamable HTTP).
-3. `AUTOMOBILE_MCP_STDIO_COMMAND` / `-Dautomobile.mcp.stdioCommand` (stdio).
-4. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
-
-## MCP dev server discovery
-Discovery focuses on hot-reload dev servers (bun `--watch`) and supports multiple worktrees.
-
-1. **Worktree enumeration**: the plugin runs `git worktree list --porcelain` using `ProcessBuilder` and coroutines.
-   - Each worktree record includes a filesystem path and optional branch name.
-2. **Port scan**: the plugin scans local listening ports (via `lsof`, `ss`, or `netstat` depending on OS).
-3. **Health probing**: each listening port is queried at `/health` (falling back to `/auto-mobile/health`).
-   - Responses with `server: "AutoMobile"` are treated as MCP servers.
-4. **Mapping**: discovered servers are matched to worktrees using the `branch` value from the health payload.
-
-The health response also includes `instanceId`, `port`, and `activeSessions` so the plugin can detect restarts
-and show server status.
+1. `AUTOMOBILE_MCP_STDIO_COMMAND` / `-Dautomobile.mcp.stdioCommand` (stdio).
+2. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
 
 ## Tool window UX
-- The dropdown lists every git worktree and its associated MCP server (if any).
-- Worktrees without a running server are shown as "no server".
-- Unmatched MCP servers are shown as standalone entries.
-- "Rescan servers" re-runs discovery to pick up cold restarts or newly launched dev servers.
-
-## Notes
-- Streamable HTTP endpoints are assumed to live at `http://localhost:<port>/auto-mobile/streamable`.
-- MCP stdio and daemon transports are still available for non-dev workflows.
+- The dropdown lists every git worktree and its associated daemon (if any).
+- Worktrees without a running daemon are shown as "no server".
+- "Rescan servers" re-runs discovery to pick up newly launched daemons.

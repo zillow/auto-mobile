@@ -15,7 +15,7 @@ flowchart TB
     end
 
     subgraph MCP["MCP Server"]
-        Transport["Transport Layer<br/>(STDIO / HTTP)"]
+        Transport["Transport Layer<br/>(STDIO / Daemon Socket)"]
         Registry["Tool & Resource<br/>Registry"]
 
         subgraph Features["Feature Composition"]

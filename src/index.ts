@@ -1,9 +1,5 @@
 #!/usr/bin/env bun
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createServer as createHttpServer } from "node:http";
-import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
 import { createProxyMcpServer } from "./server/proxyServer";
 import { logger } from "./utils/logger";
@@ -17,9 +13,6 @@ import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from 
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./daemon/appearanceSocketServer";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "./utils/appearance/AppearanceSyncScheduler";
 import { startHostEmulatorAutoConnect, stopHostEmulatorAutoConnect } from "./utils/hostEmulatorAutoConnect";
-import { execSync } from "node:child_process";
-import { defaultTimer } from "./utils/SystemTimer";
-import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
 import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefinitions";
 import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig";
@@ -27,60 +20,15 @@ import type { VideoRecordingConfigInput } from "./models";
 import { startupBenchmark } from "./utils/startupBenchmark";
 import { AndroidAccessibilityServiceManager } from "./utils/AccessibilityServiceManager";
 import { XCTestServiceBuilder } from "./utils/XCTestServiceBuilder";
-import { IOSXCTestServiceManager } from "./utils/XCTestServiceManager";
 
 startupBenchmark.mark("processEntry");
-
-// Detect port from git branch name for worktree isolation
-// e.g., work/164-feature-name -> port 9164
-function detectPortFromBranch(): number {
-  const basePort = 9000;
-
-  // Check environment variable first (explicit override)
-  // @deprecated AUTO_MOBILE_PORT - use AUTOMOBILE_PORT instead
-  const envPort = process.env.AUTOMOBILE_PORT ?? process.env.AUTO_MOBILE_PORT;
-  if (envPort) {
-    const port = parseInt(envPort, 10);
-    if (!isNaN(port) && port > 0 && port < 65536) {
-      return port;
-    }
-  }
-
-  try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"]
-    }).trim();
-
-    // Extract issue number from branch name patterns:
-    // work/164-feature-name, feature/164-name, fix/164, issue-164, etc.
-    const match = branch.match(/\b(\d{1,4})\b/);
-    if (match) {
-      const issueNumber = parseInt(match[1], 10);
-      // Keep port in valid range (9001-9999 for issue numbers 1-999)
-      if (issueNumber > 0 && issueNumber < 1000) {
-        return basePort + issueNumber;
-      }
-    }
-  } catch {
-    // Not in a git repo or git not available, use default
-  }
-
-  return basePort;
-}
-
-// Interface for transport configuration
-interface TransportConfig {
-  type: "stdio" | "sse" | "streamable";
-  port?: number;
-  host?: string;
-}
 
 // Parse command line arguments
 function parseArgs(): {
   cliMode: boolean;
   cliArgs: string[];
-  transport: TransportConfig;
+  daemonPort: number | undefined;
+  daemonHost: string;
   debugPerf: boolean;
   debug: boolean;
   uiPerfMode: boolean;
@@ -103,13 +51,8 @@ function parseArgs(): {
   } {
   const args = process.argv.slice(2);
 
-  // Default transport configuration
-  // Port is auto-detected from git branch for worktree isolation
-  const transport: TransportConfig = {
-    type: "stdio",
-    port: detectPortFromBranch(),
-    host: "localhost"
-  };
+  let daemonPort: number | undefined;
+  let daemonHost = "localhost";
 
   // Detect CLI mode based on command line flag
   const cliMode = args.includes("--cli");
@@ -251,32 +194,22 @@ function parseArgs(): {
       break;
     }
 
-    // Transport configuration
-    if (arg === "--transport") {
-      const transportType = args[i + 1];
-      if (transportType === "sse" || transportType === "stdio" || transportType === "streamable") {
-        transport.type = transportType;
-        i++; // Skip the transport type argument
-      } else {
-        logger.warn(`Invalid transport type: ${transportType}. Using default: stdio`);
-        i++; // Skip the invalid argument
-      }
-    } else if (arg === "--port") {
+    if (arg === "--port") {
       const port = parseInt(args[i + 1], 10);
       if (!isNaN(port) && port > 0 && port < 65536) {
-        transport.port = port;
+        daemonPort = port;
         i++; // Skip the port argument
       } else {
-        logger.warn(`Invalid port: ${args[i + 1]}. Using default: ${transport.port}`);
+        logger.warn(`Invalid port: ${args[i + 1]}`);
         i++; // Skip the invalid argument
       }
     } else if (arg === "--host") {
       const host = args[i + 1];
       if (host && !host.startsWith("--")) {
-        transport.host = host;
+        daemonHost = host;
         i++; // Skip the host argument
       } else {
-        logger.warn(`Invalid host: ${host}. Using default: ${transport.host}`);
+        logger.warn(`Invalid host: ${host}`);
         i++; // Skip the invalid argument
       }
     } else if (arg === "--a11y-level") {
@@ -337,7 +270,8 @@ function parseArgs(): {
   return {
     cliMode,
     cliArgs,
-    transport,
+    daemonPort,
+    daemonHost,
     debugPerf,
     debug,
     uiPerfMode,
@@ -358,693 +292,6 @@ function parseArgs(): {
     noProxy,
     noDaemon,
   };
-}
-
-// Format uptime in human-readable form
-function formatUptime(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  }
-  return `${seconds}s`;
-}
-
-// Create and start Streamable HTTP server
-async function startStreamableServer(transport: TransportConfig, debug: boolean): Promise<void> {
-  const server = createHttpServer();
-  const transports = new Map<string, StreamableHTTPServerTransport>();
-
-  // Server instance tracking for health checks and restart detection
-  const serverInstanceId = randomUUID();
-  const serverStartTime = defaultTimer.now();
-
-  server.on("request", async (req, res) => {
-    // CORS headers for development
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, MCP-Session-Id");
-
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-
-    // Health check endpoint for connection status and restart detection
-    if (url.pathname === "/health" || url.pathname === "/auto-mobile/health") {
-      const uptimeMs = defaultTimer.now() - serverStartTime;
-      let branch: string | undefined;
-      try {
-        branch = execSync("git rev-parse --abbrev-ref HEAD", {
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"]
-        }).trim();
-      } catch {
-        // Not in git repo
-      }
-      const health = {
-        status: "ok",
-        server: "AutoMobile",
-        version: "0.0.6",
-        instanceId: serverInstanceId,
-        port: transport.port,
-        branch,
-        uptime: {
-          ms: uptimeMs,
-          human: formatUptime(uptimeMs)
-        },
-        activeSessions: transports.size,
-        transport: "streamable"
-      };
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(health, null, 2));
-      return;
-    }
-
-    if (url.pathname === "/auto-mobile/streamable") {
-      // Get session ID from header
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
-      let streamableTransport: StreamableHTTPServerTransport;
-      let parsedBody: unknown;
-
-      // Parse body for POST requests
-      if (req.method === "POST") {
-        let body = "";
-        req.on("data", chunk => {
-          body += chunk.toString();
-        });
-
-        await new Promise<void>(resolve => {
-          req.on("end", resolve);
-        });
-
-        try {
-          parsedBody = JSON.parse(body);
-        } catch {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Invalid JSON" }));
-          return;
-        }
-      }
-
-      // Check if this is an initialization request
-      const isInitializeRequest = parsedBody && typeof parsedBody === "object" && true && "method" in parsedBody && parsedBody.method === "initialize";
-      const sendJsonRpcError = (message: string, error?: unknown) => {
-        if (res.headersSent) {
-          return;
-        }
-        const id =
-          parsedBody &&
-          typeof parsedBody === "object" &&
-          "id" in parsedBody
-            ? parsedBody.id
-            : null;
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          error: {
-            code: -32603,
-            message,
-            data: error instanceof Error ? error.message : undefined
-          }
-        }));
-      };
-
-      if (sessionId && transports.has(sessionId)) {
-        // Use existing transport
-        streamableTransport = transports.get(sessionId)!;
-      } else if (isInitializeRequest || !sessionId) {
-        // Create new transport for initialization or when no session ID
-        const sessionContext: { sessionId?: string } = {};
-        streamableTransport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: newSessionId => {
-            transports.set(newSessionId, streamableTransport);
-            sessionContext.sessionId = newSessionId;
-            logger.info(`Streamable HTTP session initialized: ${newSessionId}`);
-          }
-        });
-
-        // Create and connect MCP server
-        let mcpServer;
-        try {
-          mcpServer = createMcpServer({ debug, sessionContext });
-        } catch (error) {
-          logger.error("Failed to create MCP server:", error);
-          sendJsonRpcError("Server error", error);
-          return;
-        }
-
-        // Setup cleanup handlers
-        streamableTransport.onclose = async () => {
-          if (streamableTransport.sessionId) {
-            const cancelled = await executionTracker.cancelSessionExecutions(streamableTransport.sessionId);
-            transports.delete(streamableTransport.sessionId);
-            logger.info(`Streamable HTTP session closed: ${streamableTransport.sessionId} (cancelled ${cancelled} executions)`);
-          }
-        };
-
-        streamableTransport.onerror = async error => {
-          if (streamableTransport.sessionId) {
-            logger.error(`Streamable HTTP transport error for session ${streamableTransport.sessionId}:`, error);
-            await executionTracker.cancelSessionExecutions(streamableTransport.sessionId);
-            transports.delete(streamableTransport.sessionId);
-          }
-        };
-
-        try {
-          logger.info("Connecting MCP server to Streamable HTTP transport");
-          await mcpServer.connect(streamableTransport);
-          logger.info("MCP server connected to Streamable HTTP transport");
-        } catch (error) {
-          logger.error("MCP server connect failed:", error);
-          sendJsonRpcError("Server error", error);
-          return;
-        }
-      } else {
-        // Session not found - likely server restarted
-        logger.warn(`Session not found: ${sessionId}. Server may have restarted. Active sessions: ${transports.size}`);
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          error: "Session not found",
-          message: "The session may have expired or the server was restarted. Please reinitialize the connection.",
-          hint: "If using mcp-remote, restart the MCP client to establish a new session.",
-          serverInstanceId,
-          activeSessions: transports.size
-        }));
-        return;
-      }
-
-      // Let the transport handle the request
-      try {
-        await streamableTransport.handleRequest(req, res, parsedBody);
-      } catch (error) {
-        logger.error("Streamable HTTP request handling failed:", error);
-        sendJsonRpcError("Server error", error);
-      }
-
-    } else {
-      // 404 for unknown paths
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Not found" }));
-    }
-  });
-
-  // Start HTTP server
-  startupBenchmark.startPhase("serverListening");
-  server.listen(transport.port!, transport.host!, () => {
-    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/streamable`);
-    logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/streamable`);
-    startupBenchmark.endPhase("serverListening");
-    startupBenchmark.emit("mcp-server", {
-      transport: "streamable",
-      host: transport.host,
-      port: transport.port
-    });
-  });
-
-  // Handle server shutdown
-  const shutdown = async () => {
-    logger.info("Shutting down Streamable HTTP server...");
-
-    // Close all active sessions
-    for (const [sessionId, streamableTransport] of transports) {
-      try {
-        await streamableTransport.close();
-      } catch (error) {
-        logger.warn(`Error closing Streamable HTTP session ${sessionId}:`, error);
-      }
-    }
-    transports.clear();
-
-    await stopHostEmulatorAutoConnect();
-    await stopVideoRecordingSocketServer();
-    await stopTestRecordingSocketServer();
-    await stopDeviceSnapshotSocketServer();
-    await IOSXCTestServiceManager.shutdownAll();
-    await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
-
-    server.close(() => {
-      logger.info("Streamable HTTP server shut down");
-      logger.close();
-      process.exit(0);
-    });
-  };
-
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-}
-
-// Create and start SSE server
-async function startSSEServer(transport: TransportConfig, debug: boolean): Promise<void> {
-  const server = createHttpServer();
-  const sessions = new Map<string, SSEServerTransport>();
-
-  // Handle SSE connections (GET requests)
-  server.on("request", async (req, res) => {
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-
-    // CORS headers for development
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    if (req.method === "GET" && url.pathname === "/auto-mobile/sse") {
-      // Create SSE transport for this session
-      const sseTransport = new SSEServerTransport("/auto-mobile/messages", res);
-      const sessionId = sseTransport.sessionId;
-
-      sessions.set(sessionId, sseTransport);
-
-      // Create MCP server instance for this session
-      const mcpServer = createMcpServer({ debug, sessionContext: { sessionId } });
-
-      // Handle cleanup when connection closes
-      sseTransport.onclose = async () => {
-        const cancelled = await executionTracker.cancelSessionExecutions(sessionId);
-        sessions.delete(sessionId);
-        logger.info(`SSE session closed: ${sessionId} (cancelled ${cancelled} executions)`);
-      };
-
-      sseTransport.onerror = async error => {
-        logger.error(`SSE transport error for session ${sessionId}:`, error);
-        await executionTracker.cancelSessionExecutions(sessionId);
-        sessions.delete(sessionId);
-      };
-
-      // Connect MCP server to SSE transport
-      await mcpServer.connect(sseTransport);
-      logger.info(`SSE session started: ${sessionId}`);
-
-    } else if (req.method === "POST" && url.pathname === "/auto-mobile/messages") {
-      // Handle incoming messages from SSE clients
-      const sessionId = url.searchParams.get("sessionId");
-
-      if (!sessionId || !sessions.has(sessionId)) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid or missing sessionId" }));
-        return;
-      }
-
-      const sseTransport = sessions.get(sessionId)!;
-
-      // Parse request body
-      let body = "";
-      req.on("data", chunk => {
-        body += chunk.toString();
-      });
-
-      req.on("end", async () => {
-        try {
-          const parsedBody = JSON.parse(body);
-          await sseTransport.handlePostMessage(req, res, parsedBody);
-        } catch (error) {
-          logger.error(`Error handling POST message for session ${sessionId}:`, error);
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Invalid JSON" }));
-        }
-      });
-
-    } else {
-      // 404 for unknown paths
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Not found" }));
-    }
-  });
-
-  // Start HTTP server
-  startupBenchmark.startPhase("serverListening");
-  server.listen(transport.port!, transport.host!, () => {
-    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/sse`);
-    logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/sse`);
-    startupBenchmark.endPhase("serverListening");
-    startupBenchmark.emit("mcp-server", {
-      transport: "sse",
-      host: transport.host,
-      port: transport.port
-    });
-  });
-
-  // Handle server shutdown
-  const shutdown = async () => {
-    logger.info("Shutting down SSE server...");
-
-    // Close all active sessions
-    for (const [sessionId, sseTransport] of sessions) {
-      try {
-        await sseTransport.close();
-      } catch (error) {
-        logger.warn(`Error closing SSE session ${sessionId}:`, error);
-      }
-    }
-    sessions.clear();
-
-    await stopHostEmulatorAutoConnect();
-    await stopVideoRecordingSocketServer();
-    await stopTestRecordingSocketServer();
-    await stopDeviceSnapshotSocketServer();
-    await IOSXCTestServiceManager.shutdownAll();
-    await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
-
-    server.close(() => {
-      logger.info("SSE server shut down");
-      logger.close();
-      process.exit(0);
-    });
-  };
-
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-}
-
-// Create and start Streamable HTTP proxy server (connects to daemon)
-async function startStreamableProxyServer(transport: TransportConfig, daemonOptions: DaemonOptions): Promise<void> {
-  const server = createHttpServer();
-  const transports = new Map<string, StreamableHTTPServerTransport>();
-
-  // Server instance tracking for health checks
-  const serverInstanceId = randomUUID();
-  const serverStartTime = defaultTimer.now();
-
-  server.on("request", async (req, res) => {
-    // CORS headers for development
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, MCP-Session-Id");
-
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-
-    // Health check endpoint
-    if (url.pathname === "/health" || url.pathname === "/auto-mobile/health") {
-      const uptimeMs = defaultTimer.now() - serverStartTime;
-      const health = {
-        status: "ok",
-        server: "AutoMobile",
-        mode: "proxy",
-        instanceId: serverInstanceId,
-        port: transport.port,
-        uptime: {
-          ms: uptimeMs,
-          human: formatUptime(uptimeMs)
-        },
-        activeSessions: transports.size,
-        transport: "streamable"
-      };
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(health, null, 2));
-      return;
-    }
-
-    if (url.pathname === "/auto-mobile/streamable") {
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
-      let streamableTransport: StreamableHTTPServerTransport;
-      let parsedBody: unknown;
-
-      // Parse body for POST requests
-      if (req.method === "POST") {
-        let body = "";
-        req.on("data", chunk => {
-          body += chunk.toString();
-        });
-
-        await new Promise<void>(resolve => {
-          req.on("end", resolve);
-        });
-
-        try {
-          parsedBody = JSON.parse(body);
-        } catch {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Invalid JSON" }));
-          return;
-        }
-      }
-
-      const isInitializeRequest = parsedBody && typeof parsedBody === "object" && "method" in parsedBody && parsedBody.method === "initialize";
-      const sendJsonRpcError = (message: string, error?: unknown) => {
-        if (res.headersSent) {
-          return;
-        }
-        const id = parsedBody && typeof parsedBody === "object" && "id" in parsedBody ? parsedBody.id : null;
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          jsonrpc: "2.0",
-          id,
-          error: {
-            code: -32603,
-            message,
-            data: error instanceof Error ? error.message : undefined
-          }
-        }));
-      };
-
-      if (sessionId && transports.has(sessionId)) {
-        streamableTransport = transports.get(sessionId)!;
-      } else if (isInitializeRequest || !sessionId) {
-        const sessionContext: { sessionId?: string } = {};
-        streamableTransport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: newSessionId => {
-            transports.set(newSessionId, streamableTransport);
-            sessionContext.sessionId = newSessionId;
-            logger.info(`Streamable HTTP proxy session initialized: ${newSessionId}`);
-          }
-        });
-
-        // Create proxy MCP server
-        let proxyResult;
-        try {
-          proxyResult = createProxyMcpServer({
-            sessionContext,
-            proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions }
-          });
-        } catch (error) {
-          logger.error("Failed to create proxy MCP server:", error);
-          sendJsonRpcError("Server error", error);
-          return;
-        }
-
-        const mcpServer = proxyResult.server;
-        const proxyInstance = proxyResult.proxy;
-
-        // Setup cleanup handlers
-        streamableTransport.onclose = async () => {
-          if (streamableTransport.sessionId) {
-            transports.delete(streamableTransport.sessionId);
-            await proxyInstance.close();
-            logger.info(`Streamable HTTP proxy session closed: ${streamableTransport.sessionId}`);
-          }
-        };
-
-        streamableTransport.onerror = async error => {
-          if (streamableTransport.sessionId) {
-            logger.error(`Streamable HTTP proxy transport error for session ${streamableTransport.sessionId}:`, error);
-            transports.delete(streamableTransport.sessionId);
-          }
-        };
-
-        try {
-          logger.info("Connecting proxy MCP server to Streamable HTTP transport");
-          await mcpServer.connect(streamableTransport);
-          logger.info("Proxy MCP server connected to Streamable HTTP transport");
-        } catch (error) {
-          logger.error("Proxy MCP server connect failed:", error);
-          sendJsonRpcError("Server error", error);
-          return;
-        }
-      } else {
-        logger.warn(`Session not found: ${sessionId}. Server may have restarted.`);
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          error: "Session not found",
-          message: "The session may have expired or the server was restarted. Please reinitialize the connection.",
-          serverInstanceId,
-          activeSessions: transports.size
-        }));
-        return;
-      }
-
-      try {
-        await streamableTransport.handleRequest(req, res, parsedBody);
-      } catch (error) {
-        logger.error("Streamable HTTP proxy request handling failed:", error);
-        sendJsonRpcError("Server error", error);
-      }
-    } else {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Not found" }));
-    }
-  });
-
-  startupBenchmark.startPhase("serverListening");
-  server.listen(transport.port!, transport.host!, () => {
-    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/streamable (proxy mode)`);
-    logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/streamable`);
-    startupBenchmark.endPhase("serverListening");
-    startupBenchmark.emit("mcp-server", {
-      transport: "streamable",
-      mode: "proxy",
-      host: transport.host,
-      port: transport.port
-    });
-  });
-
-  // Handle server shutdown
-  const shutdown = async () => {
-    logger.info("Shutting down Streamable HTTP proxy server...");
-    for (const [sessionId, streamableTransport] of transports) {
-      try {
-        await streamableTransport.close();
-      } catch (error) {
-        logger.warn(`Error closing Streamable HTTP session ${sessionId}:`, error);
-      }
-    }
-    transports.clear();
-
-    server.close(() => {
-      logger.info("Streamable HTTP proxy server shut down");
-      logger.close();
-      process.exit(0);
-    });
-  };
-
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-}
-
-// Create and start SSE proxy server (connects to daemon)
-async function startSSEProxyServer(transport: TransportConfig, daemonOptions: DaemonOptions): Promise<void> {
-  const server = createHttpServer();
-  const sessions = new Map<string, SSEServerTransport>();
-
-  server.on("request", async (req, res) => {
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-
-    // CORS headers for development
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
-    if (req.method === "GET" && url.pathname === "/auto-mobile/sse") {
-      const sseTransport = new SSEServerTransport("/auto-mobile/messages", res);
-      const sessionId = sseTransport.sessionId;
-
-      sessions.set(sessionId, sseTransport);
-
-      // Create proxy MCP server
-      const { server: mcpServer, proxy: sseProxy } = createProxyMcpServer({
-        sessionContext: { sessionId },
-        proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions }
-      });
-
-      sseTransport.onclose = async () => {
-        sessions.delete(sessionId);
-        await sseProxy.close();
-        logger.info(`SSE proxy session closed: ${sessionId}`);
-      };
-
-      sseTransport.onerror = async error => {
-        logger.error(`SSE proxy transport error for session ${sessionId}:`, error);
-        sessions.delete(sessionId);
-      };
-
-      await mcpServer.connect(sseTransport);
-      logger.info(`SSE proxy session started: ${sessionId}`);
-
-    } else if (req.method === "POST" && url.pathname === "/auto-mobile/messages") {
-      const sessionId = url.searchParams.get("sessionId");
-
-      if (!sessionId || !sessions.has(sessionId)) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid or missing sessionId" }));
-        return;
-      }
-
-      const sseTransport = sessions.get(sessionId)!;
-
-      let body = "";
-      req.on("data", chunk => {
-        body += chunk.toString();
-      });
-
-      req.on("end", async () => {
-        try {
-          const parsedBody = JSON.parse(body);
-          await sseTransport.handlePostMessage(req, res, parsedBody);
-        } catch (error) {
-          logger.error(`Error handling POST message for session ${sessionId}:`, error);
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "Invalid JSON" }));
-        }
-      });
-
-    } else {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Not found" }));
-    }
-  });
-
-  startupBenchmark.startPhase("serverListening");
-  server.listen(transport.port!, transport.host!, () => {
-    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/sse (proxy mode)`);
-    logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/sse`);
-    startupBenchmark.endPhase("serverListening");
-    startupBenchmark.emit("mcp-server", {
-      transport: "sse",
-      mode: "proxy",
-      host: transport.host,
-      port: transport.port
-    });
-  });
-
-  const shutdown = async () => {
-    logger.info("Shutting down SSE proxy server...");
-    for (const [sessionId, sseTransport] of sessions) {
-      try {
-        await sseTransport.close();
-      } catch (error) {
-        logger.warn(`Error closing SSE session ${sessionId}:`, error);
-      }
-    }
-    sessions.clear();
-
-    server.close(() => {
-      logger.info("SSE proxy server shut down");
-      logger.close();
-      process.exit(0);
-    });
-  };
-
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
 }
 
 process.on("SIGINT", async () => {
@@ -1090,7 +337,8 @@ async function main() {
     const {
       cliMode,
       cliArgs,
-      transport,
+      daemonPort,
+      daemonHost,
       debugPerf,
       debug,
       uiPerfMode,
@@ -1161,11 +409,9 @@ async function main() {
     }
 
     if (daemonMode) {
-      // Check if --port was explicitly passed, otherwise let daemon use its default
-      const explicitPort = process.argv.includes("--port");
       await startDaemon({
-        port: explicitPort ? transport.port : undefined,
-        host: transport.host,
+        port: daemonPort,
+        host: daemonHost,
         debug,
         debugPerf,
       });
@@ -1222,63 +468,43 @@ async function main() {
         startAppearanceSyncScheduler();
       }
 
-      if (transport.type === "streamable") {
-        // Run as Streamable HTTP server
-        logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
-        logger.enableStdoutLogging();
+      // Run as MCP server with STDIO transport
+      const stdioTransport = new StdioServerTransport();
+      let server;
+      let stdioProxy: ReturnType<typeof createProxyMcpServer>["proxy"] | undefined;
+      try {
         if (useProxyMode) {
-          await startStreamableProxyServer(transport, proxyDaemonOptions);
+          const result = createProxyMcpServer({
+            proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions: proxyDaemonOptions }
+          });
+          server = result.server;
+          stdioProxy = result.proxy;
         } else {
-          await startStreamableServer(transport, debug);
+          server = createMcpServer({ debug });
         }
-      } else if (transport.type === "sse") {
-        // Run as SSE server (deprecated)
-        logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
-        logger.enableStdoutLogging();
-        if (useProxyMode) {
-          await startSSEProxyServer(transport, proxyDaemonOptions);
-        } else {
-          await startSSEServer(transport, debug);
-        }
-      } else {
-        // Run as MCP server with STDIO transport (default)
-        const stdioTransport = new StdioServerTransport();
-        let server;
-        let stdioProxy: ReturnType<typeof createProxyMcpServer>["proxy"] | undefined;
-        try {
-          if (useProxyMode) {
-            const result = createProxyMcpServer({
-              proxyConfig: { autoStartDaemon: !noDaemon, daemonOptions: proxyDaemonOptions }
-            });
-            server = result.server;
-            stdioProxy = result.proxy;
-          } else {
-            server = createMcpServer({ debug });
-          }
-        } catch (error) {
-          logger.error("Failed to create MCP server:", error);
-          throw error;
-        }
-        try {
-          logger.info("Connecting MCP server to stdio transport");
-          startupBenchmark.startPhase("serverListening");
-          await server.connect(stdioTransport);
-          startupBenchmark.endPhase("serverListening");
-          logger.info("MCP server connected to stdio transport");
-          logger.info(`AutoMobile MCP server running on stdio (${useProxyMode ? "proxy" : "direct"} mode)`);
-          startupBenchmark.emit("mcp-server", { transport: "stdio", mode: useProxyMode ? "proxy" : "direct" });
+      } catch (error) {
+        logger.error("Failed to create MCP server:", error);
+        throw error;
+      }
+      try {
+        logger.info("Connecting MCP server to stdio transport");
+        startupBenchmark.startPhase("serverListening");
+        await server.connect(stdioTransport);
+        startupBenchmark.endPhase("serverListening");
+        logger.info("MCP server connected to stdio transport");
+        logger.info(`AutoMobile MCP server running on stdio (${useProxyMode ? "proxy" : "direct"} mode)`);
+        startupBenchmark.emit("mcp-server", { transport: "stdio", mode: useProxyMode ? "proxy" : "direct" });
 
-          // Register cleanup for proxy mode
-          if (stdioProxy) {
-            const cleanupProxy = async () => {
-              await stdioProxy!.close();
-            };
-            process.on("beforeExit", cleanupProxy);
-          }
-        } catch (error) {
-          logger.error("MCP server connect failed:", error);
-          throw error;
+        // Register cleanup for proxy mode
+        if (stdioProxy) {
+          const cleanupProxy = async () => {
+            await stdioProxy!.close();
+          };
+          process.on("beforeExit", cleanupProxy);
         }
+      } catch (error) {
+        logger.error("MCP server connect failed:", error);
+        throw error;
       }
     }
   } catch (err) {

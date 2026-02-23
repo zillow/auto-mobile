@@ -245,8 +245,7 @@ export class Daemon {
   }
 
   /**
-   * Start the HTTP MCP server
-   * Based on startStreamableServer() from src/index.ts
+   * Start the HTTP MCP server (internal daemon transport, not exposed publicly)
    */
   private async startHttpServer(): Promise<void> {
     this.httpServer = createHttpServer();

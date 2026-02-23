@@ -176,9 +176,6 @@ swift run AutoMobileCompanion
 ### 2. Integration Testing
 
 ```bash
-# Start MCP server (in project root)
-bun run dev
-
 # Launch companion app
 cd ios/XcodeCompanion
 swift run AutoMobileCompanion

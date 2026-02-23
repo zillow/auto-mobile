@@ -31,8 +31,6 @@ is not detected.
 ### Environment variables
 
 Primary:
-- `AUTOMOBILE_MCP_URL`: MCP HTTP endpoint. If unset, the runner uses the daemon socket.
-- `AUTOMOBILE_MCP_HTTP_URL`: Alias for `AUTOMOBILE_MCP_URL`.
 - `AUTOMOBILE_DAEMON_SOCKET_PATH`: Daemon socket path (default: `/tmp/auto-mobile-daemon-$UID.sock`).
 - `AUTOMOBILE_TEST_PLAN`: Default YAML plan path for a test target.
 - `AUTOMOBILE_TEST_RETRY_COUNT`: Retry attempts for plan execution (default: `0`).
@@ -90,7 +88,7 @@ execution is enabled and report results after each run.
 
 ## CI vs local execution
 
-Local development typically uses the daemon socket with simulator running, while CI uses an HTTP MCP endpoint.
+Both local and CI execution use the daemon socket transport.
 
 Local:
 ```bash
@@ -101,7 +99,6 @@ swift test --filter RemindersLaunchPlanTests
 CI:
 ```bash
 AUTOMOBILE_CI_MODE=1 \
-AUTOMOBILE_MCP_URL="https://mcp.example.com/auto-mobile/streamable" \
 AUTOMOBILE_TEST_PLAN=Plans/launch-reminders-app.yaml \
 xcodebuild test -scheme XCTestRunner -destination 'platform=iOS Simulator,name=iPhone 15'
 ```

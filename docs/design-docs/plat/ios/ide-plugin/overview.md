@@ -18,7 +18,7 @@ supported Apple tooling.
 - **AutoMobile Xcode Companion** (macOS app)
   - Hosts all UI surfaces: navigation graph, performance views, feature flags,
     test recording, and plan execution.
-  - Connects to MCP over HTTP/STDIO/daemon socket.
+  - Connects to MCP over STDIO or daemon socket.
   - Provides a menu bar mode plus a docked window for persistent views.
 - **Xcode Source Editor Extension**
   - Adds commands to insert plan templates, run plans, or open the companion app.
@@ -28,17 +28,8 @@ supported Apple tooling.
 
 The companion app selects an MCP transport in this order:
 
-1. Discovered MCP dev server over HTTP (health check on localhost).
-2. `AUTOMOBILE_MCP_HTTP_URL` or `automobile.mcp.httpUrl`.
-3. `AUTOMOBILE_MCP_STDIO_COMMAND` or `automobile.mcp.stdioCommand`.
-4. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
-
-## MCP dev server discovery
-
-- Enumerate git worktrees via `git worktree list --porcelain`.
-- Scan listening ports on localhost.
-- Probe `/health` or `/auto-mobile/health` for AutoMobile servers.
-- Match servers to worktrees by branch name.
+1. `AUTOMOBILE_MCP_STDIO_COMMAND` or `automobile.mcp.stdioCommand`.
+2. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
 
 ## UX goals
 

@@ -50,7 +50,7 @@ Executes automation plans with retry and cleanup logic:
 
 ```swift
 let config = AutoMobilePlanExecutor.Configuration(
-    transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+    transport: .daemonSocket,
     planPath: "Plans/checkout.yaml",
     retryCount: 3
 )
@@ -77,8 +77,6 @@ try observer.exportTimingData(to: "timing-history.json")
 ### Environment Variables
 
 Primary:
-- `AUTOMOBILE_MCP_URL`: MCP HTTP endpoint. If unset, the runner uses the daemon socket.
-- `AUTOMOBILE_MCP_HTTP_URL`: Alias for `AUTOMOBILE_MCP_URL`.
 - `AUTOMOBILE_DAEMON_SOCKET_PATH`: Daemon socket path (default: `/tmp/auto-mobile-daemon-$UID.sock`).
 - `AUTOMOBILE_TEST_PLAN`: Path to YAML automation plan.
 - `AUTOMOBILE_TEST_RETRY_COUNT`: Number of retry attempts (default: `0`).
@@ -190,18 +188,17 @@ Note: The Reminders plans assume English UI labels and may need adjustment for o
 
 ## CI vs local execution
 
-Local development typically uses the daemon socket (no MCP URL override):
+Both local and CI execution use the daemon socket transport:
 
 ```bash
 AUTOMOBILE_TEST_PLAN=Plans/launch-reminders-app.yaml \
 swift test --filter RemindersLaunchPlanTests
 ```
 
-CI should set explicit MCP metadata and use an HTTP endpoint:
+CI should set explicit MCP metadata:
 
 ```bash
 AUTOMOBILE_CI_MODE=1 \
-AUTOMOBILE_MCP_URL="https://mcp.example.com/auto-mobile/streamable" \
 AUTOMOBILE_TEST_PLAN=Plans/launch-reminders-app.yaml \
 AUTOMOBILE_APP_VERSION="1.2.3" \
 AUTOMOBILE_GIT_COMMIT="$GITHUB_SHA" \
