@@ -66,7 +66,6 @@ object TestPlanValidator {
           "navigateTo",
           // Observation
           "observe",
-          "rawViewHierarchy",
           // Device management
           "listDevices",
           "startDevice",

@@ -22,7 +22,6 @@ object ValidTools {
           "openLink",
           "navigateTo",
           "observe",
-          "rawViewHierarchy",
           "listDevices",
           "startDevice",
           "killDevice",

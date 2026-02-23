@@ -53,7 +53,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
    * @param screenDimensions Optional screen dimensions for offscreen filtering
    * @param dedupeTextContentDesc When true, omit content-desc when it equals text (default: true)
    * @param disableAllFiltering When true, disable all optimizations and filtering (for
-   *   rawViewHierarchy)
+   *   observe with raw:true)
    */
   fun extractFromActiveWindow(
       rootNode: AccessibilityNodeInfo?,
@@ -153,7 +153,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
    * @param screenDimensions Optional screen dimensions for offscreen filtering
    * @param dedupeTextContentDesc When true, omit content-desc when it equals text (default: true)
    * @param disableAllFiltering When true, disable all optimizations and filtering (for
-   *   rawViewHierarchy)
+   *   observe with raw:true)
    */
   fun extractFromAllWindows(
       windows: List<AccessibilityWindowInfo>,

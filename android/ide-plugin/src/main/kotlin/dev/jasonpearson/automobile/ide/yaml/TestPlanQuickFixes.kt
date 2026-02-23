@@ -144,7 +144,6 @@ object TestPlanQuickFixFactory {
           "openLink",
           "navigateTo",
           "observe",
-          "rawViewHierarchy",
           "listDevices",
           "startDevice",
           "killDevice",
