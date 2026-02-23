@@ -31,6 +31,6 @@ export const XCTESTSERVICE_RELEASE_VERSION: string = "latest";
 export const XCTESTSERVICE_IPA_URL: string = XCTESTSERVICE_RELEASE_VERSION === "latest"
   ? "https://github.com/kaeawc/auto-mobile/releases/latest/download/XCTestService.ipa"
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${XCTESTSERVICE_RELEASE_VERSION}/XCTestService.ipa`;
-export const XCTESTSERVICE_SHA256_CHECKSUM: string = "a366b117e7fe9ee56e6ae0a0a88d4aee4aac80877e8aa235e60375632bc40a11"; // Empty = skip verification (local dev only)
+export const XCTESTSERVICE_SHA256_CHECKSUM: string = "5dc9b1053f48e01f045039002d4c009604f630044f25036d9e7efa4f155c4da6"; // Empty = skip verification (local dev only)
 export const XCTESTSERVICE_APP_HASH: string = ""; // Hash of XCTestServiceApp.app (device build), empty = skip verification
 export const XCTESTSERVICE_RUNNER_SHA256: string = ""; // SHA256 of runner binary (XCTestServiceUITests-Runner), empty = skip verification
