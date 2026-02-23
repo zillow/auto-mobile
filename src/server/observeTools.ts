@@ -225,7 +225,7 @@ export function registerObserveTools() {
         : await observeScreen.execute(undefined, createGlobalPerformanceTracker(), true, 0, signal);
 
       if (args.raw) {
-        await observeScreen.appendRawViewHierarchy(result);
+        await observeScreen.appendRawViewHierarchy(result, signal);
       }
 
       // Include setup timing if this is the first observe after accessibility service setup

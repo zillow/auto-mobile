@@ -297,7 +297,7 @@ export class FakeObserveScreenForSetUIState implements ObserveScreen {
     return this.result;
   }
 
-  async appendRawViewHierarchy(_result: ObserveResult): Promise<void> {
+  async appendRawViewHierarchy(_result: ObserveResult, _signal?: AbortSignal): Promise<void> {
     // no-op for testing
   }
 

@@ -439,8 +439,10 @@ export class RealObserveScreen implements ObserveScreen {
    * Fetch raw (unfiltered) view hierarchy from the device and attach to an existing result.
    * On Android: requests the accessibility service hierarchy with all filtering disabled.
    * On iOS: requests the XCTestService hierarchy with all filtering disabled.
+   * Invalidates the shared cache after fetching so that the unfiltered snapshot does not
+   * bleed into subsequent normal observe calls.
    */
-  private async collectRawViewHierarchyData(result: ObserveResult): Promise<void> {
+  private async collectRawViewHierarchyData(result: ObserveResult, signal?: AbortSignal): Promise<void> {
     try {
       if (this.device.platform === "android") {
         const client = AccessibilityServiceClient.getInstance(this.device, this.adbFactory);
@@ -448,8 +450,12 @@ export class RealObserveScreen implements ObserveScreen {
         // with minTimestamp=0 returns any cached result, which may already be filtered.
         const syncResult = await client.requestHierarchySync(
           new NoOpPerformanceTracker(),
-          true // disableAllFiltering
+          true, // disableAllFiltering
+          signal
         );
+        // Invalidate the cache so the unfiltered snapshot is not served to subsequent
+        // normal observe calls that expect a filtered hierarchy.
+        client.invalidateCache();
         if (syncResult?.hierarchy) {
           result.rawViewHierarchy = {
             json: JSON.stringify(syncResult.hierarchy, null, 2),
@@ -462,8 +468,12 @@ export class RealObserveScreen implements ObserveScreen {
         const xcTestClient = XCTestServiceClient.getInstance(this.device);
         const hierarchyResult = await xcTestClient.requestHierarchySync(
           new NoOpPerformanceTracker(),
-          true // disableAllFiltering
+          true, // disableAllFiltering
+          signal
         );
+        // Invalidate the cache so the unfiltered snapshot is not served to subsequent
+        // normal observe calls that expect a filtered hierarchy.
+        xcTestClient.invalidateCache();
         if (hierarchyResult?.hierarchy) {
           result.rawViewHierarchy = {
             xcuitest: JSON.stringify(hierarchyResult.hierarchy, null, 2),
@@ -482,8 +492,8 @@ export class RealObserveScreen implements ObserveScreen {
    * Fetch raw view hierarchy and attach it to an existing observe result.
    * Call this after execute() when raw hierarchy data is needed.
    */
-  public async appendRawViewHierarchy(result: ObserveResult): Promise<void> {
-    await this.collectRawViewHierarchyData(result);
+  public async appendRawViewHierarchy(result: ObserveResult, signal?: AbortSignal): Promise<void> {
+    await this.collectRawViewHierarchyData(result, signal);
   }
 
   /**

@@ -167,7 +167,7 @@ export class FakeObserveScreen implements ObserveScreen {
     return this.getNextObserveResult();
   }
 
-  async appendRawViewHierarchy(result: ObserveResult): Promise<void> {
+  async appendRawViewHierarchy(result: ObserveResult, _signal?: AbortSignal): Promise<void> {
     this.executedOperations.push("appendRawViewHierarchy");
 
     const error = this.failures.get("appendRawViewHierarchy");
