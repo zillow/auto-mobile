@@ -444,16 +444,15 @@ export class RealObserveScreen implements ObserveScreen {
     try {
       if (this.device.platform === "android") {
         const client = AccessibilityServiceClient.getInstance(this.device, this.adbFactory);
-        const hierarchy = await client.getAccessibilityHierarchy(
-          undefined,
+        // Use requestHierarchySync directly to bypass the cache — getAccessibilityHierarchy
+        // with minTimestamp=0 returns any cached result, which may already be filtered.
+        const syncResult = await client.requestHierarchySync(
           new NoOpPerformanceTracker(),
-          false,
-          0,
           true // disableAllFiltering
         );
-        if (hierarchy) {
+        if (syncResult?.hierarchy) {
           result.rawViewHierarchy = {
-            json: JSON.stringify(hierarchy, null, 2),
+            json: JSON.stringify(syncResult.hierarchy, null, 2),
             source: "accessibility-service",
             timestamp: this.timer.now(),
             device: { deviceId: this.device.deviceId, platform: this.device.platform }

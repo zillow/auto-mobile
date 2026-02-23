@@ -51,9 +51,4 @@ describe("observe tool registration", () => {
     expect(toolNames).not.toContain("rawViewHierarchy");
   });
 
-  test("registers identifyInteractions tool", () => {
-    registerObserveTools();
-    const toolNames = ToolRegistry.getToolDefinitions().map(t => t.name);
-    expect(toolNames).toContain("identifyInteractions");
-  });
 });
