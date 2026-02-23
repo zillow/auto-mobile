@@ -34,7 +34,6 @@ object TestPlanToolCategories {
                   ),
               "Device configuration" to
                   setOf("rotate", "shake", "systemTray", "changeLocalization"),
-              "Demo mode" to setOf("demoMode"),
               "Plan execution" to setOf("executePlan", "criticalSection"),
               "Deep links" to setOf("getDeepLinks"),
               "Navigation graph" to setOf("getNavigationGraph", "explore", "identifyInteractions"),

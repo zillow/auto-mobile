@@ -45,24 +45,13 @@ The daemon listens on a Unix socket at:
 /tmp/auto-mobile-daemon-<uid>.sock
 ```
 
-## Socket Methods
+## Socket API
 
-### `listDevices`
-List connected devices; when the daemon is active, responses include `poolStatus` with pool counts.
+The daemon exposes a full [Unix Socket API](unix-socket-api.md) for IDE plugins and the CLI. Endpoints cover:
 
-Daemon management operations are available via the unix socket interface:
-
-### `daemon/availableDevices`
-Query available devices in the pool.
-
-### `daemon/refreshDevices`
-Refresh the device pool by discovering connected devices.
-
-### `daemon/sessionInfo`
-Get information about an active session.
-
-### `daemon/releaseSession`
-Release a session and return device to pool.
+- **IDE operations** — feature flags, service updates, SharedPreferences access
+- **MCP proxy** — `tools/list`, `tools/call`, `resources/list`, `resources/read`
+- **Daemon management** — device pool queries, session lifecycle
 
 ## Implementation
 

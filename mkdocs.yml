@@ -101,6 +101,7 @@ nav:
           - 'Daemon':
              - 'Overview': design-docs/mcp/daemon/index.md
              - 'Critical Section': design-docs/mcp/daemon/critical-section.md
+             - 'Unix Socket API': design-docs/mcp/daemon/unix-socket-api.md
           - 'Multi-device': design-docs/mcp/multi-device.md
           - 'Navigation Graph':
              - 'Overview': design-docs/mcp/nav/index.md

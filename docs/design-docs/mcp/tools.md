@@ -60,12 +60,6 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 - 🖍️ `highlight` draws visual overlays to highlight areas of the screen during debugging. <kbd>🤖 Android Only</kbd>
 - 🔗 `identifyInteractions` suggests likely interactions with ready-to-use tool calls (debug-only; enable the debug feature flag).
 
-#### Performance & Monitoring
-
-- 🚩 `listFeatureFlags` lists all available feature flags and their current states.
-- ⚙️ `setFeatureFlag` enables/disables feature flags for experimental features and performance tuning.
-- 🎬 `demoMode` enables or disables demo mode with consistent status bar indicators for screenshots (`action: "enable" | "disable"`).
-
 #### Network & Connectivity
 
 - `setNetworkState` — Wi-Fi, cellular, and airplane mode control. ADB commands validated on API 35. <kbd>❌ Not Implemented</kbd> *(MCP tool not yet built; see [network-state.md](../plat/android/network-state.md))*
@@ -77,4 +71,4 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 #### Daemon & Session Management
 
 - 📋 Device pool status is exposed via the `automobile:devices/booted` resource.
-- Daemon management operations are exposed via the unix socket API (not MCP tools).
+- Daemon management and IDE operations are exposed via the [Unix Socket API](daemon/unix-socket-api.md) (not MCP tools).

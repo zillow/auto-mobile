@@ -9,7 +9,6 @@ export * from "./ClearTextResult";
 export * from "./ClipboardResult";
 export * from "./CurrentFocusResult";
 export * from "./DeepLinkResult";
-export * from "./DemoModeResult";
 export * from "./DisplayedTimeMetric";
 export * from "./Device";
 export * from "./DeviceSession";

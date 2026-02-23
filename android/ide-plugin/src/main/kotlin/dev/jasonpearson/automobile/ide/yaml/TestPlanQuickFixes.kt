@@ -153,7 +153,6 @@ object TestPlanQuickFixFactory {
           "shake",
           "systemTray",
           "changeLocalization",
-          "demoMode",
           "executePlan",
           "criticalSection",
           "getDeepLinks",

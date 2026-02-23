@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ActionableError } from "../models/ActionableError";
-import { DemoMode } from "../features/utility/DemoMode";
-import type { DemoModeOptions } from "../features/utility/DemoMode";
 import { SystemConfigurationManager } from "../features/utility/SystemConfigurationManager";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -11,18 +9,6 @@ import { BootedDevice, Platform } from "../models";
 import { addDeviceTargetingToSchema, addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const demoModeSchema = addDeviceTargetingToSchema(z.object({
-  action: z.enum(["enable", "disable"]).describe("Demo mode action"),
-  time: z.string().optional().describe("Time in HHMM (e.g., 1000)"),
-  batteryLevel: z.number().min(0).max(100).optional().describe("Battery % (0-100)"),
-  batteryPlugged: z.boolean().optional().describe("Charging status"),
-  wifiLevel: z.number().min(0).max(4).optional().describe("WiFi strength (0-4)"),
-  mobileDataType: z.enum(["4g", "5g", "lte", "3g", "edge", "none"]).optional().describe("Data type"),
-  mobileSignalLevel: z.number().min(0).max(4).optional().describe("Signal strength (0-4)"),
-  hideNotifications: z.boolean().optional().describe("Hide notifications"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
-
 export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
   deviceId: z.string().describe("Device ID"),
   platform: z.enum(["android", "ios"]).describe("Platform")
@@ -42,11 +28,6 @@ export const changeLocalizationSchema = addDeviceTargetingToSchema(changeLocaliz
 });
 
 // Export interfaces for type safety
-export interface DemoModeArgs extends DemoModeOptions {
-  action: "enable" | "disable";
-  platform: Platform;
-}
-
 export interface SetActiveDeviceArgs {
   deviceId: string;
     platform: Platform;
@@ -62,43 +43,6 @@ export interface ChangeLocalizationArgs {
 
 // Register tools
 export function registerUtilityTools() {
-  // Demo mode handler
-  const demoModeHandler = async (device: BootedDevice, args: DemoModeArgs) => {
-    try {
-      const demoMode = new DemoMode(device);
-
-      if (args.action === "enable") {
-        const options: DemoModeOptions = {
-          time: args.time,
-          batteryLevel: args.batteryLevel,
-          batteryPlugged: args.batteryPlugged,
-          wifiLevel: args.wifiLevel,
-          mobileDataType: args.mobileDataType,
-          mobileSignalLevel: args.mobileSignalLevel,
-          hideNotifications: args.hideNotifications,
-        };
-        const result = await demoMode.execute(options);
-        const message = result.success ? "Demo mode enabled" : "Failed to enable demo mode";
-
-        return createJSONToolResponse({
-          message,
-          ...result
-        });
-      }
-
-      const result = await demoMode.exitDemoMode();
-      const message = result.success ? "Demo mode disabled" : "Failed to disable demo mode";
-
-      return createJSONToolResponse({
-        message,
-        ...result
-      });
-    } catch (error) {
-      logger.error("Failed to set demo mode:", error);
-      throw new ActionableError(`Failed to set demo mode: ${error}`);
-    }
-  };
-
   // Set active device handler
   const setActiveDeviceHandler = async (args: SetActiveDeviceArgs) => {
     try {
@@ -177,13 +121,6 @@ export function registerUtilityTools() {
   };
 
   // Register with the tool registry
-  ToolRegistry.registerDeviceAware(
-    "demoMode",
-    "Enable or disable demo mode for screenshots and screen recordings",
-    demoModeSchema,
-    demoModeHandler
-  );
-
   ToolRegistry.register(
     "setActiveDevice",
     "Set active device",

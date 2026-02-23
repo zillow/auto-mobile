@@ -2564,7 +2564,7 @@ start_mcp_daemon() {
 
 # Install runtime dependencies needed for AutoMobile features.
 # These are not development/CI tools — they are required for end-user functionality:
-#   ffmpeg  - video recording and encoding (demoMode, videoRecording tools)
+#   ffmpeg  - video recording and encoding (videoRecording tool)
 #   vips    - native image processing via sharp (observe screenshots, image comparison)
 install_runtime_deps() {
     local os

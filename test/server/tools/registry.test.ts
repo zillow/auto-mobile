@@ -74,7 +74,7 @@ describe("MCP Tools Registry", () => {
       app: ["launchApp", "terminateApp", "installApp", "listApps"],
 
       // Utility tools (device state and configuration)
-      utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "demoMode"],
+      utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog"],
 
       // Emulator tools (AVD management)
       emulator: ["listDeviceImages", "checkRunningDevices", "startDevice", "killDevice"]

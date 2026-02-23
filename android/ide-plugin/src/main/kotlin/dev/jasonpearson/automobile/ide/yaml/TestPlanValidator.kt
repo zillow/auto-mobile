@@ -77,8 +77,6 @@ object TestPlanValidator {
           "shake",
           "systemTray",
           "changeLocalization",
-          // Demo mode
-          "demoMode",
           // Testing
           "executePlan",
           "criticalSection",
