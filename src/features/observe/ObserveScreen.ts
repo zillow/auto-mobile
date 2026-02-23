@@ -32,6 +32,8 @@ import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { DefaultElementParser } from "../utility/ElementParser";
+import { AccessibilityServiceClient } from "./android";
+import { XCTestServiceClient } from "./ios";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ObserveScreen } from "./interfaces/ObserveScreen";
 import type { ObserveScreenDependencies } from "./ObserveScreenDependencies";
@@ -431,6 +433,58 @@ export class RealObserveScreen implements ObserveScreen {
       logger.warn("Failed to get active window:", error);
       this.appendError(result, "Failed to retrieve active window information");
     }
+  }
+
+  /**
+   * Fetch raw (unfiltered) view hierarchy from the device and attach to an existing result.
+   * On Android: requests the accessibility service hierarchy with all filtering disabled.
+   * On iOS: requests the XCTestService hierarchy with all filtering disabled.
+   */
+  private async collectRawViewHierarchyData(result: ObserveResult): Promise<void> {
+    try {
+      if (this.device.platform === "android") {
+        const client = AccessibilityServiceClient.getInstance(this.device, this.adbFactory);
+        const hierarchy = await client.getAccessibilityHierarchy(
+          undefined,
+          new NoOpPerformanceTracker(),
+          false,
+          0,
+          true // disableAllFiltering
+        );
+        if (hierarchy) {
+          result.rawViewHierarchy = {
+            json: JSON.stringify(hierarchy, null, 2),
+            source: "accessibility-service",
+            timestamp: this.timer.now(),
+            device: { deviceId: this.device.deviceId, platform: this.device.platform }
+          };
+        }
+      } else {
+        const xcTestClient = XCTestServiceClient.getInstance(this.device);
+        const hierarchyResult = await xcTestClient.requestHierarchySync(
+          new NoOpPerformanceTracker(),
+          true // disableAllFiltering
+        );
+        if (hierarchyResult?.hierarchy) {
+          result.rawViewHierarchy = {
+            xcuitest: JSON.stringify(hierarchyResult.hierarchy, null, 2),
+            source: "xcuitest",
+            timestamp: this.timer.now(),
+            device: { deviceId: this.device.deviceId, platform: this.device.platform }
+          };
+        }
+      }
+    } catch (error) {
+      logger.warn("[ObserveScreen] Failed to collect raw view hierarchy:", error);
+    }
+  }
+
+  /**
+   * Fetch raw view hierarchy and attach it to an existing observe result.
+   * Call this after execute() when raw hierarchy data is needed.
+   */
+  public async appendRawViewHierarchy(result: ObserveResult): Promise<void> {
+    await this.collectRawViewHierarchyData(result);
   }
 
   /**

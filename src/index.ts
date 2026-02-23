@@ -136,7 +136,7 @@ function parseArgs(): {
   const debugPerf =
     args.includes("--debug-perf") || process.env.AUTOMOBILE_DEBUG_PERF === "1";
 
-  // Detect debug mode to enable debug tools (rawViewHierarchy, debugSearch, bugReport)
+  // Detect debug mode to enable debug tools (debugSearch, bugReport)
   const debug =
     args.includes("--debug") || process.env.AUTOMOBILE_DEBUG === "1";
 

@@ -297,6 +297,10 @@ export class FakeObserveScreenForSetUIState implements ObserveScreen {
     return this.result;
   }
 
+  async appendRawViewHierarchy(_result: ObserveResult): Promise<void> {
+    // no-op for testing
+  }
+
   reset(): void {
     this.callCount = 0;
     this.result = this.createDefaultResult();

@@ -11,6 +11,7 @@ import { AccessibilityAuditResult } from "./AccessibilityAudit";
 import { RecompositionSummary } from "./Recomposition";
 import { DisplayedTimeMetric } from "./DisplayedTimeMetric";
 import { SelectedElement } from "../utils/interfaces/NavigationGraph";
+import { RawViewHierarchyResult } from "./RawViewHierarchyResult";
 
 export interface PredictionTarget {
   text?: string;
@@ -205,4 +206,11 @@ export interface ObserveResult {
     /** The detected accessibility service type */
     service: "talkback" | "unknown";
   };
+
+  /**
+   * Raw view hierarchy data (only present when observe is called with raw: true)
+   * Contains the unprocessed hierarchy from the accessibility service (Android) or
+   * the pre-offscreen-filter hierarchy (iOS)
+   */
+  rawViewHierarchy?: RawViewHierarchyResult;
 }

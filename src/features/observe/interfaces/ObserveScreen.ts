@@ -25,6 +25,13 @@ export interface ObserveScreen {
   ): Promise<ObserveResult>;
 
   /**
+   * Fetch raw (unfiltered) view hierarchy from the device and attach it to an existing
+   * ObserveResult. Safe to call after execute() — does not re-observe the screen.
+   * @param result - Existing observe result to augment with raw hierarchy data
+   */
+  appendRawViewHierarchy(result: ObserveResult): Promise<void>;
+
+  /**
    * Get the most recent cached observe result from memory or disk cache.
    * @returns Promise with the most recent cached observe result
    */

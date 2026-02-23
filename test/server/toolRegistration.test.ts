@@ -101,7 +101,6 @@ class ToolRegistrationValidator {
   private readonly CONDITIONALLY_REGISTERED_TOOLS = new Set([
     // Debug-only tools (registered when isDebugModeEnabled() returns true)
     "bugReport",
-    "rawViewHierarchy",
     "debugSearch",
     "identifyInteractions",
 
@@ -273,7 +272,6 @@ describe("Tool Registration Validation (Unit Tests)", () => {
       const fakeModule = {
         tapOnSchema: {},
         bugReportSchema: {},          // Debug-only tool
-        rawViewHierarchySchema: {},   // Debug-only tool
         criticalSectionSchema: {},    // Feature-flag tool
       };
 
@@ -282,7 +280,6 @@ describe("Tool Registration Validation (Unit Tests)", () => {
       expect(names).toContain("tapOn");
       // Conditional tools should be filtered out from mandatory checks
       expect(names).not.toContain("bugReport");
-      expect(names).not.toContain("rawViewHierarchy");
       expect(names).not.toContain("criticalSection");
     });
   });

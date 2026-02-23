@@ -1946,6 +1946,10 @@
             }
           ]
         },
+        "raw": {
+          "description": "When true, include unprocessed view hierarchy in response alongside normal output (default: false)",
+          "type": "boolean"
+        },
         "sessionUuid": {
           "description": "Session UUID for device targeting",
           "type": "string"
@@ -3592,7 +3596,8 @@
             "service"
           ],
           "additionalProperties": {}
-        }
+        },
+        "rawViewHierarchy": {}
       },
       "required": [
         "updatedAt",
