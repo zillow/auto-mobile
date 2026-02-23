@@ -98,6 +98,7 @@ public class ElementLocator: ElementLocating {
         }
 
         public func trackObservedBundleId(_ bundleId: String) {
+            guard bundleId != "com.apple.springboard" else { return }
             observedBundleIds.insert(bundleId)
         }
 

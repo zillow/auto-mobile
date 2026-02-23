@@ -668,12 +668,12 @@ export class SimCtlClient implements SimCtl {
    * @returns Promise with array of device types
    */
   async getDeviceTypes(): Promise<AppleDeviceType[]> {
+    const result = await this.executeCommand("list devicetypes --json");
     try {
-      const result = await this.executeCommand("list devicetypes --json");
       const data = JSON.parse(result.stdout);
       return data.devicetypes ?? [];
     } catch (error) {
-      logger.warn(`Failed to get device types: ${error}`);
+      logger.warn(`Failed to parse device types from simctl: ${error}`);
       return [];
     }
   }
@@ -683,12 +683,12 @@ export class SimCtlClient implements SimCtl {
    * @returns Promise with array of runtimes
    */
   async getRuntimes(): Promise<AppleDeviceRuntime[]> {
+    const result = await this.executeCommand("list runtimes --json");
     try {
-      const result = await this.executeCommand("list runtimes --json");
       const data = JSON.parse(result.stdout);
       return (data.runtimes ?? []).filter((runtime: AppleDeviceRuntime) => runtime.isAvailable);
     } catch (error) {
-      logger.warn(`Failed to get runtimes: ${error}`);
+      logger.warn(`Failed to parse runtimes from simctl: ${error}`);
       return [];
     }
   }

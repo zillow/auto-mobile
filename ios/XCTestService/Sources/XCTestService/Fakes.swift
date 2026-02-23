@@ -15,6 +15,7 @@ public class FakeElementLocator: ElementLocating {
     private var getHierarchyCallCount = 0
     private var findByIdHistory: [String] = []
     private var findByTextHistory: [String] = []
+    public private(set) var trackedBundleIds: [String] = []
 
     /// Tracks the last value of disableAllFiltering passed to getViewHierarchy
     public private(set) var lastDisableAllFiltering: Bool?
@@ -56,6 +57,7 @@ public class FakeElementLocator: ElementLocating {
         getHierarchyCallCount = 0
         findByIdHistory.removeAll()
         findByTextHistory.removeAll()
+        trackedBundleIds.removeAll()
         lastDisableAllFiltering = nil
     }
 
@@ -91,7 +93,7 @@ public class FakeElementLocator: ElementLocating {
     }
 
     public func trackObservedBundleId(_ bundleId: String) {
-        // no-op for tests
+        trackedBundleIds.append(bundleId)
     }
 }
 

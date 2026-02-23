@@ -256,14 +256,13 @@ describe("Simctl", function() {
       expect(runtimes[0].isAvailable).toBe(true);
     });
 
-    test("should return empty array when runtimes command fails", async function() {
+    test("should throw when runtimes command fails", async function() {
       mockExecAsync = async (): Promise<ExecResult> => {
         throw new Error("simctl failed");
       };
 
       simctl = new Simctl(null, mockExecAsync);
-      const runtimes = await simctl.getRuntimes();
-      expect(runtimes).toEqual([]);
+      await expect(simctl.getRuntimes()).rejects.toThrow();
     });
   });
 
@@ -290,14 +289,13 @@ describe("Simctl", function() {
       expect(types[0].name).toBe("iPhone 17 Pro");
     });
 
-    test("should return empty array when devicetypes command fails", async function() {
+    test("should throw when devicetypes command fails", async function() {
       mockExecAsync = async (): Promise<ExecResult> => {
         throw new Error("simctl failed");
       };
 
       simctl = new Simctl(null, mockExecAsync);
-      const types = await simctl.getDeviceTypes();
-      expect(types).toEqual([]);
+      await expect(simctl.getDeviceTypes()).rejects.toThrow();
     });
   });
 });
