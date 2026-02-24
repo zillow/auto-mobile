@@ -4,6 +4,7 @@
 
 export { VisionFallback, DEFAULT_VISION_CONFIG } from "./VisionFallback";
 export { ClaudeVisionClient } from "./ClaudeVisionClient";
+export { getVisionEnrichedError } from "./applyVisionFallback";
 export type {
   VisionFallbackConfig,
   VisionFallbackResult,
@@ -11,4 +12,5 @@ export type {
   NavigationStep,
   AlternativeSelector,
   ClaudeVisionAnalysis,
+  VisionAnalyzer,
 } from "./VisionTypes";

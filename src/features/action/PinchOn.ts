@@ -19,6 +19,8 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { boundsArea, clamp } from "../../utils/bounds";
 import { buildContainerFromElement } from "../../utils/elementProperties";
 import { getScreenBounds as getScreenBoundsFromSize } from "../../utils/screenBounds";
+import { DEFAULT_VISION_CONFIG, getVisionEnrichedError, type VisionFallbackConfig, type VisionAnalyzer } from "../../vision/index";
+import { TakeScreenshotCapturer, type ScreenshotCapturer } from "../navigation/SelectionStateTracker";
 
 type PinchTarget = {
   bounds: Element["bounds"];
@@ -27,19 +29,32 @@ type PinchTarget = {
   warning?: string;
 };
 
+interface PinchOnDependencies {
+  finder?: ElementFinder;
+  parser?: ElementParser;
+  visionConfig?: VisionFallbackConfig;
+  screenshotCapturer?: ScreenshotCapturer;
+  visionAnalyzer?: VisionAnalyzer;
+}
+
 export class PinchOn extends BaseVisualChange {
   private finder: ElementFinder;
   private parser: ElementParser;
+  private visionConfig: VisionFallbackConfig;
+  private screenshotCapturer: ScreenshotCapturer;
+  private visionAnalyzer: VisionAnalyzer | undefined;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    finder: ElementFinder = new DefaultElementFinder(),
-    parser: ElementParser = new DefaultElementParser()
+    deps: PinchOnDependencies = {}
   ) {
     super(device, adb);
-    this.finder = finder;
-    this.parser = parser;
+    this.finder = deps.finder ?? new DefaultElementFinder();
+    this.parser = deps.parser ?? new DefaultElementParser();
+    this.visionConfig = deps.visionConfig ?? DEFAULT_VISION_CONFIG;
+    this.screenshotCapturer = deps.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
+    this.visionAnalyzer = deps.visionAnalyzer;
   }
 
   private createErrorResult(error: string, options: Partial<PinchOnOptions>): PinchOnResult {
@@ -195,8 +210,29 @@ export class PinchOn extends BaseVisualChange {
       };
     } catch (error) {
       perf.end();
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return this.createErrorResult(`Failed to perform pinch: ${errorMessage}`, options);
+      const baseErrorMessage = error instanceof Error ? error.message : String(error);
+      let finalErrorMessage = `Failed to perform pinch: ${baseErrorMessage}`;
+
+      if (this.visionConfig.enabled && options.container) {
+        const searchCriteria = {
+          text: options.container.text,
+          resourceId: options.container.elementId,
+          description: "Container element for pinching"
+        };
+        const cachedObserve = await this.observeScreen.getMostRecentCachedObserveResult();
+        const viewHierarchy = cachedObserve?.viewHierarchy ?? null;
+        finalErrorMessage = await getVisionEnrichedError(
+          this.screenshotCapturer,
+          viewHierarchy,
+          searchCriteria,
+          this.visionConfig,
+          finalErrorMessage,
+          undefined,
+          this.visionAnalyzer
+        );
+      }
+
+      return this.createErrorResult(finalErrorMessage, options);
     }
   }
 

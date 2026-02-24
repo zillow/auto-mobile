@@ -26,6 +26,8 @@ import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { resolveSwipeDirection } from "../../../utils/swipeOnUtils";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../../utils/AccessibilityDetector";
+import { DEFAULT_VISION_CONFIG, getVisionEnrichedError, type VisionFallbackConfig, type VisionAnalyzer } from "../../../vision/index";
+import { TakeScreenshotCapturer, type ScreenshotCapturer } from "../../navigation/SelectionStateTracker";
 
 import {
   GestureExecutor,
@@ -51,6 +53,9 @@ export class SwipeOn extends BaseVisualChange {
   private autoTargetSelector: AutoTargetSelector;
   private talkBackExecutor: TalkBackSwipeExecutor;
   private scrollUntilVisible: ScrollUntilVisible;
+  private visionConfig: VisionFallbackConfig;
+  private screenshotCapturer: ScreenshotCapturer;
+  private visionAnalyzer: VisionAnalyzer | undefined;
 
   private static readonly DEFAULT_APEX_PAUSE_MS = 100;
   private static readonly DEFAULT_RETURN_SPEED = 1;
@@ -67,6 +72,9 @@ export class SwipeOn extends BaseVisualChange {
     this.geometry = dependencies.geometry ?? new DefaultElementGeometry();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.accessibilityDetector = dependencies.accessibilityDetector || defaultAccessibilityDetector;
+    this.visionConfig = dependencies.visionConfig ?? DEFAULT_VISION_CONFIG;
+    this.screenshotCapturer = dependencies.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
+    this.visionAnalyzer = dependencies.visionAnalyzer;
     if (dependencies.observeScreen) {
       this.observeScreen = dependencies.observeScreen as unknown as ObserveScreen;
     }
@@ -261,11 +269,44 @@ export class SwipeOn extends BaseVisualChange {
         )
         : undefined;
 
-      // Return error result with debug info instead of throwing
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Apply vision fallback for element-related errors
+      const baseErrorMessage = error instanceof Error ? error.message : String(error);
+      let errorMessage = `Failed to perform swipeOn: ${baseErrorMessage}`;
+
+      if (this.visionConfig.enabled && (normalizedOptions.lookFor || normalizedOptions.container)) {
+        let searchCriteria: import("../../../vision/VisionTypes").ElementSearchCriteria | null = null;
+        if (normalizedOptions.lookFor) {
+          searchCriteria = {
+            text: normalizedOptions.lookFor.text,
+            resourceId: normalizedOptions.lookFor.elementId,
+            description: "Target element to scroll to"
+          };
+        } else if (normalizedOptions.container) {
+          searchCriteria = {
+            text: normalizedOptions.container.text,
+            resourceId: normalizedOptions.container.elementId,
+            description: "Container element for swiping"
+          };
+        }
+
+        if (searchCriteria) {
+          const cachedObserve = await this.observeScreen.getMostRecentCachedObserveResult();
+          const viewHierarchy = cachedObserve?.viewHierarchy ?? null;
+          errorMessage = await getVisionEnrichedError(
+            this.screenshotCapturer,
+            viewHierarchy,
+            searchCriteria,
+            this.visionConfig,
+            errorMessage,
+            undefined,
+            this.visionAnalyzer
+          );
+        }
+      }
+
       return {
         success: false,
-        error: `Failed to perform swipeOn: ${errorMessage}`,
+        error: errorMessage,
         targetType: normalizedOptions.container ? "element" : "screen",
         x1: 0,
         y1: 0,

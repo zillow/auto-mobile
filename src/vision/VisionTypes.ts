@@ -54,6 +54,14 @@ export interface VisionFallbackConfig {
   cacheTtlMinutes: number;
 }
 
+export interface VisionAnalyzer {
+  analyzeAndSuggest(
+    screenshotPath: string,
+    hierarchy: unknown,
+    searchCriteria: ElementSearchCriteria
+  ): Promise<VisionFallbackResult>;
+}
+
 export interface ClaudeVisionAnalysis {
   elementFound: boolean;
   elementLocation?: {

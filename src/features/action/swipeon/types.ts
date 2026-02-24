@@ -40,4 +40,7 @@ export interface SwipeOnDependencies {
   geometry?: import("../../../utils/interfaces/ElementGeometry").ElementGeometry;
   parser?: import("../../../utils/interfaces/ElementParser").ElementParser;
   accessibilityDetector?: AccessibilityDetector;
+  visionConfig?: import("../../../vision/VisionTypes").VisionFallbackConfig;
+  screenshotCapturer?: import("../../navigation/SelectionStateTracker").ScreenshotCapturer;
+  visionAnalyzer?: import("../../../vision/VisionTypes").VisionAnalyzer;
 }

@@ -21,6 +21,8 @@ import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { refreshAndroidViewHierarchy } from "./refreshAndroidViewHierarchy";
+import { DEFAULT_VISION_CONFIG, getVisionEnrichedError, type VisionFallbackConfig, type VisionAnalyzer } from "../../vision/index";
+import { TakeScreenshotCapturer, type ScreenshotCapturer } from "../navigation/SelectionStateTracker";
 
 const PRESS_DURATION_MIN_MS = 600;
 const PRESS_DURATION_MAX_MS = 3000;
@@ -32,22 +34,35 @@ const DROP_DURATION_MS = 100;
 const DRAG_TIMEOUT_BUFFER_MS = 500;
 const HIERARCHY_REFRESH_TIMEOUT_MS = 5000;
 
+interface DragAndDropDeps {
+  visionConfig?: VisionFallbackConfig;
+  screenshotCapturer?: ScreenshotCapturer;
+  visionAnalyzer?: VisionAnalyzer;
+}
+
 export class DragAndDrop extends BaseVisualChange {
   private finder: ElementFinder;
   private geometry: ElementGeometry;
   private accessibilityService: AccessibilityServiceClient;
   private viewHierarchy: ViewHierarchy;
+  private visionConfig: VisionFallbackConfig;
+  private screenshotCapturer: ScreenshotCapturer;
+  private visionAnalyzer: VisionAnalyzer | undefined;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    deps: DragAndDropDeps = {}
   ) {
     super(device, adb, timer);
     this.finder = new DefaultElementFinder();
     this.geometry = new DefaultElementGeometry();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
+    this.visionConfig = deps.visionConfig ?? DEFAULT_VISION_CONFIG;
+    this.screenshotCapturer = deps.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
+    this.visionAnalyzer = deps.visionAnalyzer;
   }
 
   async execute(
@@ -161,12 +176,38 @@ export class DragAndDrop extends BaseVisualChange {
     } catch (error) {
       perf.end();
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const baseErrorMessage = error instanceof Error ? error.message : String(error);
+      let finalErrorMessage = `Failed to perform drag and drop: ${baseErrorMessage}`;
+
+      if (this.visionConfig.enabled) {
+        // Infer which element failed from the error message
+        const isSourceError = baseErrorMessage.toLowerCase().includes("source");
+        const failedTarget = isSourceError ? options.source : options.target;
+        if (failedTarget) {
+          const searchCriteria = {
+            text: failedTarget.text,
+            resourceId: failedTarget.elementId,
+            description: isSourceError ? "Source element for drag" : "Target element for drop"
+          };
+          const cachedObserve = await this.observeScreen.getMostRecentCachedObserveResult();
+          const viewHierarchy = cachedObserve?.viewHierarchy ?? null;
+          finalErrorMessage = await getVisionEnrichedError(
+            this.screenshotCapturer,
+            viewHierarchy,
+            searchCriteria,
+            this.visionConfig,
+            finalErrorMessage,
+            signal,
+            this.visionAnalyzer
+          );
+        }
+      }
+
       return {
         success: false,
         duration: 0,
         distance: 0,
-        error: `Failed to perform drag and drop: ${errorMessage}`
+        error: finalErrorMessage
       };
     }
   }

@@ -22,11 +22,10 @@ import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
-import { TakeScreenshot } from "../observe/TakeScreenshot";
+import { DEFAULT_VISION_CONFIG, getVisionEnrichedError, type VisionFallbackConfig, type VisionAnalyzer } from "../../vision/index";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 import { throwIfAborted } from "../../utils/toolUtils";
-import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer } from "../navigation/SelectionStateTracker";
+import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer, type ScreenshotCapturer } from "../navigation/SelectionStateTracker";
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
 import type { ElementSelector } from "../../utils/interfaces/ElementSelector";
@@ -51,6 +50,8 @@ type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
  */
 export interface TapOnElementDependencies {
   visionConfig?: VisionFallbackConfig;
+  screenshotCapturer?: ScreenshotCapturer;
+  visionAnalyzer?: VisionAnalyzer;
   selectionStateTracker?: SelectionStateTracker;
   accessibilityDetector?: AccessibilityDetector;
   timer?: Timer;
@@ -68,6 +69,8 @@ export class TapOnElement extends BaseVisualChange {
   private elementParser: ElementParser;
   private accessibilityService: AccessibilityServiceClient;
   private visionConfig: VisionFallbackConfig;
+  private screenshotCapturer: ScreenshotCapturer;
+  private visionAnalyzer: VisionAnalyzer | undefined;
   private selectionStateTracker: SelectionStateTracker;
   private accessibilityDetector: AccessibilityDetector;
   private elementSelector: ElementSelector;
@@ -89,9 +92,11 @@ export class TapOnElement extends BaseVisualChange {
     this.elementParser = new DefaultElementParser();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
     this.visionConfig = options.visionConfig || DEFAULT_VISION_CONFIG;
+    this.screenshotCapturer = options.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
+    this.visionAnalyzer = options.visionAnalyzer;
     this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
     this.selectionStateTracker = options.selectionStateTracker ?? new SelectionStateTracker({
-      screenshotCapturer: new TakeScreenshotCapturer(device, this.adbFactory)
+      screenshotCapturer: this.screenshotCapturer
     });
     this.accessibilityDetector = options.accessibilityDetector || defaultAccessibilityDetector;
     this.elementSelector = options.elementSelector ?? new DefaultElementSelector();
@@ -390,75 +395,38 @@ export class TapOnElement extends BaseVisualChange {
       );
     }
 
-    if (this.visionConfig.enabled && observeResult) {
-      logger.info("🔍 Element not found after polling, trying vision fallback...");
-
-      try {
-        const screenshot = new TakeScreenshot(this.device, this.adbFactory);
-        const screenshotResult = await screenshot.execute({}, signal);
-
-        if (!screenshotResult.success || !screenshotResult.path) {
-          logger.error("Failed to capture screenshot for vision fallback");
-          throw new Error("Screenshot capture failed");
-        }
-
-        const visionFallback = new VisionFallback(this.visionConfig);
-        const visionResult = await visionFallback.analyzeAndSuggest(
-          screenshotResult.path,
-          observeResult.viewHierarchy as any, // ViewNode type
-          {
-            text: options.text,
-            resourceId: options.elementId,
-            description: `Interactive element for tapping (action: ${options.action})`,
-          }
-        );
-
-        if (visionResult.confidence === "high" && visionResult.navigationSteps && visionResult.navigationSteps.length > 0) {
-          const stepsText = visionResult.navigationSteps
-            .map((step, i) => `${i + 1}. ${step.description}`)
-            .join("\n");
-
-          throw new ActionableError(
-            `Element not found, but AI suggests these steps:\n${stepsText}\n\n` +
-            `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
-          );
-        }
-
-        if (visionResult.alternativeSelectors && visionResult.alternativeSelectors.length > 0) {
-          const suggestions = visionResult.alternativeSelectors
-            .map(alt => `- ${alt.type}: "${alt.value}" (${alt.reasoning})`)
-            .join("\n");
-
-          throw new ActionableError(
-            `Element not found. AI suggests trying:\n${suggestions}\n\n` +
-            `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
-          );
-        }
-
-        throw new ActionableError(
-          `Element not found. ${visionResult.reason || "No clear path found."}\n\n` +
-          `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
-        );
-
-      } catch (error) {
-        if (error instanceof ActionableError) {
-          throw error;
-        }
-        logger.error("Vision fallback failed:", error);
-      }
-    }
-
+    let baseError: string;
     if (options.text) {
       const containerHint = options.container
         ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
         : "";
-      throw new ActionableError(`Element not found with provided text '${options.text}'${containerHint}`);
+      baseError = `Element not found with provided text '${options.text}'${containerHint}`;
+    } else {
+      const containerHint = options.container
+        ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
+        : "";
+      baseError = `Element not found with provided elementId '${options.elementId}'${containerHint}`;
     }
 
-    const containerHint = options.container
-      ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
-      : "";
-    throw new ActionableError(`Element not found with provided elementId '${options.elementId}'${containerHint}`);
+    if (this.visionConfig.enabled && observeResult) {
+      logger.info("🔍 Element not found after polling, trying vision fallback...");
+      const enrichedMsg = await getVisionEnrichedError(
+        this.screenshotCapturer,
+        observeResult.viewHierarchy,
+        {
+          text: options.text,
+          resourceId: options.elementId,
+          description: `Interactive element for tapping (action: ${options.action})`,
+        },
+        this.visionConfig,
+        baseError,
+        signal,
+        this.visionAnalyzer
+      );
+      throw new ActionableError(enrichedMsg);
+    }
+
+    throw new ActionableError(baseError);
   }
 
   private isContainerAvailable(
