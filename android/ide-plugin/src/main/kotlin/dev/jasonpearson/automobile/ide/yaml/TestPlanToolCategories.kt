@@ -23,7 +23,7 @@ object TestPlanToolCategories {
                       "openLink",
                       "navigateTo",
                   ),
-              "Observation" to setOf("observe", "rawViewHierarchy"),
+              "Observation" to setOf("observe"),
               "Device management" to
                   setOf(
                       "listDevices",

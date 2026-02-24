@@ -1,5 +1,6 @@
 import { ObserveResult } from "../../src/models";
 import type { ObserveScreen } from "../../src/features/observe/interfaces/ObserveScreen";
+import type { RawViewHierarchyResult } from "../../src/models/RawViewHierarchyResult";
 
 /**
  * Fake implementation of ObserveScreen for testing
@@ -164,5 +165,21 @@ export class FakeObserveScreen implements ObserveScreen {
     }
 
     return this.getNextObserveResult();
+  }
+
+  async appendRawViewHierarchy(result: ObserveResult, _signal?: AbortSignal): Promise<void> {
+    this.executedOperations.push("appendRawViewHierarchy");
+
+    const error = this.failures.get("appendRawViewHierarchy");
+    if (error) {
+      throw error;
+    }
+
+    result.rawViewHierarchy = {
+      json: "{\"fake\":true}",
+      source: "accessibility-service",
+      timestamp: 0,
+      device: { deviceId: "fake-device", platform: "android" }
+    } as RawViewHierarchyResult;
   }
 }

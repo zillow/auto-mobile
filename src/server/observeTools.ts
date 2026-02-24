@@ -41,7 +41,8 @@ const waitForSchema = z.union([
 
 export const observeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform"),
-  waitFor: waitForSchema.optional().describe("Wait for element to appear before returning observation")
+  waitFor: waitForSchema.optional().describe("Wait for element to appear before returning observation"),
+  raw: z.boolean().optional().describe("When true, include unprocessed view hierarchy in response alongside normal output (default: false)")
 }));
 
 const observeElementsSchema = z.object({
@@ -79,7 +80,8 @@ const observeResultSchema = z.object({
   freshness: freshnessSchema.optional(),
   recompositionSummary: z.any().optional(),
   predictions: predictionsSchema.optional(),
-  accessibilityState: accessibilityStateSchema.optional()
+  accessibilityState: accessibilityStateSchema.optional(),
+  rawViewHierarchy: z.any().optional()
 }).passthrough();
 
 export const identifyInteractionsSchema = addDeviceTargetingToSchema(z.object({
@@ -221,6 +223,10 @@ export function registerObserveTools() {
       const result = waitOutcome
         ? waitOutcome.observation
         : await observeScreen.execute(undefined, createGlobalPerformanceTracker(), true, 0, signal);
+
+      if (args.raw) {
+        await observeScreen.appendRawViewHierarchy(result, signal);
+      }
 
       // Include setup timing if this is the first observe after accessibility service setup
       const setupTiming = consumeSetupTiming(device.deviceId);

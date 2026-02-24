@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ActionableError } from "../models/ActionableError";
-import { RawViewHierarchy } from "../features/debug/RawViewHierarchy";
 import { DebugSearch } from "../features/debug/DebugSearch";
 import { BugReport } from "../features/debug/BugReport";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -21,11 +20,6 @@ const ensureDebugEnabled = () => {
 };
 
 // Type definitions for tool arguments
-export interface RawViewHierarchyArgs {
-  platform: Platform;
-  source?: "uiautomator" | "accessibility-service" | "both";
-}
-
 export interface DebugSearchArgs {
   platform: Platform;
   text?: string;
@@ -48,13 +42,6 @@ export interface BugReportArgs {
 }
 
 // Schema definitions
-export const rawViewHierarchySchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
-  source: z.enum(["uiautomator", "accessibility-service", "both"])
-    .optional()
-    .describe("Source for hierarchy extraction (Android only, ignored on iOS): 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison. iOS always returns XCUITest JSON.")
-}));
-
 const debugSearchBaseSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   text: z.string().optional().describe("Text to search for in elements"),
@@ -83,20 +70,6 @@ export const bugReportSchema = addDeviceTargetingToSchema(z.object({
 
 // Register debug tools
 export function registerDebugTools() {
-  // Raw View Hierarchy handler
-  const rawViewHierarchyHandler = async (device: BootedDevice, args: RawViewHierarchyArgs) => {
-    try {
-      ensureDebugEnabled();
-      const rawViewHierarchy = new RawViewHierarchy(device);
-      const result = await rawViewHierarchy.execute({
-        source: args.source
-      });
-      return createJSONToolResponse(result);
-    } catch (error) {
-      throw new ActionableError(`Failed to get raw view hierarchy: ${error}`);
-    }
-  };
-
   // Debug Search handler
   const debugSearchHandler = async (device: BootedDevice, args: DebugSearchArgs) => {
     try {
@@ -141,15 +114,6 @@ export function registerDebugTools() {
   };
 
   // Register tools with the tool registry
-  ToolRegistry.registerDeviceAware(
-    "rawViewHierarchy",
-    "Get raw view hierarchy data without parsing. Returns XML from uiautomator and/or JSON from accessibility service. Useful for debugging when parsed hierarchy doesn't match what's on screen.",
-    rawViewHierarchySchema,
-    rawViewHierarchyHandler,
-    false,
-    true
-  );
-
   ToolRegistry.registerDeviceAware(
     "debugSearch",
     "Debug element search operations. Shows all matching elements, which one would be selected, and near-misses that almost matched. Use this to understand why an element isn't being found or why the wrong element is being selected.",
