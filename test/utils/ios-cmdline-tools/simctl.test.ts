@@ -223,22 +223,27 @@ describe("Simctl", function() {
     });
   });
 
-  describe("getRuntimes with missing runtimes field", function() {
-    test("should return empty array when simctl JSON has no runtimes field", async function() {
-      // Xcode 26.2 returns only {devices: {...}} from `xcrun simctl list devices --json`
+  describe("getRuntimes uses dedicated simctl command", function() {
+    test("should return runtimes from simctl list runtimes --json", async function() {
       mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
-        if (file === "xcrun" && args.includes("--json")) {
+        if (file === "xcrun" && args.join(" ") === "simctl list runtimes --json") {
           return createExecResult(JSON.stringify({
-            devices: {
-              "com.apple.CoreSimulator.SimRuntime.iOS-26-2": [
-                {
-                  name: "iPad Pro 13-inch (M5)",
-                  udid: "9C9EB557-D6B4-472E-8CF4-F1E0174A63C3",
-                  state: "Booted",
-                  isAvailable: true
-                }
-              ]
-            }
+            runtimes: [
+              {
+                bundlePath: "/Library/Developer/CoreSimulator/Volumes/iOS_26.2/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.2.simruntime",
+                identifier: "com.apple.CoreSimulator.SimRuntime.iOS-26-2",
+                isAvailable: true,
+                name: "iOS 26.2",
+                version: "26.2"
+              },
+              {
+                bundlePath: "/Library/Developer/CoreSimulator/Volumes/iOS_18.6/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 18.6.simruntime",
+                identifier: "com.apple.CoreSimulator.SimRuntime.iOS-18-6",
+                isAvailable: false,
+                name: "iOS 18.6",
+                version: "18.6"
+              }
+            ]
           }), "");
         }
         return createExecResult("", "");
@@ -246,20 +251,51 @@ describe("Simctl", function() {
 
       simctl = new Simctl(null, mockExecAsync);
       const runtimes = await simctl.getRuntimes();
-      expect(runtimes).toEqual([]);
+      expect(runtimes).toHaveLength(1);
+      expect(runtimes[0].name).toBe("iOS 26.2");
+      expect(runtimes[0].isAvailable).toBe(true);
     });
 
-    test("should return empty array from getDeviceTypes when field is missing", async function() {
+    test("should throw when runtimes command fails", async function() {
+      mockExecAsync = async (): Promise<ExecResult> => {
+        throw new Error("simctl failed");
+      };
+
+      simctl = new Simctl(null, mockExecAsync);
+      await expect(simctl.getRuntimes()).rejects.toThrow();
+    });
+  });
+
+  describe("getDeviceTypes uses dedicated simctl command", function() {
+    test("should return device types from simctl list devicetypes --json", async function() {
       mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
-        if (file === "xcrun" && args.includes("--json")) {
-          return createExecResult(JSON.stringify({ devices: {} }), "");
+        if (file === "xcrun" && args.join(" ") === "simctl list devicetypes --json") {
+          return createExecResult(JSON.stringify({
+            devicetypes: [
+              {
+                name: "iPhone 17 Pro",
+                identifier: "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+                bundlePath: "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Library/Developer/CoreSimulator/Profiles/DeviceTypes/iPhone 17 Pro.simdevicetype"
+              }
+            ]
+          }), "");
         }
         return createExecResult("", "");
       };
 
       simctl = new Simctl(null, mockExecAsync);
       const types = await simctl.getDeviceTypes();
-      expect(types).toEqual([]);
+      expect(types).toHaveLength(1);
+      expect(types[0].name).toBe("iPhone 17 Pro");
+    });
+
+    test("should throw when devicetypes command fails", async function() {
+      mockExecAsync = async (): Promise<ExecResult> => {
+        throw new Error("simctl failed");
+      };
+
+      simctl = new Simctl(null, mockExecAsync);
+      await expect(simctl.getDeviceTypes()).rejects.toThrow();
     });
   });
 });

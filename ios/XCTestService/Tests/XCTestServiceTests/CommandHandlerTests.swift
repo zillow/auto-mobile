@@ -288,6 +288,7 @@ final class CommandHandlerTests: XCTestCase {
         XCTAssertEqual(launchResponse.success, true)
         XCTAssertEqual(launchResponse.type, "launch_app_result")
         XCTAssertEqual(fakeGesturePerformer.getAppLaunchHistory(), ["com.apple.Preferences"])
+        XCTAssertEqual(fakeElementLocator.trackedBundleIds, ["com.apple.Preferences"])
     }
 
     // MARK: - Unknown Command Tests

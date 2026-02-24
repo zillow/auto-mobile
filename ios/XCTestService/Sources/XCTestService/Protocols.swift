@@ -13,6 +13,9 @@ public protocol ElementLocating {
 
     /// Find element by text content
     func findElement(byText text: String) -> Any?
+
+    /// Track a bundle ID so the foreground app detector can find it
+    func trackObservedBundleId(_ bundleId: String)
 }
 
 // MARK: - GesturePerformer Protocol

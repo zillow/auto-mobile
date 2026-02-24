@@ -1,5 +1,5 @@
 import type { ExecResult } from "../../src/models";
-import type { AppleDevice, AppleDeviceRuntime } from "../../src/utils/ios-cmdline-tools/SimCtlClient";
+import type { AppleDevice, AppleDeviceRuntime, AppleDeviceType } from "../../src/utils/ios-cmdline-tools/SimCtlClient";
 
 const buildExecResult = (stdout: string): ExecResult => ({
   stdout,
@@ -67,6 +67,11 @@ export class FakeSimCtlClient {
   async getDeviceInfo(udid: string): Promise<AppleDevice | null> {
     this.recordCall("getDeviceInfo", { udid });
     return this.deviceInfo.get(udid) ?? null;
+  }
+
+  async getDeviceTypes(): Promise<AppleDeviceType[]> {
+    this.recordCall("getDeviceTypes", {});
+    return [];
   }
 
   async getRuntimes(): Promise<AppleDeviceRuntime[]> {
