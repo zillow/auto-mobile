@@ -330,7 +330,7 @@ export class XcodeSigningManager {
   }
 
   public async detectTeamIdsFromXcode(): Promise<string[]> {
-    const projectPath = join(process.cwd(), "ios", "XCTestService", "XCTestService.xcodeproj");
+    const projectPath = join(process.cwd(), "ios", "CtrlProxy iOS", "CtrlProxy iOS.xcodeproj");
     try {
       if (this.dependencies.platform() !== "darwin") {
         const available = await this.dependencies.xcodebuild.isAvailable();
@@ -340,7 +340,7 @@ export class XcodeSigningManager {
       }
 
       const result = await this.dependencies.xcodebuild.executeCommand(
-        ["-showBuildSettings", "-project", projectPath, "-scheme", "XCTestServiceApp"],
+        ["-showBuildSettings", "-project", projectPath, "-scheme", "CtrlProxyApp"],
         { timeoutMs: 30000, maxBuffer: 10 * 1024 * 1024 }
       );
       const teams = new Set<string>();

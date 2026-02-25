@@ -2882,29 +2882,29 @@ ios_check_simulator_runtimes() {
     return 0
 }
 
-ios_check_xctestservice_build() {
+ios_check_ctrl_proxy_build() {
     if [[ "$(detect_os)" != "macos" ]]; then
         return 1
     fi
 
     if [[ "${IS_REPO}" != "true" ]]; then
-        log_info "XCTestService build handled by AutoMobile on first use."
+        log_info "CtrlProxy iOS build handled by AutoMobile on first use."
         return 0
     fi
 
-    local xctest_dir="${PROJECT_ROOT}/ios/XCTestService"
+    local xctest_dir="${PROJECT_ROOT}/ios/control-proxy"
     if [[ ! -d "${xctest_dir}" ]]; then
-        log_warn "XCTestService project not found in repo."
-        log_info "AutoMobile will install/build XCTestService when needed."
+        log_warn "CtrlProxy iOS project not found in repo."
+        log_info "AutoMobile will install/build CtrlProxy iOS when needed."
         return 1
     fi
 
-    if run_spinner "Validating XCTestService project" bash -c "cd \"${xctest_dir}\" && xcodebuild -list -json >/dev/null 2>&1"; then
-        log_info "XCTestService project detected. AutoMobile will build on demand."
+    if run_spinner "Validating CtrlProxy iOS project" bash -c "cd \"${xctest_dir}\" && xcodebuild -list -json >/dev/null 2>&1"; then
+        log_info "CtrlProxy iOS project detected. AutoMobile will build on demand."
         return 0
     fi
 
-    log_warn "Unable to query XCTestService project. AutoMobile will build on demand."
+    log_warn "Unable to query CtrlProxy iOS project. AutoMobile will build on demand."
     return 1
 }
 
@@ -2926,7 +2926,7 @@ run_ios_setup() {
     fi
 
     ios_check_simulator_runtimes
-    ios_check_xctestservice_build
+    ios_check_ctrl_proxy_build
     return 0
 }
 

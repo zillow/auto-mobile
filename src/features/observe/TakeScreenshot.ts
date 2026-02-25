@@ -11,7 +11,7 @@ import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from 
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ensureSecureTempDirSync, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ScreenshotService } from "./interfaces/ScreenshotService";
-import { XCTestServiceClient } from "./ios";
+import { CtrlProxyClient } from "./ios";
 import { getDeviceDataStreamServer } from "../../daemon/deviceDataStreamSocketServer";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
@@ -252,7 +252,7 @@ export class TakeScreenshot implements ScreenshotService {
   }
 
   /**
-   * Capture screenshot using XCTestService
+   * Capture screenshot using CtrlProxy iOS
    * @param finalPath - Path to save the screenshot
    * @returns ScreenshotResult with path to the saved screenshot or error
    */
@@ -262,17 +262,17 @@ export class TakeScreenshot implements ScreenshotService {
     const startTime = this.timer.now();
 
     try {
-      const client = XCTestServiceClient.getInstance(this.device);
+      const client = CtrlProxyClient.getInstance(this.device);
 
       // Ensure connected before requesting screenshot
       if (!await client.ensureConnected()) {
         return {
           success: false,
-          error: "Failed to connect to XCTestService",
+          error: "Failed to connect to CtrlProxy iOS",
         };
       }
 
-      // Request screenshot from XCTestService
+      // Request screenshot from CtrlProxy iOS
       const result = await client.requestScreenshot(10000); // 10 second timeout
 
       if (!result.success || !result.data) {

@@ -6,14 +6,14 @@ import { DeviceAppInspector, parseDevicectlJsonOutputPath } from "../../../src/u
 import { hashAppBundle } from "../../../src/utils/ios-cmdline-tools/AppBundleHasher";
 import { FakeHostControlDeviceAppInspector } from "../../fakes/FakeHostControlDeviceAppInspector";
 
-const bundleId = "dev.jasonpearson.automobile.XCTestServiceApp";
+const bundleId = "dev.jasonpearson.automobile.ctrlproxy";
 
 const createTempDir = async (): Promise<string> => {
   return fs.mkdtemp(join(tmpdir(), "automobile-device-"));
 };
 
 const createFixtureApp = async (root: string): Promise<string> => {
-  const appDir = join(root, "XCTestServiceApp.app");
+  const appDir = join(root, "CtrlProxyApp.app");
   await fs.mkdir(appDir, { recursive: true });
   await fs.writeFile(join(appDir, "Info.plist"), "info", "utf-8");
   return appDir;
@@ -42,7 +42,7 @@ describe("DeviceAppInspector", () => {
             apps: [
               {
                 bundleIdentifier: bundleId,
-                bundleURL: "file:///private/var/containers/Bundle/Application/ABC/XCTestServiceApp.app"
+                bundleURL: "file:///private/var/containers/Bundle/Application/ABC/CtrlProxyApp.app"
               }
             ]
           };
@@ -52,7 +52,7 @@ describe("DeviceAppInspector", () => {
       if (command.includes("device copy from")) {
         const destination = parseArgValue(command, "--destination");
         if (destination) {
-          const target = join(destination, "XCTestServiceApp.app");
+          const target = join(destination, "CtrlProxyApp.app");
           await fs.mkdir(target, { recursive: true });
           await fs.copyFile(join(fixtureApp, "Info.plist"), join(target, "Info.plist"));
         }

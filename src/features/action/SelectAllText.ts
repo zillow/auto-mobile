@@ -2,8 +2,8 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, SelectAllTextResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { CtrlProxyClient } from "../observe/android";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 
 export class SelectAllText extends BaseVisualChange {
@@ -53,22 +53,22 @@ export class SelectAllText extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific select all using XCTestService.
+   * Execute iOS-specific select all using CtrlProxy iOS.
    */
   private async executeiOSSelectAll(): Promise<SelectAllTextResult> {
     try {
-      const client = XCTestServiceClient.getInstance(this.device);
+      const client = IOSCtrlProxyClient.getInstance(this.device);
       const result = await client.requestSelectAll();
 
       if (result.success) {
-        logger.info(`[SelectAllText] Select all via XCTestService`);
+        logger.info(`[SelectAllText] Select all via CtrlProxy iOS`);
         return { success: true };
       }
 
-      logger.warn(`[SelectAllText] XCTestService selectAll failed: ${result.error}`);
+      logger.warn(`[SelectAllText] CtrlProxy iOS selectAll failed: ${result.error}`);
       return { success: false, error: result.error };
     } catch (error) {
-      logger.error(`[SelectAllText] XCTestService exception: ${error}`);
+      logger.error(`[SelectAllText] CtrlProxy iOS exception: ${error}`);
       return { success: false, error: String(error) };
     }
   }
@@ -78,7 +78,7 @@ export class SelectAllText extends BaseVisualChange {
    * Uses ACTION_SET_SELECTION which is significantly faster than ADB double-tap.
    */
   private async executeAndroidSelectAll(): Promise<SelectAllTextResult> {
-    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
+    const a11yClient = AndroidCtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestSelectAll();
 
     if (a11yResult.success) {

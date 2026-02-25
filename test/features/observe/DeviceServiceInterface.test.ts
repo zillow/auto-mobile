@@ -2,7 +2,7 @@
  * Interface compliance tests for DeviceService implementations.
  *
  * These tests verify that both CtrlProxyClient (Android) and
- * XCTestServiceClient (iOS) properly implement the DeviceService interface.
+ * CtrlProxyClient (iOS) properly implement the DeviceService interface.
  *
  * The tests focus on:
  * 1. Type compatibility - instances can be assigned to interface type
@@ -13,7 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DeviceService, AndroidDeviceService } from "../../../src/features/observe/DeviceService";
 import { CtrlProxyClient } from "../../../src/features/observe/android";
-import { XCTestServiceClient } from "../../../src/features/observe/ios";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../../../src/features/observe/ios";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice } from "../../../src/models";
 import {
@@ -73,8 +73,8 @@ describe("DeviceService Interface Compliance", () => {
       void client.close();
     });
 
-    test("XCTestServiceClient implements DeviceService interface", () => {
-      // This test verifies at compile-time that XCTestServiceClient
+    test("CtrlProxyClient (iOS) implements DeviceService interface", () => {
+      // This test verifies at compile-time that CtrlProxyClient (iOS)
       // is assignable to the DeviceService interface
       const fakeTimer = new FakeTimer();
       fakeTimer.enableAutoAdvance();
@@ -85,15 +85,15 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test iOS Device",
       };
 
-      XCTestServiceClient.resetInstances();
-      const client = XCTestServiceClient.createForTesting(
+      IOSCtrlProxyClient.resetInstances();
+      const client = IOSCtrlProxyClient.createForTesting(
         testDevice,
         8765,
         createSuccessWebSocketFactory(fakeTimer),
         fakeTimer
       );
 
-      // Type assertion: XCTestServiceClient should be assignable to DeviceService
+      // Type assertion: CtrlProxyClient (iOS) should be assignable to DeviceService
       const deviceService: DeviceService = client;
 
       // Verify the interface methods exist
@@ -150,7 +150,7 @@ describe("DeviceService Interface Compliance", () => {
       void client.close();
     });
 
-    test("XCTestServiceClient has Apple-specific methods", () => {
+    test("CtrlProxyClient (iOS) has Apple-specific methods", () => {
       const fakeTimer = new FakeTimer();
       fakeTimer.enableAutoAdvance();
 
@@ -160,8 +160,8 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test iOS Device",
       };
 
-      XCTestServiceClient.resetInstances();
-      const client = XCTestServiceClient.createForTesting(
+      IOSCtrlProxyClient.resetInstances();
+      const client = IOSCtrlProxyClient.createForTesting(
         testDevice,
         8765,
         createSuccessWebSocketFactory(fakeTimer),
@@ -169,7 +169,7 @@ describe("DeviceService Interface Compliance", () => {
       );
 
       // Verify Apple-specific interface methods exist
-      // Note: XCTestServiceClient currently implements requestLaunchApp and requestPressHome
+      // Note: CtrlProxyClient (iOS) currently implements requestLaunchApp and requestPressHome
       // but not all AppleDeviceService methods (requestTerminateApp, requestPressButton)
       expect(typeof client.requestLaunchApp).toBe("function");
       expect(typeof client.requestPressHome).toBe("function");
@@ -251,8 +251,8 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test iOS Device",
       };
 
-      XCTestServiceClient.resetInstances();
-      const client = XCTestServiceClient.createForTesting(
+      IOSCtrlProxyClient.resetInstances();
+      const client = IOSCtrlProxyClient.createForTesting(
         testDevice,
         8765,
         createSuccessWebSocketFactory(fakeTimer),
@@ -273,8 +273,8 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test iOS Device",
       };
 
-      XCTestServiceClient.resetInstances();
-      const client = XCTestServiceClient.createForTesting(
+      IOSCtrlProxyClient.resetInstances();
+      const client = IOSCtrlProxyClient.createForTesting(
         testDevice,
         8765,
         createInstantFailureWebSocketFactory(fakeTimer),

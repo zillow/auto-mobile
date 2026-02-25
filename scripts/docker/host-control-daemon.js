@@ -96,7 +96,7 @@ async function isXcodeAvailable() {
 // Track running emulator processes
 const runningEmulators = new Map(); // avdName -> { pid, process }
 const runningSimulators = new Map(); // udid -> { name, state }
-const runningXCTestServices = new Map(); // deviceId -> { pid, process, port, startedAt, deviceId }
+const runningCtrlProxyIOS = new Map(); // deviceId -> { pid, process, port, startedAt, deviceId }
 const runningIproxyTunnels = new Map(); // key -> { pid, process, deviceId, localPort, devicePort }
 
 const sanitizeForLog = value => String(value ?? "").replace(/[\r\n]/g, "");
@@ -252,7 +252,7 @@ function findXctestrunPath(requestedPath) {
     return requestedPath;
   }
 
-  const cacheDir = path.join(os.homedir(), ".automobile", "xctestservice");
+  const cacheDir = path.join(os.homedir(), ".automobile", "ctrl-proxy-ios");
   if (!fs.existsSync(cacheDir)) {
     return null;
   }
@@ -978,11 +978,11 @@ const handlers = {
   },
 
   /**
-   * Start XCTestService via xcodebuild on the host
+   * Start CtrlProxy iOS via xcodebuild on the host
    */
   async "xctest-start"(params) {
     if (!IS_MACOS) {
-      return { success: false, error: "XCTestService is only available on macOS" };
+      return { success: false, error: "CtrlProxy iOS is only available on macOS" };
     }
 
     const { deviceId, port, xctestrunPath, bundleId, timeoutSeconds } = params;
@@ -990,9 +990,9 @@ const handlers = {
       return { success: false, error: "deviceId and port are required" };
     }
 
-    const existing = runningXCTestServices.get(deviceId);
+    const existing = runningCtrlProxyIOS.get(deviceId);
     if (existing && isProcessRunning(existing.pid)) {
-      return { success: true, pid: existing.pid, message: "XCTestService already running" };
+      return { success: true, pid: existing.pid, message: "CtrlProxy iOS already running" };
     }
 
     const resolvedXctestrunPath = findXctestrunPath(xctestrunPath);
@@ -1005,28 +1005,28 @@ const handlers = {
       );
     } else {
       const projectRoot = path.resolve(__dirname, "..", "..");
-      const projectPath = path.join(projectRoot, "ios", "XCTestService", "XCTestService.xcodeproj");
+      const projectPath = path.join(projectRoot, "ios", "control-proxy", "CtrlProxy.xcodeproj");
       args.push(
         "test",
         "-project",
         projectPath,
         "-scheme",
-        "XCTestServiceApp"
+        "CtrlProxyApp"
       );
     }
 
     args.push(
       "-destination",
       `id=${deviceId}`,
-      "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
-      `XCTESTSERVICE_PORT=${port}`
+      "-only-testing:CtrlProxyUITests/CtrlProxyUITests/testRunService",
+      `CTRL_PROXY_IOS_PORT=${port}`
     );
 
     if (bundleId) {
-      args.push(`XCTESTSERVICE_BUNDLE_ID=${bundleId}`);
+      args.push(`CTRL_PROXY_IOS_BUNDLE_ID=${bundleId}`);
     }
     if (timeoutSeconds) {
-      args.push(`XCTESTSERVICE_TIMEOUT=${timeoutSeconds}`);
+      args.push(`CTRL_PROXY_IOS_TIMEOUT=${timeoutSeconds}`);
     }
 
     try {
@@ -1038,32 +1038,32 @@ const handlers = {
       drainChildOutput(child);
 
       const entry = { pid: child.pid, process: child, port, startedAt: Date.now(), deviceId };
-      runningXCTestServices.set(deviceId, entry);
+      runningCtrlProxyIOS.set(deviceId, entry);
 
       child.on("exit", () => {
-        runningXCTestServices.delete(deviceId);
+        runningCtrlProxyIOS.delete(deviceId);
       });
 
-      return { success: true, pid: child.pid, message: "XCTestService started" };
+      return { success: true, pid: child.pid, message: "CtrlProxy iOS started" };
     } catch (error) {
       return { success: false, error: error.message };
     }
   },
 
   /**
-   * Stop XCTestService on the host
+   * Stop CtrlProxy iOS on the host
    */
   async "xctest-stop"(params) {
     if (!IS_MACOS) {
-      return { success: false, error: "XCTestService is only available on macOS" };
+      return { success: false, error: "CtrlProxy iOS is only available on macOS" };
     }
 
     const { deviceId, pid } = params || {};
     let targetEntry = null;
-    if (deviceId && runningXCTestServices.has(deviceId)) {
-      targetEntry = runningXCTestServices.get(deviceId);
+    if (deviceId && runningCtrlProxyIOS.has(deviceId)) {
+      targetEntry = runningCtrlProxyIOS.get(deviceId);
     } else if (pid) {
-      for (const entry of runningXCTestServices.values()) {
+      for (const entry of runningCtrlProxyIOS.values()) {
         if (entry.pid === pid) {
           targetEntry = entry;
           break;
@@ -1072,40 +1072,40 @@ const handlers = {
     }
 
     if (!targetEntry) {
-      return { success: false, error: "XCTestService process not found" };
+      return { success: false, error: "CtrlProxy iOS process not found" };
     }
 
     try {
       process.kill(targetEntry.pid);
-      runningXCTestServices.delete(deviceId || targetEntry.deviceId);
-      return { success: true, message: `Stopped XCTestService pid ${targetEntry.pid}` };
+      runningCtrlProxyIOS.delete(deviceId || targetEntry.deviceId);
+      return { success: true, message: `Stopped CtrlProxy iOS pid ${targetEntry.pid}` };
     } catch (error) {
       return { success: false, error: error.message };
     }
   },
 
   /**
-   * Check XCTestService status on the host
+   * Check CtrlProxy iOS status on the host
    */
   async "xctest-status"(params) {
     if (!IS_MACOS) {
-      return { success: false, error: "XCTestService is only available on macOS" };
+      return { success: false, error: "CtrlProxy iOS is only available on macOS" };
     }
 
     const { deviceId, pid, port } = params || {};
     let entry = null;
 
-    if (deviceId && runningXCTestServices.has(deviceId)) {
-      entry = runningXCTestServices.get(deviceId);
+    if (deviceId && runningCtrlProxyIOS.has(deviceId)) {
+      entry = runningCtrlProxyIOS.get(deviceId);
     } else if (pid) {
-      for (const item of runningXCTestServices.values()) {
+      for (const item of runningCtrlProxyIOS.values()) {
         if (item.pid === pid) {
           entry = item;
           break;
         }
       }
     } else if (port) {
-      for (const item of runningXCTestServices.values()) {
+      for (const item of runningCtrlProxyIOS.values()) {
         if (item.port === port) {
           entry = item;
           break;
@@ -1120,7 +1120,7 @@ const handlers = {
     const running = isProcessRunning(entry.pid);
     if (!running) {
       if (deviceId) {
-        runningXCTestServices.delete(deviceId);
+        runningCtrlProxyIOS.delete(deviceId);
       }
       return { success: true, running: false };
     }
@@ -1278,9 +1278,9 @@ iOS Commands (macOS only):
   - iproxy-status          Check iproxy status (params: pid or deviceId, localPort, devicePort)
   - devicectl-app-hash     Compute device app hash (params: deviceId, bundleId)
   - devicectl-uninstall    Uninstall device app (params: deviceId, bundleId)
-  - xctest-start           Start XCTestService (params: deviceId, port, xctestrunPath, bundleId, timeoutSeconds)
-  - xctest-stop            Stop XCTestService (params: deviceId or pid)
-  - xctest-status          Check XCTestService status (params: deviceId, pid, port)
+  - xctest-start           Start CtrlProxy iOS (params: deviceId, port, xctestrunPath, bundleId, timeoutSeconds)
+  - xctest-stop            Stop CtrlProxy iOS (params: deviceId or pid)
+  - xctest-status          Check CtrlProxy iOS status (params: deviceId, pid, port)
   - ios-info               Get iOS tooling info
 
 Press Ctrl+C to stop.
@@ -1301,11 +1301,11 @@ process.on("SIGINT", () => {
     }
   }
 
-  // Kill any XCTestService processes we started
-  for (const [deviceId, { pid }] of runningXCTestServices) {
+  // Kill any CtrlProxy iOS processes we started
+  for (const [deviceId, { pid }] of runningCtrlProxyIOS) {
     try {
       process.kill(pid, "SIGTERM");
-      console.log(`Stopped XCTestService for ${deviceId} (pid ${pid})`);
+      console.log(`Stopped CtrlProxy iOS for ${deviceId} (pid ${pid})`);
     } catch {
       // Ignore errors
     }

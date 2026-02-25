@@ -9,8 +9,8 @@ import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeTargetUserDetector } from "../../fakes/FakeTargetUserDetector";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeWindow } from "../../fakes/FakeWindow";
-import { FakeXCTestService } from "../../fakes/FakeXCTestService";
-import { XCTestServiceClient } from "../../../src/features/observe/ios";
+import { FakeIOSCtrlProxy } from "../../fakes/FakeIOSCtrlProxy";
+import { CtrlProxyClient } from "../../../src/features/observe/ios";
 
 describe("LaunchApp", () => {
   let device: BootedDevice;
@@ -205,9 +205,9 @@ describe("LaunchApp", () => {
     fakeTimer.enableAutoAdvance();
     const iosDevice: BootedDevice = { name: "test-ios-device", platform: "ios", deviceId: "ios-123" };
     const systemBundleId = "com.apple.Preferences";
-    const fakeXCTestService = new FakeXCTestService();
-    const getInstanceSpy = spyOn(XCTestServiceClient, "getInstance").mockReturnValue(
-      fakeXCTestService as unknown as XCTestServiceClient
+    const fakeIOSCtrlProxy = new FakeIOSCtrlProxy();
+    const getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(
+      fakeIOSCtrlProxy as unknown as CtrlProxyClient
     );
 
     const iosObserveResult: ObserveResult = {
@@ -242,7 +242,7 @@ describe("LaunchApp", () => {
     try {
       const result = await iosLaunchApp.execute(systemBundleId, false, false);
       expect(result.success).toBe(true);
-      expect(fakeXCTestService.getLaunchAppHistory()).toEqual([systemBundleId]);
+      expect(fakeIOSCtrlProxy.getLaunchAppHistory()).toEqual([systemBundleId]);
       expect(installedAppsProvider.getCallCount()).toBe(1);
     } finally {
       getInstanceSpy.mockRestore();

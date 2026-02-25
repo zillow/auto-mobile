@@ -2,7 +2,7 @@
  * DeviceServiceUtils - Shared utilities for device service clients
  *
  * These utilities are used by both CtrlProxyClient (Android) and
- * XCTestServiceClient (iOS) to reduce code duplication.
+ * CtrlProxyClient (iOS) to reduce code duplication.
  */
 
 import type { Timer } from "../../utils/SystemTimer";

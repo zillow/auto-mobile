@@ -1,0 +1,707 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0377180BB666F63386C77E17 /* CommandHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77305F40F85694E983987E68 /* CommandHandler.swift */; };
+		0E8A9A62BEF9C4E672D09764 /* PerfProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF454F64F7AF11BD79DB97D /* PerfProviderTests.swift */; };
+		12D60B8E4D067E91189066AD /* CommandHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C10BFA5B6504892F8459D7 /* CommandHandlerTests.swift */; };
+		1F968B5EDB744057F51321EF /* ElementLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95565999DC108319DEED894A /* ElementLocator.swift */; };
+		2BC78956D2B04A95DA43E6FB /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F9D7B74C318EE243B225B95 /* Protocols.swift */; };
+		3841CE71EF7F67B82441E6E3 /* DisplayLinkFPSMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1044F2C47DD6B836C1E32F1C /* DisplayLinkFPSMonitor.swift */; };
+		42E706C81F51E89DEBD9C1A9 /* CtrlProxy.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */; };
+		4413FD9E4C8BF4071C74D482 /* HierarchyDebouncerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E5AAA4E2861D92C17F39B14 /* HierarchyDebouncerTests.swift */; };
+		47A050F2D8153251E395B7B9 /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F9D7B74C318EE243B225B95 /* Protocols.swift */; };
+		4A0FBEF6FAEF437AA17B20EA /* PerfProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A284B6FFBE969931BB03A2FF /* PerfProvider.swift */; };
+		53A41EE5F98E771345D6EA90 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CB9272A186932D89EB1072 /* WebSocketServer.swift */; };
+		5458E55CB48475D2487A49C3 /* HierarchyDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034DC5B8A3A4FCE46CD89568 /* HierarchyDebouncer.swift */; };
+		5DF6CF60A8796BBB8C80341C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0CDD96577EB9823B5FCF2585 /* Assets.xcassets */; };
+		5FDF9AE29841625DD7EFB7EC /* GesturePerformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2144B84CD70DB35A1030624 /* GesturePerformer.swift */; };
+		74CA22BFA1779993CDCF59AE /* CtrlProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE277596991C059142C485B /* CtrlProxy.swift */; };
+		7F0A1FBC49EE6CFD37F53294 /* CtrlProxyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 802717F6B1F37809C4806C23 /* CtrlProxyUITests.swift */; };
+		81E23C054BAEC85A37171E29 /* CtrlProxy.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		96ED92C8F268021CE148C4FF /* CtrlProxy.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */; };
+		9FE4564D1819768FEFD62606 /* ElementLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95565999DC108319DEED894A /* ElementLocator.swift */; };
+		A603343B94D35DDF48F7AA4D /* Fakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2931E58B158EE51C5F4F /* Fakes.swift */; };
+		A9D79278D7A9C7ED3E7E4F8C /* CtrlProxy.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		B55A16F80CE62B998CEBC6E0 /* PerformanceMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B136EAD78CC0B932F258C265 /* PerformanceMetrics.swift */; };
+		BD627F44D1B9F2D3976AA0EC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81453AD074F2A392251CFC3 /* Models.swift */; };
+		BD7D2FF024054ED74F17958D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81453AD074F2A392251CFC3 /* Models.swift */; };
+		C194D73F02D0776F0F7FCA7B /* CtrlProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE277596991C059142C485B /* CtrlProxy.swift */; };
+		C2DCB71857A14ED314300AAC /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CB9272A186932D89EB1072 /* WebSocketServer.swift */; };
+		CC061B4978496D75042B253A /* CommandHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77305F40F85694E983987E68 /* CommandHandler.swift */; };
+		D0C171171348407EBFF5BAB7 /* PerfProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A284B6FFBE969931BB03A2FF /* PerfProvider.swift */; };
+		D9EF3A486E53F97C1CCB7A3B /* GesturePerformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2144B84CD70DB35A1030624 /* GesturePerformer.swift */; };
+		DFEE186C8B4CD32EF76D995A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 878A53A7F0EDDABDF2435E7F /* AppDelegate.swift */; };
+		E8327D679D58C8F804C064B1 /* PerformanceMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B136EAD78CC0B932F258C265 /* PerformanceMetrics.swift */; };
+		EA65C486C9E6DBB5BFE9CA41 /* HierarchyDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034DC5B8A3A4FCE46CD89568 /* HierarchyDebouncer.swift */; };
+		F469E7EF16C59A99DBD519DA /* DisplayLinkFPSMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1044F2C47DD6B836C1E32F1C /* DisplayLinkFPSMonitor.swift */; };
+		F7B78DBB0517EC004EF4ECF6 /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184CFC1280E0802EBF53965F /* ModelsTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		195113DD92332B613D6F1FB7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 47C2E526C953A554EECC01E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 829FFB06AC273BEE7049A7F2;
+			remoteInfo = CtrlProxyApp;
+		};
+		54374A7FEA0119889A660A03 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 47C2E526C953A554EECC01E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 61A21F82A43E4D436CD13CCD;
+			remoteInfo = CtrlProxy;
+		};
+		B7C947B3DD74297C9B808552 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 47C2E526C953A554EECC01E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 61A21F82A43E4D436CD13CCD;
+			remoteInfo = CtrlProxy;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		882047DB62E7BA5C6856C006 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A9D79278D7A9C7ED3E7E4F8C /* CtrlProxy.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B65E460A639928701285A58C /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				81E23C054BAEC85A37171E29 /* CtrlProxy.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		009A6B01284035997298367F /* CtrlProxyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CtrlProxyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		034DC5B8A3A4FCE46CD89568 /* HierarchyDebouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HierarchyDebouncer.swift; sourceTree = "<group>"; };
+		056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = CtrlProxy.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CDD96577EB9823B5FCF2585 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Assets.xcassets; path = CtrlProxyApp/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		0EE277596991C059142C485B /* CtrlProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CtrlProxy.swift; sourceTree = "<group>"; };
+		0F9D7B74C318EE243B225B95 /* Protocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocols.swift; sourceTree = "<group>"; };
+		1044F2C47DD6B836C1E32F1C /* DisplayLinkFPSMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayLinkFPSMonitor.swift; sourceTree = "<group>"; };
+		184CFC1280E0802EBF53965F /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
+		22671C94D317E15EED752E59 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		25C10BFA5B6504892F8459D7 /* CommandHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandHandlerTests.swift; sourceTree = "<group>"; };
+		3E5AAA4E2861D92C17F39B14 /* HierarchyDebouncerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HierarchyDebouncerTests.swift; sourceTree = "<group>"; };
+		42C53A4D56EE97B5BD11EC63 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		637A2A05C90AA6E64D224651 /* CtrlProxyTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CtrlProxyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		652F5687D2FC57F3D6D4629C /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		77305F40F85694E983987E68 /* CommandHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandHandler.swift; sourceTree = "<group>"; };
+		802717F6B1F37809C4806C23 /* CtrlProxyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CtrlProxyUITests.swift; sourceTree = "<group>"; };
+		878A53A7F0EDDABDF2435E7F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		95565999DC108319DEED894A /* ElementLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementLocator.swift; sourceTree = "<group>"; };
+		9A1B2931E58B158EE51C5F4F /* Fakes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fakes.swift; sourceTree = "<group>"; };
+		9BD704E3A2708D91D4FABE3E /* CtrlProxyApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CtrlProxyApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A284B6FFBE969931BB03A2FF /* PerfProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfProvider.swift; sourceTree = "<group>"; };
+		B136EAD78CC0B932F258C265 /* PerformanceMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMetrics.swift; sourceTree = "<group>"; };
+		B4CB9272A186932D89EB1072 /* WebSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketServer.swift; sourceTree = "<group>"; };
+		D81453AD074F2A392251CFC3 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		DEF454F64F7AF11BD79DB97D /* PerfProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfProviderTests.swift; sourceTree = "<group>"; };
+		F2144B84CD70DB35A1030624 /* GesturePerformer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GesturePerformer.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7B73985BC6AE32DF61C58D50 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				96ED92C8F268021CE148C4FF /* CtrlProxy.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7DAF3F9BCD60B95D6CE15526 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				42E706C81F51E89DEBD9C1A9 /* CtrlProxy.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1CDEF48286EEE403E65B2062 /* Configurations */ = {
+			isa = PBXGroup;
+			children = (
+				42C53A4D56EE97B5BD11EC63 /* Debug.xcconfig */,
+				652F5687D2FC57F3D6D4629C /* Release.xcconfig */,
+			);
+			path = Configurations;
+			sourceTree = "<group>";
+		};
+		5F6475BE026D0B46115D178A /* CtrlProxyTests */ = {
+			isa = PBXGroup;
+			children = (
+				25C10BFA5B6504892F8459D7 /* CommandHandlerTests.swift */,
+				3E5AAA4E2861D92C17F39B14 /* HierarchyDebouncerTests.swift */,
+				184CFC1280E0802EBF53965F /* ModelsTests.swift */,
+				DEF454F64F7AF11BD79DB97D /* PerfProviderTests.swift */,
+			);
+			name = CtrlProxyTests;
+			path = Tests/CtrlProxyTests;
+			sourceTree = "<group>";
+		};
+		7570CCD895BDD26847716F63 /* CtrlProxyUITests */ = {
+			isa = PBXGroup;
+			children = (
+				802717F6B1F37809C4806C23 /* CtrlProxyUITests.swift */,
+			);
+			name = CtrlProxyUITests;
+			path = Tests/CtrlProxyUITests;
+			sourceTree = "<group>";
+		};
+		893219E941F14547E673AD18 = {
+			isa = PBXGroup;
+			children = (
+				0CDD96577EB9823B5FCF2585 /* Assets.xcassets */,
+				1CDEF48286EEE403E65B2062 /* Configurations */,
+				E5F13404E64357EACB45F12C /* CtrlProxy */,
+				8F975B4ACF30326B292C01BE /* CtrlProxyApp */,
+				5F6475BE026D0B46115D178A /* CtrlProxyTests */,
+				7570CCD895BDD26847716F63 /* CtrlProxyUITests */,
+				ECABFBABEC912FAB47B50B74 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8F975B4ACF30326B292C01BE /* CtrlProxyApp */ = {
+			isa = PBXGroup;
+			children = (
+				878A53A7F0EDDABDF2435E7F /* AppDelegate.swift */,
+				22671C94D317E15EED752E59 /* Info.plist */,
+			);
+			path = CtrlProxyApp;
+			sourceTree = "<group>";
+		};
+		E5F13404E64357EACB45F12C /* CtrlProxy */ = {
+			isa = PBXGroup;
+			children = (
+				77305F40F85694E983987E68 /* CommandHandler.swift */,
+				0EE277596991C059142C485B /* CtrlProxy.swift */,
+				1044F2C47DD6B836C1E32F1C /* DisplayLinkFPSMonitor.swift */,
+				95565999DC108319DEED894A /* ElementLocator.swift */,
+				9A1B2931E58B158EE51C5F4F /* Fakes.swift */,
+				F2144B84CD70DB35A1030624 /* GesturePerformer.swift */,
+				034DC5B8A3A4FCE46CD89568 /* HierarchyDebouncer.swift */,
+				D81453AD074F2A392251CFC3 /* Models.swift */,
+				B136EAD78CC0B932F258C265 /* PerformanceMetrics.swift */,
+				A284B6FFBE969931BB03A2FF /* PerfProvider.swift */,
+				0F9D7B74C318EE243B225B95 /* Protocols.swift */,
+				B4CB9272A186932D89EB1072 /* WebSocketServer.swift */,
+			);
+			name = CtrlProxy;
+			path = Sources/CtrlProxy;
+			sourceTree = "<group>";
+		};
+		ECABFBABEC912FAB47B50B74 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */,
+				9BD704E3A2708D91D4FABE3E /* CtrlProxyApp.app */,
+				637A2A05C90AA6E64D224651 /* CtrlProxyTests.xctest */,
+				009A6B01284035997298367F /* CtrlProxyUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2B5458099134F47AA1A7C4DA /* CtrlProxyUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA86089DF9B8AC2EDABF94A0 /* Build configuration list for PBXNativeTarget "CtrlProxyUITests" */;
+			buildPhases = (
+				7CFC5122F30AA08D7EB28C15 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E20E35C9CD5E3D45AB8ED161 /* PBXTargetDependency */,
+			);
+			name = CtrlProxyUITests;
+			packageProductDependencies = (
+			);
+			productName = CtrlProxyUITests;
+			productReference = 009A6B01284035997298367F /* CtrlProxyUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		61A21F82A43E4D436CD13CCD /* CtrlProxy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9D178DC0AEA3EC333E3183D4 /* Build configuration list for PBXNativeTarget "CtrlProxy" */;
+			buildPhases = (
+				2477461A76859C0AB71BD1B8 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CtrlProxy;
+			packageProductDependencies = (
+			);
+			productName = CtrlProxy;
+			productReference = 056D5DCA8003C7DFA37244C4 /* CtrlProxy.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		829FFB06AC273BEE7049A7F2 /* CtrlProxyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B6CD7711D6D7267F8AC88EB7 /* Build configuration list for PBXNativeTarget "CtrlProxyApp" */;
+			buildPhases = (
+				95AF442534FB883338D9AB7A /* Sources */,
+				BB24353236FA18281C53852F /* Resources */,
+				7B73985BC6AE32DF61C58D50 /* Frameworks */,
+				882047DB62E7BA5C6856C006 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B22F8606D9BB5657FC266B25 /* PBXTargetDependency */,
+			);
+			name = CtrlProxyApp;
+			packageProductDependencies = (
+			);
+			productName = CtrlProxyApp;
+			productReference = 9BD704E3A2708D91D4FABE3E /* CtrlProxyApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D665478F817F2DF283B43BFB /* CtrlProxyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 07EB4238F860C4A378A232DC /* Build configuration list for PBXNativeTarget "CtrlProxyTests" */;
+			buildPhases = (
+				4B5380685A4F9E3E2ED84075 /* Sources */,
+				7DAF3F9BCD60B95D6CE15526 /* Frameworks */,
+				B65E460A639928701285A58C /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				312F7F921AF3E434019D2690 /* PBXTargetDependency */,
+			);
+			name = CtrlProxyTests;
+			packageProductDependencies = (
+			);
+			productName = CtrlProxyTests;
+			productReference = 637A2A05C90AA6E64D224651 /* CtrlProxyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		47C2E526C953A554EECC01E3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					2B5458099134F47AA1A7C4DA = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 829FFB06AC273BEE7049A7F2;
+					};
+					61A21F82A43E4D436CD13CCD = {
+						ProvisioningStyle = Automatic;
+					};
+					829FFB06AC273BEE7049A7F2 = {
+						ProvisioningStyle = Automatic;
+					};
+					D665478F817F2DF283B43BFB = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E05A42B658B1C02C052C128D /* Build configuration list for PBXProject "CtrlProxy" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 893219E941F14547E673AD18;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				61A21F82A43E4D436CD13CCD /* CtrlProxy */,
+				829FFB06AC273BEE7049A7F2 /* CtrlProxyApp */,
+				D665478F817F2DF283B43BFB /* CtrlProxyTests */,
+				2B5458099134F47AA1A7C4DA /* CtrlProxyUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BB24353236FA18281C53852F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5DF6CF60A8796BBB8C80341C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2477461A76859C0AB71BD1B8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0377180BB666F63386C77E17 /* CommandHandler.swift in Sources */,
+				74CA22BFA1779993CDCF59AE /* CtrlProxy.swift in Sources */,
+				F469E7EF16C59A99DBD519DA /* DisplayLinkFPSMonitor.swift in Sources */,
+				9FE4564D1819768FEFD62606 /* ElementLocator.swift in Sources */,
+				A603343B94D35DDF48F7AA4D /* Fakes.swift in Sources */,
+				D9EF3A486E53F97C1CCB7A3B /* GesturePerformer.swift in Sources */,
+				EA65C486C9E6DBB5BFE9CA41 /* HierarchyDebouncer.swift in Sources */,
+				BD7D2FF024054ED74F17958D /* Models.swift in Sources */,
+				D0C171171348407EBFF5BAB7 /* PerfProvider.swift in Sources */,
+				E8327D679D58C8F804C064B1 /* PerformanceMetrics.swift in Sources */,
+				47A050F2D8153251E395B7B9 /* Protocols.swift in Sources */,
+				C2DCB71857A14ED314300AAC /* WebSocketServer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B5380685A4F9E3E2ED84075 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12D60B8E4D067E91189066AD /* CommandHandlerTests.swift in Sources */,
+				4413FD9E4C8BF4071C74D482 /* HierarchyDebouncerTests.swift in Sources */,
+				F7B78DBB0517EC004EF4ECF6 /* ModelsTests.swift in Sources */,
+				0E8A9A62BEF9C4E672D09764 /* PerfProviderTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7CFC5122F30AA08D7EB28C15 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC061B4978496D75042B253A /* CommandHandler.swift in Sources */,
+				C194D73F02D0776F0F7FCA7B /* CtrlProxy.swift in Sources */,
+				7F0A1FBC49EE6CFD37F53294 /* CtrlProxyUITests.swift in Sources */,
+				3841CE71EF7F67B82441E6E3 /* DisplayLinkFPSMonitor.swift in Sources */,
+				1F968B5EDB744057F51321EF /* ElementLocator.swift in Sources */,
+				5FDF9AE29841625DD7EFB7EC /* GesturePerformer.swift in Sources */,
+				5458E55CB48475D2487A49C3 /* HierarchyDebouncer.swift in Sources */,
+				BD627F44D1B9F2D3976AA0EC /* Models.swift in Sources */,
+				4A0FBEF6FAEF437AA17B20EA /* PerfProvider.swift in Sources */,
+				B55A16F80CE62B998CEBC6E0 /* PerformanceMetrics.swift in Sources */,
+				2BC78956D2B04A95DA43E6FB /* Protocols.swift in Sources */,
+				53A41EE5F98E771345D6EA90 /* WebSocketServer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		95AF442534FB883338D9AB7A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DFEE186C8B4CD32EF76D995A /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		312F7F921AF3E434019D2690 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 61A21F82A43E4D436CD13CCD /* CtrlProxy */;
+			targetProxy = 54374A7FEA0119889A660A03 /* PBXContainerItemProxy */;
+		};
+		B22F8606D9BB5657FC266B25 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 61A21F82A43E4D436CD13CCD /* CtrlProxy */;
+			targetProxy = B7C947B3DD74297C9B808552 /* PBXContainerItemProxy */;
+		};
+		E20E35C9CD5E3D45AB8ED161 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 829FFB06AC273BEE7049A7F2 /* CtrlProxyApp */;
+			targetProxy = 195113DD92332B613D6F1FB7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		01AFAB6B966EE2ACF589AE78 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		285D2C9E445B8FC8B747B5AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CtrlProxyApp;
+			};
+			name = Release;
+		};
+		32038DEFD9AB3835FD445F66 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 652F5687D2FC57F3D6D4629C /* Release.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5FB327F8E51267F6C09AF654 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = CtrlProxyApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6045648EE67F9787D4E4FDD7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		6C9023AF7D96CFE534D6CDD8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		93CBFA3F37A7BCA6FF9BC1B3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = CtrlProxyApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9720DF514BE8AC52DE5CA512 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 42C53A4D56EE97B5BD11EC63 /* Debug.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D4F72785148586BF7FF452C4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CtrlProxyApp;
+			};
+			name = Debug;
+		};
+		EBDA3EF8F7D06425069886C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.jasonpearson.automobile.ctrlproxy.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		07EB4238F860C4A378A232DC /* Build configuration list for PBXNativeTarget "CtrlProxyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EBDA3EF8F7D06425069886C9 /* Debug */,
+				6C9023AF7D96CFE534D6CDD8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9D178DC0AEA3EC333E3183D4 /* Build configuration list for PBXNativeTarget "CtrlProxy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				01AFAB6B966EE2ACF589AE78 /* Debug */,
+				6045648EE67F9787D4E4FDD7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B6CD7711D6D7267F8AC88EB7 /* Build configuration list for PBXNativeTarget "CtrlProxyApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				93CBFA3F37A7BCA6FF9BC1B3 /* Debug */,
+				5FB327F8E51267F6C09AF654 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E05A42B658B1C02C052C128D /* Build configuration list for PBXProject "CtrlProxy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9720DF514BE8AC52DE5CA512 /* Debug */,
+				32038DEFD9AB3835FD445F66 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FA86089DF9B8AC2EDABF94A0 /* Build configuration list for PBXNativeTarget "CtrlProxyUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4F72785148586BF7FF452C4 /* Debug */,
+				285D2C9E445B8FC8B747B5AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 47C2E526C953A554EECC01E3 /* Project object */;
+}

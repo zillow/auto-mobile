@@ -7,8 +7,8 @@ import { DaemonState } from "../daemon/daemonState";
 import type { Session } from "../daemon/sessionManager";
 import type { DevicePool } from "../daemon/devicePool";
 import { AndroidCtrlProxyManager } from "../utils/CtrlProxyManager";
-import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
-import { APK_SHA256_CHECKSUM, XCTESTSERVICE_SHA256_CHECKSUM } from "../constants/release";
+import { IOSCtrlProxyManager } from "../utils/IOSCtrlProxyManager";
+import { APK_SHA256_CHECKSUM, IOS_CTRL_PROXY_SHA256_CHECKSUM } from "../constants/release";
 import { defaultTimer } from "../utils/SystemTimer";
 
 // Resource URIs
@@ -350,12 +350,12 @@ async function queryDeviceServiceStatus(device: BootedDeviceInfo): Promise<Devic
         isCompatible,
       };
     } else if (device.platform === "ios") {
-      const manager = IOSXCTestServiceManager.getInstance(bootedDevice);
+      const manager = IOSCtrlProxyManager.getInstance(bootedDevice);
       const [installed, running] = await Promise.all([
         manager.isInstalled(),
         manager.isRunning(),
       ]);
-      const expectedSha256 = XCTESTSERVICE_SHA256_CHECKSUM;
+      const expectedSha256 = IOS_CTRL_PROXY_SHA256_CHECKSUM;
       return {
         installed,
         enabled: running,

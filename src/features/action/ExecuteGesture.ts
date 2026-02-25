@@ -5,8 +5,8 @@ import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { CtrlProxyClient } from "../observe/android";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 
 /**
@@ -111,7 +111,7 @@ export class ExecuteGesture extends BaseVisualChange {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     try {
-      const client = CtrlProxyClient.getInstance(this.device, this.adb);
+      const client = AndroidCtrlProxyClient.getInstance(this.device, this.adb);
 
       const result = await perf.track("a11ySwipe", async () => {
         return await client.requestSwipe(x1, y1, x2, y2, duration, 5000, perf);
@@ -186,8 +186,8 @@ export class ExecuteGesture extends BaseVisualChange {
   }
 
   /**
-   * Execute swipe using XCTestService's gesture API.
-   * This uses the WebSocket-based XCTestService for faster, more reliable gestures.
+   * Execute swipe using CtrlProxy iOS's gesture API.
+   * This uses the WebSocket-based CtrlProxy iOS for faster, more reliable gestures.
    * @param x1 - Starting X coordinate
    * @param y1 - Starting Y coordinate
    * @param x2 - Ending X coordinate
@@ -204,14 +204,14 @@ export class ExecuteGesture extends BaseVisualChange {
     duration: number,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
-    const client = XCTestServiceClient.getInstance(this.device);
+    const client = IOSCtrlProxyClient.getInstance(this.device);
 
     const result = await perf.track("xctestSwipe", async () => {
       return await client.requestSwipe(x1, y1, x2, y2, duration, 5000, perf);
     });
 
     if (result.success) {
-      logger.info(`[SWIPE] XCTestService swipe successful: deviceTotal=${result.totalTimeMs}ms, gesture=${result.gestureTimeMs}ms`);
+      logger.info(`[SWIPE] CtrlProxy iOS swipe successful: deviceTotal=${result.totalTimeMs}ms, gesture=${result.gestureTimeMs}ms`);
       return {
         success: true,
         x1,
@@ -223,7 +223,7 @@ export class ExecuteGesture extends BaseVisualChange {
         a11yGestureTimeMs: result.gestureTimeMs
       };
     } else {
-      logger.error(`[SWIPE] XCTestService swipe failed: ${result.error}`);
+      logger.error(`[SWIPE] CtrlProxy iOS swipe failed: ${result.error}`);
       return {
         success: false,
         x1,
@@ -295,16 +295,16 @@ export class ExecuteGesture extends BaseVisualChange {
   private async executeiOSGesture(path: Point[] | FingerPath[], duration: number): Promise<any> {
     if (Array.isArray(path) && path.length > 0) {
       if ("finger" in path[0]) {
-        // Multi-finger gestures are not supported on iOS through XCTestService yet
+        // Multi-finger gestures are not supported on iOS through CtrlProxy iOS yet
         throw new Error("Multi-finger gestures not supported on iOS - use simple swipe instead");
       } else {
-        // Single finger path - convert to simple swipe using XCTestService
+        // Single finger path - convert to simple swipe using CtrlProxy iOS
         const points = path as Point[];
         if (points.length >= 2) {
           const start = points[0];
           const end = points[points.length - 1];
 
-          const client = XCTestServiceClient.getInstance(this.device);
+          const client = IOSCtrlProxyClient.getInstance(this.device);
           await client.requestSwipe(start.x, start.y, end.x, end.y, duration);
         }
       }

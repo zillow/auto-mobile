@@ -19,7 +19,7 @@ import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig"
 import type { VideoRecordingConfigInput } from "./models";
 import { startupBenchmark } from "./utils/startupBenchmark";
 import { AndroidCtrlProxyManager } from "./utils/CtrlProxyManager";
-import { XCTestServiceBuilder } from "./utils/XCTestServiceBuilder";
+import { IOSCtrlProxyBuilder } from "./utils/IOSCtrlProxyBuilder";
 
 startupBenchmark.mark("processEntry");
 
@@ -371,10 +371,10 @@ async function main() {
       AndroidCtrlProxyManager.prefetchApk();
     }
 
-    // Start iOS XCTestService build prefetch (macOS only)
+    // Start iOS CtrlProxy iOS build prefetch (macOS only)
     // This runs asynchronously and will be ready when first iOS device connects
     if (process.platform === "darwin") {
-      XCTestServiceBuilder.prefetchBuild();
+      IOSCtrlProxyBuilder.prefetchBuild();
     }
 
     const featureFlagService = FeatureFlagService.getInstance();

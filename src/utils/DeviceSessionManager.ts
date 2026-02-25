@@ -5,12 +5,12 @@ import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { AndroidCtrlProxyManager } from "./CtrlProxyManager";
-import { IOSXCTestServiceManager } from "./XCTestServiceManager";
+import { IOSCtrlProxyManager } from "./IOSCtrlProxyManager";
 import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
 import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
-import { CtrlProxyClient } from "../features/observe/android";
-import { XCTestServiceClient } from "../features/observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../features/observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../features/observe/ios";
 import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { createPerformanceTracker } from "./PerformanceTracker";
 import { storeSetupTiming } from "../server/ToolExecutionContext";
@@ -421,7 +421,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
         if (options?.skipAccessibilityDownload !== undefined) { logger.warn("[DeviceSessionManager] skipAccessibilityDownload is deprecated; use skipCtrlProxyDownload instead."); } else { logger.warn("[DeviceSessionManager] skipAccessibilitySetup is deprecated; use skipCtrlProxyDownload instead."); }
       }
 
-      const accessibilityClient = CtrlProxyClient.getInstance(device);
+      const accessibilityClient = AndroidCtrlProxyClient.getInstance(device);
       if (accessibilityClient.isConnected()) {
         // WebSocket appears connected, but verify service is actually responsive
         // This catches cases where service crashed but socket wasn't properly closed
@@ -576,7 +576,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
       return;
     }
 
-    // Create a device object for the XCTestService clients
+    // Create a device object for the CtrlProxy iOS clients
     const device: BootedDevice = {
       deviceId,
       name: deviceInfo.name,
@@ -585,73 +585,73 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
     // Always track setup timing (one-time per session, valuable for debugging)
     const perf = createPerformanceTracker(true);
-    perf.serial("ensureXCTestService");
+    perf.serial("ensureCtrlProxy iOS");
     let didSetup = false;
 
     try {
-      const skipXCTestServiceSetup = options?.skipCtrlProxyDownload ?? options?.skipAccessibilityDownload ?? options?.skipAccessibilitySetup;
+      const skipCtrlProxyIOSSetup = options?.skipCtrlProxyDownload ?? options?.skipAccessibilityDownload ?? options?.skipAccessibilitySetup;
 
-      const manager = IOSXCTestServiceManager.getInstance(device);
-      const xcTestClient = XCTestServiceClient.getInstance(device, manager.getServicePort());
+      const manager = IOSCtrlProxyManager.getInstance(device);
+      const xcTestClient = IOSCtrlProxyClient.getInstance(device, manager.getServicePort());
 
       // Check if WebSocket is already connected
       if (xcTestClient.isConnected()) {
         // WebSocket appears connected, verify service is actually responsive
-        logger.info(`[DeviceSessionManager] XCTestService WebSocket connected for ${deviceId}, verifying service is responsive`);
+        logger.info(`[DeviceSessionManager] CtrlProxy iOS WebSocket connected for ${deviceId}, verifying service is responsive`);
         const isReady = await perf.track("verifyConnectedService", () =>
           xcTestClient.verifyServiceReady(2, 200, 2000)
         );
         if (isReady) {
-          logger.info(`[DeviceSessionManager] XCTestService verified responsive for ${deviceId}`);
+          logger.info(`[DeviceSessionManager] CtrlProxy iOS verified responsive for ${deviceId}`);
           this.registerPushUpdateListener(device);
           perf.end();
           return;
         }
         // Service not responsive despite connected socket - fall through to normal flow
-        logger.warn(`[DeviceSessionManager] WebSocket connected but XCTestService not responsive for ${deviceId}, checking status`);
+        logger.warn(`[DeviceSessionManager] WebSocket connected but CtrlProxy iOS not responsive for ${deviceId}, checking status`);
       }
 
       // Check current status
       const isRunning = await perf.track("checkRunning", () => manager.isRunning());
 
       if (isRunning) {
-        logger.info(`[DeviceSessionManager] XCTestService already running for ${deviceId}, verifying WebSocket connection`);
+        logger.info(`[DeviceSessionManager] CtrlProxy iOS already running for ${deviceId}, verifying WebSocket connection`);
         // Service is running, try to connect WebSocket
         const connected = await perf.track("verifyConnection", () => xcTestClient.waitForConnection(3, 200));
         if (connected) {
           // Verify service is responsive and cache hierarchy for fast first observe
-          logger.info(`[DeviceSessionManager] Verifying XCTestService is responsive for ${deviceId}`);
+          logger.info(`[DeviceSessionManager] Verifying CtrlProxy iOS is responsive for ${deviceId}`);
           const ready = await perf.track("verifyServiceReady", () => xcTestClient.verifyServiceReady(3, 500, 3000));
           if (ready) {
-            logger.info(`[DeviceSessionManager] XCTestService running, connected, and verified for ${deviceId}`);
+            logger.info(`[DeviceSessionManager] CtrlProxy iOS running, connected, and verified for ${deviceId}`);
             this.registerPushUpdateListener(device);
             perf.end();
             return;
           }
-          logger.warn(`[DeviceSessionManager] XCTestService running and connected but not responsive for ${deviceId}`);
+          logger.warn(`[DeviceSessionManager] CtrlProxy iOS running and connected but not responsive for ${deviceId}`);
         }
         // WebSocket won't connect despite service running - may need restart
-        logger.warn(`[DeviceSessionManager] XCTestService running but WebSocket failed for ${deviceId}, will attempt restart`);
+        logger.warn(`[DeviceSessionManager] CtrlProxy iOS running but WebSocket failed for ${deviceId}, will attempt restart`);
         manager.resetSetupState();
       }
 
-      if (skipXCTestServiceSetup) {
-        logger.info(`[DeviceSessionManager] Skipping XCTestService setup for ${deviceId}`);
+      if (skipCtrlProxyIOSSetup) {
+        logger.info(`[DeviceSessionManager] Skipping CtrlProxy iOS setup for ${deviceId}`);
         perf.end();
         return;
       }
 
       // Setup the service (will start if not running)
-      logger.info(`[DeviceSessionManager] Setting up XCTestService for ${deviceId}`);
+      logger.info(`[DeviceSessionManager] Setting up CtrlProxy iOS for ${deviceId}`);
       const setupResult = await manager.setup(false, perf);
       didSetup = true;
 
       if (!setupResult.success) {
         // Log build-specific errors if available
         if (setupResult.buildResult && !setupResult.buildResult.success) {
-          logger.warn(`[DeviceSessionManager] XCTestService build failed for ${deviceId}: ${setupResult.buildResult.error}`);
+          logger.warn(`[DeviceSessionManager] CtrlProxy iOS build failed for ${deviceId}: ${setupResult.buildResult.error}`);
         } else {
-          logger.warn(`[DeviceSessionManager] XCTestService setup failed for ${deviceId}: ${setupResult.error}`);
+          logger.warn(`[DeviceSessionManager] CtrlProxy iOS setup failed for ${deviceId}: ${setupResult.error}`);
         }
         // Don't throw - allow observe to fall back to other methods
         perf.end();
@@ -660,24 +660,24 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
       // Wait for WebSocket connection after setup
       // After fresh setup, WebSocket may need extra time to initialize
-      logger.info(`[DeviceSessionManager] Waiting for XCTestService WebSocket connection after setup for ${deviceId}`);
+      logger.info(`[DeviceSessionManager] Waiting for CtrlProxy iOS WebSocket connection after setup for ${deviceId}`);
       const connected = await perf.track("waitForConnection", () => xcTestClient.waitForConnection(5, 1000));
       if (connected) {
         // Verify service is actually ready to respond (not just WebSocket connected)
-        logger.info(`[DeviceSessionManager] Verifying XCTestService is responsive for ${deviceId}`);
+        logger.info(`[DeviceSessionManager] Verifying CtrlProxy iOS is responsive for ${deviceId}`);
         const ready = await perf.track("verifyServiceReady", () => xcTestClient.verifyServiceReady(5, 1000, 5000));
         if (!ready) {
-          logger.warn(`[DeviceSessionManager] XCTestService not responsive after setup for ${deviceId}`);
+          logger.warn(`[DeviceSessionManager] CtrlProxy iOS not responsive after setup for ${deviceId}`);
         } else {
-          logger.info(`[DeviceSessionManager] XCTestService setup complete and verified for ${deviceId}`);
+          logger.info(`[DeviceSessionManager] CtrlProxy iOS setup complete and verified for ${deviceId}`);
           this.registerPushUpdateListener(device);
         }
       } else {
-        logger.warn(`[DeviceSessionManager] WebSocket connection failed after XCTestService setup for ${deviceId}`);
+        logger.warn(`[DeviceSessionManager] WebSocket connection failed after CtrlProxy iOS setup for ${deviceId}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`[DeviceSessionManager] Failed to setup XCTestService: ${errorMessage}`);
+      logger.error(`[DeviceSessionManager] Failed to setup CtrlProxy iOS: ${errorMessage}`);
       // Don't throw - allow observe to fall back to other methods
     } finally {
       perf.end();
@@ -783,7 +783,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
   /**
    * Register push update listener for an iOS device to clear ObserveScreen cache when UI changes.
-   * This is called when XCTestService is successfully connected.
+   * This is called when CtrlProxy iOS is successfully connected.
    */
   private registerPushUpdateListener(device: BootedDevice): void {
     const deviceId = device.deviceId;
@@ -792,8 +792,8 @@ export class DeviceSessionManager implements DeviceSessionManager {
     }
 
     try {
-      const manager = IOSXCTestServiceManager.getInstance(device);
-      const xcTestClient = XCTestServiceClient.getInstance(device, manager.getServicePort());
+      const manager = IOSCtrlProxyManager.getInstance(device);
+      const xcTestClient = IOSCtrlProxyClient.getInstance(device, manager.getServicePort());
 
       xcTestClient.onPushUpdate(() => {
         logger.info(`[DeviceSessionManager] Received iOS UI change notification for ${deviceId}, clearing ObserveScreen cache`);

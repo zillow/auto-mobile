@@ -7,7 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "./ios";
+import { CtrlProxyClient } from "./ios";
 import type { ScreenSize } from "./interfaces/ScreenSize";
 
 export class GetScreenSize implements ScreenSize {
@@ -251,8 +251,8 @@ export class GetScreenSize implements ScreenSize {
       const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
 
       if (isiOSDevice) {
-        // iOS device - use XCTestServiceClient to get hierarchy and extract screen size
-        const client = XCTestServiceClient.getInstance(this.device);
+        // iOS device - use CtrlProxyClient to get hierarchy and extract screen size
+        const client = CtrlProxyClient.getInstance(this.device);
         const hierarchyResult = await perf.track("iOSHierarchy", () =>
           client.getAccessibilityHierarchy()
         );
@@ -269,7 +269,7 @@ export class GetScreenSize implements ScreenSize {
           }
         }
 
-        throw new Error("Failed to get iOS screen size from XCTestServiceClient hierarchy");
+        throw new Error("Failed to get iOS screen size from CtrlProxyClient hierarchy");
       } else {
         // Android device - use adb to get screen size
         return await this.getAndroidScreenSize(dumpsysResult, perf);

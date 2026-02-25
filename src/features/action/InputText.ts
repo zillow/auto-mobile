@@ -3,8 +3,8 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, SendTextResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { CtrlProxyClient } from "../observe/android";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class InputText extends BaseVisualChange {
@@ -82,7 +82,7 @@ export class InputText extends BaseVisualChange {
   ): Promise<SendTextResult & { method?: "a11y" }> {
     // Use accessibility service exclusively (fastest method, ~10-30ms vs ~200-300ms for ADB)
     // It also natively supports Unicode without needing virtual keyboard
-    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
+    const a11yClient = AndroidCtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestSetText(text);
 
     if (a11yResult.success) {
@@ -121,11 +121,11 @@ export class InputText extends BaseVisualChange {
     text: string,
     imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
   ): Promise<SendTextResult & { method?: "a11y" }> {
-    const client = XCTestServiceClient.getInstance(this.device);
+    const client = IOSCtrlProxyClient.getInstance(this.device);
     const result = await client.requestSetText(text);
 
     if (!result.success) {
-      logger.error(`[InputText] XCTestService setText failed: ${result.error}`);
+      logger.error(`[InputText] CtrlProxy iOS setText failed: ${result.error}`);
       return {
         success: false,
         text,
@@ -134,11 +134,11 @@ export class InputText extends BaseVisualChange {
       };
     }
 
-    // Handle IME action if specified (XCTestService supports this)
+    // Handle IME action if specified (CtrlProxy iOS supports this)
     if (imeAction) {
       const imeResult = await client.requestImeAction(imeAction);
       if (!imeResult.success) {
-        logger.warn(`[InputText] XCTestService IME action failed: ${imeResult.error}`);
+        logger.warn(`[InputText] CtrlProxy iOS IME action failed: ${imeResult.error}`);
       }
     }
 

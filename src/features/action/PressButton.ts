@@ -2,7 +2,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient } from "../observe/ios";
 
 export class PressButton extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
@@ -114,7 +114,7 @@ export class PressButton extends BaseVisualChange {
       };
     }
 
-    const client = XCTestServiceClient.getInstance(this.device);
+    const client = CtrlProxyClient.getInstance(this.device);
     const result = await client.requestPressHome();
 
     if (!result.success) {

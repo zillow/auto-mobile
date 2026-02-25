@@ -32,8 +32,8 @@ import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { DefaultElementParser } from "../utility/ElementParser";
-import { CtrlProxyClient } from "./android";
-import { XCTestServiceClient } from "./ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "./android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "./ios";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ObserveScreen } from "./interfaces/ObserveScreen";
 import type { ObserveScreenDependencies } from "./ObserveScreenDependencies";
@@ -438,14 +438,14 @@ export class RealObserveScreen implements ObserveScreen {
   /**
    * Fetch raw (unfiltered) view hierarchy from the device and attach to an existing result.
    * On Android: requests the accessibility service hierarchy with all filtering disabled.
-   * On iOS: requests the XCTestService hierarchy with all filtering disabled.
+   * On iOS: requests the CtrlProxy iOS hierarchy with all filtering disabled.
    * Invalidates the shared cache after fetching so that the unfiltered snapshot does not
    * bleed into subsequent normal observe calls.
    */
   private async collectRawViewHierarchyData(result: ObserveResult, signal?: AbortSignal): Promise<void> {
     try {
       if (this.device.platform === "android") {
-        const client = CtrlProxyClient.getInstance(this.device, this.adbFactory);
+        const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
         // Use requestHierarchySync directly to bypass the cache — getAccessibilityHierarchy
         // with minTimestamp=0 returns any cached result, which may already be filtered.
         const syncResult = await client.requestHierarchySync(
@@ -465,7 +465,7 @@ export class RealObserveScreen implements ObserveScreen {
           };
         }
       } else {
-        const xcTestClient = XCTestServiceClient.getInstance(this.device);
+        const xcTestClient = IOSCtrlProxyClient.getInstance(this.device);
         const hierarchyResult = await xcTestClient.requestHierarchySync(
           new NoOpPerformanceTracker(),
           true, // disableAllFiltering
@@ -568,7 +568,7 @@ export class RealObserveScreen implements ObserveScreen {
         // iOS-specific data collection logic here
         perf.serial("ios_collect");
 
-        // Collect view hierarchy (fast via XCTestService WebSocket)
+        // Collect view hierarchy (fast via CtrlProxy iOS WebSocket)
         await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
 
         // Extract screen size from hierarchy
@@ -578,12 +578,12 @@ export class RealObserveScreen implements ObserveScreen {
             result.screenSize = extractedSize;
             logger.debug(`[iOS] Extracted screen size from hierarchy: ${extractedSize.width}x${extractedSize.height}`);
           } else if (result.viewHierarchy?.screenWidth && result.viewHierarchy?.screenHeight) {
-            // Fallback to screenWidth/screenHeight from XCTestService (logical points)
+            // Fallback to screenWidth/screenHeight from CtrlProxy iOS (logical points)
             result.screenSize = {
               width: result.viewHierarchy.screenWidth,
               height: result.viewHierarchy.screenHeight
             };
-            logger.debug(`[iOS] Using screen size from XCTestService: ${result.screenSize.width}x${result.screenSize.height}`);
+            logger.debug(`[iOS] Using screen size from CtrlProxy iOS: ${result.screenSize.width}x${result.screenSize.height}`);
           } else {
             logger.warn("[iOS] Failed to extract screen size from hierarchy");
           }

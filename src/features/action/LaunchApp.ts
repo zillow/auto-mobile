@@ -13,7 +13,7 @@ import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetri
 import { setLastTtiMs } from "../performance/PerformanceMonitor";
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient } from "../observe/ios";
 
 export interface TargetUserDetector {
   detectTargetUserId(packageName: string, userId?: number): Promise<number>;
@@ -245,7 +245,7 @@ export class LaunchApp extends BaseVisualChange {
           }
         }
 
-        const xcTestClient = XCTestServiceClient.getInstance(this.device);
+        const xcTestClient = CtrlProxyClient.getInstance(this.device);
         const xcTestLaunchResult = await xcTestClient.requestLaunchApp(bundleId);
         let launchResult: { success: boolean; pid?: number; error?: string } = {
           success: xcTestLaunchResult.success,
@@ -253,7 +253,7 @@ export class LaunchApp extends BaseVisualChange {
         };
 
         if (!xcTestLaunchResult.success) {
-          logger.warn(`[LaunchApp] XCTestService launch failed: ${xcTestLaunchResult.error ?? "unknown error"}`);
+          logger.warn(`[LaunchApp] CtrlProxy iOS launch failed: ${xcTestLaunchResult.error ?? "unknown error"}`);
           launchResult = await this.simctl.launchApp(bundleId, {
             foregroundIfRunning: !coldBoot
           });

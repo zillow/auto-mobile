@@ -106,4 +106,4 @@ xcodebuild test -scheme XCTestRunner -destination 'platform=iOS Simulator,name=i
 ## See also
 
 - [MCP test timings](../../mcp/daemon/index.md)
-- [iOS automation server](xctestservice.md)
+- [iOS automation server](ctrl-proxy-ios.md)

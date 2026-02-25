@@ -8,7 +8,7 @@ import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ActionableError, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient } from "../observe/ios";
 import { getScreenBounds } from "../../utils/screenBounds";
 
 /**
@@ -131,8 +131,8 @@ export class SwipeOnScreen extends BaseVisualChange {
     logger.info(`[SwipeOnScreen] Bounded swipe coordinates: start=(${boundedStartX}, ${boundedStartY}), end=(${boundedEndX}, ${boundedEndY})`);
 
     try {
-      // Use XCTestServiceClient for swipe
-      const client = XCTestServiceClient.getInstance(this.device);
+      // Use CtrlProxyClient for swipe
+      const client = CtrlProxyClient.getInstance(this.device);
       const xcResult = await client.requestSwipe(
         boundedStartX,
         boundedStartY,
@@ -141,11 +141,11 @@ export class SwipeOnScreen extends BaseVisualChange {
       );
 
       if (!xcResult.success) {
-        logger.error(`[SwipeOnScreen] XCTestService swipe failed: ${xcResult.error}`);
+        logger.error(`[SwipeOnScreen] CtrlProxy iOS swipe failed: ${xcResult.error}`);
         throw new Error(`iOS swipe failed: ${xcResult.error}`);
       }
 
-      logger.info(`[SwipeOnScreen] XCTestService swipe completed successfully`);
+      logger.info(`[SwipeOnScreen] CtrlProxy iOS swipe completed successfully`);
       return {
         success: true,
         startX: boundedStartX,

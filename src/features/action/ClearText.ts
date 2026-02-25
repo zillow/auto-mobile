@@ -5,8 +5,8 @@ import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../utility/ElementParser";
 import { ObserveResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { CtrlProxyClient } from "../observe/android";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 import { ANDROID_INPUT_CLASSES } from "../../utils/elementProperties";
 
@@ -64,7 +64,7 @@ export class ClearText extends BaseVisualChange {
    */
   private async executeAndroidClearText(observeResult: ObserveResult): Promise<ClearTextResult> {
     // Use accessibility service (fastest method, ~50-80ms vs ~200-500ms for ADB deletes)
-    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
+    const a11yClient = AndroidCtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestClearText();
 
     if (a11yResult.success) {
@@ -103,22 +103,22 @@ export class ClearText extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific clear text using XCTestService.
+   * Execute iOS-specific clear text using CtrlProxy iOS.
    */
   private async executeiOSClearText(observeResult: ObserveResult): Promise<ClearTextResult> {
     try {
-      const client = XCTestServiceClient.getInstance(this.device);
+      const client = IOSCtrlProxyClient.getInstance(this.device);
       const result = await client.requestClearText();
 
       if (result.success) {
-        logger.info(`[ClearText] Cleared text via XCTestService`);
+        logger.info(`[ClearText] Cleared text via CtrlProxy iOS`);
         return { success: true };
       }
 
-      logger.warn(`[ClearText] XCTestService clear failed: ${result.error}`);
+      logger.warn(`[ClearText] CtrlProxy iOS clear failed: ${result.error}`);
       return { success: false, error: result.error };
     } catch (error) {
-      logger.error(`[ClearText] XCTestService exception: ${error}`);
+      logger.error(`[ClearText] CtrlProxy iOS exception: ${error}`);
       return { success: false, error: String(error) };
     }
   }

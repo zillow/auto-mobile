@@ -1,0 +1,100 @@
+name: CtrlProxy
+options:
+  bundleIdPrefix: dev.jasonpearson.automobile
+  deploymentTarget:
+    iOS: "15.0"
+  xcodeVersion: "15.0"
+
+configFiles:
+  Debug: Configurations/Debug.xcconfig
+  Release: Configurations/Release.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+
+targets:
+  CtrlProxyApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: CtrlProxyApp
+        excludes:
+          - "*.xcassets"
+      - path: CtrlProxyApp/Assets.xcassets
+        type: folder
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.ctrlproxy
+        INFOPLIST_FILE: CtrlProxyApp/Info.plist
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - target: CtrlProxy
+        embed: true
+
+  CtrlProxy:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Sources/CtrlProxy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.ctrlproxy
+        DEFINES_MODULE: YES
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+  CtrlProxyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/CtrlProxyTests
+    dependencies:
+      - target: CtrlProxy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.ctrlproxy.tests
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+  CtrlProxyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/CtrlProxyUITests
+      # Include CtrlProxy sources directly so XCTest is available during compilation
+      - path: Sources/CtrlProxy
+        excludes:
+          - "Fakes.swift"  # Exclude test-only fakes
+    dependencies:
+      - target: CtrlProxyApp
+        # Note: We don't depend on CtrlProxy framework - sources are compiled directly into UI tests
+        # to give XCTest access for XCUIApplication
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.ctrlproxy.uitests
+        TEST_TARGET_NAME: CtrlProxyApp
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  CtrlProxyApp:
+    build:
+      targets:
+        CtrlProxyApp: all
+        CtrlProxy: all
+        CtrlProxyTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CtrlProxyTests
+        - CtrlProxyUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

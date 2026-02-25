@@ -7,7 +7,7 @@ import { BOOTED_DEVICE_RESOURCE_URIS, notifyBootedDeviceResourcesUpdated } from 
 import { DEVICE_IMAGE_RESOURCE_URIS, notifyDeviceImageResourcesUpdated } from "./deviceImageResources";
 import { syncInstalledAppResources } from "./appResources";
 import { listActiveVideoRecordings, stopVideoRecording } from "./videoRecordingManager";
-import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
+import { IOSCtrlProxyManager } from "../utils/IOSCtrlProxyManager";
 import { logger } from "../utils/logger";
 
 // Schema definitions
@@ -189,12 +189,12 @@ export function registerDeviceTools() {
         }
       }
 
-      // Stop XCTestService before shutting down iOS simulators to prevent
+      // Stop CtrlProxy iOS before shutting down iOS simulators to prevent
       // the auto-reconnect logic from restarting the service (and keeping
       // the simulator alive).
       if (args.device.platform === "ios") {
         try {
-          const xcTestManager = IOSXCTestServiceManager.getInstance({
+          const xcTestManager = IOSCtrlProxyManager.getInstance({
             name: args.device.name,
             platform: "ios",
             deviceId: args.device.deviceId,
@@ -202,7 +202,7 @@ export function registerDeviceTools() {
           });
           await xcTestManager.stop();
         } catch (error) {
-          logger.warn(`[DeviceTools] Failed to stop XCTestService before kill: ${error}`);
+          logger.warn(`[DeviceTools] Failed to stop CtrlProxy iOS before kill: ${error}`);
         }
       }
 
