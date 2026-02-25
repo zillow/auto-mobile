@@ -14,6 +14,7 @@ export interface TalkBackTapResult {
 
 export type TalkBackTapAction = "tap" | "doubleTap";
 export type TalkBackFallbackAction = "tap" | "doubleTap" | "longPress";
+export type TalkBackLongPressAction = "longPress";
 
 interface TalkBackTapStrategyDependencies {
   matcher?: FocusElementMatcher;
@@ -69,23 +70,26 @@ export class TalkBackTapStrategy {
     action: TalkBackTapAction,
     driver: TalkBackNavigationDriver
   ): Promise<TalkBackTapResult> {
-    const resourceId = element?.["resource-id"];
-    if (!resourceId) {
+    const resourceId = element?.["resource-id"] as string | undefined;
+    const elementText = element.text as string | undefined;
+    const elementContentDesc = element["content-desc"] as string | undefined;
+
+    if (!resourceId && !elementText && !elementContentDesc) {
       return {
         success: false,
         method: "focus-navigation",
-        error: "Element has no resource-id"
+        error: "Element has no resource-id, text, or content-desc for navigation"
       };
     }
 
     try {
-      logger.debug(`[TalkBackTapStrategy] Attempting focus navigation to element with resourceId: ${resourceId}`);
+      logger.debug(`[TalkBackTapStrategy] Attempting focus navigation to element (resourceId: ${resourceId}, text: ${elementText})`);
 
-      // Build selector from element (include bounds for disambiguation in list views)
+      // Build selector from available fields (include bounds for disambiguation in list views)
       const targetSelector = {
-        resourceId,
-        text: element.text as string | undefined,
-        contentDesc: element["content-desc"] as string | undefined,
+        ...(resourceId ? { resourceId } : {}),
+        text: elementText,
+        contentDesc: elementContentDesc,
         bounds: element.bounds
       };
 
@@ -232,13 +236,50 @@ export class TalkBackTapStrategy {
   }
 
   /**
+   * Execute a long press on an element using ACTION_LONG_CLICK with coordinate gesture fallback.
+   *
+   * Tries ACTION_LONG_CLICK first (requires resource-id), then falls back to
+   * a coordinate-based long press gesture via the accessibility service.
+   *
+   * @param x - X coordinate (for coordinate fallback)
+   * @param y - Y coordinate (for coordinate fallback)
+   * @param durationMs - Long press duration in milliseconds
+   * @param element - The target element
+   * @param driver - The TalkBack navigation driver
+   * @returns Result indicating success/failure and method used
+   */
+  async executeLongPress(
+    x: number,
+    y: number,
+    durationMs: number,
+    element: Element,
+    driver: TalkBackNavigationDriver
+  ): Promise<TalkBackTapResult> {
+    const resourceId = element["resource-id"] as string | undefined;
+
+    if (resourceId) {
+      const longClickResult = await driver.requestAction("long_click", resourceId);
+      if (longClickResult.success) {
+        logger.info(`[TalkBackTapStrategy] Long press via ACTION_LONG_CLICK succeeded`);
+        return { success: true, method: "focus-navigation" };
+      }
+      logger.warn(
+        `[TalkBackTapStrategy] ACTION_LONG_CLICK failed (${longClickResult.error}), ` +
+        `falling back to coordinate gesture`
+      );
+    }
+
+    return this.executeCoordinateFallback(x, y, "longPress", durationMs, driver);
+  }
+
+  /**
    * Activate the currently focused element using double-tap with ACTION_CLICK fallback.
    */
   private async activateElement(
     element: Element,
     driver: TalkBackNavigationDriver
   ): Promise<TalkBackTapResult> {
-    const resourceId = element["resource-id"];
+    const resourceId = element["resource-id"] as string | undefined;
     const center = this.getElementCenter(element);
     const tapDuration = 50;
 
@@ -246,17 +287,24 @@ export class TalkBackTapStrategy {
     const firstTap = await driver.requestTapCoordinates(center.x, center.y, tapDuration);
 
     if (!firstTap.success) {
-      // If double-tap fails, try ACTION_CLICK on the resource-id
-      logger.warn(`[TalkBackTapStrategy] Double-tap activation failed, trying ACTION_CLICK fallback`);
-      const clickResult = await driver.requestAction("click", resourceId);
-      if (!clickResult.success) {
-        return {
-          success: false,
-          method: "focus-navigation",
-          error: `Activation failed: double-tap and ACTION_CLICK both failed`
-        };
+      if (resourceId) {
+        // If double-tap fails, try ACTION_CLICK on the resource-id
+        logger.warn(`[TalkBackTapStrategy] Double-tap activation failed, trying ACTION_CLICK fallback`);
+        const clickResult = await driver.requestAction("click", resourceId);
+        if (!clickResult.success) {
+          return {
+            success: false,
+            method: "focus-navigation",
+            error: `Activation failed: double-tap and ACTION_CLICK both failed`
+          };
+        }
+        return { success: true, method: "focus-navigation" };
       }
-      return { success: true, method: "focus-navigation" };
+      return {
+        success: false,
+        method: "focus-navigation",
+        error: `Activation failed: double-tap failed`
+      };
     }
 
     await this.timer.sleep(200);
@@ -265,14 +313,22 @@ export class TalkBackTapStrategy {
     const secondTap = await driver.requestTapCoordinates(center.x, center.y, tapDuration);
 
     if (!secondTap.success) {
-      // If second tap fails, try ACTION_CLICK as fallback
-      logger.warn(`[TalkBackTapStrategy] Second tap failed, trying ACTION_CLICK fallback`);
-      const clickResult = await driver.requestAction("click", resourceId);
-      if (!clickResult.success) {
+      if (resourceId) {
+        // If second tap fails, try ACTION_CLICK as fallback
+        logger.warn(`[TalkBackTapStrategy] Second tap failed, trying ACTION_CLICK fallback`);
+        const clickResult = await driver.requestAction("click", resourceId);
+        if (!clickResult.success) {
+          return {
+            success: false,
+            method: "focus-navigation",
+            error: `Activation failed: second tap and ACTION_CLICK both failed`
+          };
+        }
+      } else {
         return {
           success: false,
           method: "focus-navigation",
-          error: `Activation failed: second tap and ACTION_CLICK both failed`
+          error: `Activation failed: second tap failed`
         };
       }
     }

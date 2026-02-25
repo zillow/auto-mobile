@@ -849,15 +849,11 @@ export class TapOnElement extends BaseVisualChange {
       ? isTalkBackEnabled
       : (await this.accessibilityDetector.detectMethod(this.device.id, this.adb)) === "talkback";
 
-    const resourceId = element?.["resource-id"];
-
-    // Use accessibility service only if TalkBack is enabled AND element has resource-id
-    // Otherwise fall back to coordinate-based tapping
-    if (talkBackEnabled && resourceId) {
-      // TalkBack mode: Use CtrlProxy ACTION_CLICK with coordinate fallback
+    if (talkBackEnabled) {
+      // TalkBack mode: Use accessibility actions with coordinate fallback
       await this.executeAndroidTapWithAccessibility(action, x, y, element, durationMs, options, signal);
     } else {
-      // Standard mode or no resource-id: Use coordinate-based taps
+      // Standard mode: Use coordinate-based taps
       await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
     }
   }
@@ -886,7 +882,8 @@ export class TapOnElement extends BaseVisualChange {
 
   /**
    * Execute tap using CtrlProxy actions (TalkBack mode)
-   * Uses focus navigation when TalkBack is enabled, falls back to coordinate-based tapping if navigation fails
+   * Uses focus navigation when TalkBack is enabled, falls back to coordinate-based tapping if navigation fails.
+   * For longPress, tries ACTION_LONG_CLICK first, then coordinate gesture, then ADB.
    */
   private async executeAndroidTapWithAccessibility(
     action: string,
@@ -897,17 +894,29 @@ export class TapOnElement extends BaseVisualChange {
     _options?: TapOnElementOptions,
     signal?: AbortSignal
   ): Promise<void> {
-    const resourceId = element?.["resource-id"];
-    if (!resourceId) {
-      logger.warn("[TapOnElement] Element has no resource-id, falling back to coordinate-based tap");
-      await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+    const driver = this.talkBackDriverFactory.createDriver(this.device);
+
+    if (action === "longPress") {
+      // Long press: try ACTION_LONG_CLICK first, then coordinate gesture fallback
+      const longPressResult = await this.talkBackStrategy.executeLongPress(
+        x,
+        y,
+        durationMs,
+        element,
+        driver
+      );
+
+      if (!longPressResult.success) {
+        logger.warn(
+          `[TapOnElement] Long press accessibility methods failed (${longPressResult.error}), ` +
+          `falling back to ADB tap at (${x}, ${y})`
+        );
+        await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+      }
       return;
     }
 
-    const driver = this.talkBackDriverFactory.createDriver(this.device);
-
     // Try focus navigation for tap and doubleTap actions
-    // Long press still uses coordinate-based approach as it's more reliable
     if (action === "tap" || action === "doubleTap") {
       const result = await this.talkBackStrategy.executeTap(
         this.device.id,

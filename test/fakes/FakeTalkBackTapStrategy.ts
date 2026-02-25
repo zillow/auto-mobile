@@ -12,6 +12,7 @@ import type { TalkBackNavigationDriver } from "../../src/features/talkback/TalkB
 export class FakeTalkBackTapStrategy {
   tapResult: TalkBackTapResult = { success: true, method: "focus-navigation" };
   fallbackResult: TalkBackTapResult = { success: true, method: "coordinate-fallback" };
+  longPressResult: TalkBackTapResult = { success: true, method: "focus-navigation" };
 
   tapCalls: Array<{
     deviceId: string;
@@ -26,8 +27,16 @@ export class FakeTalkBackTapStrategy {
     durationMs: number;
   }> = [];
 
+  longPressCalls: Array<{
+    x: number;
+    y: number;
+    durationMs: number;
+    element: Element;
+  }> = [];
+
   private tapOverrides: TalkBackTapResult[] = [];
   private fallbackOverrides: TalkBackTapResult[] = [];
+  private longPressOverrides: TalkBackTapResult[] = [];
 
   setTapResult(result: TalkBackTapResult): void {
     this.tapResult = result;
@@ -37,12 +46,20 @@ export class FakeTalkBackTapStrategy {
     this.fallbackResult = result;
   }
 
+  setLongPressResult(result: TalkBackTapResult): void {
+    this.longPressResult = result;
+  }
+
   queueTapResult(result: TalkBackTapResult): void {
     this.tapOverrides.push(result);
   }
 
   queueFallbackResult(result: TalkBackTapResult): void {
     this.fallbackOverrides.push(result);
+  }
+
+  queueLongPressResult(result: TalkBackTapResult): void {
+    this.longPressOverrides.push(result);
   }
 
   async executeTap(
@@ -74,5 +91,21 @@ export class FakeTalkBackTapStrategy {
     }
 
     return this.fallbackResult;
+  }
+
+  async executeLongPress(
+    x: number,
+    y: number,
+    durationMs: number,
+    element: Element,
+    _driver: TalkBackNavigationDriver
+  ): Promise<TalkBackTapResult> {
+    this.longPressCalls.push({ x, y, durationMs, element });
+
+    if (this.longPressOverrides.length > 0) {
+      return this.longPressOverrides.shift()!;
+    }
+
+    return this.longPressResult;
   }
 }

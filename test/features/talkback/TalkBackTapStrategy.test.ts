@@ -37,17 +37,54 @@ describe("TalkBackTapStrategy", () => {
   });
 
   describe("executeTap", () => {
-    test("returns error when element has no resource-id", async () => {
+    test("returns error when element has no identifying information", async () => {
       const element = {
-        bounds: { left: 0, top: 0, right: 100, bottom: 100 },
-        text: "Button"
+        bounds: { left: 0, top: 0, right: 100, bottom: 100 }
+        // no text, no resource-id, no content-desc
       } as Element;
 
       const result = await strategy.executeTap("device-1", element, "tap", driver);
 
       expect(result.success).toBe(false);
       expect(result.method).toBe("focus-navigation");
-      expect(result.error).toContain("no resource-id");
+      expect(result.error).toBeDefined();
+    });
+
+    test("navigates using text match when element has no resource-id", async () => {
+      const element = {
+        bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+        text: "Button"
+      } as Element;
+
+      driver.setElements([element], 0);
+
+      const navigateToElement = spyOn(mockExecutor, "navigateToElement")
+        .mockResolvedValue(true);
+
+      const result = await strategy.executeTap("device-1", element, "tap", driver);
+
+      expect(result.success).toBe(true);
+      expect(result.method).toBe("focus-navigation");
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
+      expect(driver.getTapCount()).toBe(2); // Double-tap to activate
+    });
+
+    test("navigates using content-desc match when element has no resource-id", async () => {
+      const element = {
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 },
+        "content-desc": "Close dialog"
+      } as Element;
+
+      driver.setElements([element], 0);
+
+      const navigateToElement = spyOn(mockExecutor, "navigateToElement")
+        .mockResolvedValue(true);
+
+      const result = await strategy.executeTap("device-1", element, "tap", driver);
+
+      expect(result.success).toBe(true);
+      expect(result.method).toBe("focus-navigation");
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
     });
 
     test("uses focus navigation for tap action", async () => {
@@ -179,6 +216,71 @@ describe("TalkBackTapStrategy", () => {
       expect(result.success).toBe(false);
       expect(result.method).toBe("focus-navigation");
       expect(result.error).toContain("traversal order");
+    });
+  });
+
+  describe("executeLongPress", () => {
+    test("uses ACTION_LONG_CLICK when element has resource-id", async () => {
+      const element = {
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
+      } as Element;
+
+      driver.setActionResult({ success: true, action: "long_click", totalTimeMs: 1 });
+
+      const result = await strategy.executeLongPress(50, 50, 1000, element, driver);
+
+      expect(result.success).toBe(true);
+      expect(result.method).toBe("focus-navigation");
+      expect(driver.actionHistory).toHaveLength(1);
+      expect(driver.actionHistory[0]).toEqual({ action: "long_click", resourceId: "test:id/button" });
+      expect(driver.getTapCount()).toBe(0); // No coordinate taps
+    });
+
+    test("falls back to coordinate gesture when ACTION_LONG_CLICK fails", async () => {
+      const element = {
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
+      } as Element;
+
+      driver.setActionResult({ success: false, action: "long_click", totalTimeMs: 1, error: "service unavailable" });
+
+      const result = await strategy.executeLongPress(50, 50, 1000, element, driver);
+
+      expect(result.success).toBe(true);
+      expect(result.method).toBe("coordinate-fallback");
+      expect(driver.getTapCount()).toBe(1);
+      expect(driver.tapHistory[0]).toEqual({ x: 50, y: 50, durationMs: 1000 }); // Full duration for longPress
+    });
+
+    test("uses coordinate gesture directly when element has no resource-id", async () => {
+      const element = {
+        bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+        text: "Button"
+      } as Element;
+
+      const result = await strategy.executeLongPress(50, 50, 1000, element, driver);
+
+      expect(result.success).toBe(true);
+      expect(result.method).toBe("coordinate-fallback");
+      expect(driver.getActionCount()).toBe(0); // No ACTION_LONG_CLICK attempted
+      expect(driver.getTapCount()).toBe(1);
+      expect(driver.tapHistory[0]).toEqual({ x: 50, y: 50, durationMs: 1000 });
+    });
+
+    test("returns error when coordinate fallback also fails", async () => {
+      const element = {
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
+      } as Element;
+
+      driver.setActionResult({ success: false, action: "long_click", totalTimeMs: 1, error: "failed" });
+      driver.setTapResult({ success: false, totalTimeMs: 1, error: "gesture failed" });
+
+      const result = await strategy.executeLongPress(50, 50, 1000, element, driver);
+
+      expect(result.success).toBe(false);
+      expect(result.method).toBe("coordinate-fallback");
     });
   });
 
