@@ -243,24 +243,32 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
-        run: turbo run lint
+        env:
+          TURBO_TELEMETRY_DISABLED: "1"
+          DO_NOT_TRACK: "1"
+        run: turbo run lint --output-logs=errors-only --log-order=grouped
 
       - name: "Run Build"
         shell: bash
+        env:
+          TURBO_TELEMETRY_DISABLED: "1"
+          DO_NOT_TRACK: "1"
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-          turbo run build 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
+          turbo run build --output-logs=errors-only --log-order=grouped 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
 
       - name: "Run Tests"
         shell: bash
         env:
           # Force AdbClient into test mode on Windows to prevent adb daemon startup
           AUTOMOBILE_TEST_MODE: ${{ matrix.os == 'windows-latest' && 'true' || '' }}
+          TURBO_TELEMETRY_DISABLED: "1"
+          DO_NOT_TRACK: "1"
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-          turbo run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
+          turbo run test --output-logs=errors-only --log-order=grouped 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
       - name: "Upload Build/Test Logs"
         if: failure()
@@ -751,7 +759,10 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Tests with Coverage"
-        run: turbo run test:coverage
+        env:
+          TURBO_TELEMETRY_DISABLED: "1"
+          DO_NOT_TRACK: "1"
+        run: turbo run test:coverage --output-logs=errors-only
 
       - name: "Generate Coverage Badge"
         run: bash scripts/coverage/generate-badge.sh coverage/lcov.info coverage/ts-coverage-badge.json "TS coverage" "3178C6"
