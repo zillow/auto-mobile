@@ -1,12 +1,12 @@
 import { expect, describe, test, beforeEach, spyOn } from "bun:test";
 import { HomeScreen } from "../../../src/features/action/HomeScreen";
 import { BootedDevice, ObserveResult } from "../../../src/models";
-import { XCTestServiceClient } from "../../../src/features/observe/ios";
+import { CtrlProxyClient } from "../../../src/features/observe/ios";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
-import { FakeXCTestService } from "../../fakes/FakeXCTestService";
+import { FakeIOSCtrlProxy } from "../../fakes/FakeIOSCtrlProxy";
 
 
 // Helper function to create mock ObserveResult
@@ -91,7 +91,7 @@ describe("HomeScreen", () => {
       expect(result.observation?.screenSize).toBeDefined();
     });
 
-    test("should use XCTestService press home on iOS", async () => {
+    test("should use CtrlProxy iOS press home on iOS", async () => {
       const iosDevice: BootedDevice = {
         name: "iPhone 15",
         platform: "ios",
@@ -102,15 +102,15 @@ describe("HomeScreen", () => {
       (iosHomeScreen as any).window = fakeWindow;
       (iosHomeScreen as any).awaitIdle = fakeAwaitIdle;
 
-      const fakeXCTestService = new FakeXCTestService();
-      const getInstanceSpy = spyOn(XCTestServiceClient, "getInstance").mockReturnValue(
-        fakeXCTestService as any
+      const fakeIOSCtrlProxy = new FakeIOSCtrlProxy();
+      const getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(
+        fakeIOSCtrlProxy as any
       );
 
       try {
         const result = await iosHomeScreen.execute();
         expect(result.success).toBe(true);
-        expect(fakeXCTestService.getPressHomeRequestCount()).toBe(1);
+        expect(fakeIOSCtrlProxy.getPressHomeRequestCount()).toBe(1);
       } finally {
         getInstanceSpy.mockRestore();
       }

@@ -3,8 +3,8 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ImeActionResult, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { CtrlProxyClient } from "../observe/android";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 import { CtrlProxy } from "../observe/interfaces/CtrlProxy";
 import { Timer } from "../../utils/SystemTimer";
 import { defaultTimer } from "../../utils/SystemTimer";
@@ -88,7 +88,7 @@ export class ImeAction extends BaseVisualChange {
     _observeResult: ObserveResult
   ): Promise<ImeActionResult> {
     // Use provided a11y service or get default instance
-    const a11yClient = this.a11yService || CtrlProxyClient.getInstance(this.device, this.adb);
+    const a11yClient = this.a11yService || AndroidCtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestImeAction(action);
 
     if (a11yResult.success) {
@@ -160,25 +160,25 @@ export class ImeAction extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific IME action using XCTestService.
+   * Execute iOS-specific IME action using CtrlProxy iOS.
    */
   private async executeiOSImeAction(
     action: "done" | "next" | "search" | "send" | "go" | "previous",
     _observeResult: ObserveResult
   ): Promise<ImeActionResult> {
     try {
-      const client = XCTestServiceClient.getInstance(this.device);
+      const client = IOSCtrlProxyClient.getInstance(this.device);
       const result = await client.requestImeAction(action);
 
       if (result.success) {
-        logger.info(`[ImeAction] IME action '${action}' completed via XCTestService`);
+        logger.info(`[ImeAction] IME action '${action}' completed via CtrlProxy iOS`);
         return { success: true, action };
       }
 
-      logger.warn(`[ImeAction] XCTestService IME action failed: ${result.error}`);
+      logger.warn(`[ImeAction] CtrlProxy iOS IME action failed: ${result.error}`);
       return { success: false, action, error: result.error };
     } catch (error) {
-      logger.error(`[ImeAction] XCTestService exception: ${error}`);
+      logger.error(`[ImeAction] CtrlProxy iOS exception: ${error}`);
       return { success: false, action, error: String(error) };
     }
   }

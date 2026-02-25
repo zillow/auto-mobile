@@ -62,12 +62,12 @@ echo ""
 
 # Packages that can be tested on macOS (either macOS-only or cross-platform)
 # Note: iOS-only packages cannot run tests on macOS without a simulator
-# XCTestService has unit tests that can run on macOS
+# control-proxy has unit tests that can run on macOS
 TESTABLE_PACKAGES=(
     "AXeAutomation"
     "XcodeCompanion"
     "XcodeExtension"
-    "XCTestService"
+    "control-proxy"
 )
 
 # iOS-only packages (tests require iOS simulator - skip in basic test run)

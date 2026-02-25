@@ -2,7 +2,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, HomeScreenResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient } from "../observe/ios";
 
 /**
  * Navigates to the home screen using the hardware home button (keyevent 3).
@@ -50,7 +50,7 @@ export class HomeScreen extends BaseVisualChange {
   }
 
   private async executeIosHomeNavigation(): Promise<void> {
-    const client = XCTestServiceClient.getInstance(this.device);
+    const client = CtrlProxyClient.getInstance(this.device);
     const result = await client.requestPressHome();
     if (!result.success) {
       throw new Error(result.error ?? "Failed to press iOS home button");

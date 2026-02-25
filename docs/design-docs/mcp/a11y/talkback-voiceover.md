@@ -37,7 +37,7 @@ When TalkBack (Android) or VoiceOver (iOS) is enabled, mobile UX fundamentally c
 | AccessibilityService query | In-process `getEnabledAccessibilityServiceList()` | Instant | Requires AutoMobile AccessibilityService context |
 | `dumpsys accessibility` (fallback) | Full accessibility configuration dump | ~100-200ms | Useful for debugging, not production |
 
-**iOS VoiceOver** is detected via `UIAccessibility.isVoiceOverRunning` (native iOS API, requires XCTestService integration).
+**iOS VoiceOver** is detected via `UIAccessibility.isVoiceOverRunning` (native iOS API, requires CtrlProxy iOS integration).
 
 See [Android TalkBack](../../plat/android/talkback.md) for platform-specific ADB commands and simulation details.
 

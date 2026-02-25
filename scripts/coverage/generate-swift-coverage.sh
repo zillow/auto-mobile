@@ -13,7 +13,7 @@ OUTPUT_FILE="${PROJECT_ROOT}/coverage/swift-coverage-badge.json"
 # Core library packages only — excludes scaffold apps (XcodeCompanion, XcodeExtension)
 # and iOS-only packages (XCTestRunner) that require a simulator.
 TESTABLE_PACKAGES=(
-  "XCTestService"
+  "control-proxy"
 )
 
 total_lines=0
@@ -47,15 +47,15 @@ for package in "${TESTABLE_PACKAGES[@]}"; do
   fi
 
   # Find the test binary (the Mach-O executable inside the .xctest bundle)
-  xctest_bundle="${build_dir}/${package}PackageTests.xctest"
-  test_binary="${xctest_bundle}/Contents/MacOS/${package}PackageTests"
-  if [[ ! -f "$test_binary" ]]; then
-    # Fallback: search for any matching xctest bundle
-    xctest_bundle=$(find "${build_dir}" -name "${package}PackageTests.xctest" -maxdepth 1 2>/dev/null | head -1)
-    if [[ -n "$xctest_bundle" ]]; then
-      test_binary="${xctest_bundle}/Contents/MacOS/${package}PackageTests"
-    fi
+  # The bundle name is derived from the Swift package's module name, not the directory name,
+  # so we search dynamically rather than constructing a fixed name.
+  xctest_bundle=$(find "${build_dir}" -maxdepth 1 -name "*PackageTests.xctest" 2>/dev/null | head -1)
+  if [[ -z "$xctest_bundle" ]]; then
+    echo "Warning: no test binary found for ${package}" >&2
+    continue
   fi
+  bundle_name=$(basename "${xctest_bundle}" .xctest)
+  test_binary="${xctest_bundle}/Contents/MacOS/${bundle_name}"
   if [[ ! -f "$test_binary" ]]; then
     echo "Warning: no test binary found for ${package}" >&2
     continue

@@ -149,7 +149,7 @@ nav:
           - 'iOS':
             - 'Overview': design-docs/plat/ios/index.md
             - 'Screen Streaming': design-docs/plat/ios/screen-streaming.md
-            - 'XCTest Service': design-docs/plat/ios/xctestservice.md
+            - 'CtrlProxy iOS': design-docs/plat/ios/ctrl-proxy-ios.md
             - 'simctl Integration': design-docs/plat/ios/simctl.md
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
             - 'Managed Apple IDs': design-docs/plat/ios/managed-apple-ids.md

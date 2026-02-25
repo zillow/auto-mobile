@@ -1,8 +1,8 @@
 /**
- * Shared types for XCTestServiceClient delegates.
+ * Shared types for CtrlProxyClient delegates.
  *
  * This module defines the context interfaces that delegates receive to access
- * shared state and functionality from the main XCTestServiceClient.
+ * shared state and functionality from the main CtrlProxyClient.
  */
 
 import type { ViewHierarchyWindowInfo } from "../../../models";
@@ -21,7 +21,7 @@ export type { PerfTiming, BaseResult, GestureTimingResult, ActionTimingResult } 
 /**
  * Interface for iOS accessibility node format (matching Android format)
  */
-export interface XCTestNode {
+export interface CtrlProxyNode {
   text?: string;
   textSize?: number;
   contentDesc?: string;
@@ -50,16 +50,16 @@ export interface XCTestNode {
   errorMessage?: string;
   hintText?: string;
   actions?: string[];
-  node?: XCTestNode | XCTestNode[];
+  node?: CtrlProxyNode | CtrlProxyNode[];
 }
 
 /**
  * Interface for iOS view hierarchy (matching Android format)
  */
-export interface XCTestHierarchy {
+export interface CtrlProxyHierarchy {
   updatedAt: number;
   packageName: string;
-  hierarchy: XCTestNode;
+  hierarchy: CtrlProxyNode;
   windows?: ViewHierarchyWindowInfo[];
   /** iOS screen scale factor (e.g., 2.0 for @2x, 3.0 for @3x retina) */
   screenScale?: number;
@@ -74,12 +74,12 @@ export interface XCTestHierarchy {
  * iOS-side performance timing data.
  * Alias for shared PerfTiming type.
  */
-export type XCTestPerfTiming = PerfTiming;
+export type CtrlProxyPerfTiming = PerfTiming;
 
 /**
  * Interface for iOS performance snapshot from CADisplayLink FPS monitoring
  */
-export interface XCTestPerformanceSnapshot {
+export interface CtrlProxyPerformanceSnapshot {
   timestamp: number;
   fps?: number;
   frameTimeMs?: number;
@@ -93,25 +93,25 @@ export interface XCTestPerformanceSnapshot {
 }
 
 /**
- * Interface for WebSocket message from XCTestService
+ * Interface for WebSocket message from CtrlProxy iOS
  */
 export interface WebSocketMessage {
   type: string;
   timestamp?: number;
   requestId?: string;
-  data?: XCTestHierarchy;
-  performanceData?: XCTestPerformanceSnapshot;
+  data?: CtrlProxyHierarchy;
+  performanceData?: CtrlProxyPerformanceSnapshot;
   format?: string;
   success?: boolean;
   totalTimeMs?: number;
   error?: string;
-  perfTiming?: XCTestPerfTiming | XCTestPerfTiming[];
+  perfTiming?: CtrlProxyPerfTiming | CtrlProxyPerfTiming[];
 }
 
 /**
  * Interface for screenshot result
  */
-export interface XCTestScreenshotResult {
+export interface CtrlProxyScreenshotResult {
   success: boolean;
   data?: string; // Base64 encoded PNG
   format?: string;
@@ -119,54 +119,54 @@ export interface XCTestScreenshotResult {
   error?: string;
 }
 
-/** Swipe result from XCTestService */
-export type XCTestSwipeResult = GestureTimingResult;
+/** Swipe result from CtrlProxy iOS */
+export type CtrlProxySwipeResult = GestureTimingResult;
 
 /** Tap coordinates result */
-export type XCTestTapResult = BaseResult;
+export type CtrlProxyTapResult = BaseResult;
 
-/** Drag result from XCTestService */
-export type XCTestDragResult = GestureTimingResult;
+/** Drag result from CtrlProxy iOS */
+export type CtrlProxyDragResult = GestureTimingResult;
 
-/** Pinch result from XCTestService */
-export type XCTestPinchResult = GestureTimingResult;
+/** Pinch result from CtrlProxy iOS */
+export type CtrlProxyPinchResult = GestureTimingResult;
 
-/** Set text result from XCTestService */
-export type XCTestSetTextResult = BaseResult;
+/** Set text result from CtrlProxy iOS */
+export type CtrlProxySetTextResult = BaseResult;
 
-/** IME action result from XCTestService */
-export type XCTestImeActionResult = ActionTimingResult;
+/** IME action result from CtrlProxy iOS */
+export type CtrlProxyImeActionResult = ActionTimingResult;
 
-/** Select all result from XCTestService */
-export type XCTestSelectAllResult = BaseResult;
+/** Select all result from CtrlProxy iOS */
+export type CtrlProxySelectAllResult = BaseResult;
 
-/** Press home result from XCTestService */
-export type XCTestPressHomeResult = BaseResult;
+/** Press home result from CtrlProxy iOS */
+export type CtrlProxyPressHomeResult = BaseResult;
 
-/** Launch app result from XCTestService */
-export type XCTestLaunchAppResult = BaseResult;
+/** Launch app result from CtrlProxy iOS */
+export type CtrlProxyLaunchAppResult = BaseResult;
 
-/** Action result from XCTestService */
-export type XCTestActionResult = ActionTimingResult;
+/** Action result from CtrlProxy iOS */
+export type CtrlProxyActionResult = ActionTimingResult;
 
 /**
  * Interface for cached hierarchy with metadata
  */
-export interface CachedHierarchy {
-  hierarchy: XCTestHierarchy;
+export interface CtrlProxyCachedHierarchy {
+  hierarchy: CtrlProxyHierarchy;
   receivedAt: number;
   fresh: boolean;
-  perfTiming?: XCTestPerfTiming;
+  perfTiming?: CtrlProxyPerfTiming;
 }
 
 /**
  * Interface for hierarchy response with freshness indicator
  */
-export interface XCTestHierarchyResponse {
-  hierarchy: XCTestHierarchy | null;
+export interface CtrlProxyHierarchyResponse {
+  hierarchy: CtrlProxyHierarchy | null;
   fresh: boolean;
   updatedAt?: number;
-  perfTiming?: XCTestPerfTiming;
+  perfTiming?: CtrlProxyPerfTiming;
 }
 
 /**
@@ -176,7 +176,7 @@ export interface HierarchyDelegateContext extends DelegateContext {
   /** Cache freshness TTL in milliseconds */
   cacheFreshTtlMs: number;
   /** Get the cached hierarchy data */
-  getCachedHierarchy(): CachedHierarchy | null;
+  getCachedHierarchy(): CtrlProxyCachedHierarchy | null;
   /** Set the cached hierarchy data */
-  setCachedHierarchy(h: CachedHierarchy | null): void;
+  setCachedHierarchy(h: CtrlProxyCachedHierarchy | null): void;
 }

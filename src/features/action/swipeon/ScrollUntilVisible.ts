@@ -10,8 +10,8 @@ import {
 } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { CtrlProxyClient } from "../../observe/android";
-import { XCTestServiceClient } from "../../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../../observe/ios";
 import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
@@ -29,7 +29,7 @@ export interface ScrollUntilVisibleDependencies {
   finder: ElementFinder;
   geometry: ElementGeometry;
   observeScreen: ObserveScreen;
-  accessibilityService: CtrlProxyClient;
+  accessibilityService: AndroidCtrlProxyClient;
   accessibilityDetector: AccessibilityDetector;
   overlayDetector: OverlayDetector;
   talkBackExecutor: TalkBackSwipeExecutor;
@@ -347,7 +347,7 @@ export class ScrollUntilVisible {
           );
           break;
         case "ios":
-          latestViewHierarchy = await XCTestServiceClient.getInstance(this.deps.device).getAccessibilityHierarchy() ?? undefined;
+          latestViewHierarchy = await IOSCtrlProxyClient.getInstance(this.deps.device).getAccessibilityHierarchy() ?? undefined;
           break;
         default:
           throw new ActionableError(`Unsupported platform: ${this.deps.device.platform}`);

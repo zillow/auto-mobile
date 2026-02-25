@@ -9,8 +9,8 @@ import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
 import { DefaultElementParser } from "../utility/ElementParser";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ViewHierarchyQueryOptions } from "../../models";
-import { CtrlProxyClient } from "./android";
-import { XCTestServiceClient } from "./ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "./android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "./ios";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
@@ -31,19 +31,19 @@ export class ViewHierarchy implements ViewHierarchyInterface {
   private device: BootedDevice;
   private parser: ElementParser;
   private geometry: ElementGeometry;
-  private accessibilityServiceClient: CtrlProxyClient;
+  private accessibilityServiceClient: AndroidCtrlProxyClient;
   private timer: Timer;
 
   /**
    * Create a ViewHierarchy instance
    * @param device - Device to get view hierarchy from
    * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
-   * @param accessibilityServiceClient - Optional CtrlProxyClient instance for testing
+   * @param accessibilityServiceClient - Optional AndroidCtrlProxyClient instance for testing
    */
   constructor(
     device: BootedDevice,
     adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
-    accessibilityServiceClient: CtrlProxyClient | null = null,
+    accessibilityServiceClient: AndroidCtrlProxyClient | null = null,
     timer: Timer = defaultTimer,
   ) {
     this.device = device;
@@ -62,7 +62,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
       adbFactory = defaultAdbClientFactory;
     }
 
-    this.accessibilityServiceClient = accessibilityServiceClient || CtrlProxyClient.getInstance(device, adbFactory);
+    this.accessibilityServiceClient = accessibilityServiceClient || AndroidCtrlProxyClient.getInstance(device, adbFactory);
     this.timer = timer;
   }
 
@@ -119,7 +119,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
 
     perf.serial("ios_viewHierarchy");
 
-    const xcTestClient = XCTestServiceClient.getInstance(this.device);
+    const xcTestClient = IOSCtrlProxyClient.getInstance(this.device);
     const viewHierarchy = await perf.track("xcTestService", async () => {
       // Use getLatestHierarchy which properly handles skipWaitForFresh and minTimestamp
       const result = await xcTestClient.getLatestHierarchy(
@@ -133,7 +133,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
       if (!result || !result.hierarchy) {
         return {
           hierarchy: {
-            error: "Failed to retrieve iOS view hierarchy from XCTestService"
+            error: "Failed to retrieve iOS view hierarchy from CtrlProxy iOS"
           }
         } as unknown as ViewHierarchyResult;
       }
@@ -145,7 +145,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
     perf.end();
 
     const duration = this.timer.now() - startTime;
-    logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from XCTestService in ${duration}ms`);
+    logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from CtrlProxy iOS in ${duration}ms`);
     return viewHierarchy;
   }
 

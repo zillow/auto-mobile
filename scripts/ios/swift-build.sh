@@ -62,7 +62,7 @@ MACOS_PACKAGES=(
 
 # iOS + macOS packages (have both platform support)
 IOS_MACOS_PACKAGES=(
-    "XCTestService"
+    "control-proxy"
     "XCTestRunner"
 )
 

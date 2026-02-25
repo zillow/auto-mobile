@@ -486,7 +486,7 @@ export class PerformanceMonitor {
     server.pushPerformanceData(data);
 
     // Also push to the observation stream for IDE plugin
-    // Skip for iOS - XCTestServiceClient handles observation stream updates via CADisplayLink
+    // Skip for iOS - CtrlProxy iOSClient handles observation stream updates via CADisplayLink
     if (device.platform === "ios") {
       return;
     }

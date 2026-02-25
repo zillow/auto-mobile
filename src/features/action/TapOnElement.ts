@@ -19,8 +19,8 @@ import { DefaultElementFinder } from "../utility/ElementFinder";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { DefaultElementSelector } from "../utility/DefaultElementSelector";
 import { logger } from "../../utils/logger";
-import { CtrlProxyClient } from "../observe/android";
-import { XCTestServiceClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { DEFAULT_VISION_CONFIG, getVisionEnrichedError, type VisionFallbackConfig, type VisionAnalyzer } from "../../vision/index";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
@@ -67,7 +67,7 @@ export class TapOnElement extends BaseVisualChange {
   private finder: ElementFinder;
   private geometry: ElementGeometry;
   private elementParser: ElementParser;
-  private accessibilityService: CtrlProxyClient;
+  private accessibilityService: AndroidCtrlProxyClient;
   private visionConfig: VisionFallbackConfig;
   private screenshotCapturer: ScreenshotCapturer;
   private visionAnalyzer: VisionAnalyzer | undefined;
@@ -90,7 +90,7 @@ export class TapOnElement extends BaseVisualChange {
     this.finder = new DefaultElementFinder();
     this.geometry = new DefaultElementGeometry();
     this.elementParser = new DefaultElementParser();
-    this.accessibilityService = CtrlProxyClient.getInstance(device, this.adbFactory);
+    this.accessibilityService = AndroidCtrlProxyClient.getInstance(device, this.adbFactory);
     this.visionConfig = options.visionConfig || DEFAULT_VISION_CONFIG;
     this.screenshotCapturer = options.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
     this.visionAnalyzer = options.visionAnalyzer;
@@ -257,7 +257,7 @@ export class TapOnElement extends BaseVisualChange {
       }
       case "ios":
       {
-        const xcTestClient = XCTestServiceClient.getInstance(this.device);
+        const xcTestClient = IOSCtrlProxyClient.getInstance(this.device);
         const rawHierarchy = await xcTestClient.getAccessibilityHierarchy();
         return rawHierarchy
           ? this.prepareViewHierarchyForResponse(rawHierarchy, screenSize)
@@ -946,7 +946,7 @@ export class TapOnElement extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific tap operations using XCTestService
+   * Execute iOS-specific tap operations using CtrlProxy iOS
    * @param action - The tap action to perform
    * @param x - X coordinate
    * @param y - Y coordinate
@@ -961,26 +961,26 @@ export class TapOnElement extends BaseVisualChange {
     // Use short duration (50ms) for tap/doubleTap, full duration for longPress
     const tapDuration = action === "longPress" ? durationMs : 50;
 
-    const client = XCTestServiceClient.getInstance(this.device);
+    const client = IOSCtrlProxyClient.getInstance(this.device);
 
     if (action === "doubleTap") {
       // Double tap - perform two taps
       const firstResult = await client.requestTapCoordinates(x, y, tapDuration);
       if (!firstResult.success) {
-        throw new ActionableError(`XCTestService tap failed: ${firstResult.error}`);
+        throw new ActionableError(`CtrlProxy iOS tap failed: ${firstResult.error}`);
       }
 
       await this.timer.sleep(200);
 
       const secondResult = await client.requestTapCoordinates(x, y, tapDuration);
       if (!secondResult.success) {
-        throw new ActionableError(`XCTestService second tap failed: ${secondResult.error}`);
+        throw new ActionableError(`CtrlProxy iOS second tap failed: ${secondResult.error}`);
       }
     } else {
       // Single tap or long press
       const result = await client.requestTapCoordinates(x, y, tapDuration);
       if (!result.success) {
-        throw new ActionableError(`XCTestService tap failed: ${result.error}`);
+        throw new ActionableError(`CtrlProxy iOS tap failed: ${result.error}`);
       }
     }
   }

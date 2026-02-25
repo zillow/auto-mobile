@@ -1,0 +1,59 @@
+name: "Build CtrlProxy iOS IPA"
+
+on:
+  workflow_call:
+    outputs:
+      sha256:
+        description: "SHA256 checksum of the built IPA"
+        value: ${{ jobs.build.outputs.sha256 }}
+      runner_sha256:
+        description: "SHA256 checksum of the CtrlProxyUITests-Runner binary"
+        value: ${{ jobs.build.outputs.runner_sha256 }}
+
+jobs:
+  build:
+    name: "Build CtrlProxy iOS IPA"
+    runs-on: macos-26
+    outputs:
+      sha256: ${{ steps.checksum.outputs.ipa_sha256 }}
+      runner_sha256: ${{ steps.checksum.outputs.runner_sha256 }}
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v6
+
+      - name: "Select Xcode 26.0"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.0"
+
+      - name: "Cache Homebrew packages"
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /opt/homebrew/Cellar/xcodegen
+            /usr/local/Cellar/xcodegen
+          key: homebrew-xcodegen-${{ runner.os }}
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Cache Ruby gems"
+        uses: actions/cache@v5
+        with:
+          path: ~/.gem
+          key: gems-xcpretty-${{ runner.os }}
+
+      - name: "Install xcpretty"
+        run: gem install xcpretty
+
+      - name: "Build CtrlProxy iOS IPA"
+        id: checksum
+        run: ./scripts/ios/ctrl-proxy-create-ipa.sh --output /tmp/control-proxy.ipa
+
+      - name: "Upload CtrlProxy iOS IPA"
+        uses: actions/upload-artifact@v6
+        with:
+          name: ctrl-proxy-ios-ipa
+          path: /tmp/control-proxy.ipa
+          retention-days: 7

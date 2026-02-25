@@ -21,12 +21,12 @@ import {
   RELEASE_VERSION,
   APK_SHA256_CHECKSUM,
   APK_URL,
-  XCTESTSERVICE_SHA256_CHECKSUM,
-  XCTESTSERVICE_IPA_URL,
-  XCTESTSERVICE_APP_HASH,
+  IOS_CTRL_PROXY_SHA256_CHECKSUM,
+  IOS_CTRL_PROXY_IPA_URL,
+  IOS_CTRL_PROXY_APP_HASH,
 } from "../constants/release";
 import { AndroidCtrlProxyManager } from "../utils/CtrlProxyManager";
-import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
+import { IOSCtrlProxyManager } from "../utils/IOSCtrlProxyManager";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
 import { CtrlProxyClient } from "../features/observe/android";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
@@ -264,9 +264,9 @@ export class UnixSocketServer {
           },
           ios: {
             xcTestService: {
-              expectedSha256: XCTESTSERVICE_SHA256_CHECKSUM,
-              expectedAppHash: XCTESTSERVICE_APP_HASH,
-              url: XCTESTSERVICE_IPA_URL,
+              expectedSha256: IOS_CTRL_PROXY_SHA256_CHECKSUM,
+              expectedAppHash: IOS_CTRL_PROXY_APP_HASH,
+              url: IOS_CTRL_PROXY_IPA_URL,
             },
           },
         };
@@ -297,11 +297,11 @@ export class UnixSocketServer {
             status: result,
           };
         } else {
-          const manager = IOSXCTestServiceManager.getInstance(targetDevice);
+          const manager = IOSCtrlProxyManager.getInstance(targetDevice);
           await manager.forceRestart();
           return {
             success: true,
-            message: "XCTestService restarted",
+            message: "CtrlProxy iOS restarted",
           };
         }
       }

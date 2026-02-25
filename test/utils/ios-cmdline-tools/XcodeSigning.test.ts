@@ -7,7 +7,7 @@ const CERT_BASE64 = "MIIDETCCAfmgAwIBAgIUJQItJgRhsTPNGV58eJPhAw9xIWcwDQYJKoZIhvc
 
 const deviceUdid = "00008030001E28C11E";
 const profileUuid = "A0B1C2D3-E4F5-6789-ABCD-EF0123456789";
-const profileName = "AutoMobile XCTestService";
+const profileName = "AutoMobile CtrlProxy";
 const teamId = "TEAM12345";
 
 const profileXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -39,7 +39,7 @@ const profileXml = `<?xml version="1.0" encoding="UTF-8"?>
       <key>get-task-allow</key>
       <true/>
       <key>application-identifier</key>
-      <string>${teamId}.dev.jasonpearson.automobile.XCTestServiceApp</string>
+      <string>${teamId}.dev.jasonpearson.automobile.ctrlproxy</string>
     </dict>
     <key>DeveloperCertificates</key>
     <array>

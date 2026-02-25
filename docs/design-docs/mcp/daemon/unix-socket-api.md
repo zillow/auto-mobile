@@ -141,7 +141,7 @@ Enables or disables a feature flag, with optional configuration.
 
 ### `ide/updateService`
 
-Updates the Android accessibility service APK or restarts the iOS XCTestService on the target device.
+Updates the Android accessibility service APK or restarts the iOS CtrlProxy iOS on the target device.
 
 **Params**
 
@@ -160,7 +160,7 @@ Updates the Android accessibility service APK or restarts the iOS XCTestService 
 }
 ```
 
-For iOS, `status` is omitted and `message` is `"XCTestService restarted"`.
+For iOS, `status` is omitted and `message` is `"CtrlProxy iOS restarted"`.
 
 ---
 

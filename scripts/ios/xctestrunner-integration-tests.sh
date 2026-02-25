@@ -13,7 +13,7 @@
 #   AUTOMOBILE_TEST_PLAN   Test plan file to use (default: Plans/launch-reminders-app.yaml)
 #
 # Prerequisites:
-#   - XCTestService artifacts must be built (run xctestservice-build-for-testing.sh)
+#   - CtrlProxy iOS artifacts must be built (run ctrl-proxy-build-for-testing.sh)
 #   - A simulator must be booted
 #   - Bun must be installed (for the MCP daemon)
 
@@ -49,13 +49,13 @@ echo ""
 # Check prerequisites
 echo -e "${BLUE}Checking prerequisites...${NC}"
 
-# Check if XCTestService artifacts exist
-if ! "${SCRIPT_DIR}/xctestservice-verify-artifacts.sh" >/dev/null 2>&1; then
-    echo -e "  ${RED}✗${NC} XCTestService artifacts not found"
-    echo -e "${YELLOW}Run ./scripts/ios/xctestservice-build-for-testing.sh first${NC}"
+# Check if CtrlProxy iOS artifacts exist
+if ! "${SCRIPT_DIR}/ctrl-proxy-verify-artifacts.sh" >/dev/null 2>&1; then
+    echo -e "  ${RED}✗${NC} CtrlProxy iOS artifacts not found"
+    echo -e "${YELLOW}Run ./scripts/ios/ctrl-proxy-build-for-testing.sh first${NC}"
     exit 1
 fi
-echo -e "  ${GREEN}✓${NC} XCTestService artifacts found"
+echo -e "  ${GREEN}✓${NC} CtrlProxy iOS artifacts found"
 
 # Check if simulator is booted
 BOOTED_DEVICE=$(xcrun simctl list devices booted -j | grep -o '"udid" : "[^"]*"' | head -1 | sed 's/"udid" : "\(.*\)"/\1/')

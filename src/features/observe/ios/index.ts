@@ -1,43 +1,43 @@
 /**
- * XCTest Service Module
+ * iOS CtrlProxy Module
  *
- * This module provides access to iOS XCTestService functionality
+ * This module provides access to iOS CtrlProxy functionality
  * for UI automation, hierarchy inspection, and device interaction.
  */
 
 // Main client
-export { XCTestServiceClient } from "./XCTestServiceClient";
-export type { XCTestService } from "./XCTestServiceClient";
+export { CtrlProxyClient } from "./CtrlProxyClient";
+export type { CtrlProxyService } from "./CtrlProxyClient";
 
 // Delegate modules (for advanced usage)
-export { XCTestServiceGestures } from "./XCTestServiceGestures";
-export { XCTestServiceText } from "./XCTestServiceText";
-export { XCTestServiceHierarchy } from "./XCTestServiceHierarchy";
-export { XCTestServiceScreenshot } from "./XCTestServiceScreenshot";
-export { XCTestServiceNavigation } from "./XCTestServiceNavigation";
+export { CtrlProxyGestures } from "./CtrlProxyGestures";
+export { CtrlProxyText } from "./CtrlProxyText";
+export { CtrlProxyHierarchy } from "./CtrlProxyHierarchy";
+export { CtrlProxyScreenshot } from "./CtrlProxyScreenshot";
+export { CtrlProxyNavigation } from "./CtrlProxyNavigation";
 
 // Types
 export type {
   // Node and hierarchy types
-  XCTestNode,
-  XCTestHierarchy,
-  XCTestHierarchyResponse,
-  XCTestPerfTiming,
-  CachedHierarchy,
+  CtrlProxyNode,
+  CtrlProxyHierarchy,
+  CtrlProxyHierarchyResponse,
+  CtrlProxyPerfTiming,
+  CtrlProxyCachedHierarchy,
   WebSocketMessage,
 
   // Result types
-  XCTestScreenshotResult,
-  XCTestSwipeResult,
-  XCTestTapResult,
-  XCTestDragResult,
-  XCTestPinchResult,
-  XCTestSetTextResult,
-  XCTestImeActionResult,
-  XCTestSelectAllResult,
-  XCTestPressHomeResult,
-  XCTestLaunchAppResult,
-  XCTestActionResult,
+  CtrlProxyScreenshotResult,
+  CtrlProxySwipeResult,
+  CtrlProxyTapResult,
+  CtrlProxyDragResult,
+  CtrlProxyPinchResult,
+  CtrlProxySetTextResult,
+  CtrlProxyImeActionResult,
+  CtrlProxySelectAllResult,
+  CtrlProxyPressHomeResult,
+  CtrlProxyLaunchAppResult,
+  CtrlProxyActionResult,
 
   // Delegate context types
   DelegateContext,

@@ -2,7 +2,7 @@
  * Shared types for device service delegates.
  *
  * These types are used by both Android (CtrlProxyClient) and
- * iOS (XCTestServiceClient) delegate implementations to eliminate
+ * iOS (CtrlProxyClient) delegate implementations to eliminate
  * duplicated result type definitions.
  */
 

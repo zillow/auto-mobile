@@ -118,7 +118,7 @@ export class Daemon {
     await this.initializeDevicePoolWithTimeout(5000);
     startupBenchmark.endPhase("deviceDiscovery");
 
-    // Initialize iOS XCTestService connections for discovered iOS devices
+    // Initialize iOS CtrlProxy iOS connections for discovered iOS devices
     // This establishes WebSocket connections early so observe calls are fast
     await this.initializeIosServices();
 
@@ -840,18 +840,18 @@ export class Daemon {
   }
 
   /**
-   * Initialize iOS XCTestService connections for discovered iOS devices
+   * Initialize iOS CtrlProxy iOS connections for discovered iOS devices
    * This establishes WebSocket connections early so first observe calls are fast
    */
   private async initializeIosServices(): Promise<void> {
     const allDevices = this.devicePool.getAllDevices();
     const iosDevices = allDevices.filter(device => device.platform === "ios");
     if (iosDevices.length === 0) {
-      logger.debug("[Daemon] No iOS devices to initialize XCTestService for");
+      logger.debug("[Daemon] No iOS devices to initialize CtrlProxy iOS for");
       return;
     }
 
-    logger.info(`[Daemon] Initializing XCTestService for ${iosDevices.length} iOS device(s)...`);
+    logger.info(`[Daemon] Initializing CtrlProxy iOS for ${iosDevices.length} iOS device(s)...`);
     const deviceSessionManager = DeviceSessionManager.getInstance();
 
     // Per-device timeout to prevent hanging on unresponsive devices
@@ -859,7 +859,7 @@ export class Daemon {
 
     for (const device of iosDevices) {
       try {
-        logger.info(`[Daemon] Setting up XCTestService for iOS device ${device.id}`);
+        logger.info(`[Daemon] Setting up CtrlProxy iOS for iOS device ${device.id}`);
 
         const timeoutPromise = new Promise<never>((_, reject) => {
           const timer = defaultTimer.setTimeout(() => {
@@ -877,10 +877,10 @@ export class Daemon {
           }),
           timeoutPromise
         ]);
-        logger.info(`[Daemon] XCTestService ready for iOS device ${device.id}`);
+        logger.info(`[Daemon] CtrlProxy iOS ready for iOS device ${device.id}`);
       } catch (error) {
         // Log but don't fail - service will be set up on first tool call if needed
-        logger.warn(`[Daemon] Failed to initialize XCTestService for ${device.id}: ${error}`);
+        logger.warn(`[Daemon] Failed to initialize CtrlProxy iOS for ${device.id}: ${error}`);
       }
     }
   }

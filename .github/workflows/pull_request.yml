@@ -32,11 +32,11 @@ jobs:
       ios_should_run: ${{ steps.ios_should_run.outputs.should_run }}
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Check for documentation-only changes"
         id: filter
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.issue.number;
@@ -77,7 +77,7 @@ jobs:
 
       - name: "Check for SHA256-only changes"
         id: check-sha256
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.issue.number;
@@ -91,7 +91,7 @@ jobs:
 
             // Check if title matches the automated SHA256 update pattern
             const titleMatches = pr.title === 'chore: update accessibility service APK SHA256' ||
-                                 pr.title === 'chore: update XCTestService IPA SHA256';
+                                 pr.title === 'chore: update CtrlProxy iOS IPA SHA256';
 
             // Get list of changed files
             const { data: files } = await github.rest.pulls.listFiles({
@@ -196,7 +196,7 @@ jobs:
         working-directory: android/ide-plugin
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -235,7 +235,7 @@ jobs:
         working-directory: android/ide-plugin
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -271,7 +271,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Run XMLStarlet"
         shell: "bash"
@@ -287,7 +287,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Run ktfmt"
         shell: "bash"
@@ -301,7 +301,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Run ShellCheck"
         shell: "bash"
@@ -315,7 +315,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Validate MkDocs Navigation"
         shell: "bash"
@@ -329,7 +329,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Validate Claude Plugin"
         shell: "bash"
@@ -343,7 +343,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Create contributing file"
         shell: "bash"
@@ -375,7 +375,7 @@ jobs:
 
       - name: "Git Checkout"
         if: needs.detect-changes.outputs.docs_only != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Run Interactive Installer"
         if: needs.detect-changes.outputs.docs_only != 'true'
@@ -443,10 +443,10 @@ jobs:
         language: [ 'typescript' ]
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Initialize CodeQL"
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
@@ -462,7 +462,7 @@ jobs:
         run: turbo run build --output-logs=errors-only
 
       - name: "Perform CodeQL Analysis"
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{matrix.language}}"
 
@@ -473,7 +473,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -512,11 +512,11 @@ jobs:
 
       - name: "Git Checkout"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Cache Bun dependencies"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.bun/install/cache
@@ -594,12 +594,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Setup Node for native addons"
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "18.20.5"
 
@@ -635,7 +635,7 @@ jobs:
     if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Cache Turborepo"
         uses: actions/cache@v4
@@ -675,7 +675,7 @@ jobs:
     if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -706,7 +706,7 @@ jobs:
     if: needs.detect-changes.outputs.ios_should_run == 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Select Xcode 15.4"
         uses: maxim-lobanov/setup-xcode@v1
@@ -743,7 +743,7 @@ jobs:
           - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -791,7 +791,7 @@ jobs:
           - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -808,7 +808,7 @@ jobs:
     if: needs.detect-changes.outputs.ios_should_run == 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Install XcodeGen"
         run: brew install xcodegen
@@ -829,7 +829,7 @@ jobs:
           - { name: "Xcode 26", runner: "macos-26", xcode: "26.0" }
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -839,71 +839,56 @@ jobs:
       - name: "Ensure iOS Simulator runtime"
         uses: ./.github/actions/ensure-ios-simulator-runtime
 
-      - name: "Install XcodeGen"
-        run: brew install xcodegen
-
-      - name: "Generate Xcode Projects"
-        run: ./scripts/ios/xcodegen-generate.sh
-
       - name: "Build Xcode Projects"
         run: ./scripts/ios/xcode-build.sh
 
-  ios-xctestservice-build:
-    name: "Build XCTestService for Testing"
+  ios-ctrl-proxy-build:
+    name: "Build CtrlProxy iOS for Testing"
     runs-on: macos-26
     needs: detect-changes
     if: needs.detect-changes.outputs.ios_should_run == 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Select Xcode 26.0"
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "26.0"
 
-      - name: "Ensure iOS Simulator runtime"
-        uses: ./.github/actions/ensure-ios-simulator-runtime
-
-      - name: "Install XcodeGen"
-        run: brew install xcodegen
-
       - name: "Install xcpretty"
         run: gem install xcpretty
 
-      - name: "Build XCTestService for Testing"
-        run: ./scripts/ios/xctestservice-build-for-testing.sh
+      - name: "Build CtrlProxy iOS for Testing"
+        run: ./scripts/ios/ctrl-proxy-build-for-testing.sh
 
-      - name: "Upload XCTestService Artifacts"
+      - name: "Upload CtrlProxy iOS Artifacts"
         uses: actions/upload-artifact@v6
         with:
-          name: xctestservice-simulator-xcode26
-          path: /tmp/automobile-xctestservice/Build/Products
+          name: ctrl-proxy-simulator-xcode26
+          path: /tmp/automobile-ctrl-proxy/Build/Products
           retention-days: 1
 
   ios-xctest-runner-simulator-tests:
     name: "XCTestRunner Simulator Tests"
     runs-on: macos-26
-    needs: [detect-changes, ios-xctestservice-build]
+    needs: [detect-changes, ios-ctrl-proxy-build]
     if: needs.detect-changes.outputs.ios_should_run == 'true'
     timeout-minutes: 30
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: "Select Xcode 26.0"
+      - name: "Select Xcode 26.2"
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "26.0"
+          xcode-version: "26.2"
 
-      - name: "Ensure iOS Simulator runtime"
-        uses: ./.github/actions/ensure-ios-simulator-runtime
-
-      - name: "Download XCTestService Artifacts"
+      - name: "Download CtrlProxy iOS Artifacts"
         uses: actions/download-artifact@v7
         with:
-          name: xctestservice-simulator-xcode26
-          path: /tmp/automobile-xctestservice/Build/Products
+          name: ctrl-proxy-simulator-xcode26
+          path: /tmp/automobile-ctrl-proxy/Build/Products
 
       - name: "Setup Bun"
         uses: oven-sh/setup-bun@v2
@@ -913,20 +898,14 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Boot iOS Simulator"
-        run: |
-          # Find the first available iPhone simulator device
-          DEVICE=$(xcrun simctl list devices available -j \
-            | jq -r '[.devices | to_entries[] | .value[] | select(.name | startswith("iPhone"))] | first | .name')
-          echo "Booting simulator: ${DEVICE}"
-          xcrun simctl boot "${DEVICE}"
-          xcrun simctl bootstatus "${DEVICE}" -b
+        run: ./scripts/ios/boot-simulator.sh --ios-version 26.2
 
-      - name: "Verify XCTestService Artifacts"
+      - name: "Verify CtrlProxy iOS Artifacts"
         run: |
-          echo "Checking XCTestService artifacts..."
-          ls -la /tmp/automobile-xctestservice/Build/Products/
-          ls -la /tmp/automobile-xctestservice/Build/Products/Debug-iphonesimulator/ || true
-          XCTESTRUN=$(find /tmp/automobile-xctestservice/Build/Products -name "*.xctestrun" | head -1)
+          echo "Checking CtrlProxy iOS artifacts..."
+          ls -la /tmp/automobile-ctrl-proxy/Build/Products/
+          ls -la /tmp/automobile-ctrl-proxy/Build/Products/Debug-iphonesimulator/ || true
+          XCTESTRUN=$(find /tmp/automobile-ctrl-proxy/Build/Products -name "*.xctestrun" | head -1)
           echo "xctestrun file: ${XCTESTRUN}"
 
       - name: "Run Reminders integration tests"
@@ -951,7 +930,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -985,7 +964,7 @@ jobs:
     if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1022,7 +1001,7 @@ jobs:
           path: android/junit-runner/build/reports/tests/test/
 
       - name: "Publish Test Report"
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v6
         if: always()
         with:
           check_name: "JUnit Runner Emulator Test Report"
@@ -1046,7 +1025,7 @@ jobs:
           exit 1
 
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1096,7 +1075,7 @@ jobs:
           path: android/junit-runner/build/reports/tests/test/
 
       - name: "Publish Test Report"
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v6
         if: always()
         with:
           check_name: "JUnit Runner Emulator.wtf Test Report"
@@ -1110,7 +1089,7 @@ jobs:
     if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1140,7 +1119,7 @@ jobs:
           path: android/playground/app/build/reports/tests/test/
 
       - name: "Publish Test Report"
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v6
         if: always()
         with:
           check_name: "Playground Automobile Emulator Test Report"
@@ -1156,7 +1135,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -1180,7 +1159,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1212,7 +1191,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -1242,7 +1221,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1276,7 +1255,7 @@ jobs:
     if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Run hadolint"
         uses: hadolint/hadolint-action@v3.1.0
@@ -1296,7 +1275,7 @@ jobs:
     if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1341,7 +1320,7 @@ jobs:
     if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1386,7 +1365,7 @@ jobs:
     if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1432,7 +1411,7 @@ jobs:
     if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1506,7 +1485,7 @@ jobs:
 
       - name: "Post Consolidated Comment"
         if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -1848,7 +1827,7 @@ jobs:
       - ios-swift-test
       - ios-xcodegen
       - ios-xcode-build
-      - ios-xctestservice-build
+      - ios-ctrl-proxy-build
       - ios-xctest-runner-simulator-tests
     runs-on: ubuntu-latest
     steps:
@@ -1859,7 +1838,7 @@ jobs:
             "${{ needs.ios-swift-test.result }}" \
             "${{ needs.ios-xcodegen.result }}" \
             "${{ needs.ios-xcode-build.result }}" \
-            "${{ needs.ios-xctestservice-build.result }}" \
+            "${{ needs.ios-ctrl-proxy-build.result }}" \
             "${{ needs.ios-xctest-runner-simulator-tests.result }}" \
           )
           for r in "${results[@]}"; do

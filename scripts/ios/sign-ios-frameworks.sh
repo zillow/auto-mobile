@@ -22,23 +22,27 @@ fi
 KEYCHAIN_PATH="${IOS_KEYCHAIN_PATH:-}"
 STRICT_MODE="${IOS_SIGNING_STRICT:-false}"
 
+# Format: "directory:scheme"  (scheme matches the Swift package/target name)
 PACKAGES=(
-  "XCTestRunner"
-  "XCTestService"
+  "XCTestRunner:XCTestRunner"
+  "control-proxy:CtrlProxy"
 )
 
-for package in "${PACKAGES[@]}"; do
-  PACKAGE_DIR="${IOS_DIR}/${package}"
+for entry in "${PACKAGES[@]}"; do
+  package_dir="${entry%%:*}"
+  scheme="${entry##*:}"
+
+  PACKAGE_DIR="${IOS_DIR}/${package_dir}"
   if [[ ! -d "${PACKAGE_DIR}" ]]; then
-    echo "Error: ${package} package not found at ${PACKAGE_DIR}" >&2
+    echo "Error: ${package_dir} package not found at ${PACKAGE_DIR}" >&2
     exit 1
   fi
 
-  DERIVED_DATA_PATH="${PROJECT_ROOT}/scratch/ios-signing/${package}"
+  DERIVED_DATA_PATH="${PROJECT_ROOT}/scratch/ios-signing/${package_dir}"
   mkdir -p "${DERIVED_DATA_PATH}"
 
   XCODEBUILD_ARGS=(
-    -scheme "${package}"
+    -scheme "${scheme}"
     -destination 'generic/platform=iOS'
     -configuration Release
     -derivedDataPath "${DERIVED_DATA_PATH}"
@@ -53,16 +57,16 @@ for package in "${PACKAGES[@]}"; do
     XCODEBUILD_ARGS+=(OTHER_CODE_SIGN_FLAGS="--keychain ${KEYCHAIN_PATH}")
   fi
 
-  echo "Building ${package} for iOS release signing..."
+  echo "Building ${scheme} (${package_dir}) for iOS release signing..."
   (cd "${PACKAGE_DIR}" && xcodebuild "${XCODEBUILD_ARGS[@]}")
 
-  FRAMEWORK_PATH=$(find "${DERIVED_DATA_PATH}" -type d -name "${package}.framework" -path "*/Release-iphoneos/*" | head -n 1 || true)
+  FRAMEWORK_PATH=$(find "${DERIVED_DATA_PATH}" -type d -name "${scheme}.framework" -path "*/Release-iphoneos/*" | head -n 1 || true)
   if [[ -z "${FRAMEWORK_PATH}" ]]; then
     if [[ "${STRICT_MODE}" == "true" ]]; then
-      echo "Error: ${package}.framework not found in derived data: ${DERIVED_DATA_PATH}" >&2
+      echo "Error: ${scheme}.framework not found in derived data: ${DERIVED_DATA_PATH}" >&2
       exit 1
     else
-      echo "Warning: ${package}.framework not found in derived data: ${DERIVED_DATA_PATH}"
+      echo "Warning: ${scheme}.framework not found in derived data: ${DERIVED_DATA_PATH}"
       continue
     fi
   fi

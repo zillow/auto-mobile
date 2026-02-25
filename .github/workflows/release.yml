@@ -12,8 +12,8 @@ permissions:
   packages: write
 
 jobs:
-  build-xctestservice-ipa:
-    uses: ./.github/workflows/build-xctestservice-ipa.yml
+  build-ctrl-proxy-ios-ipa:
+    uses: ./.github/workflows/build-ctrl-proxy-ios-ipa.yml
 
   build-control-proxy-apk:
     uses: ./.github/workflows/build-control-proxy-apk.yml
@@ -26,11 +26,11 @@ jobs:
 
   verify-and-release:
     runs-on: ubuntu-latest
-    needs: [build-xctestservice-ipa, build-control-proxy-apk]
+    needs: [build-ctrl-proxy-ios-ipa, build-control-proxy-apk]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -40,7 +40,7 @@ jobs:
           bun-version: 1.3.9
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
@@ -63,10 +63,10 @@ jobs:
           name: control-proxy-apk
           path: /tmp
 
-      - name: "Download XCTestService IPA"
+      - name: "Download CtrlProxy iOS IPA"
         uses: actions/download-artifact@v7
         with:
-          name: xctestservice-ipa
+          name: ctrl-proxy-ios-ipa
           path: /tmp
 
       - name: "Verify APK SHA256 matches source"
@@ -76,17 +76,17 @@ jobs:
           CHECKSUM=$(grep '^checksum=' /tmp/apk-verify.log | cut -d= -f2)
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
-      - name: "Verify XCTestService IPA SHA256 matches source"
+      - name: "Verify CtrlProxy iOS IPA SHA256 matches source"
         id: verify_ipa_checksum
         run: |
-          bash scripts/ci/verify-artifact-sha256.sh /tmp/XCTestService.ipa XCTESTSERVICE_SHA256_CHECKSUM | tee /tmp/ipa-verify.log
+          bash scripts/ci/verify-artifact-sha256.sh /tmp/control-proxy.ipa IOS_CTRL_PROXY_SHA256_CHECKSUM | tee /tmp/ipa-verify.log
           CHECKSUM=$(grep '^checksum=' /tmp/ipa-verify.log | cut -d= -f2)
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
       - name: Generate release constants
         run: |
           RELEASE_VERSION="${{ steps.version.outputs.version }}" \
-          XCTESTSERVICE_RELEASE_VERSION="${{ steps.version.outputs.version }}" \
+          IOS_CTRL_PROXY_RELEASE_VERSION="${{ steps.version.outputs.version }}" \
           bash scripts/generate-release-constants.sh
 
       - name: Run tests
@@ -136,7 +136,7 @@ jobs:
           APK_CHECKSUM="${{ steps.verify_checksum.outputs.checksum }}"
           IPA_CHECKSUM="${{ steps.verify_ipa_checksum.outputs.checksum }}"
           NOTES="${NOTES}"$'\n\n'"## Accessibility Service APK"$'\n\n'"**SHA256 Checksum:** \`${APK_CHECKSUM}\`"$'\n\n'"Download the APK from the release assets below."
-          NOTES="${NOTES}"$'\n\n'"## XCTestService IPA"$'\n\n'"**SHA256 Checksum:** \`${IPA_CHECKSUM}\`"$'\n\n'"Download the IPA from the release assets below."
+          NOTES="${NOTES}"$'\n\n'"## CtrlProxy iOS IPA"$'\n\n'"**SHA256 Checksum:** \`${IPA_CHECKSUM}\`"$'\n\n'"Download the IPA from the release assets below."
 
           # Save to file for GitHub release
           echo "$NOTES" > release_notes.txt
@@ -159,7 +159,7 @@ jobs:
           ./mcp-publisher publish
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -237,7 +237,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
@@ -254,7 +254,7 @@ jobs:
           body_path: release_notes.txt
           files: |
             /tmp/control-proxy-debug.apk
-            /tmp/XCTestService.ipa
+            /tmp/control-proxy.ipa
           draft: false
           prerelease: false
         env:
@@ -267,7 +267,7 @@ jobs:
           echo "**Version:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**APK Built:** control-proxy-debug.apk" >> $GITHUB_STEP_SUMMARY
           echo "**APK SHA256:** \`${{ steps.verify_checksum.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**IPA Built:** XCTestService.ipa" >> $GITHUB_STEP_SUMMARY
+          echo "**IPA Built:** control-proxy.ipa" >> $GITHUB_STEP_SUMMARY
           echo "**IPA SHA256:** \`${{ steps.verify_ipa_checksum.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Published Artifacts" >> $GITHUB_STEP_SUMMARY

@@ -10,7 +10,7 @@
 # Components watched (in order):
 #   1. IntelliJ/Android Studio IDE plugin
 #   2. Android AccessibilityService (with sha updates for TypeScript)
-#   3. iOS XCTestService (with sha updates for TypeScript)
+#   3. iOS CtrlProxy (with sha updates for TypeScript)
 #   4. MCP TypeScript daemon
 #
 # Usage:
@@ -28,7 +28,7 @@
 #
 # Environment:
 #   ANDROID_SERIAL       ADB device id override
-#   XCTESTSERVICE_PORT   Override XCTestService port (default: 8765)
+#   CTRL_PROXY_IOS_PORT   Override CtrlProxy iOS port (default: 8765)
 
 set -euo pipefail
 
@@ -48,14 +48,14 @@ source "${SCRIPT_DIR}/lib/apk.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/ide-plugin.sh"
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/lib/xctestservice.sh"
+source "${SCRIPT_DIR}/lib/ctrl-proxy-ios.sh"
 
 # Path constants
 ANDROID_DIR="${PROJECT_ROOT}/android"
 SERVICE_DIR="${ANDROID_DIR}/control-proxy"
 APK_PATH="${SERVICE_DIR}/build/outputs/apk/debug/control-proxy-debug.apk"
-XCTEST_SERVICE_DIR="${PROJECT_ROOT}/ios/XCTestService"
-DERIVED_DATA_PATH="/tmp/automobile-xctestservice"
+CTRL_PROXY_IOS_DIR="${PROJECT_ROOT}/ios/control-proxy"
+DERIVED_DATA_PATH="/tmp/automobile-ctrl-proxy"
 PID_FILE="${PROJECT_ROOT}/.automobile-hot-reload.pid"
 
 # CLI options with defaults
@@ -95,7 +95,7 @@ AutoMobile unified hot-reload development workflow.
 Watches all components in a single loop:
   1. IntelliJ/Android Studio IDE plugin
   2. Android AccessibilityService (with sha updates)
-  3. iOS XCTestService (with sha updates)
+  3. iOS CtrlProxy (with sha updates)
   4. MCP TypeScript daemon
 
 Options:
@@ -110,7 +110,7 @@ Options:
 
 Environment variables:
   ANDROID_SERIAL       ADB device id override
-  XCTESTSERVICE_PORT   Override XCTestService port (default: 8765)
+  CTRL_PROXY_IOS_PORT   Override CtrlProxy iOS port (default: 8765)
 EOF
 }
 
@@ -122,7 +122,7 @@ kill_previous() {
     if [[ -n "${old_pid}" ]] && kill -0 "${old_pid}" 2>/dev/null; then
       log_info "Killing previous hot-reload process (PID ${old_pid})..."
       kill "${old_pid}" 2>/dev/null || true
-      # Wait up to 10 seconds for graceful shutdown (allows XCTestService cleanup)
+      # Wait up to 10 seconds for graceful shutdown (allows CtrlProxy iOS cleanup)
       local count=0
       while kill -0 "${old_pid}" 2>/dev/null && [[ ${count} -lt 10 ]]; do
         sleep 1
@@ -150,14 +150,14 @@ kill_previous() {
     fi
   fi
 
-  # Kill any orphaned xcodebuild test processes for XCTestService that may
+  # Kill any orphaned xcodebuild.*test.*CtrlProxy that may
   # have been left behind when a watcher was SIGKILL'd
-  pids=$(pgrep -f "xcodebuild.*test.*XCTestService" 2>/dev/null || true)
+  pids=$(pgrep -f "xcodebuild.*test.*CtrlProxy" 2>/dev/null || true)
   if [[ -n "${pids}" ]]; then
-    log_info "Killing orphaned XCTestService xcodebuild processes: ${pids}"
+    log_info "Killing orphaned CtrlProxy iOS xcodebuild processes: ${pids}"
     echo "${pids}" | xargs kill 2>/dev/null || true
     sleep 2
-    pids=$(pgrep -f "xcodebuild.*test.*XCTestService" 2>/dev/null || true)
+    pids=$(pgrep -f "xcodebuild.*test.*CtrlProxy" 2>/dev/null || true)
     if [[ -n "${pids}" ]]; then
       log_warn "Force killing orphaned xcodebuild processes..."
       echo "${pids}" | xargs kill -9 2>/dev/null || true
@@ -249,13 +249,13 @@ build_typescript() {
 # iOS-specific file list (separate from APK file list)
 list_ios_watch_files() {
   local watch_dirs=(
-    "${XCTEST_SERVICE_DIR}/Sources"
-    "${XCTEST_SERVICE_DIR}/Tests"
-    "${XCTEST_SERVICE_DIR}/XCTestServiceApp"
+    "${CTRL_PROXY_IOS_DIR}/Sources"
+    "${CTRL_PROXY_IOS_DIR}/Tests"
+    "${CTRL_PROXY_IOS_DIR}/CtrlProxyApp"
   )
   local extra_files=(
-    "${XCTEST_SERVICE_DIR}/project.yml"
-    "${XCTEST_SERVICE_DIR}/XCTestService.xcodeproj/project.pbxproj"
+    "${CTRL_PROXY_IOS_DIR}/project.yml"
+    "${CTRL_PROXY_IOS_DIR}/CtrlProxy.xcodeproj/project.pbxproj"
   )
 
   if command -v rg >/dev/null 2>&1; then
@@ -472,8 +472,8 @@ setup_ios() {
     return 1
   fi
 
-  if [[ ! -d "${XCTEST_SERVICE_DIR}" ]]; then
-    log_warn "XCTestService directory not found: ${XCTEST_SERVICE_DIR}"
+  if [[ ! -d "${CTRL_PROXY_IOS_DIR}" ]]; then
+    log_warn "CtrlProxy iOS directory not found: ${CTRL_PROXY_IOS_DIR}"
     return 1
   fi
 
@@ -485,10 +485,10 @@ setup_ios() {
   fi
 
   log_info "Derived data: ${DERIVED_DATA_PATH}"
-  log_info "Building XCTestService..."
+  log_info "Building CtrlProxy iOS..."
 
-  if ! build_xctestservice; then
-    log_warn "Initial XCTestService build failed. Will retry on changes."
+  if ! build_ctrl_proxy_ios; then
+    log_warn "Initial CtrlProxy iOS build failed. Will retry on changes."
     return 1
   fi
 
@@ -655,7 +655,7 @@ unified_watch_loop() {
 
       if [[ "${next_ios_hash}" != "${LAST_IOS_HASH}" ]]; then
         log_info "[iOS] Change detected. Rebuilding..."
-        if build_xctestservice; then
+        if build_ctrl_proxy_ios; then
           LAST_IOS_HASH="$(hash_ios_watch_state)"
           IOS_NEEDS_RESTART=true
           # Update TypeScript checksum after iOS build
@@ -669,17 +669,17 @@ unified_watch_loop() {
         fi
       fi
 
-      # Check if XCTestService process died
+      # Check if CtrlProxy iOS process died
       if [[ -n "${XCODEBUILD_PID}" ]] && ! kill -0 "${XCODEBUILD_PID}" 2>/dev/null; then
-        log_warn "[iOS] XCTestService process exited."
+        log_warn "[iOS] CtrlProxy iOS process exited."
         XCODEBUILD_PID=""
         IOS_NEEDS_RESTART=true
       fi
 
       # Restart if needed
       if [[ "${IOS_NEEDS_RESTART}" == "true" ]] && [[ -n "${LAST_SIMULATOR}" ]]; then
-        stop_xctestservice
-        start_xctestservice "${LAST_SIMULATOR}"
+        stop_ctrl_proxy_ios
+        start_ctrl_proxy_ios "${LAST_SIMULATOR}"
         IOS_NEEDS_RESTART=false
       fi
     fi
@@ -842,11 +842,11 @@ WATCHER_LOG="${PROJECT_ROOT}/scratch/hot-reload.log"
 : > "${WATCHER_LOG}"
 
 (
-  # Background watcher cleanup — stops XCTestService and removes PID file
+  # Background watcher cleanup — stops CtrlProxy iOS and removes PID file
   # shellcheck disable=SC2317,SC2329 # invoked indirectly via trap
   watcher_cleanup() {
     log_info "Watcher stopping..."
-    stop_xctestservice
+    stop_ctrl_proxy_ios
     rm -f "${PID_FILE}"
   }
   trap watcher_cleanup EXIT TERM INT HUP
@@ -854,11 +854,11 @@ WATCHER_LOG="${PROJECT_ROOT}/scratch/hot-reload.log"
   WATCHER_START_TIME=$(date +%s)
   MAX_DURATION=$(( TIMEOUT_MINUTES * 60 ))
 
-  # Start initial iOS XCTestService if simulator available
+  # Start initial iOS CtrlProxy if simulator available
   if [[ "${IOS_ENABLED}" == "true" ]]; then
     initial_simulator="$(get_current_simulator)"
     if [[ -n "${initial_simulator}" ]]; then
-      start_xctestservice "${initial_simulator}"
+      start_ctrl_proxy_ios "${initial_simulator}"
       LAST_SIMULATOR="${initial_simulator}"
     fi
   fi

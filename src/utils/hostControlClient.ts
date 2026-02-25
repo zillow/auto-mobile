@@ -72,7 +72,7 @@ interface IosInfo {
   developerDir?: string;
 }
 
-interface XCTestServiceStatus {
+interface CtrlProxyIOSStatus {
   running: boolean;
   pid?: number;
   port?: number;
@@ -491,7 +491,7 @@ export async function uninstallDeviceApp(params: {
   return sendCommand("devicectl-uninstall", params);
 }
 
-export async function startXCTestService(params: {
+export async function startCtrlProxyIOS(params: {
   deviceId: string;
   port: number;
   xctestrunPath?: string;
@@ -501,19 +501,19 @@ export async function startXCTestService(params: {
   return sendCommand("xctest-start", params);
 }
 
-export async function stopXCTestService(params: {
+export async function stopCtrlProxyIOS(params: {
   deviceId?: string;
   pid?: number;
 }): Promise<HostControlResult<{ message: string }>> {
   return sendCommand("xctest-stop", params);
 }
 
-export async function getXCTestServiceStatus(params: {
+export async function getCtrlProxyIOSStatus(params: {
   deviceId?: string;
   pid?: number;
   port?: number;
-} = {}): Promise<HostControlResult<XCTestServiceStatus>> {
-  return sendCommand<XCTestServiceStatus>("xctest-status", params);
+} = {}): Promise<HostControlResult<CtrlProxyIOSStatus>> {
+  return sendCommand<CtrlProxyIOSStatus>("xctest-status", params);
 }
 
 /**

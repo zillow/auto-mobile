@@ -19,9 +19,9 @@ For detailed architecture documentation, see `docs/design-docs/plat/ios/`.
 
 ## Components
 
-### XCTestService
+### CtrlProxy iOS
 
-**Path**: `ios/XCTestService/`
+**Path**: `ios/CtrlProxy iOS/`
 **Type**: Swift Package (iOS library)
 **Purpose**: WebSocket-based automation server using native XCTest APIs
 
@@ -33,16 +33,16 @@ Core automation library providing:
 - Screenshot capture
 
 ```bash
-cd ios/XCTestService
+cd ios/CtrlProxy iOS
 swift build
 swift test
 ```
 
 #### Code signing for physical devices
 
-XCTestService deployment to physical devices requires a valid provisioning profile and signing identity. AutoMobile
+CtrlProxy iOS deployment to physical devices requires a valid provisioning profile and signing identity. AutoMobile
 attempts automatic signing via Xcode when possible and falls back to manual signing with matching profiles.
-The MCP server also verifies the installed XCTestService app bundle hash (excluding signing artifacts) against the
+The MCP server also verifies the installed CtrlProxy iOS app bundle hash (excluding signing artifacts) against the
 expected release hash before starting.
 
 Manual overrides (optional):
