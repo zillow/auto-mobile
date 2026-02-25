@@ -56,25 +56,25 @@ if ! command -v xcodebuild &> /dev/null; then
     exit 1
 fi
 
-if ! command -v xcodegen &> /dev/null; then
-    echo -e "${YELLOW}Warning: xcodegen not found. Attempting to install via brew...${NC}"
-    if command -v brew &> /dev/null; then
-        brew install xcodegen
-    else
-        echo -e "${RED}Error: xcodegen not found and brew not available.${NC}"
-        echo -e "${RED}Please install xcodegen: brew install xcodegen${NC}"
-        exit 1
-    fi
-fi
-
 XCODE_VERSION=$(xcodebuild -version)
 XCODE_VERSION=${XCODE_VERSION%%$'\n'*}
 echo -e "${BLUE}Xcode version:${NC} ${XCODE_VERSION}"
 echo -e "${BLUE}Derived data:${NC} ${DERIVED_DATA}"
 echo ""
 
-# Generate Xcode project if needed
+# Generate Xcode project if needed (xcodeproj is committed to git, so this is
+# only triggered in local dev when the project file is missing)
 if [ ! -d "${XCODEPROJ}" ]; then
+    if ! command -v xcodegen &> /dev/null; then
+        echo -e "${YELLOW}Warning: xcodegen not found. Attempting to install via brew...${NC}"
+        if command -v brew &> /dev/null; then
+            brew install xcodegen
+        else
+            echo -e "${RED}Error: xcodegen not found and brew not available.${NC}"
+            echo -e "${RED}Please install xcodegen: brew install xcodegen${NC}"
+            exit 1
+        fi
+    fi
     echo -e "${BLUE}Generating Xcode project...${NC}"
     cd "${CTRL_PROXY_IOS_DIR}"
     xcodegen generate

@@ -839,12 +839,6 @@ jobs:
       - name: "Ensure iOS Simulator runtime"
         uses: ./.github/actions/ensure-ios-simulator-runtime
 
-      - name: "Install XcodeGen"
-        run: brew install xcodegen
-
-      - name: "Generate Xcode Projects"
-        run: ./scripts/ios/xcodegen-generate.sh
-
       - name: "Build Xcode Projects"
         run: ./scripts/ios/xcode-build.sh
 
@@ -861,9 +855,6 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "26.0"
-
-      - name: "Install XcodeGen"
-        run: brew install xcodegen
 
       - name: "Install xcpretty"
         run: gem install xcpretty
