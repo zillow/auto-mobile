@@ -43,17 +43,34 @@ fi
 
 echo "Looking for iPhone simulator running iOS ${IOS_VERSION}..." >&2
 
-# Find the first available (non-unavailable) iPhone device for the requested iOS version
+# Runtime identifier uses dashes: iOS-26-2 not iOS-26.2
+RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-${IOS_VERSION//./-}"
+
+# Find the first available iPhone device for the requested iOS version
 UDID=$(xcrun simctl list devices available -j \
-  | jq -r --arg v "${IOS_VERSION}" '
+  | jq -r --arg runtime "${RUNTIME_ID}" '
       .devices
       | to_entries[]
-      | select(.key | contains($v))
+      | select(.key == $runtime)
       | .value[]
       | select(.name | startswith("iPhone"))
       | .udid
     ' \
   | head -1)
+
+# If no device exists for this runtime, create one
+if [[ -z "${UDID}" ]]; then
+  echo "No existing iPhone device for iOS ${IOS_VERSION}, creating one..." >&2
+  DEVICE_TYPE=$(xcrun simctl list devicetypes -j \
+    | jq -r '.devicetypes[] | select(.name | startswith("iPhone")) | .identifier' \
+    | tail -1)
+  if [[ -z "${DEVICE_TYPE}" ]]; then
+    echo "error: no iPhone device type found to create simulator" >&2
+    exit 1
+  fi
+  echo "Creating device: ${DEVICE_TYPE} with runtime ${RUNTIME_ID}" >&2
+  UDID=$(xcrun simctl create "CI iPhone" "${DEVICE_TYPE}" "${RUNTIME_ID}")
+fi
 
 if [[ -z "${UDID}" ]]; then
   echo "error: no available iPhone simulator found for iOS ${IOS_VERSION}" >&2
