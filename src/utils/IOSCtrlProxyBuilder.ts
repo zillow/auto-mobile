@@ -540,7 +540,7 @@ export class IOSCtrlProxyBuilder {
         return genericOverride.trim();
       }
       // IOS_CTRL_PROXY_APP_HASH is documented as the device build hash
-      return IOS_CTRL_PROXY_APP_HASH || "";
+      return IOS_CTRL_PROXY_APP_HASH;
     }
     // For simulator, only use platform-specific override (already checked above)
     // Skip verification if no simulator-specific hash is provided
