@@ -160,7 +160,7 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
   public static readonly BUNDLE_ID = "dev.jasonpearson.automobile.ctrlproxy";
   public static readonly APP_BUNDLE_ID = "dev.jasonpearson.automobile.ctrlproxy";
   /** Bundle ID used before the rename to CtrlProxy — uninstalled opportunistically on device setup */
-  private static readonly LEGACY_APP_BUNDLE_ID = "dev.jasonpearson.automobile.CtrlProxy iOSApp";
+  private static readonly LEGACY_APP_BUNDLE_ID = "dev.jasonpearson.automobile.XCTestServiceApp";
   private static readonly IPROXY_HEALTH_CHECK_INTERVAL_MS = 5000;
   private static readonly IPROXY_MAX_HEALTH_FAILURES = 2;
   private static readonly IPROXY_RESTART_BASE_DELAY_MS = 1000;
