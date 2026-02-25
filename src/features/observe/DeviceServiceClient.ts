@@ -2,7 +2,7 @@
  * DeviceServiceClient - Abstract base class for device service WebSocket clients
  *
  * This base class provides shared connection lifecycle management used by both
- * AccessibilityServiceClient (Android) and XCTestServiceClient (iOS).
+ * CtrlProxyClient (Android) and XCTestServiceClient (iOS).
  *
  * Shared functionality:
  * - WebSocket connection management

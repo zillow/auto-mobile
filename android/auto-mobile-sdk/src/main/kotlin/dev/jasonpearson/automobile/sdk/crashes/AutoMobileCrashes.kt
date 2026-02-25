@@ -32,7 +32,7 @@ object AutoMobileCrashes {
     private const val TAG = "AutoMobileCrashes"
 
     /** Package name of the AutoMobile AccessibilityService that receives broadcasts */
-    private const val ACCESSIBILITY_SERVICE_PACKAGE = "dev.jasonpearson.automobile.accessibilityservice"
+    private const val ACCESSIBILITY_SERVICE_PACKAGE = "dev.jasonpearson.automobile.ctrlproxy"
 
     const val ACTION_CRASH = "dev.jasonpearson.automobile.sdk.CRASH"
     const val EXTRA_TIMESTAMP = "timestamp"

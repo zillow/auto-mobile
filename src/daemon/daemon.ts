@@ -31,7 +31,7 @@ import { startPerformancePushSocketServer, stopPerformancePushSocketServer } fro
 import { startDeviceDataStreamSocketServer, stopDeviceDataStreamSocketServer, getDeviceDataStreamServer, type NavigationGraphStreamData } from "./deviceDataStreamSocketServer";
 import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
 import { startFailuresPushSocketServer, stopFailuresPushSocketServer } from "./failuresPushSocketServer";
-import { AccessibilityServiceClient } from "../features/observe/android";
+import { CtrlProxyClient } from "../features/observe/android";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
@@ -533,7 +533,7 @@ export class Daemon {
           };
 
           // Get or create the accessibility service client for this device
-          const client = AccessibilityServiceClient.getInstance(bootedDevice, null);
+          const client = CtrlProxyClient.getInstance(bootedDevice, null);
 
           // Trigger WebSocket connection (async, fire-and-forget)
           client.ensureConnected().then(connected => {
@@ -873,7 +873,7 @@ export class Daemon {
 
         await Promise.race([
           deviceSessionManager.verifyIosDevice(device.id, {
-            skipAccessibilityDownload: true  // Skip app download during startup, use cached version
+            skipCtrlProxyDownload: true  // Skip app download during startup, use cached version
           }),
           timeoutPromise
         ]);

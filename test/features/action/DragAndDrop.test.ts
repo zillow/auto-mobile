@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { BootedDevice, ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import { DragAndDrop } from "../../../src/features/action/DragAndDrop";
-import { AccessibilityServiceClient } from "../../../src/features/observe/android";
-import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
-import { FakeAccessibilityService } from "../../fakes/FakeAccessibilityService";
+import { CtrlProxyClient } from "../../../src/features/observe/android";
+import { AndroidCtrlProxyManager } from "../../../src/utils/CtrlProxyManager";
+import { FakeCtrlProxy } from "../../fakes/FakeCtrlProxy";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
@@ -21,7 +21,7 @@ describe("DragAndDrop", () => {
   let fakeObserveScreen: FakeObserveScreen;
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeWindow: FakeWindow;
-  let fakeA11yService: FakeAccessibilityService;
+  let fakeA11yService: FakeCtrlProxy;
   let fakeAdb: FakeAdbExecutor;
   let fakeTimer: FakeTimer;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
@@ -63,7 +63,7 @@ describe("DragAndDrop", () => {
     fakeObserveScreen = new FakeObserveScreen();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeWindow = new FakeWindow();
-    fakeA11yService = new FakeAccessibilityService();
+    fakeA11yService = new FakeCtrlProxy();
     fakeAdb = new FakeAdbExecutor();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
@@ -72,10 +72,10 @@ describe("DragAndDrop", () => {
     fakeWindow.configureCachedActiveWindow(null);
     fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
 
-    managerSpy = spyOn(AndroidAccessibilityServiceManager, "getInstance").mockReturnValue({
+    managerSpy = spyOn(AndroidCtrlProxyManager, "getInstance").mockReturnValue({
       isAvailable: async () => true
     } as any);
-    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(fakeA11yService as any);
+    getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(fakeA11yService as any);
 
     dragAndDrop = new DragAndDrop(device, null, fakeTimer);
     (dragAndDrop as any).observeScreen = fakeObserveScreen;

@@ -3,7 +3,7 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, SendTextResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
 import { defaultTimer } from "../../utils/SystemTimer";
 
@@ -82,7 +82,7 @@ export class InputText extends BaseVisualChange {
   ): Promise<SendTextResult & { method?: "a11y" }> {
     // Use accessibility service exclusively (fastest method, ~10-30ms vs ~200-300ms for ADB)
     // It also natively supports Unicode without needing virtual keyboard
-    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestSetText(text);
 
     if (a11yResult.success) {

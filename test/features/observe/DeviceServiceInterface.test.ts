@@ -1,7 +1,7 @@
 /**
  * Interface compliance tests for DeviceService implementations.
  *
- * These tests verify that both AccessibilityServiceClient (Android) and
+ * These tests verify that both CtrlProxyClient (Android) and
  * XCTestServiceClient (iOS) properly implement the DeviceService interface.
  *
  * The tests focus on:
@@ -12,7 +12,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { DeviceService, AndroidDeviceService } from "../../../src/features/observe/DeviceService";
-import { AccessibilityServiceClient } from "../../../src/features/observe/android";
+import { CtrlProxyClient } from "../../../src/features/observe/android";
 import { XCTestServiceClient } from "../../../src/features/observe/ios";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice } from "../../../src/models";
@@ -28,8 +28,8 @@ describe("DeviceService Interface Compliance", () => {
   // ===========================================================================
 
   describe("Type Compliance", () => {
-    test("AccessibilityServiceClient implements DeviceService interface", () => {
-      // This test verifies at compile-time that AccessibilityServiceClient
+    test("CtrlProxyClient implements DeviceService interface", () => {
+      // This test verifies at compile-time that CtrlProxyClient
       // is assignable to the DeviceService interface
       const fakeTimer = new FakeTimer();
       fakeTimer.enableAutoAdvance();
@@ -43,16 +43,16 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      AccessibilityServiceClient.resetInstances();
+      CtrlProxyClient.resetInstances();
       // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
-      const client = AccessibilityServiceClient.createForTesting(
+      const client = CtrlProxyClient.createForTesting(
         testDevice,
         fakeAdb,
         createSuccessWebSocketFactory(),
         fakeTimer
       );
 
-      // Type assertion: AccessibilityServiceClient should be assignable to DeviceService
+      // Type assertion: CtrlProxyClient should be assignable to DeviceService
       const deviceService: DeviceService = client;
 
       // Verify the interface methods exist
@@ -114,7 +114,7 @@ describe("DeviceService Interface Compliance", () => {
       void client.close();
     });
 
-    test("AccessibilityServiceClient implements AndroidDeviceService interface", () => {
+    test("CtrlProxyClient implements AndroidDeviceService interface", () => {
       const fakeTimer = new FakeTimer();
       fakeTimer.enableAutoAdvance();
       const fakeAdb = new FakeAdbExecutor();
@@ -127,16 +127,16 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      AccessibilityServiceClient.resetInstances();
+      CtrlProxyClient.resetInstances();
       // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
-      const client = AccessibilityServiceClient.createForTesting(
+      const client = CtrlProxyClient.createForTesting(
         testDevice,
         fakeAdb,
         createSuccessWebSocketFactory(),
         fakeTimer
       );
 
-      // Type assertion: AccessibilityServiceClient should be assignable to AndroidDeviceService
+      // Type assertion: CtrlProxyClient should be assignable to AndroidDeviceService
       const androidService: AndroidDeviceService = client;
 
       // Verify Android-specific interface methods exist
@@ -197,9 +197,9 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      AccessibilityServiceClient.resetInstances();
+      CtrlProxyClient.resetInstances();
       // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
-      const client = AccessibilityServiceClient.createForTesting(
+      const client = CtrlProxyClient.createForTesting(
         testDevice,
         fakeAdb,
         createSuccessWebSocketFactory(fakeTimer),
@@ -223,9 +223,9 @@ describe("DeviceService Interface Compliance", () => {
         name: "Test Android Device",
       };
 
-      AccessibilityServiceClient.resetInstances();
+      CtrlProxyClient.resetInstances();
       // Pass FakeAdbExecutor directly since it implements AdbExecutor interface
-      const client = AccessibilityServiceClient.createForTesting(
+      const client = CtrlProxyClient.createForTesting(
         testDevice,
         fakeAdb,
         createInstantFailureWebSocketFactory(fakeTimer),

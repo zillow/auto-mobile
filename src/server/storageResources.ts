@@ -1,6 +1,6 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
-import { AccessibilityServiceClient } from "../features/observe/android";
+import { CtrlProxyClient } from "../features/observe/android";
 import { BootedDevice } from "../models";
 import { logger } from "../utils/logger";
 import type { PreferenceFile, KeyValueEntry } from "../features/storage/storageTypes";
@@ -111,7 +111,7 @@ async function getStorageFilesResource(params: Record<string, string>): Promise<
     }
 
     logger.info(`[StorageResources] Found device: ${device.deviceId}, calling listPreferenceFiles`);
-    const client = AccessibilityServiceClient.getInstance(device);
+    const client = CtrlProxyClient.getInstance(device);
     const files = await client.listPreferenceFiles(decodedPackage);
     logger.info(`[StorageResources] listPreferenceFiles returned ${files.length} files`);
     const lastUpdated = new Date().toISOString();
@@ -168,7 +168,7 @@ async function getStorageEntriesResource(params: Record<string, string>): Promis
       };
     }
 
-    const client = AccessibilityServiceClient.getInstance(device);
+    const client = CtrlProxyClient.getInstance(device);
     const entries = await client.getPreferenceEntries(decodedPackage, decodedFileName);
     const lastUpdated = new Date().toISOString();
     const hash = generateHash(entries);

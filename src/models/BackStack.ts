@@ -62,6 +62,6 @@ export interface BackStackInfo {
   capturedAt?: number;
   /** Whether the back stack information is partial/incomplete */
   partial?: boolean;
-  /** Source of the back stack data: 'adb' | 'accessibility-service' | 'hybrid' */
+  /** Source of the back stack data: 'adb' | 'control-proxy' | 'hybrid' */
   source?: string;
 }

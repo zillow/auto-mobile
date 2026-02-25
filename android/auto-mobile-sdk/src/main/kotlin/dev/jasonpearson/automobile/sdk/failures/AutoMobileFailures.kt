@@ -38,7 +38,7 @@ object AutoMobileFailures {
     private const val MAX_EVENTS = 100
 
     /** Package name of the AutoMobile AccessibilityService that receives broadcasts */
-    private const val ACCESSIBILITY_SERVICE_PACKAGE = "dev.jasonpearson.automobile.accessibilityservice"
+    private const val ACCESSIBILITY_SERVICE_PACKAGE = "dev.jasonpearson.automobile.ctrlproxy"
 
     const val ACTION_HANDLED_EXCEPTION = "dev.jasonpearson.automobile.sdk.HANDLED_EXCEPTION"
     const val EXTRA_TIMESTAMP = "timestamp"

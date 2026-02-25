@@ -64,7 +64,7 @@ The following items are documented as designs or proposals but have **no corresp
 - **iOS XcodeCompanion** — Scaffolded macOS app with all views and navigation defined; feature completeness is ongoing. See [iOS IDE plugin](plat/ios/ide-plugin/overview.md).
 - **iOS XcodeExtension** — Scaffold with 5 registered commands; implementations are minimal stubs.
 - **`highlight` tool** — Fully implemented on Android; returns an unsupported error on iOS.
-- **`rawViewHierarchy` (accessibility-service source)** — Android only. iOS returns XCUITest JSON.
+- **`rawViewHierarchy` (control-proxy source)** — Android only. iOS returns XCUITest JSON.
 - **Work profile `userId` override** — Auto-detection works; manual `userId` parameter is not supported in MCP tool schemas.
 
 ### Features That Lack Test Coverage

@@ -13,8 +13,8 @@ import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
 import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { DefaultElementFinder } from "../utility/ElementFinder";
 import { DefaultElementParser } from "../utility/ElementParser";
-import { AccessibilityServiceClient } from "../observe/android";
-import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { CtrlProxyClient } from "../observe/android";
+import { AndroidCtrlProxyManager } from "../../utils/CtrlProxyManager";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { boundsArea, clamp } from "../../utils/bounds";
 import { buildContainerFromElement } from "../../utils/elementProperties";
@@ -93,7 +93,7 @@ export class PinchOn extends BaseVisualChange {
       return this.createErrorResult(`Unsupported platform: ${this.device.platform}`, options);
     }
 
-    const a11yManager = AndroidAccessibilityServiceManager.getInstance(this.device, this.adb);
+    const a11yManager = AndroidCtrlProxyManager.getInstance(this.device, this.adb);
     const available = await perf.track("a11yAvailable", () => a11yManager.isAvailable());
     if (!available) {
       perf.end();
@@ -136,7 +136,7 @@ export class PinchOn extends BaseVisualChange {
       const duration = options.duration ?? 300;
       const rotationDegrees = options.rotationDegrees ?? 0;
 
-      const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+      const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
 
       const pinchResult = await this.observedInteraction(
         async () => {

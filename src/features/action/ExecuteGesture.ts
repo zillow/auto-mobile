@@ -5,7 +5,7 @@ import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 
@@ -111,7 +111,7 @@ export class ExecuteGesture extends BaseVisualChange {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     try {
-      const client = AccessibilityServiceClient.getInstance(this.device, this.adb);
+      const client = CtrlProxyClient.getInstance(this.device, this.adb);
 
       const result = await perf.track("a11ySwipe", async () => {
         return await client.requestSwipe(x1, y1, x2, y2, duration, 5000, perf);

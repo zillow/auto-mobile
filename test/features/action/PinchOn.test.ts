@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { BootedDevice, ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import { PinchOn } from "../../../src/features/action/PinchOn";
-import { AccessibilityServiceClient } from "../../../src/features/observe/android";
-import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
-import { FakeAccessibilityService } from "../../fakes/FakeAccessibilityService";
+import { CtrlProxyClient } from "../../../src/features/observe/android";
+import { AndroidCtrlProxyManager } from "../../../src/utils/CtrlProxyManager";
+import { FakeCtrlProxy } from "../../fakes/FakeCtrlProxy";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
@@ -22,7 +22,7 @@ describe("PinchOn", () => {
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeWindow: FakeWindow;
   let fakeTimer: FakeTimer;
-  let fakeA11yService: FakeAccessibilityService;
+  let fakeA11yService: FakeCtrlProxy;
   let fakeAdb: FakeAdbExecutor;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let managerSpy: ReturnType<typeof spyOn> | null = null;
@@ -57,17 +57,17 @@ describe("PinchOn", () => {
     fakeWindow = new FakeWindow();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    fakeA11yService = new FakeAccessibilityService();
+    fakeA11yService = new FakeCtrlProxy();
     fakeAdb = new FakeAdbExecutor();
 
     fakeObserveScreen.setObserveResult(() => createObserveResult());
     fakeWindow.configureCachedActiveWindow(null);
     fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
 
-    managerSpy = spyOn(AndroidAccessibilityServiceManager, "getInstance").mockReturnValue({
+    managerSpy = spyOn(AndroidCtrlProxyManager, "getInstance").mockReturnValue({
       isAvailable: async () => true
     } as any);
-    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(fakeA11yService as any);
+    getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(fakeA11yService as any);
 
     pinchOn = new PinchOn(device);
     (pinchOn as any).observeScreen = fakeObserveScreen;

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
-import { checkVersion, checkAccessibilityService } from "../../src/doctor/checks/automobile";
+import { checkVersion, checkCtrlProxy } from "../../src/doctor/checks/automobile";
 import { RELEASE_VERSION } from "../../src/constants/release";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import type { AdbClientFactory } from "../../src/utils/android-cmdline-tools/AdbClientFactory";
@@ -25,7 +25,7 @@ describe("checkVersion", () => {
   });
 });
 
-describe("checkAccessibilityService", () => {
+describe("checkCtrlProxy", () => {
   let fakeAdb: FakeAdbExecutor;
   let fakeFactory: AdbClientFactory;
 
@@ -39,9 +39,9 @@ describe("checkAccessibilityService", () => {
   test("returns skip when no devices connected", async () => {
     fakeAdb.setDevices([]);
 
-    const result = await checkAccessibilityService(fakeFactory);
+    const result = await checkCtrlProxy(fakeFactory);
 
-    expect(result.name).toBe("Accessibility Service");
+    expect(result.name).toBe("CtrlProxy");
     expect(result.status).toBe("skip");
     expect(result.message).toBe("No Android devices connected");
   });

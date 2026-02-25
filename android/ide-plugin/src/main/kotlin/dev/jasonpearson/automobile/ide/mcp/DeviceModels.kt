@@ -47,7 +47,7 @@ data class ServiceExpectedInfo(
 
 @Serializable
 data class DaemonPlatformInfo(
-    val accessibilityService: ServiceExpectedInfo? = null,
+    val ctrlProxy: ServiceExpectedInfo? = null,
     val xcTestService: ServiceExpectedInfo? = null,
 )
 

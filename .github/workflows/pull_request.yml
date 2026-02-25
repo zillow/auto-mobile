@@ -636,7 +636,7 @@ jobs:
 
       - uses: ./.github/actions/gradle-task-run
         with:
-          gradle-tasks: ":junit-runner:test :junit-runner:jacocoTestReport :accessibility-service:testDebugUnitTest :accessibility-service:createDebugUnitTestCoverageReport :auto-mobile-sdk:testDebugUnitTest :auto-mobile-sdk:createDebugUnitTestCoverageReport :test-plan-validation:test :test-plan-validation:jacocoTestReport :protocol:test :protocol:jacocoTestReport"
+          gradle-tasks: ":junit-runner:test :junit-runner:jacocoTestReport :control-proxy:testDebugUnitTest :control-proxy:createDebugUnitTestCoverageReport :auto-mobile-sdk:testDebugUnitTest :auto-mobile-sdk:createDebugUnitTestCoverageReport :test-plan-validation:test :test-plan-validation:jacocoTestReport :protocol:test :protocol:jacocoTestReport"
           gradle-project-directory: "android"
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
@@ -938,7 +938,7 @@ jobs:
     name: "Run JUnit Runner Emulator Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [detect-changes, build-android-accessibility-service]
+    needs: [detect-changes, build-android-control-proxy]
     if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
@@ -949,15 +949,15 @@ jobs:
       - name: "Download Accessibility Service APK"
         uses: actions/download-artifact@v7
         with:
-          name: accessibility-service-apk
-          path: android/accessibility-service/build/outputs/apk/debug
+          name: control-proxy-apk
+          path: android/control-proxy/build/outputs/apk/debug
 
       # Run AutoMobile tests that require emulator
       - uses: ./.github/actions/android-emulator
         with:
           script: "./gradlew :junit-runner:test --stacktrace --info"
           working-directory: './android/'
-          accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          accessibility-apk-path: control-proxy/build/outputs/apk/debug/control-proxy-debug.apk
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -991,7 +991,7 @@ jobs:
     name: "Run JUnit Runner Emulator.wtf Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [detect-changes, build-android-accessibility-service]
+    needs: [detect-changes, build-android-control-proxy]
     if: needs.detect-changes.outputs.android_should_run == 'true' && vars.EMULATOR_WTF_ENABLED == 'true'
     env:
       HAS_API_KEY: ${{ secrets.EMULATOR_WTF_API_KEY != '' }}
@@ -1023,8 +1023,8 @@ jobs:
       - name: "Download Accessibility Service APK"
         uses: actions/download-artifact@v7
         with:
-          name: accessibility-service-apk
-          path: android/accessibility-service/build/outputs/apk/debug
+          name: control-proxy-apk
+          path: android/control-proxy/build/outputs/apk/debug
 
       - name: "Run AutoMobile tests on emulator.wtf"
         uses: ./.github/actions/android-emulator-wtf
@@ -1033,7 +1033,7 @@ jobs:
         with:
           script: "./gradlew :junit-runner:test --stacktrace --info"
           working-directory: "./android/"
-          accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          accessibility-apk-path: control-proxy/build/outputs/apk/debug/control-proxy-debug.apk
           device: "model=Pixel7,version=35,gpu=auto"
           max-time-limit: "2m"
 
@@ -1063,7 +1063,7 @@ jobs:
     name: "Run Playground Automobile Emulator Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [detect-changes, build-android-accessibility-service]
+    needs: [detect-changes, build-android-control-proxy]
     if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
@@ -1074,15 +1074,15 @@ jobs:
       - name: "Download Accessibility Service APK"
         uses: actions/download-artifact@v7
         with:
-          name: accessibility-service-apk
-          path: android/accessibility-service/build/outputs/apk/debug
+          name: control-proxy-apk
+          path: android/control-proxy/build/outputs/apk/debug
 
       # Run AutoMobile tests that require emulator
       - uses: ./.github/actions/android-emulator
         with:
           script: "./gradlew :playground:app:test --stacktrace --info"
           working-directory: './android/'
-          accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          accessibility-apk-path: control-proxy/build/outputs/apk/debug/control-proxy-debug.apk
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
@@ -1103,7 +1103,7 @@ jobs:
           check_name: "Playground Automobile Emulator Test Report"
           report_paths: '**/build/test-results/**/*.xml'
 
-  android-accessibility-service-unit-tests:
+  android-control-proxy-unit-tests:
     name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -1117,7 +1117,7 @@ jobs:
 
       - uses: ./.github/actions/gradle-task-run
         with:
-          gradle-tasks: ":accessibility-service:testDebugUnitTest"
+          gradle-tasks: ":control-proxy:testDebugUnitTest"
           gradle-project-directory: "android"
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
@@ -1159,7 +1159,7 @@ jobs:
           name: aar
           path: core/build/outputs/aar/core-debug.aar
 
-  build-android-accessibility-service:
+  build-android-control-proxy:
     name: "Build Accessibility Service"
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -1173,7 +1173,7 @@ jobs:
 
       - uses: ./.github/actions/gradle-task-run
         with:
-          gradle-tasks: ":accessibility-service:assembleDebug"
+          gradle-tasks: ":control-proxy:assembleDebug"
           gradle-project-directory: "android"
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
@@ -1186,8 +1186,8 @@ jobs:
       - name: "Store Accessibility Service APK"
         uses: actions/upload-artifact@v6
         with:
-          name: accessibility-service-apk
-          path: android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          name: control-proxy-apk
+          path: android/control-proxy/build/outputs/apk/debug/control-proxy-debug.apk
 
   build-playground-app:
     name: "Build Playground App"
@@ -1830,27 +1830,27 @@ jobs:
     name: "Android"
     if: always()
     needs:
-      - build-android-accessibility-service
+      - build-android-control-proxy
       - build-junit-runner-library
       - build-playground-app
       - junit-runner-unit-tests
       - junit-runner-emulator-tests
       - junit-runner-emulator-wtf-tests
       - playground-automobile-emulator-tests
-      - android-accessibility-service-unit-tests
+      - android-control-proxy-unit-tests
     runs-on: ubuntu-latest
     steps:
       - name: "Check results"
         run: |
           results=( \
-            "${{ needs.build-android-accessibility-service.result }}" \
+            "${{ needs.build-android-control-proxy.result }}" \
             "${{ needs.build-junit-runner-library.result }}" \
             "${{ needs.build-playground-app.result }}" \
             "${{ needs.junit-runner-unit-tests.result }}" \
             "${{ needs.junit-runner-emulator-tests.result }}" \
             "${{ needs.junit-runner-emulator-wtf-tests.result }}" \
             "${{ needs.playground-automobile-emulator-tests.result }}" \
-            "${{ needs.android-accessibility-service-unit-tests.result }}" \
+            "${{ needs.android-control-proxy-unit-tests.result }}" \
           )
           for r in "${results[@]}"; do
             if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then

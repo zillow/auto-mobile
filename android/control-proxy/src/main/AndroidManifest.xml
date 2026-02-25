@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- Package visibility for Android 11+ to access ContentProviders in other apps -->
+  <!-- This permission allows the accessibility service to query any installed package -->
+  <!-- Required for storage inspection to work with any app that has the AutoMobile SDK -->
+  <!-- Note: This is appropriate for a debugging/development tool like AutoMobile -->
+  <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+  <!-- Permissions required for accessibility service -->
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.MANAGE_CA_CERTIFICATES" />
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <application
+        android:allowBackup="true"
+      android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+      android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+      android:theme="@style/Theme.Automobileandroid">
+
+      <!-- Main Activity -->
+      <activity
+        android:name=".MainActivity"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="android.intent.action.MAIN" />
+          <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+      </activity>
+
+      <!-- AutoMobile CtrlProxy Service -->
+      <service
+        android:name=".CtrlProxy"
+        android:label="@string/accessibility_service_name"
+        android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+        android:exported="false">
+        <intent-filter>
+          <action android:name="android.accessibilityservice.AccessibilityService" />
+        </intent-filter>
+        <meta-data
+          android:name="android.accessibilityservice"
+          android:resource="@xml/accessibility_service_config" />
+      </service>
+
+      <receiver
+        android:name=".AutoMobileDeviceAdminReceiver"
+        android:exported="true"
+        android:permission="android.permission.BIND_DEVICE_ADMIN">
+        <meta-data
+          android:name="android.app.device_admin"
+          android:resource="@xml/device_admin_policies" />
+        <intent-filter>
+          <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+        </intent-filter>
+      </receiver>
+
+  </application>
+
+</manifest>

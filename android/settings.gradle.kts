@@ -30,7 +30,7 @@ plugins {
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-include(":accessibility-service")
+include(":control-proxy")
 
 include(":auto-mobile-sdk")
 

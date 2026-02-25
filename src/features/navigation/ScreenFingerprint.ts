@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { logger } from "../../utils/logger";
 
 /**
- * Interface for accessibility service node format (subset of AccessibilityNode from AccessibilityServiceClient)
+ * Interface for accessibility service node format (subset of AccessibilityNode from CtrlProxyClient)
  */
 interface AccessibilityNode {
   text?: string;

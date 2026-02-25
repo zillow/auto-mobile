@@ -11,10 +11,10 @@ import type { ElementFinder } from "../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
 import { DefaultElementFinder } from "../utility/ElementFinder";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
-import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../../utils/CtrlProxyManager";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
@@ -43,7 +43,7 @@ interface DragAndDropDeps {
 export class DragAndDrop extends BaseVisualChange {
   private finder: ElementFinder;
   private geometry: ElementGeometry;
-  private accessibilityService: AccessibilityServiceClient;
+  private accessibilityService: CtrlProxyClient;
   private viewHierarchy: ViewHierarchy;
   private visionConfig: VisionFallbackConfig;
   private screenshotCapturer: ScreenshotCapturer;
@@ -58,7 +58,7 @@ export class DragAndDrop extends BaseVisualChange {
     super(device, adb, timer);
     this.finder = new DefaultElementFinder();
     this.geometry = new DefaultElementGeometry();
-    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
+    this.accessibilityService = CtrlProxyClient.getInstance(device, this.adbFactory);
     this.viewHierarchy = new ViewHierarchy(device, this.adbFactory);
     this.visionConfig = deps.visionConfig ?? DEFAULT_VISION_CONFIG;
     this.screenshotCapturer = deps.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
@@ -82,7 +82,7 @@ export class DragAndDrop extends BaseVisualChange {
     const perf = createGlobalPerformanceTracker();
     perf.serial("dragAndDrop");
 
-    const a11yManager = AndroidAccessibilityServiceManager.getInstance(this.device, this.adb);
+    const a11yManager = AndroidCtrlProxyManager.getInstance(this.device, this.adb);
     const isAvailable = await perf.track("a11yAvailable", () => a11yManager.isAvailable());
     if (!isAvailable) {
       perf.end();

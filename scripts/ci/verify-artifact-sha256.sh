@@ -4,7 +4,7 @@
 # Usage: verify-artifact-sha256.sh <artifact-path> <constant-name>
 #
 # Example:
-#   verify-artifact-sha256.sh /tmp/accessibility-service-debug.apk APK_SHA256_CHECKSUM
+#   verify-artifact-sha256.sh /tmp/control-proxy-debug.apk APK_SHA256_CHECKSUM
 #   verify-artifact-sha256.sh /tmp/XCTestService.ipa XCTESTSERVICE_SHA256_CHECKSUM
 set -euo pipefail
 

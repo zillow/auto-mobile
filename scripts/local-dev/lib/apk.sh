@@ -5,7 +5,7 @@
 # Required variables (must be set before sourcing):
 #   PROJECT_ROOT - Path to project root
 #   ANDROID_DIR  - Path to android directory
-#   SERVICE_DIR  - Path to accessibility-service directory
+#   SERVICE_DIR  - Path to control-proxy directory
 #   APK_PATH     - Path to built APK
 #   ADB_BIN      - Path to adb binary (from lib/adb.sh)
 #   DEVICE_ID    - Target device ID (optional, empty = all devices)
@@ -91,7 +91,7 @@ hash_watch_state() {
 # Build the accessibility service APK
 build_apk() {
   log_info "Building AccessibilityService..."
-  if ! (cd "${ANDROID_DIR}" && ./gradlew :accessibility-service:assembleDebug); then
+  if ! (cd "${ANDROID_DIR}" && ./gradlew :control-proxy:assembleDebug); then
     log_error "Gradle build failed."
     return 1
   fi

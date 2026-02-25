@@ -1,5 +1,5 @@
 /**
- * Shared types for Android test recording via getevent + AccessibilityService.
+ * Shared types for Android test recording via getevent + CtrlProxy.
  */
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ export interface GestureEmitter {
 }
 
 /**
- * Minimal subset of AccessibilityServiceClient needed by DualTrackRecorder.
+ * Minimal subset of CtrlProxyClient needed by DualTrackRecorder.
  */
 export interface A11ySource {
   ensureConnected(): Promise<boolean>;

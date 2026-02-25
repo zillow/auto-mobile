@@ -5,7 +5,7 @@ import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
-import { FakeAccessibilityService } from "../../fakes/FakeAccessibilityService";
+import { FakeCtrlProxy } from "../../fakes/FakeCtrlProxy";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("ImeAction", () => {
@@ -14,7 +14,7 @@ describe("ImeAction", () => {
   let fakeObserveScreen: FakeObserveScreen;
   let fakeWindow: FakeWindow;
   let fakeAwaitIdle: FakeAwaitIdle;
-  let fakeA11yService: FakeAccessibilityService;
+  let fakeA11yService: FakeCtrlProxy;
   let fakeTimer: FakeTimer;
 
   // Test device for Android platform
@@ -31,7 +31,7 @@ describe("ImeAction", () => {
     fakeObserveScreen.enableAutoVaryHierarchy();
     fakeWindow = new FakeWindow();
     fakeAwaitIdle = new FakeAwaitIdle();
-    fakeA11yService = new FakeAccessibilityService();
+    fakeA11yService = new FakeCtrlProxy();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
 

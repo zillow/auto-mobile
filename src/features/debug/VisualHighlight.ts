@@ -3,7 +3,7 @@ import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-c
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { DeviceSessionManager } from "../../utils/DeviceSessionManager";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import {
   ActionableError,
   BootedDevice,
@@ -131,12 +131,12 @@ export class VisualHighlight {
   private device: BootedDevice;
   private readonly adb: AdbExecutor;
   private adbFactory: AdbClientFactory;
-  private accessibilityServiceClient: AccessibilityServiceClient;
+  private accessibilityServiceClient: CtrlProxyClient;
 
   constructor(
     device: BootedDevice,
     adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
-    accessibilityServiceClient?: AccessibilityServiceClient
+    accessibilityServiceClient?: CtrlProxyClient
   ) {
     this.device = device;
     // Detect if the argument is a factory (has create method) or an executor
@@ -153,7 +153,7 @@ export class VisualHighlight {
       this.adb = this.adbFactory.create(device);
     }
     this.accessibilityServiceClient = accessibilityServiceClient
-      || AccessibilityServiceClient.getInstance(device, this.adbFactory);
+      || CtrlProxyClient.getInstance(device, this.adbFactory);
   }
 
   async addHighlight(

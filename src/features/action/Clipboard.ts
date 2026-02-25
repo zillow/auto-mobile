@@ -3,7 +3,7 @@ import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/A
 import { BootedDevice, ClipboardResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 
 export class Clipboard {
   private device: BootedDevice;
@@ -76,7 +76,7 @@ export class Clipboard {
     }
 
     // Try accessibility service first (preferred method)
-    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
 
     try {
       const a11yResult = await a11yClient.requestClipboard(action, text);

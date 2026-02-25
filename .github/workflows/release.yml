@@ -15,8 +15,8 @@ jobs:
   build-xctestservice-ipa:
     uses: ./.github/workflows/build-xctestservice-ipa.yml
 
-  build-accessibility-service-apk:
-    uses: ./.github/workflows/build-accessibility-service-apk.yml
+  build-control-proxy-apk:
+    uses: ./.github/workflows/build-control-proxy-apk.yml
     secrets:
       GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -26,7 +26,7 @@ jobs:
 
   verify-and-release:
     runs-on: ubuntu-latest
-    needs: [build-xctestservice-ipa, build-accessibility-service-apk]
+    needs: [build-xctestservice-ipa, build-control-proxy-apk]
 
     steps:
       - name: Checkout code
@@ -60,7 +60,7 @@ jobs:
       - name: "Download Accessibility Service APK"
         uses: actions/download-artifact@v7
         with:
-          name: accessibility-service-apk
+          name: control-proxy-apk
           path: /tmp
 
       - name: "Download XCTestService IPA"
@@ -72,7 +72,7 @@ jobs:
       - name: "Verify APK SHA256 matches source"
         id: verify_checksum
         run: |
-          bash scripts/ci/verify-artifact-sha256.sh /tmp/accessibility-service-debug.apk APK_SHA256_CHECKSUM | tee /tmp/apk-verify.log
+          bash scripts/ci/verify-artifact-sha256.sh /tmp/control-proxy-debug.apk APK_SHA256_CHECKSUM | tee /tmp/apk-verify.log
           CHECKSUM=$(grep '^checksum=' /tmp/apk-verify.log | cut -d= -f2)
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
@@ -238,7 +238,7 @@ jobs:
           name: AutoMobile v${{ steps.version.outputs.version }}
           body_path: release_notes.txt
           files: |
-            /tmp/accessibility-service-debug.apk
+            /tmp/control-proxy-debug.apk
             /tmp/XCTestService.ipa
           draft: false
           prerelease: false
@@ -250,7 +250,7 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**APK Built:** accessibility-service-debug.apk" >> $GITHUB_STEP_SUMMARY
+          echo "**APK Built:** control-proxy-debug.apk" >> $GITHUB_STEP_SUMMARY
           echo "**APK SHA256:** \`${{ steps.verify_checksum.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**IPA Built:** XCTestService.ipa" >> $GITHUB_STEP_SUMMARY
           echo "**IPA SHA256:** \`${{ steps.verify_ipa_checksum.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY

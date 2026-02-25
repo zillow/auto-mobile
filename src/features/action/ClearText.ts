@@ -5,7 +5,7 @@ import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../utility/ElementParser";
 import { ObserveResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 import { ANDROID_INPUT_CLASSES } from "../../utils/elementProperties";
@@ -64,7 +64,7 @@ export class ClearText extends BaseVisualChange {
    */
   private async executeAndroidClearText(observeResult: ObserveResult): Promise<ClearTextResult> {
     // Use accessibility service (fastest method, ~50-80ms vs ~200-500ms for ADB deletes)
-    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestClearText();
 
     if (a11yResult.success) {

@@ -19,7 +19,7 @@ import { DefaultElementFinder } from "../utility/ElementFinder";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { DefaultElementSelector } from "../utility/DefaultElementSelector";
 import { logger } from "../../utils/logger";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { DEFAULT_VISION_CONFIG, getVisionEnrichedError, type VisionFallbackConfig, type VisionAnalyzer } from "../../vision/index";
@@ -67,7 +67,7 @@ export class TapOnElement extends BaseVisualChange {
   private finder: ElementFinder;
   private geometry: ElementGeometry;
   private elementParser: ElementParser;
-  private accessibilityService: AccessibilityServiceClient;
+  private accessibilityService: CtrlProxyClient;
   private visionConfig: VisionFallbackConfig;
   private screenshotCapturer: ScreenshotCapturer;
   private visionAnalyzer: VisionAnalyzer | undefined;
@@ -90,7 +90,7 @@ export class TapOnElement extends BaseVisualChange {
     this.finder = new DefaultElementFinder();
     this.geometry = new DefaultElementGeometry();
     this.elementParser = new DefaultElementParser();
-    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
+    this.accessibilityService = CtrlProxyClient.getInstance(device, this.adbFactory);
     this.visionConfig = options.visionConfig || DEFAULT_VISION_CONFIG;
     this.screenshotCapturer = options.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);
     this.visionAnalyzer = options.visionAnalyzer;
@@ -854,7 +854,7 @@ export class TapOnElement extends BaseVisualChange {
     // Use accessibility service only if TalkBack is enabled AND element has resource-id
     // Otherwise fall back to coordinate-based tapping
     if (talkBackEnabled && resourceId) {
-      // TalkBack mode: Use AccessibilityService ACTION_CLICK with coordinate fallback
+      // TalkBack mode: Use CtrlProxy ACTION_CLICK with coordinate fallback
       await this.executeAndroidTapWithAccessibility(action, x, y, element, durationMs, options, signal);
     } else {
       // Standard mode or no resource-id: Use coordinate-based taps
@@ -885,7 +885,7 @@ export class TapOnElement extends BaseVisualChange {
   }
 
   /**
-   * Execute tap using AccessibilityService actions (TalkBack mode)
+   * Execute tap using CtrlProxy actions (TalkBack mode)
    * Uses focus navigation when TalkBack is enabled, falls back to coordinate-based tapping if navigation fails
    */
   private async executeAndroidTapWithAccessibility(

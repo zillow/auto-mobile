@@ -12,7 +12,7 @@
 #
 # Example:
 #   ./scripts/android/run-emulator-tests.sh \
-#     "accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk" \
+#     "control-proxy/build/outputs/apk/debug/control-proxy-debug.apk" \
 #     "./gradlew :junit-runner:test"
 #
 # shellcheck disable=SC2012 # Using ls for readable debug output is appropriate here
@@ -34,12 +34,12 @@ TEST_SCRIPT="${2:-}"
 if [ -z "$APK_PATH" ] || [ -z "$TEST_SCRIPT" ]; then
   echo -e "${RED}Error: Missing required arguments${NC}"
   echo "Usage: $0 <apk-path> <test-script>"
-  echo "Example: $0 'accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk' './gradlew :junit-runner:test'"
+  echo "Example: $0 'control-proxy/build/outputs/apk/debug/control-proxy-debug.apk' './gradlew :junit-runner:test'"
   exit 1
 fi
 
 if [ -n "$APK_PATH" ]; then
-  export AUTOMOBILE_ACCESSIBILITY_APK_PATH="$APK_PATH"
+  export AUTOMOBILE_CTRL_PROXY_APK_PATH="$APK_PATH"
   export AUTOMOBILE_SKIP_ACCESSIBILITY_CHECKSUM=1
   export AUTOMOBILE_SKIP_ACCESSIBILITY_DOWNLOAD_IF_INSTALLED=1
 fi
@@ -205,41 +205,41 @@ else
     ls -la | head -20
     echo ""
 
-    echo "accessibility-service/ directory:"
-    if [ -d "accessibility-service" ]; then
-      ls -la accessibility-service/ | head -20
+    echo "control-proxy/ directory:"
+    if [ -d "control-proxy" ]; then
+      ls -la control-proxy/ | head -20
     else
       print_warning "(directory not found)"
     fi
     echo ""
 
-    echo "accessibility-service/build/ directory:"
-    if [ -d "accessibility-service/build" ]; then
-      ls -la accessibility-service/build/ | head -20
+    echo "control-proxy/build/ directory:"
+    if [ -d "control-proxy/build" ]; then
+      ls -la control-proxy/build/ | head -20
     else
       print_warning "(directory not found)"
     fi
     echo ""
 
-    echo "accessibility-service/build/outputs/ directory:"
-    if [ -d "accessibility-service/build/outputs" ]; then
-      ls -la accessibility-service/build/outputs/ | head -20
+    echo "control-proxy/build/outputs/ directory:"
+    if [ -d "control-proxy/build/outputs" ]; then
+      ls -la control-proxy/build/outputs/ | head -20
     else
       print_warning "(directory not found)"
     fi
     echo ""
 
-    echo "accessibility-service/build/outputs/apk/ directory:"
-    if [ -d "accessibility-service/build/outputs/apk" ]; then
-      ls -la accessibility-service/build/outputs/apk/ | head -20
+    echo "control-proxy/build/outputs/apk/ directory:"
+    if [ -d "control-proxy/build/outputs/apk" ]; then
+      ls -la control-proxy/build/outputs/apk/ | head -20
     else
       print_warning "(directory not found)"
     fi
     echo ""
 
-    echo "accessibility-service/build/outputs/apk/debug/ directory:"
-    if [ -d "accessibility-service/build/outputs/apk/debug" ]; then
-      ls -la accessibility-service/build/outputs/apk/debug/ | head -20
+    echo "control-proxy/build/outputs/apk/debug/ directory:"
+    if [ -d "control-proxy/build/outputs/apk/debug" ]; then
+      ls -la control-proxy/build/outputs/apk/debug/ | head -20
     else
       print_warning "(directory not found)"
     fi
@@ -287,7 +287,7 @@ else
       print_warning "Signature mismatch detected - uninstalling old version and retrying"
       echo ""
 
-      PACKAGE_NAME="dev.jasonpearson.automobile.accessibilityservice"
+      PACKAGE_NAME="dev.jasonpearson.automobile.ctrlproxy"
       echo "Uninstalling existing package..."
       if adb uninstall "$PACKAGE_NAME"; then
         print_success "Old package uninstalled"

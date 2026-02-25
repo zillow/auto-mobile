@@ -8,7 +8,7 @@ The MCP server exposes AutoMobile's capabilities as tool calls, resources, and r
 
 ## Core Capabilities
 
-- 🤖 **Fast UX Inspection** Kotlin [Accessibility Service](../plat/android/accessibility-service.md) and Swift [XCTestService](../plat/ios/xctestservice.md) to enable fast, accurate observations. 10x faster than the next fastest observation toolkit.
+- 🤖 **Fast UX Inspection** Kotlin [Accessibility Service](../plat/android/control-proxy.md) and Swift [XCTestService](../plat/ios/xctestservice.md) to enable fast, accurate observations. 10x faster than the next fastest observation toolkit.
 - 🦾 **Full Touch Injection** Tap, Swipe, Pinch, Drag & Drop, Shake with automatic element targeting.
 - ♻️ **Tool Feedback** [Observations](observe/index.md) drive the [interaction loop](interaction-loop.md) for all [tool calls](tools.md).
 - 🧪 **Test Execution** [Kotlin JUnitRunner](../plat/android/junitrunner.md) & [Swift XCTestRunner](../plat/ios/xctestrunner.md) execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.

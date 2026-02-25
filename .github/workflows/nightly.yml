@@ -10,8 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  build-accessibility-service-apk:
-    uses: ./.github/workflows/build-accessibility-service-apk.yml
+  build-control-proxy-apk:
+    uses: ./.github/workflows/build-control-proxy-apk.yml
     secrets:
       GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -25,7 +25,7 @@ jobs:
   update-sha256:
     name: "Update SHA256 Checksums"
     runs-on: ubuntu-latest
-    needs: [build-accessibility-service-apk, build-xctestservice-ipa]
+    needs: [build-control-proxy-apk, build-xctestservice-ipa]
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -33,7 +33,7 @@ jobs:
       - name: "Download APK artifact"
         uses: actions/download-artifact@v7
         with:
-          name: accessibility-service-apk
+          name: control-proxy-apk
           path: /tmp
 
       - name: "Download IPA artifact"
@@ -43,7 +43,7 @@ jobs:
           path: /tmp
 
       - name: "Verify APK SHA256"
-        run: bash scripts/ci/verify-transit-sha256.sh /tmp/accessibility-service-debug.apk "${{ needs.build-accessibility-service-apk.outputs.sha256 }}"
+        run: bash scripts/ci/verify-transit-sha256.sh /tmp/control-proxy-debug.apk "${{ needs.build-control-proxy-apk.outputs.sha256 }}"
 
       - name: "Verify IPA SHA256"
         run: bash scripts/ci/verify-transit-sha256.sh /tmp/XCTestService.ipa "${{ needs.build-xctestservice-ipa.outputs.sha256 }}"
@@ -61,7 +61,7 @@ jobs:
       - name: "Check if updates needed"
         id: check
         run: |
-          NEW_APK="${{ needs.build-accessibility-service-apk.outputs.sha256 }}"
+          NEW_APK="${{ needs.build-control-proxy-apk.outputs.sha256 }}"
           OLD_APK="${{ steps.current.outputs.apk_sha256 }}"
           NEW_IPA="${{ needs.build-xctestservice-ipa.outputs.sha256 }}"
           OLD_IPA="${{ steps.current.outputs.ipa_sha256 }}"
@@ -99,7 +99,7 @@ jobs:
       - name: "Update release constants"
         if: steps.check.outputs.needed == 'true'
         env:
-          APK_SHA256_CHECKSUM: ${{ needs.build-accessibility-service-apk.outputs.sha256 }}
+          APK_SHA256_CHECKSUM: ${{ needs.build-control-proxy-apk.outputs.sha256 }}
           XCTESTSERVICE_SHA256_CHECKSUM: ${{ needs.build-xctestservice-ipa.outputs.sha256 }}
         run: bash scripts/generate-release-constants.sh
 
@@ -127,7 +127,7 @@ jobs:
           commit-message: |
             ${{ steps.pr-title.outputs.title }}
 
-            APK: ${{ steps.current.outputs.apk_sha256 || '(empty)' }} -> ${{ needs.build-accessibility-service-apk.outputs.sha256 }}${{ steps.check.outputs.apk_changed == 'true' && ' (changed)' || ' (unchanged)' }}
+            APK: ${{ steps.current.outputs.apk_sha256 || '(empty)' }} -> ${{ needs.build-control-proxy-apk.outputs.sha256 }}${{ steps.check.outputs.apk_changed == 'true' && ' (changed)' || ' (unchanged)' }}
             IPA: ${{ steps.current.outputs.ipa_sha256 || '(empty)' }} -> ${{ needs.build-xctestservice-ipa.outputs.sha256 }}${{ steps.check.outputs.ipa_changed == 'true' && ' (changed)' || ' (unchanged)' }}
           title: ${{ steps.pr-title.outputs.title }}
           body: |
@@ -137,13 +137,13 @@ jobs:
 
             | Artifact | Previous | New | Changed |
             |----------|----------|-----|---------|
-            | **APK** | `${{ steps.current.outputs.apk_sha256 || '(empty)' }}` | `${{ needs.build-accessibility-service-apk.outputs.sha256 }}` | ${{ steps.check.outputs.apk_changed == 'true' && '✅ Yes' || 'No' }} |
+            | **APK** | `${{ steps.current.outputs.apk_sha256 || '(empty)' }}` | `${{ needs.build-control-proxy-apk.outputs.sha256 }}` | ${{ steps.check.outputs.apk_changed == 'true' && '✅ Yes' || 'No' }} |
             | **IPA** | `${{ steps.current.outputs.ipa_sha256 || '(empty)' }}` | `${{ needs.build-xctestservice-ipa.outputs.sha256 }}` | ${{ steps.check.outputs.ipa_changed == 'true' && '✅ Yes' || 'No' }} |
 
             ### Why did this happen?
 
             SHA256 checksums change when any of these change:
-            - Source code in `android/accessibility-service/src/` or `ios/XCTestService/`
+            - Source code in `android/control-proxy/src/` or `ios/XCTestService/`
             - Build configuration (`build.gradle.kts` or `project.yml`)
             - Dependencies or SDK versions
 

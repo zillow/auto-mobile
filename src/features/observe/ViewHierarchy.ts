@@ -9,7 +9,7 @@ import type { ElementGeometry } from "../../utils/interfaces/ElementGeometry";
 import { DefaultElementParser } from "../utility/ElementParser";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ViewHierarchyQueryOptions } from "../../models";
-import { AccessibilityServiceClient } from "./android";
+import { CtrlProxyClient } from "./android";
 import { XCTestServiceClient } from "./ios";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { serverConfig } from "../../utils/ServerConfig";
@@ -31,19 +31,19 @@ export class ViewHierarchy implements ViewHierarchyInterface {
   private device: BootedDevice;
   private parser: ElementParser;
   private geometry: ElementGeometry;
-  private accessibilityServiceClient: AccessibilityServiceClient;
+  private accessibilityServiceClient: CtrlProxyClient;
   private timer: Timer;
 
   /**
    * Create a ViewHierarchy instance
    * @param device - Device to get view hierarchy from
    * @param adbFactoryOrExecutor - Factory for creating AdbClient instances, or an AdbExecutor for testing
-   * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
+   * @param accessibilityServiceClient - Optional CtrlProxyClient instance for testing
    */
   constructor(
     device: BootedDevice,
     adbFactoryOrExecutor: AdbClientFactory | AdbExecutor | null = defaultAdbClientFactory,
-    accessibilityServiceClient: AccessibilityServiceClient | null = null,
+    accessibilityServiceClient: CtrlProxyClient | null = null,
     timer: Timer = defaultTimer,
   ) {
     this.device = device;
@@ -62,7 +62,7 @@ export class ViewHierarchy implements ViewHierarchyInterface {
       adbFactory = defaultAdbClientFactory;
     }
 
-    this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, adbFactory);
+    this.accessibilityServiceClient = accessibilityServiceClient || CtrlProxyClient.getInstance(device, adbFactory);
     this.timer = timer;
   }
 

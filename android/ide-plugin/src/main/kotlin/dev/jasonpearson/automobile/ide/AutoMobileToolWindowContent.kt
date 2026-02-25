@@ -3057,10 +3057,10 @@ private fun DaemonStatusInfo(
                 )
             }
         }
-        val a11ySha = daemonStatus.android?.accessibilityService?.expectedSha256 ?: ""
-        if (a11ySha.isNotEmpty()) {
+        val ctrlProxySha = daemonStatus.android?.ctrlProxy?.expectedSha256 ?: ""
+        if (ctrlProxySha.isNotEmpty()) {
             Text(
-                "A11y SHA: ${a11ySha.take(8)}...",
+                "CtrlProxy SHA: ${ctrlProxySha.take(8)}...",
                 fontSize = 8.sp,
                 color = colors.text.normal.copy(alpha = 0.4f),
                 maxLines = 1,

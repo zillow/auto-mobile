@@ -9,7 +9,7 @@ import { getDaemonHealthReport } from "../../daemon/debugTools";
 import { RELEASE_VERSION } from "../../constants/release";
 import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
-import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../../utils/CtrlProxyManager";
 import { logger } from "../../utils/logger";
 
 const RELEASES_URL = "https://github.com/kaeawc/auto-mobile/releases";
@@ -98,9 +98,9 @@ async function checkDaemonConnectivity(): Promise<CheckResult> {
 }
 
 /**
- * Check accessibility service status on connected devices
+ * Check CtrlProxy status on connected devices
  */
-export async function checkAccessibilityService(
+export async function checkCtrlProxy(
   adbFactory: AdbClientFactory = defaultAdbClientFactory
 ): Promise<CheckResult> {
   try {
@@ -109,7 +109,7 @@ export async function checkAccessibilityService(
 
     if (devices.length === 0) {
       return {
-        name: "Accessibility Service",
+        name: "CtrlProxy",
         status: "skip",
         message: "No Android devices connected",
       };
@@ -119,8 +119,8 @@ export async function checkAccessibilityService(
     const device = devices[0];
     // Reset cached instances to ensure fresh ADB reads for doctor diagnostics
     // (getInstance memoizes isInstalled/isEnabled for 30 minutes which can report stale state)
-    AndroidAccessibilityServiceManager.resetInstances();
-    const serviceManager = AndroidAccessibilityServiceManager.getInstance(device);
+    AndroidCtrlProxyManager.resetInstances();
+    const serviceManager = AndroidCtrlProxyManager.getInstance(device);
 
     const versionResult = await serviceManager.ensureCompatibleVersion();
     const isInstalled = await serviceManager.isInstalled();
@@ -157,16 +157,16 @@ export async function checkAccessibilityService(
 
     if (downloadUnavailable) {
       return {
-        name: "Accessibility Service",
+        name: "CtrlProxy",
         status: "warn",
         message: diagnostics.join("; "),
-        recommendation: "Newer accessibility service APK unavailable while offline. Connect to the internet and re-run doctor."
+        recommendation: "Newer CtrlProxy APK unavailable while offline. Connect to the internet and re-run doctor."
       };
     }
 
     if (isInstalled && isEnabled && (versionResult.status === "compatible" || versionResult.status === "upgraded" || versionResult.status === "installed" || versionResult.status === "reinstalled" || versionResult.status === "skipped")) {
       return {
-        name: "Accessibility Service",
+        name: "CtrlProxy",
         status: "pass",
         message: diagnostics.join("; "),
         recommendation: attemptedDownloadOrInstall
@@ -177,36 +177,36 @@ export async function checkAccessibilityService(
 
     if (isInstalled && !isEnabled) {
       return {
-        name: "Accessibility Service",
+        name: "CtrlProxy",
         status: "warn",
         message: diagnostics.join("; "),
         recommendation: attemptedDownloadOrInstall
-          ? `Enable the accessibility service in device settings. If you need the latest APK, download from ${RELEASES_URL}`
-          : "Enable the accessibility service in device settings",
+          ? `Enable CtrlProxy in device settings. If you need the latest APK, download from ${RELEASES_URL}`
+          : "Enable CtrlProxy in device settings",
       };
     }
 
     if (!isInstalled) {
       return {
-        name: "Accessibility Service",
+        name: "CtrlProxy",
         status: "warn",
         message: diagnostics.join("; "),
-        recommendation: "The accessibility service will be installed automatically when needed",
+        recommendation: "CtrlProxy will be installed automatically when needed",
       };
     }
 
     return {
-      name: "Accessibility Service",
+      name: "CtrlProxy",
       status: "warn",
       message: diagnostics.join("; "),
       recommendation: attemptedDownloadOrInstall
         ? `If you need the latest APK, download from ${RELEASES_URL}`
-        : "Review accessibility service installation status",
+        : "Review CtrlProxy installation status",
     };
   } catch (error) {
-    logger.debug(`Accessibility service check failed: ${error}`);
+    logger.debug(`CtrlProxy check failed: ${error}`);
     return {
-      name: "Accessibility Service",
+      name: "CtrlProxy",
       status: "skip",
       message: `Could not check: ${error instanceof Error ? error.message : String(error)}`,
     };
@@ -261,7 +261,7 @@ export async function checkWorkProfileAccessibility(
         undefined,
         true
       );
-      const isEnabled = result.stdout.includes(AndroidAccessibilityServiceManager.PACKAGE);
+      const isEnabled = result.stdout.includes(AndroidCtrlProxyManager.PACKAGE);
       if (!isEnabled) {
         profilesWithoutService.push({ userId: profile.userId, name: profile.name });
       }
@@ -304,7 +304,7 @@ export async function runAutoMobileChecks(): Promise<CheckResult[]> {
   results.push(checkVersion());
   results.push(await checkDaemonStatus());
   results.push(await checkDaemonConnectivity());
-  results.push(await checkAccessibilityService());
+  results.push(await checkCtrlProxy());
   results.push(await checkWorkProfileAccessibility());
 
   return results;

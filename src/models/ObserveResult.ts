@@ -58,7 +58,7 @@ export interface Predictions {
 export interface ObserveResult {
   /**
    * Timestamp when the screen state was captured on the device (milliseconds since epoch)
-   * This comes from the AccessibilityService on Android or equivalent on iOS
+   * This comes from the CtrlProxy on Android or equivalent on iOS
    * Falls back to server timestamp if device timestamp is unavailable
    */
   updatedAt: string | number;

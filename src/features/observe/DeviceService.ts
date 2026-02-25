@@ -1,7 +1,7 @@
 /**
  * DeviceService - Unified interface for device automation clients
  *
- * This interface defines common operations shared between Android (AccessibilityServiceClient)
+ * This interface defines common operations shared between Android (CtrlProxyClient)
  * and iOS (XCTestServiceClient) device clients. Platform-specific operations are defined
  * in extended interfaces.
  */
@@ -68,7 +68,7 @@ export interface ImeActionResult extends DeviceOperationResult {
  * Core device service interface with operations common to all platforms.
  *
  * Implementations:
- * - AccessibilityServiceClient (Android)
+ * - CtrlProxyClient (Android)
  * - XCTestServiceClient (iOS)
  */
 export interface DeviceService {

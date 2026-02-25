@@ -18,7 +18,7 @@ import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefiniti
 import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig";
 import type { VideoRecordingConfigInput } from "./models";
 import { startupBenchmark } from "./utils/startupBenchmark";
-import { AndroidAccessibilityServiceManager } from "./utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "./utils/CtrlProxyManager";
 import { XCTestServiceBuilder } from "./utils/XCTestServiceBuilder";
 
 startupBenchmark.mark("processEntry");
@@ -45,7 +45,7 @@ function parseArgs(): {
   daemonMode: boolean;
   daemonCommand?: string;
   daemonArgs: string[];
-  skipAccessibilityDownload: boolean;
+  skipCtrlProxyDownload: boolean;
   noProxy: boolean;
   noDaemon: boolean;
   } {
@@ -98,7 +98,7 @@ function parseArgs(): {
   let a11yUseBaseline = false;
   const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
   const rawElementSearch = args.includes("--raw-element-search");
-  const skipAccessibilityDownload = args.includes("--skip-accessibility-download");
+  const skipCtrlProxyDownload = args.includes("--skip-ctrl-proxy-download") || args.includes("--skip-accessibility-download");
   let planExecutionLockScope: PlanExecutionLockScope = "session";
   const videoRecordingDefaults: VideoRecordingConfigInput = {};
 
@@ -288,7 +288,7 @@ function parseArgs(): {
     daemonMode,
     daemonCommand,
     daemonArgs,
-    skipAccessibilityDownload,
+    skipCtrlProxyDownload,
     noProxy,
     noDaemon,
   };
@@ -302,7 +302,7 @@ process.on("SIGINT", async () => {
   await stopDeviceSnapshotSocketServer();
   await stopAppearanceSocketServer();
   stopAppearanceSyncScheduler();
-  await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
+  await AndroidCtrlProxyManager.cleanupPrefetchedApk();
   logger.close();
   process.exit(0);
 });
@@ -315,7 +315,7 @@ process.on("SIGTERM", async () => {
   await stopDeviceSnapshotSocketServer();
   await stopAppearanceSocketServer();
   stopAppearanceSyncScheduler();
-  await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
+  await AndroidCtrlProxyManager.cleanupPrefetchedApk();
   logger.close();
   process.exit(0);
 });
@@ -355,20 +355,20 @@ async function main() {
       daemonMode,
       daemonCommand,
       daemonArgs,
-      skipAccessibilityDownload,
+      skipCtrlProxyDownload,
       noProxy,
       noDaemon,
     } = parseArgs();
 
     serverConfig.setPlanExecutionLockScope(planExecutionLockScope);
     serverConfig.setVideoRecordingDefaults(videoRecordingDefaults);
-    serverConfig.setSkipAccessibilityDownload(skipAccessibilityDownload);
-    if (skipAccessibilityDownload) {
-      logger.info("Accessibility APK download disabled (--skip-accessibility-download)");
+    serverConfig.setSkipCtrlProxyDownload(skipCtrlProxyDownload);
+    if (skipCtrlProxyDownload) {
+      logger.info("CtrlProxy APK download disabled (--skip-ctrl-proxy-download)");
     } else {
       // Start prefetching the accessibility service APK in the background
       // This runs asynchronously and will be ready when first device connects
-      AndroidAccessibilityServiceManager.prefetchApk();
+      AndroidCtrlProxyManager.prefetchApk();
     }
 
     // Start iOS XCTestService build prefetch (macOS only)

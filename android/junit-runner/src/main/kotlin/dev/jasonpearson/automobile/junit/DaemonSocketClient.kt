@@ -226,30 +226,30 @@ internal object DaemonSocketClientManager {
 
   private fun resolveDaemonEnvironmentOverrides(): Map<String, String> {
     val resolvedOverrides = mutableMapOf<String, String>()
-    val accessibilityApkProperty =
-        SystemPropertyCache.get("automobile.accessibility.apk.path", "").trim()
-    val accessibilityApkEnv = System.getenv("AUTOMOBILE_ACCESSIBILITY_APK_PATH")?.trim().orEmpty()
-    val accessibilityApkPath =
+    val ctrlProxyApkProperty =
+        SystemPropertyCache.get("automobile.ctrl.proxy.apk.path", "").trim()
+    val ctrlProxyApkEnv = System.getenv("AUTOMOBILE_CTRL_PROXY_APK_PATH")?.trim().orEmpty()
+    val ctrlProxyApkPath =
         when {
-          accessibilityApkProperty.isNotEmpty() -> accessibilityApkProperty
-          accessibilityApkEnv.isNotEmpty() -> accessibilityApkEnv
-          else -> findLocalAccessibilityApkPath().orEmpty()
+          ctrlProxyApkProperty.isNotEmpty() -> ctrlProxyApkProperty
+          ctrlProxyApkEnv.isNotEmpty() -> ctrlProxyApkEnv
+          else -> findLocalCtrlProxyApkPath().orEmpty()
         }
-    if (accessibilityApkPath.isNotEmpty()) {
-      resolvedOverrides["AUTOMOBILE_ACCESSIBILITY_APK_PATH"] = accessibilityApkPath
+    if (ctrlProxyApkPath.isNotEmpty()) {
+      resolvedOverrides["AUTOMOBILE_CTRL_PROXY_APK_PATH"] = ctrlProxyApkPath
     }
     return resolvedOverrides
   }
 
-  private fun findLocalAccessibilityApkPath(): String? {
+  private fun findLocalCtrlProxyApkPath(): String? {
     val candidates =
         listOf(
-            File("accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
+            File("control-proxy/build/outputs/apk/debug/control-proxy-debug.apk"),
             File(
-                "../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
+                "../control-proxy/build/outputs/apk/debug/control-proxy-debug.apk"
             ),
             File(
-                "../../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
+                "../../control-proxy/build/outputs/apk/debug/control-proxy-debug.apk"
             ),
         )
     return candidates.firstOrNull { it.exists() }?.absolutePath

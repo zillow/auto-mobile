@@ -148,7 +148,7 @@ android {
 ## Best Practices
 
 1. **Use mavenLocal for local iteration** - Helpful for testing unpublished changes
-2. **Enable the [Accessibility Service](accessibility-service.md)** - Required for real-time view hierarchy access
+2. **Enable the [Accessibility Service](control-proxy.md)** - Required for real-time view hierarchy access
 3. **Configure API keys securely** - Use environment variables in CI, avoid hardcoding
 4. **Enable timing optimization** - Use historical timing data to order tests efficiently
 5. **Monitor device pool** - Ensure enough devices are available for parallel execution

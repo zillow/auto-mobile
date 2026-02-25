@@ -2,7 +2,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, SelectAllTextResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
 import { logger } from "../../utils/logger";
 
@@ -78,7 +78,7 @@ export class SelectAllText extends BaseVisualChange {
    * Uses ACTION_SET_SELECTION which is significantly faster than ADB double-tap.
    */
   private async executeAndroidSelectAll(): Promise<SelectAllTextResult> {
-    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yClient = CtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestSelectAll();
 
     if (a11yResult.success) {

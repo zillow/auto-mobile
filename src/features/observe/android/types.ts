@@ -1,8 +1,8 @@
 /**
- * Shared types for AccessibilityServiceClient delegates.
+ * Shared types for CtrlProxyClient delegates.
  *
  * This module defines the context interfaces that delegates receive to access
- * shared state and functionality from the main AccessibilityServiceClient.
+ * shared state and functionality from the main CtrlProxyClient.
  */
 
 import type { BootedDevice, RecompositionNodeInfo, ViewHierarchyWindowInfo } from "../../../models";
@@ -81,11 +81,11 @@ export interface AccessibilityHierarchy {
   /** Element with TalkBack cursor */
   "accessibility-focused-element"?: AccessibilityNode;
   /**
-   * True when the accessibility service couldn't fully extract the hierarchy.
+   * True when CtrlProxy couldn't fully extract the hierarchy.
    * This happens when the active window has a null root (app restricts accessibility)
    * or only system UI windows were accessible.
    */
-  accessibilityServiceIncomplete?: boolean;
+  ctrlProxyIncomplete?: boolean;
   error?: string;
   /** Screen width from accessibility service (eliminates need for dumpsys) */
   screenWidth?: number;

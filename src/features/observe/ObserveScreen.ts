@@ -15,7 +15,7 @@ import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/A
 import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
-import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../../utils/CtrlProxyManager";
 import { PerformanceTracker, NoOpPerformanceTracker, processTimingData } from "../../utils/PerformanceTracker";
 import { PerformanceAudit } from "../performance/PerformanceAudit";
 import { ThresholdManager } from "../performance/ThresholdManager";
@@ -32,7 +32,7 @@ import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { DefaultElementParser } from "../utility/ElementParser";
-import { AccessibilityServiceClient } from "./android";
+import { CtrlProxyClient } from "./android";
 import { XCTestServiceClient } from "./ios";
 import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 import type { ObserveScreen } from "./interfaces/ObserveScreen";
@@ -372,7 +372,7 @@ export class RealObserveScreen implements ObserveScreen {
       logger.warn("Failed to get view hierarchy:", error);
 
       // Clear cache on failure
-      AndroidAccessibilityServiceManager.getInstance(this.device, this.adb).clearAvailabilityCache();
+      AndroidCtrlProxyManager.getInstance(this.device, this.adb).clearAvailabilityCache();
 
       // Check if the error is due to screen being off
       const errorStr = String(error);
@@ -445,7 +445,7 @@ export class RealObserveScreen implements ObserveScreen {
   private async collectRawViewHierarchyData(result: ObserveResult, signal?: AbortSignal): Promise<void> {
     try {
       if (this.device.platform === "android") {
-        const client = AccessibilityServiceClient.getInstance(this.device, this.adbFactory);
+        const client = CtrlProxyClient.getInstance(this.device, this.adbFactory);
         // Use requestHierarchySync directly to bypass the cache — getAccessibilityHierarchy
         // with minTimestamp=0 returns any cached result, which may already be filtered.
         const syncResult = await client.requestHierarchySync(

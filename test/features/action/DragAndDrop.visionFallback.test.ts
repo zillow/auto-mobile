@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { BootedDevice, ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import { DragAndDrop } from "../../../src/features/action/DragAndDrop";
-import { AccessibilityServiceClient } from "../../../src/features/observe/android";
-import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
-import { FakeAccessibilityService } from "../../fakes/FakeAccessibilityService";
+import { CtrlProxyClient } from "../../../src/features/observe/android";
+import { AndroidCtrlProxyManager } from "../../../src/utils/CtrlProxyManager";
+import { FakeCtrlProxy } from "../../fakes/FakeCtrlProxy";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeScreenshotCapturer } from "../../fakes/FakeScreenshotCapturer";
@@ -29,7 +29,7 @@ describe("DragAndDrop vision fallback", () => {
 
   let fakeObserveScreen: FakeObserveScreen;
   let fakeTimer: FakeTimer;
-  let fakeA11yService: FakeAccessibilityService;
+  let fakeCtrlProxy: FakeCtrlProxy;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let managerSpy: ReturnType<typeof spyOn> | null = null;
 
@@ -68,13 +68,13 @@ describe("DragAndDrop vision fallback", () => {
     fakeObserveScreen = new FakeObserveScreen();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
-    fakeA11yService = new FakeAccessibilityService();
+    fakeCtrlProxy = new FakeCtrlProxy();
     fakeObserveScreen.setObserveResult(() => createObserveResult());
 
-    managerSpy = spyOn(AndroidAccessibilityServiceManager, "getInstance").mockReturnValue({
+    managerSpy = spyOn(AndroidCtrlProxyManager, "getInstance").mockReturnValue({
       isAvailable: async () => true
     } as any);
-    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(fakeA11yService as any);
+    getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(fakeCtrlProxy as any);
   });
 
   afterEach(() => {

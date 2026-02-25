@@ -52,8 +52,8 @@ source "${SCRIPT_DIR}/lib/xctestservice.sh"
 
 # Path constants
 ANDROID_DIR="${PROJECT_ROOT}/android"
-SERVICE_DIR="${ANDROID_DIR}/accessibility-service"
-APK_PATH="${SERVICE_DIR}/build/outputs/apk/debug/accessibility-service-debug.apk"
+SERVICE_DIR="${ANDROID_DIR}/control-proxy"
+APK_PATH="${SERVICE_DIR}/build/outputs/apk/debug/control-proxy-debug.apk"
 XCTEST_SERVICE_DIR="${PROJECT_ROOT}/ios/XCTestService"
 DERIVED_DATA_PATH="/tmp/automobile-xctestservice"
 PID_FILE="${PROJECT_ROOT}/.automobile-hot-reload.pid"

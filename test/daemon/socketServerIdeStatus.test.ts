@@ -95,15 +95,15 @@ describe("UnixSocketServer ide/status and ide/updateService handlers", () => {
     const result = response.result as {
       version: string;
       releaseVersion: string;
-      android: { accessibilityService: { expectedSha256: string; url: string } };
+      android: { ctrlProxy: { expectedSha256: string; url: string } };
       ios: { xcTestService: { expectedSha256: string; expectedAppHash: string; url: string } };
     };
     expect(typeof result.version).toBe("string");
     expect(typeof result.releaseVersion).toBe("string");
     expect(result.android).toBeDefined();
-    expect(result.android.accessibilityService).toBeDefined();
-    expect(typeof result.android.accessibilityService.expectedSha256).toBe("string");
-    expect(typeof result.android.accessibilityService.url).toBe("string");
+    expect(result.android.ctrlProxy).toBeDefined();
+    expect(typeof result.android.ctrlProxy.expectedSha256).toBe("string");
+    expect(typeof result.android.ctrlProxy.url).toBe("string");
     expect(result.ios).toBeDefined();
     expect(result.ios.xcTestService).toBeDefined();
     expect(typeof result.ios.xcTestService.expectedSha256).toBe("string");

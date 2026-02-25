@@ -1,14 +1,14 @@
 import { logger } from "../../../utils/logger";
 import type { BootedDevice, PlanStep, Element } from "../../../models";
 import type { GestureEmitter, GestureEvent, A11ySource } from "./types";
-import { AccessibilityServiceClient } from "../../observe/android";
+import { CtrlProxyClient } from "../../observe/android";
 import { defaultAdbClientFactory } from "../../../utils/android-cmdline-tools/AdbClientFactory";
 import { discoverTouchNode } from "./TouchNodeDiscovery";
 import { buildAxisRanges, buildScaler, queryDensity, queryRotation } from "./AxisRanges";
 import { GetEventReader } from "./GetEventReader";
 import { defaultTimer, type Timer } from "../../../utils/SystemTimer";
 
-/** An InteractionEvent from the AccessibilityService (subset of fields we use) */
+/** An InteractionEvent from the CtrlProxy (subset of fields we use) */
 interface ReceivedInteraction {
   type: string;
   timestamp: number;
@@ -27,13 +27,13 @@ interface PendingGesture {
 }
 
 /**
- * How long to wait for an AccessibilityService event to pair with a getevent gesture.
+ * How long to wait for a CtrlProxy event to pair with a getevent gesture.
  * If no A11y event arrives within this window, the gesture step is dropped with a warning.
  */
 export const MERGE_WINDOW_MS = 100;
 
 /**
- * Merges GestureEvents from getevent with InteractionEvents from the AccessibilityService
+ * Merges GestureEvents from getevent with InteractionEvents from the CtrlProxy
  * to build AutoMobile plan steps with full gesture-type and element-identity information.
  *
  * Usage:
@@ -49,8 +49,8 @@ export class DualTrackRecorder {
   private lastInputText: { elementKey: string; text: string; stepIndex: number } | null = null;
   private activeEmitter: GestureEmitter | null = null;
   private unsubscribeA11y: (() => void) | null = null;
-  /** Reference to the real AccessibilityServiceClient when not in test mode */
-  private activeA11y: AccessibilityServiceClient | null = null;
+  /** Reference to the real CtrlProxyClient when not in test mode */
+  private activeA11y: CtrlProxyClient | null = null;
   private stopped = false;
 
   get stepCount(): number {
@@ -61,18 +61,18 @@ export class DualTrackRecorder {
     private readonly device: BootedDevice,
     /** Optional override for testing — defaults to a real GetEventReader */
     private readonly gestureEmitter?: GestureEmitter,
-    /** Optional override for testing — defaults to AccessibilityServiceClient */
+    /** Optional override for testing — defaults to CtrlProxyClient */
     private readonly a11ySource?: A11ySource,
     /** Optional override for testing — defaults to the system timer */
     private readonly timer: Timer = defaultTimer
   ) {}
 
   async start(): Promise<void> {
-    // In real mode (no test override), obtain the AccessibilityServiceClient directly
+    // In real mode (no test override), obtain the CtrlProxyClient directly
     // so we can send start/stop recording notifications to the Kotlin service.
-    let a11yClient: AccessibilityServiceClient | undefined;
+    let a11yClient: CtrlProxyClient | undefined;
     if (!this.a11ySource) {
-      a11yClient = AccessibilityServiceClient.getInstance(this.device);
+      a11yClient = CtrlProxyClient.getInstance(this.device);
     }
 
     const a11y: A11ySource = this.a11ySource ?? a11yClient!;

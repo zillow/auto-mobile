@@ -125,7 +125,7 @@ nav:
             - 'Overview': design-docs/plat/android/index.md
             - 'Observe': design-docs/plat/android/observe.md
             - 'Screen Streaming': design-docs/plat/android/screen-streaming.md
-            - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
+            - 'CtrlProxy': design-docs/plat/android/control-proxy.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
             - 'JUnitRunner': design-docs/plat/android/junitrunner.md
             - 'IDE Plugin':

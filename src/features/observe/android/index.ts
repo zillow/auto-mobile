@@ -1,22 +1,22 @@
 /**
- * Accessibility Service Module
+ * CtrlProxy Module
  *
- * This module provides access to Android accessibility service functionality
+ * This module provides access to Android CtrlProxy functionality
  * for UI automation, hierarchy inspection, and device interaction.
  */
 
 // Main client
-export { AccessibilityServiceClient } from "./AccessibilityServiceClient";
-export type { AccessibilityService, InteractionEvent } from "./AccessibilityServiceClient";
+export { CtrlProxyClient } from "./CtrlProxyClient";
+export type { CtrlProxy, InteractionEvent } from "./CtrlProxyClient";
 
 // Delegate modules (for advanced usage)
-export { AccessibilityServiceGestures } from "./AccessibilityServiceGestures";
-export { AccessibilityServiceText } from "./AccessibilityServiceText";
-export { AccessibilityServiceHierarchy } from "./AccessibilityServiceHierarchy";
-export { AccessibilityServiceStorage } from "./AccessibilityServiceStorage";
-export { AccessibilityServiceCertificates } from "./AccessibilityServiceCertificates";
-export { AccessibilityServiceFocus } from "./AccessibilityServiceFocus";
-export { AccessibilityServiceHighlights } from "./AccessibilityServiceHighlights";
+export { CtrlProxyGestures } from "./CtrlProxyGestures";
+export { CtrlProxyText } from "./CtrlProxyText";
+export { CtrlProxyHierarchy } from "./CtrlProxyHierarchy";
+export { CtrlProxyStorage } from "./CtrlProxyStorage";
+export { CtrlProxyCertificates } from "./CtrlProxyCertificates";
+export { CtrlProxyFocus } from "./CtrlProxyFocus";
+export { CtrlProxyHighlights } from "./CtrlProxyHighlights";
 
 // Types
 export type {

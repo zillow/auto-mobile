@@ -8,7 +8,7 @@ export {
 export { AppLifecycleMonitor } from "../AppLifecycleMonitor";
 export { DeviceSessionManager } from "../DeviceSessionManager";
 export { DeepLinkManager } from "../DeepLinkManager";
-export { AccessibilityServiceManager } from "../AccessibilityServiceManager";
+export { CtrlProxyManager } from "../CtrlProxyManager";
 // Screenshot utilities - split into focused classes (Phase 3.1)
 export { ScreenshotComparator } from "../screenshot/ScreenshotComparator";
 export { PerceptualHasher } from "../screenshot/PerceptualHasher";

@@ -6,7 +6,7 @@ import { BootedDevice, Platform } from "../models";
 import { DaemonState } from "../daemon/daemonState";
 import type { Session } from "../daemon/sessionManager";
 import type { DevicePool } from "../daemon/devicePool";
-import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../utils/CtrlProxyManager";
 import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
 import { APK_SHA256_CHECKSUM, XCTESTSERVICE_SHA256_CHECKSUM } from "../constants/release";
 import { defaultTimer } from "../utils/SystemTimer";
@@ -332,7 +332,7 @@ async function queryDeviceServiceStatus(device: BootedDeviceInfo): Promise<Devic
 
   try {
     if (device.platform === "android") {
-      const manager = AndroidAccessibilityServiceManager.getInstance(bootedDevice);
+      const manager = AndroidCtrlProxyManager.getInstance(bootedDevice);
       const [installed, enabled, installedSha256] = await Promise.all([
         manager.isInstalled(),
         manager.isEnabled(),

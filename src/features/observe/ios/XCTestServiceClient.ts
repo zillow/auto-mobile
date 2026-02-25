@@ -195,7 +195,7 @@ export interface XCTestService {
 
 /**
  * XCTestServiceClient - WebSocket client for iOS XCTestService
- * Provides iOS UI hierarchy and interaction capabilities matching Android AccessibilityServiceClient
+ * Provides iOS UI hierarchy and interaction capabilities matching Android CtrlProxyClient
  *
  * Extends DeviceServiceClient for shared connection lifecycle management.
  */

@@ -1,0 +1,59 @@
+name: "Build CtrlProxy APK"
+
+on:
+  workflow_call:
+    secrets:
+      GRADLE_ENCRYPTION_KEY:
+        required: true
+      RELEASE_KEYSTORE_BASE64:
+        required: true
+      RELEASE_KEYSTORE_PASSWORD:
+        required: true
+      RELEASE_KEY_ALIAS:
+        required: true
+      RELEASE_KEY_PASSWORD:
+        required: true
+    outputs:
+      sha256:
+        description: "SHA256 checksum of the built APK"
+        value: ${{ jobs.build.outputs.sha256 }}
+
+jobs:
+  build:
+    name: "Build Accessibility Service"
+    runs-on: ubuntu-latest
+    outputs:
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":control-proxy:assembleDebug"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/build-control-proxy-apk"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+      - name: "Calculate APK SHA256"
+        id: checksum
+        run: |
+          APK_PATH="android/control-proxy/build/outputs/apk/debug/control-proxy-debug.apk"
+          SHA256=$(sha256sum "$APK_PATH" | cut -d' ' -f1)
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "APK SHA256: $SHA256"
+
+      - name: "Copy APK to /tmp"
+        run: cp android/control-proxy/build/outputs/apk/debug/control-proxy-debug.apk /tmp/control-proxy-debug.apk
+
+      - name: "Upload CtrlProxy APK"
+        uses: actions/upload-artifact@v6
+        with:
+          name: control-proxy-apk
+          path: /tmp/control-proxy-debug.apk
+          retention-days: 7

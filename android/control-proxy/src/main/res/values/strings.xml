@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">CtrlProxy</string>
+  <string name="accessibility_service_name">AutoMobile CtrlProxy</string>
+  <string name="accessibility_service_description">Extracts active window view hierarchy information to provide fast UI inspection for AutoMobile</string>
+</resources>

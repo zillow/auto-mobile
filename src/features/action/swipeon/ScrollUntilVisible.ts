@@ -10,7 +10,7 @@ import {
 } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../../observe/android";
+import { CtrlProxyClient } from "../../observe/android";
 import { XCTestServiceClient } from "../../observe/ios";
 import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
@@ -29,7 +29,7 @@ export interface ScrollUntilVisibleDependencies {
   finder: ElementFinder;
   geometry: ElementGeometry;
   observeScreen: ObserveScreen;
-  accessibilityService: AccessibilityServiceClient;
+  accessibilityService: CtrlProxyClient;
   accessibilityDetector: AccessibilityDetector;
   overlayDetector: OverlayDetector;
   talkBackExecutor: TalkBackSwipeExecutor;

@@ -61,9 +61,9 @@ WebSocket Server:
 If the script fails, it will provide specific error messages and suggestions:
 
 - **No device**: Start an emulator or connect a device
-- **App not installed**: Run `./gradlew :accessibility-service:installDebug`
+- **App not installed**: Run `./gradlew :control-proxy:installDebug`
 - **Service not enabled**: Enable in Settings → Accessibility
-- **Connection failed**: Check service logs with `adb logcat -s AutoMobileAccessibilityService:*`
+- **Connection failed**: Check service logs with `adb logcat -s CtrlProxy:*`
 
 ### Testing the connection manually:
 
@@ -76,5 +76,5 @@ npm install -g wscat
 wscat -c ws://localhost:8765/ws
 
 # View logs
-adb logcat -s AutoMobileAccessibilityService:*
+adb logcat -s CtrlProxy:*
 ```

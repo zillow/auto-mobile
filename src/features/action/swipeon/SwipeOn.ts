@@ -20,7 +20,7 @@ import { DefaultElementParser } from "../../utility/ElementParser";
 import { ExecuteGesture } from "../ExecuteGesture";
 import { logger } from "../../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../../observe/android";
+import { CtrlProxyClient } from "../../observe/android";
 import { buildElementSearchDebugContext } from "../../../utils/DebugContextBuilder";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { resolveSwipeDirection } from "../../../utils/swipeOnUtils";
@@ -47,7 +47,7 @@ export class SwipeOn extends BaseVisualChange {
   private executeGesture: GestureExecutor;
   private finder: ElementFinder;
   private geometry: ElementGeometry;
-  private accessibilityService: AccessibilityServiceClient;
+  private accessibilityService: CtrlProxyClient;
   private accessibilityDetector: AccessibilityDetector;
   private overlayDetector: OverlayDetector;
   private autoTargetSelector: AutoTargetSelector;
@@ -70,7 +70,7 @@ export class SwipeOn extends BaseVisualChange {
     const parser = dependencies.parser ?? new DefaultElementParser();
     this.finder = dependencies.finder ?? new DefaultElementFinder();
     this.geometry = dependencies.geometry ?? new DefaultElementGeometry();
-    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adbFactory);
+    this.accessibilityService = CtrlProxyClient.getInstance(device, this.adbFactory);
     this.accessibilityDetector = dependencies.accessibilityDetector || defaultAccessibilityDetector;
     this.visionConfig = dependencies.visionConfig ?? DEFAULT_VISION_CONFIG;
     this.screenshotCapturer = dependencies.screenshotCapturer ?? new TakeScreenshotCapturer(device, this.adbFactory);

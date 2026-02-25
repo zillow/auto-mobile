@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { TapOnElement } from "../../../src/features/action/TapOnElement";
 import { FakeScreenshotCapturer } from "../../fakes/FakeScreenshotCapturer";
 import { FakeVisionAnalyzer } from "../../fakes/FakeVisionAnalyzer";
-import { FakeAccessibilityService } from "../../fakes/FakeAccessibilityService";
+import { FakeCtrlProxy } from "../../fakes/FakeCtrlProxy";
 import type { VisionFallbackConfig } from "../../../src/vision/VisionTypes";
-import { AccessibilityServiceClient } from "../../../src/features/observe/android";
+import { CtrlProxyClient } from "../../../src/features/observe/android";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import type { ObserveResult, TapOnElementOptions } from "../../../src/models";
 import { SelectionStateTracker } from "../../../src/features/navigation/SelectionStateTracker";
@@ -30,11 +30,11 @@ const createObserveResult = (): ObserveResult => ({
 
 describe("TapOnElement vision fallback (handleElementNotFound)", () => {
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
-  let fakeA11yService: FakeAccessibilityService;
+  let fakeCtrlProxy: FakeCtrlProxy;
 
   beforeEach(() => {
-    fakeA11yService = new FakeAccessibilityService();
-    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(fakeA11yService as any);
+    fakeCtrlProxy = new FakeCtrlProxy();
+    getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(fakeCtrlProxy as any);
   });
 
   afterEach(() => {

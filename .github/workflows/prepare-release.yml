@@ -17,8 +17,8 @@ jobs:
   build-xctestservice-ipa:
     uses: ./.github/workflows/build-xctestservice-ipa.yml
 
-  build-accessibility-service-apk:
-    uses: ./.github/workflows/build-accessibility-service-apk.yml
+  build-control-proxy-apk:
+    uses: ./.github/workflows/build-control-proxy-apk.yml
     secrets:
       GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -28,7 +28,7 @@ jobs:
 
   prepare:
     runs-on: ubuntu-latest
-    needs: [build-xctestservice-ipa, build-accessibility-service-apk]
+    needs: [build-xctestservice-ipa, build-control-proxy-apk]
 
     steps:
       - name: Checkout code
@@ -62,13 +62,13 @@ jobs:
       - name: "Download Accessibility Service APK"
         uses: actions/download-artifact@v7
         with:
-          name: accessibility-service-apk
+          name: control-proxy-apk
           path: /tmp
 
       - name: Calculate SHA256 checksums
         id: checksum
         run: |
-          APK_SHA256=$(sha256sum /tmp/accessibility-service-debug.apk | cut -d' ' -f1)
+          APK_SHA256=$(sha256sum /tmp/control-proxy-debug.apk | cut -d' ' -f1)
           echo "apk_sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
           echo "APK SHA256: $APK_SHA256"
 

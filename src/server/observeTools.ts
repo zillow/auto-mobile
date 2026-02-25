@@ -14,7 +14,7 @@ import { DefaultElementFinder } from "../features/utility/ElementFinder";
 import type { ElementFinder } from "../utils/interfaces/ElementFinder";
 import { defaultTimer } from "../utils/SystemTimer";
 import { consumeSetupTiming } from "./ToolExecutionContext";
-import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../utils/CtrlProxyManager";
 import { logger } from "../utils/logger";
 import {
   accessibilityStateSchema,
@@ -251,7 +251,7 @@ export function registerObserveTools() {
       if (device.platform === "android" && result.accessibilityState?.enabled === false) {
         logger.warn("[observe] Accessibility service not enabled, resetting setup state for next attempt");
         try {
-          const manager = AndroidAccessibilityServiceManager.getInstance(device);
+          const manager = AndroidCtrlProxyManager.getInstance(device);
           manager.resetSetupState();
         } catch (error) {
           logger.warn("[observe] Failed to reset accessibility setup state", {

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { AccessibilityFocusTracker } from "../../src/utils/AccessibilityFocusTracker";
-import { AccessibilityServiceClient } from "../../src/features/observe/android";
+import { CtrlProxyClient } from "../../src/features/observe/android";
 import type { CurrentFocusResult, Element, TraversalOrderResult } from "../../src/models";
 import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("AccessibilityFocusTracker", () => {
   let tracker: AccessibilityFocusTracker;
-  let fakeClient: FakeAccessibilityServiceClient;
+  let fakeClient: FakeCtrlProxyClient;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let requestCurrentFocusSpy: ReturnType<typeof spyOn> | null = null;
   let requestTraversalOrderSpy: ReturnType<typeof spyOn> | null = null;
@@ -52,7 +52,7 @@ describe("AccessibilityFocusTracker", () => {
     requestTraversalOrder: (timeoutMs: number) => Promise<TraversalOrderResult>;
   }
 
-  class FakeAccessibilityServiceClient implements FocusClient {
+  class FakeCtrlProxyClient implements FocusClient {
     async requestCurrentFocus(_timeoutMs: number): Promise<CurrentFocusResult> {
       return createFocusResult(null);
     }
@@ -70,13 +70,13 @@ describe("AccessibilityFocusTracker", () => {
     tracker = AccessibilityFocusTracker.getInstance();
     tracker.invalidateAll(deviceId);
 
-    fakeClient = new FakeAccessibilityServiceClient();
+    fakeClient = new FakeCtrlProxyClient();
 
     requestCurrentFocusSpy = spyOn(fakeClient, "requestCurrentFocus");
     requestTraversalOrderSpy = spyOn(fakeClient, "requestTraversalOrder");
 
-    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(
-      fakeClient as AccessibilityServiceClient
+    getInstanceSpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(
+      fakeClient as CtrlProxyClient
     );
   });
 

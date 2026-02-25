@@ -24,7 +24,7 @@ class ServerConfig {
   private _videoRecordingDefaults: VideoRecordingConfigInput = {};
   private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
   private _appearanceDefaults: AppearanceConfigInput = {};
-  private _skipAccessibilityDownload: boolean = false;
+  private _skipCtrlProxyDownload: boolean = false;
 
   private constructor() {}
 
@@ -111,12 +111,12 @@ class ServerConfig {
     return { ...this._appearanceDefaults };
   }
 
-  setSkipAccessibilityDownload(skip: boolean): void {
-    this._skipAccessibilityDownload = skip;
+  setSkipCtrlProxyDownload(skip: boolean): void {
+    this._skipCtrlProxyDownload = skip;
   }
 
-  isSkipAccessibilityDownloadEnabled(): boolean {
-    return this._skipAccessibilityDownload;
+  isSkipCtrlProxyDownloadEnabled(): boolean {
+    return this._skipCtrlProxyDownload;
   }
 
 }

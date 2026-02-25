@@ -17,7 +17,7 @@ JVM_MODULES=(
 )
 
 ANDROID_MODULES=(
-  "accessibility-service"
+  "control-proxy"
   "auto-mobile-sdk"
 )
 

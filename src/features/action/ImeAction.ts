@@ -3,20 +3,20 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ImeActionResult, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
-import { AccessibilityServiceClient } from "../observe/android";
+import { CtrlProxyClient } from "../observe/android";
 import { XCTestServiceClient } from "../observe/ios";
-import { AccessibilityService } from "../observe/interfaces/AccessibilityService";
+import { CtrlProxy } from "../observe/interfaces/CtrlProxy";
 import { Timer } from "../../utils/SystemTimer";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class ImeAction extends BaseVisualChange {
-  private a11yService: AccessibilityService | null = null;
+  private a11yService: CtrlProxy | null = null;
   private imeTimer: Timer;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    a11yService: AccessibilityService | null = null,
+    a11yService: CtrlProxy | null = null,
     timer: Timer = defaultTimer
   ) {
     super(device, adb, timer);
@@ -88,7 +88,7 @@ export class ImeAction extends BaseVisualChange {
     _observeResult: ObserveResult
   ): Promise<ImeActionResult> {
     // Use provided a11y service or get default instance
-    const a11yClient = this.a11yService || AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yClient = this.a11yService || CtrlProxyClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestImeAction(action);
 
     if (a11yResult.success) {

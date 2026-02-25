@@ -37,7 +37,7 @@ object AutoMobileAnr {
     private const val TAG = "AutoMobileAnr"
 
     /** Package name of the AutoMobile AccessibilityService that receives broadcasts */
-    private const val ACCESSIBILITY_SERVICE_PACKAGE = "dev.jasonpearson.automobile.accessibilityservice"
+    private const val ACCESSIBILITY_SERVICE_PACKAGE = "dev.jasonpearson.automobile.ctrlproxy"
 
     const val ACTION_ANR = "dev.jasonpearson.automobile.sdk.ANR"
 

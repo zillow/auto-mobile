@@ -1,5 +1,5 @@
 import type { ViewHierarchyResult } from "../../models";
-import type { AccessibilityServiceClient } from "../observe/android";
+import type { CtrlProxyClient } from "../observe/android";
 import type { ViewHierarchy } from "../observe/ViewHierarchy";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { serverConfig } from "../../utils/ServerConfig";
@@ -13,7 +13,7 @@ import { logger } from "../../utils/logger";
  * any post-processing (filtering, attachRawViewHierarchy, etc.).
  */
 export async function refreshAndroidViewHierarchy(
-  accessibilityService: AccessibilityServiceClient,
+  accessibilityService: CtrlProxyClient,
   viewHierarchy: ViewHierarchy,
   timeoutMs: number,
   signal?: AbortSignal
@@ -33,7 +33,7 @@ export async function refreshAndroidViewHierarchy(
     return null;
   }
 
-  if (rawHierarchy.accessibilityServiceIncomplete) {
+  if (rawHierarchy.ctrlProxyIncomplete) {
     logger.debug("[refreshAndroidViewHierarchy] Accessibility service returned incomplete hierarchy, fetching uiautomator fallback");
     try {
       const uiautomatorHierarchy = await viewHierarchy.getUiAutomatorHierarchy(

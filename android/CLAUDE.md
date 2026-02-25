@@ -9,7 +9,7 @@ Quick reference for AI agents working in `android/`. Run all commands from the r
 ## Common Commands (from repo root)
 - `./gradlew -p android <task>`
 - `./gradlew -p android :junit-runner:test`
-- `./gradlew -p android :accessibility-service:assembleDebug`
+- `./gradlew -p android :control-proxy:assembleDebug`
 - `./gradlew -p android :ide-plugin:build`
 
 ## Notes

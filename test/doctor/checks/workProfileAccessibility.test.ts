@@ -63,11 +63,11 @@ describe("checkWorkProfileAccessibility", () => {
     fakeAdb.setCommandResponse(
       "settings --user 10 get secure enabled_accessibility_services",
       {
-        stdout: "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService",
+        stdout: "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy",
         stderr: "",
-        toString: () => "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService",
-        trim: () => "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService",
-        includes: (s: string) => "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService".includes(s)
+        toString: () => "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy",
+        trim: () => "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy",
+        includes: (s: string) => "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy".includes(s)
       }
     );
 
@@ -152,11 +152,11 @@ describe("checkWorkProfileAccessibility", () => {
     fakeAdb.setCommandResponse(
       "settings --user 10 get secure enabled_accessibility_services",
       {
-        stdout: "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService",
+        stdout: "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy",
         stderr: "",
-        toString: () => "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService",
-        trim: () => "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService",
-        includes: (s: string) => "dev.jasonpearson.automobile.accessibilityservice/dev.jasonpearson.automobile.accessibilityservice.AutoMobileAccessibilityService".includes(s)
+        toString: () => "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy",
+        trim: () => "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy",
+        includes: (s: string) => "dev.jasonpearson.automobile.ctrlproxy/dev.jasonpearson.automobile.ctrlproxy.CtrlProxy".includes(s)
       }
     );
 

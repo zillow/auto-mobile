@@ -1,7 +1,7 @@
 /**
  * DeviceServiceUtils - Shared utilities for device service clients
  *
- * These utilities are used by both AccessibilityServiceClient (Android) and
+ * These utilities are used by both CtrlProxyClient (Android) and
  * XCTestServiceClient (iOS) to reduce code duplication.
  */
 

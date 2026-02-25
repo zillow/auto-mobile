@@ -1,12 +1,12 @@
 import { SessionManager } from "../daemon/sessionManager";
 import type { Session } from "../daemon/sessionManager";
 import { DevicePool } from "../daemon/devicePool";
-import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../utils/CtrlProxyManager";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { ActionableError, BootedDevice, Platform } from "../models";
 import { logger } from "../utils/logger";
 import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
-import { AccessibilityServiceClient } from "../features/observe/android";
+import { CtrlProxyClient } from "../features/observe/android";
 import { createPerformanceTracker, type TimingData } from "../utils/PerformanceTracker";
 
 /**
@@ -125,7 +125,7 @@ async function ensureAccessibilityServiceReady(deviceId: string, sessionId: stri
   const perf = createPerformanceTracker(true);
   perf.serial("ensureAccessibilityServiceReady");
 
-  const serviceManager = AndroidAccessibilityServiceManager.getInstance(device);
+  const serviceManager = AndroidCtrlProxyManager.getInstance(device);
   const setupResult = await serviceManager.setup(false, perf);
 
   if (!setupResult.success) {
@@ -140,7 +140,7 @@ async function ensureAccessibilityServiceReady(deviceId: string, sessionId: stri
   }
 
   // Wait for WebSocket connection to be ready after setup
-  const accessibilityClient = AccessibilityServiceClient.getInstance(deviceId);
+  const accessibilityClient = CtrlProxyClient.getInstance(deviceId);
   const connected = await perf.track("waitForConnection", () => accessibilityClient.waitForConnection());
 
   perf.end();

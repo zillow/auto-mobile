@@ -245,7 +245,7 @@ export class HierarchyNavigationDetector {
 
   /**
    * Register a callback to be invoked when navigation is detected.
-   * Used by AccessibilityServiceClient to trigger screenshot capture.
+   * Used by CtrlProxyClient to trigger screenshot capture.
    */
   public setNavigationCallback(callback: HierarchyNavigationCallback | null): void {
     this.navigationCallback = callback;

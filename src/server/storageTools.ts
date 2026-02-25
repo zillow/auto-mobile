@@ -3,7 +3,7 @@ import { ToolRegistry } from "./toolRegistry";
 import { ActionableError, BootedDevice } from "../models";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { AccessibilityServiceClient } from "../features/observe/android";
+import { CtrlProxyClient } from "../features/observe/android";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { ResourceRegistry } from "./resourceRegistry";
 import type { KeyValueType } from "../features/storage/storageTypes";
@@ -89,7 +89,7 @@ export function registerStorageTools(): void {
     validateAndroidDevice(device);
 
     try {
-      const client = AccessibilityServiceClient.getInstance(device, defaultAdbClientFactory);
+      const client = CtrlProxyClient.getInstance(device, defaultAdbClientFactory);
       if (args.value === null) {
         await client.removePreference(args.appId, args.fileName, args.key);
       } else {
@@ -121,7 +121,7 @@ export function registerStorageTools(): void {
     validateAndroidDevice(device);
 
     try {
-      const client = AccessibilityServiceClient.getInstance(device, defaultAdbClientFactory);
+      const client = CtrlProxyClient.getInstance(device, defaultAdbClientFactory);
       await client.removePreference(args.appId, args.fileName, args.key);
 
       void ResourceRegistry.notifyResourceUpdated(
@@ -147,7 +147,7 @@ export function registerStorageTools(): void {
     validateAndroidDevice(device);
 
     try {
-      const client = AccessibilityServiceClient.getInstance(device, defaultAdbClientFactory);
+      const client = CtrlProxyClient.getInstance(device, defaultAdbClientFactory);
       await client.clearPreferenceStore(args.appId, args.fileName);
 
       void ResourceRegistry.notifyResourceUpdated(

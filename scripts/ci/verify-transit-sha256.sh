@@ -5,7 +5,7 @@
 # Usage: verify-transit-sha256.sh <file-path> <expected-sha256>
 #
 # Example:
-#   verify-transit-sha256.sh /tmp/accessibility-service-debug.apk abc123...
+#   verify-transit-sha256.sh /tmp/control-proxy-debug.apk abc123...
 set -euo pipefail
 
 FILE_PATH="${1:?Usage: verify-transit-sha256.sh <file-path> <expected-sha256>}"

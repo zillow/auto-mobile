@@ -25,10 +25,10 @@ import {
   XCTESTSERVICE_IPA_URL,
   XCTESTSERVICE_APP_HASH,
 } from "../constants/release";
-import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { AndroidCtrlProxyManager } from "../utils/CtrlProxyManager";
 import { IOSXCTestServiceManager } from "../utils/XCTestServiceManager";
 import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
-import { AccessibilityServiceClient } from "../features/observe/android";
+import { CtrlProxyClient } from "../features/observe/android";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import type { KeyValueType } from "../features/storage/storageTypes";
 
@@ -257,7 +257,7 @@ export class UnixSocketServer {
           version: getMcpServerVersion(),
           releaseVersion: RELEASE_VERSION,
           android: {
-            accessibilityService: {
+            ctrlProxy: {
               expectedSha256: APK_SHA256_CHECKSUM,
               url: APK_URL,
             },
@@ -288,7 +288,7 @@ export class UnixSocketServer {
         }
 
         if (args.platform === "android") {
-          const manager = AndroidAccessibilityServiceManager.getInstance(targetDevice);
+          const manager = AndroidCtrlProxyManager.getInstance(targetDevice);
           const result = await manager.ensureCompatibleVersion();
           const successStatuses = new Set(["compatible", "upgraded", "installed", "reinstalled"]);
           return {
@@ -322,7 +322,7 @@ export class UnixSocketServer {
         if (!targetDevice) {
           throw new Error(`Device not found: ${args.deviceId}`);
         }
-        const client = AccessibilityServiceClient.getInstance(targetDevice, defaultAdbClientFactory);
+        const client = CtrlProxyClient.getInstance(targetDevice, defaultAdbClientFactory);
         if (args.value === null || args.value === undefined) {
           await client.removePreference(args.appId, args.fileName, args.key);
         } else {
@@ -351,7 +351,7 @@ export class UnixSocketServer {
         if (!targetDevice) {
           throw new Error(`Device not found: ${args.deviceId}`);
         }
-        const client = AccessibilityServiceClient.getInstance(targetDevice, defaultAdbClientFactory);
+        const client = CtrlProxyClient.getInstance(targetDevice, defaultAdbClientFactory);
         await client.removePreference(args.appId, args.fileName, args.key);
         return { success: true };
       }
@@ -369,7 +369,7 @@ export class UnixSocketServer {
         if (!targetDevice) {
           throw new Error(`Device not found: ${args.deviceId}`);
         }
-        const client = AccessibilityServiceClient.getInstance(targetDevice, defaultAdbClientFactory);
+        const client = CtrlProxyClient.getInstance(targetDevice, defaultAdbClientFactory);
         await client.clearPreferenceStore(args.appId, args.fileName);
         return { success: true };
       }
