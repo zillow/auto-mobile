@@ -888,13 +888,10 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
-      - name: "Select Xcode 26.0"
+      - name: "Select Xcode 26.2"
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "26.0"
-
-      - name: "Ensure iOS Simulator runtime"
-        uses: ./.github/actions/ensure-ios-simulator-runtime
+          xcode-version: "26.2"
 
       - name: "Download CtrlProxy iOS Artifacts"
         uses: actions/download-artifact@v7
@@ -911,9 +908,8 @@ jobs:
 
       - name: "Boot iOS Simulator"
         run: |
-          # Find the first available iPhone simulator device
           DEVICE=$(xcrun simctl list devices available -j \
-            | jq -r '[.devices | to_entries[] | .value[] | select(.name | startswith("iPhone"))] | first | .name')
+            | jq -r '[.devices | to_entries[] | select(.key | contains("26.2")) | .value[] | select(.name | startswith("iPhone"))] | first | .name')
           echo "Booting simulator: ${DEVICE}"
           xcrun simctl boot "${DEVICE}"
           xcrun simctl bootstatus "${DEVICE}" -b
