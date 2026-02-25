@@ -30,7 +30,7 @@ androidx-lifecycle = "2.10.0"
 androidx-startup = "1.2.0"
 
 # Media library versions
-coil = "3.3.0"
+coil = "3.4.0"
 core-splashscreen = "1.2.0"
 kotlinx-coroutines-test = "1.10.2"
 media3 = "1.9.2"
