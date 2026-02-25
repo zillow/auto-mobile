@@ -10,7 +10,7 @@
 #   device-id    Optional simulator device ID. If not provided, uses first booted simulator.
 #
 # Environment Variables:
-#   AUTOMOBILE_CTRL_PROXY_DERIVED_DATA  Override the default derived data path
+#   AUTOMOBILE_CTRL_PROXY_IOS_DERIVED_DATA  Override the default derived data path
 #                                       (default: /tmp/automobile-ctrl-proxy)
 
 set -e
@@ -24,7 +24,7 @@ NC='\033[0m' # No Color
 
 # Default derived data path
 DEFAULT_DERIVED_DATA="/tmp/automobile-ctrl-proxy"
-DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
+DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_IOS_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
 
 # CtrlProxy iOS bundle identifiers
 CTRL_PROXY_APP_BUNDLE_ID="dev.jasonpearson.automobile.ctrlproxy"

@@ -7,7 +7,7 @@
 #   ./scripts/ios/ctrl-proxy-verify-artifacts.sh
 #
 # Environment Variables:
-#   AUTOMOBILE_CTRL_PROXY_DERIVED_DATA  Override the default derived data path
+#   AUTOMOBILE_CTRL_PROXY_IOS_DERIVED_DATA  Override the default derived data path
 #                                       (default: /tmp/automobile-ctrl-proxy)
 #
 # Exit Codes:
@@ -26,7 +26,7 @@ NC='\033[0m' # No Color
 
 # Default derived data path
 DEFAULT_DERIVED_DATA="/tmp/automobile-ctrl-proxy"
-DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
+DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_IOS_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
 PRODUCTS_DIR="${DERIVED_DATA}/Build/Products"
 SIM_DIR="${PRODUCTS_DIR}/Debug-iphonesimulator"
 

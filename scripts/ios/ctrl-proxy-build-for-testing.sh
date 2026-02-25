@@ -10,7 +10,7 @@
 #   --install    Install to /tmp/automobile-ctrl-proxy after build
 #
 # Environment Variables:
-#   AUTOMOBILE_CTRL_PROXY_DERIVED_DATA  Override the default derived data path
+#   AUTOMOBILE_CTRL_PROXY_IOS_DERIVED_DATA  Override the default derived data path
 #                                       (default: /tmp/automobile-ctrl-proxy)
 
 set -e
@@ -43,7 +43,7 @@ XCODEPROJ="${CTRL_PROXY_IOS_DIR}/CtrlProxy.xcodeproj"
 
 # Default derived data path (matches IOSCtrlProxyBuilder.ts)
 DEFAULT_DERIVED_DATA="/tmp/automobile-ctrl-proxy"
-DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
+DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_IOS_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  CtrlProxy iOS Build for Testing${NC}"
