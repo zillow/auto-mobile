@@ -1,6 +1,7 @@
 .auto-mobile-config.json
 .idea
 node_modules
+.turbo
 /coverage
 /dist
 /venv

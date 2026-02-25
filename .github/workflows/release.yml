@@ -90,13 +90,28 @@ jobs:
           bash scripts/generate-release-constants.sh
 
       - name: Run tests
-        run: bun run test
+        env:
+          TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
+          DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
+        run: turbo run test --output-logs=errors-only
 
       - name: Run lint
-        run: bun run lint
+        env:
+          TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
+          DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
+        run: turbo run lint --output-logs=errors-only
 
       - name: Build TypeScript with injected checksum
-        run: bun run build
+        env:
+          TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
+          DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
+        run: turbo run build --output-logs=errors-only
 
       - name: Create release notes
         id: release_notes

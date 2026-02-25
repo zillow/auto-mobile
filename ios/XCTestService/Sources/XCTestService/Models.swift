@@ -525,9 +525,9 @@ public struct PerformanceUpdateResponse: Codable {
     public let performanceData: PerformanceSnapshot
 
     public init(data: PerformanceSnapshot) {
-        self.type = "performance_update"
-        self.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
-        self.performanceData = data
+        type = "performance_update"
+        timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        performanceData = data
     }
 }
 

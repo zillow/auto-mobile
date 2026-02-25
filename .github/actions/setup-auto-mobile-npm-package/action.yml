@@ -25,11 +25,17 @@ runs:
           bun pm cache rm
           bun install --frozen-lockfile
         }
+        echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
 
     - name: "Build AutoMobile"
       shell: ${{ inputs.shell }}
+      env:
+        TURBO_TELEMETRY_DISABLED: "1"
+        TURBO_NO_UPDATE_NOTIFIER: "1"
+        DO_NOT_TRACK: "1"
+        NO_COLOR: "1"
       run: |
-        bun run build
+        bunx turbo run build --output-logs=errors-only
 
     - name: "Globally Install AutoMobile"
       shell: ${{ inputs.shell }}

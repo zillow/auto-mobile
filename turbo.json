@@ -1,0 +1,64 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "stream",
+  "envMode": "strict",
+  "globalDependencies": ["tsconfig.json"],
+  "tasks": {
+    "build": {
+      "description": "Compile TypeScript source to dist/",
+      "outputs": ["dist/**"],
+      "inputs": [
+        "src/**",
+        "build.ts",
+        "schemas/**",
+        "scripts/build-ios-assets.js",
+        "package.json"
+      ],
+      "outputLogs": "new-only",
+      "env": ["AUTOMOBILE_SOURCEMAP_INCLUDE_DEPS"],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
+    },
+    "lint": {
+      "description": "Run ESLint with auto-fix on source and test files",
+      "inputs": [
+        "src/**",
+        "test/**",
+        "scripts/**/*.ts",
+        "eslint.config.mjs"
+      ],
+      "outputs": [],
+      "outputLogs": "new-only",
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
+    },
+    "test": {
+      "description": "Run Bun test suite",
+      "inputs": [
+        "src/**",
+        "test/**",
+        "schemas/**",
+        "scripts/**",
+        "package.json",
+        "bunfig.toml"
+      ],
+      "outputs": [],
+      "outputLogs": "new-only",
+      "env": ["AUTOMOBILE_TEST_MODE"],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS", "DEBUG_ADB_EXEC"]
+    },
+    "test:coverage": {
+      "description": "Run tests with coverage reporting to coverage/",
+      "inputs": [
+        "src/**",
+        "test/**",
+        "schemas/**",
+        "scripts/**",
+        "package.json",
+        "bunfig.toml"
+      ],
+      "outputs": ["coverage/**"],
+      "outputLogs": "new-only",
+      "env": ["AUTOMOBILE_TEST_MODE"],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
+    }
+  }
+}

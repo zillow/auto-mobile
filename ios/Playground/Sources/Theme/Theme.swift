@@ -5,7 +5,7 @@ import SwiftUI
 struct AutoMobileTheme {
     let colorScheme: ColorScheme
 
-    // Primary colors
+    /// Primary colors
     var primary: Color {
         colorScheme == .dark ? .autoMobileWhite : .autoMobileLalala
     }
@@ -14,11 +14,16 @@ struct AutoMobileTheme {
         colorScheme == .dark ? .autoMobileLalala : .autoMobileWhite
     }
 
-    // Secondary colors (red accent)
-    var secondary: Color { .autoMobileRed }
-    var onSecondary: Color { .autoMobileWhite }
+    /// Secondary colors (red accent)
+    var secondary: Color {
+        .autoMobileRed
+    }
 
-    // Background colors
+    var onSecondary: Color {
+        .autoMobileWhite
+    }
+
+    /// Background colors
     var background: Color {
         colorScheme == .dark ? .autoMobileBlack : .autoMobileEggshell
     }
@@ -27,7 +32,7 @@ struct AutoMobileTheme {
         colorScheme == .dark ? .autoMobileWhite : .autoMobileLalala
     }
 
-    // Surface colors
+    /// Surface colors
     var surface: Color {
         colorScheme == .dark ? .autoMobileLalala : .autoMobileWhite
     }
@@ -40,14 +45,28 @@ struct AutoMobileTheme {
         colorScheme == .dark ? .autoMobileLalala : .autoMobileEggshell
     }
 
-    // Semantic colors
-    var success: Color { .autoMobileSuccess }
-    var warning: Color { .autoMobileWarning }
-    var error: Color { .autoMobileError }
-    var info: Color { .autoMobileInfo }
+    /// Semantic colors
+    var success: Color {
+        .autoMobileSuccess
+    }
 
-    // Text colors
-    var textPrimary: Color { onSurface }
+    var warning: Color {
+        .autoMobileWarning
+    }
+
+    var error: Color {
+        .autoMobileError
+    }
+
+    var info: Color {
+        .autoMobileInfo
+    }
+
+    /// Text colors
+    var textPrimary: Color {
+        onSurface
+    }
+
     var textSecondary: Color {
         colorScheme == .dark ? .autoMobileLightGrey : .autoMobileDarkGrey
     }

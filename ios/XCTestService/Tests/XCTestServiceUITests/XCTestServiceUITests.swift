@@ -118,4 +118,3 @@ final class XCTestServiceUITests: XCTestCase {
         return nil
     }
 }
-

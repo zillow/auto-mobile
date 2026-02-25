@@ -124,7 +124,7 @@ ensure_gum() {
 ensure_auto_mobile() {
   # Always build the project to pick up latest changes
   log_info "Building TypeScript project..."
-  if ! (cd "${PROJECT_ROOT}" && bun run build); then
+  if ! (cd "${PROJECT_ROOT}" && bunx turbo run build --output-logs=errors-only); then
     log_error "Failed to build TypeScript project."
     return 1
   fi

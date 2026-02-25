@@ -106,7 +106,7 @@ struct DemoRow: View {
 // MARK: - Scroll Performance Demo
 
 struct ScrollPerformanceDemo: View {
-    private let items = (1...1000).map { "Item \($0)" }
+    private let items = (1 ... 1000).map { "Item \($0)" }
     @Environment(\.autoMobileTheme) private var theme
 
     var body: some View {
@@ -210,10 +210,10 @@ struct AnimationDemo: View {
 // MARK: - Heavy Computation Demo
 
 struct HeavyComputationDemo: View {
-    @State private var result: String = "Tap a button to test"
+    @State private var result = "Tap a button to test"
     @State private var isComputing = false
     @State private var progress: Double = 0
-    @State private var selectedDuration: Double = 1.0
+    @State private var selectedDuration = 1.0
     @Environment(\.autoMobileTheme) private var theme
 
     private let durations: [Double] = [0.5, 1.0, 2.0, 3.0, 5.0]
@@ -228,11 +228,13 @@ struct HeavyComputationDemo: View {
                         .fontWeight(.bold)
                         .foregroundStyle(theme.textPrimary)
 
-                    Text("This will freeze the UI completely by sleeping on the main thread. Use this to test jank detection.")
-                        .font(.body)
-                        .foregroundStyle(theme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                    Text(
+                        "This will freeze the UI completely by sleeping on the main thread. Use this to test jank detection."
+                    )
+                    .font(.body)
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
 
                     // Duration picker
                     VStack(spacing: 8) {
@@ -336,7 +338,7 @@ struct HeavyComputationDemo: View {
             let iterations = 10_000_000
             let updateInterval = iterations / 100
 
-            for i in 0..<iterations {
+            for i in 0 ..< iterations {
                 sum += sin(Double(i)) * cos(Double(i))
 
                 if i % updateInterval == 0 {
@@ -362,7 +364,7 @@ struct FormDemo: View {
     @State private var email = ""
     @State private var enableNotifications = true
     @State private var selectedTheme = "System"
-    @State private var volume: Double = 0.5
+    @State private var volume = 0.5
 
     private let themes = ["System", "Light", "Dark"]
 
@@ -417,7 +419,7 @@ struct AlertsDemo: View {
                     showAlert = true
                 }
                 .alert("Alert Title", isPresented: $showAlert) {
-                    Button("OK", role: .cancel) { }
+                    Button("OK", role: .cancel) {}
                 } message: {
                     Text("This is an alert message.")
                 }
@@ -426,10 +428,10 @@ struct AlertsDemo: View {
                     showConfirmation = true
                 }
                 .confirmationDialog("Choose an action", isPresented: $showConfirmation) {
-                    Button("Option 1") { }
-                    Button("Option 2") { }
-                    Button("Delete", role: .destructive) { }
-                    Button("Cancel", role: .cancel) { }
+                    Button("Option 1") {}
+                    Button("Option 2") {}
+                    Button("Delete", role: .destructive) {}
+                    Button("Cancel", role: .cancel) {}
                 }
             }
 
@@ -485,9 +487,11 @@ struct AccessibilityDemo: View {
                     .font(.headline)
                     .foregroundStyle(theme.textPrimary)
 
-                Text("This text will scale with Dynamic Type settings. Try changing the text size in Settings > Accessibility > Display & Text Size.")
-                    .dynamicTypeSize(dynamicTypeSize)
-                    .foregroundStyle(theme.textSecondary)
+                Text(
+                    "This text will scale with Dynamic Type settings. Try changing the text size in Settings > Accessibility > Display & Text Size."
+                )
+                .dynamicTypeSize(dynamicTypeSize)
+                .foregroundStyle(theme.textSecondary)
             }
 
             Section("VoiceOver Labels") {

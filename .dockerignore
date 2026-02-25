@@ -21,6 +21,7 @@
 # Node modules are rebuilt inside container via npm ci
 node_modules/
 package-lock.json.bak
+.turbo/
 
 # npm artifacts
 npm-debug.log*
