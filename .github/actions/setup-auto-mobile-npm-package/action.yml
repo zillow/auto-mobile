@@ -29,7 +29,7 @@ runs:
     - name: "Build AutoMobile"
       shell: ${{ inputs.shell }}
       run: |
-        bun run build
+        turbo run build
 
     - name: "Globally Install AutoMobile"
       shell: ${{ inputs.shell }}

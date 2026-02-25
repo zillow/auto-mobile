@@ -231,17 +231,26 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
+      - name: "Cache Turborepo"
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ matrix.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ matrix.os }}-${{ hashFiles('bun.lock') }}-
+            turbo-${{ matrix.os }}-
+
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
-        run: bun run lint
+        run: turbo run lint
 
       - name: "Run Build"
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-          bun run build 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
+          turbo run build 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
 
       - name: "Run Tests"
         shell: bash
@@ -251,7 +260,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-          bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
+          turbo run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
       - name: "Upload Build/Test Logs"
         if: failure()
@@ -730,10 +739,19 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
+      - name: "Cache Turborepo"
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-ubuntu-latest-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-ubuntu-latest-${{ hashFiles('bun.lock') }}-
+            turbo-ubuntu-latest-
+
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Tests with Coverage"
-        run: bun run test:coverage
+        run: turbo run test:coverage
 
       - name: "Generate Coverage Badge"
         run: bash scripts/coverage/generate-badge.sh coverage/lcov.info coverage/ts-coverage-badge.json "TS coverage" "3178C6"

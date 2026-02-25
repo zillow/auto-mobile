@@ -454,7 +454,7 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Build TypeScript"
-        run: bun run build
+        run: turbo run build
 
       - name: "Perform CodeQL Analysis"
         uses: github/codeql-action/analyze@v3
@@ -520,13 +520,23 @@ jobs:
           restore-keys: |
             bun-${{ matrix.os }}-
 
+      - name: "Cache Turborepo"
+        if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ matrix.os }}-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ matrix.os }}-${{ hashFiles('bun.lock') }}-
+            turbo-${{ matrix.os }}-
+
       - name: "Setup Auto Mobile"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
-        run: bun run lint
+        run: turbo run lint
 
       - name: "Run Build"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
@@ -534,7 +544,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-          bun run build 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
+          turbo run build 2>&1 | tee "ci-logs/bun-build-${{ matrix.os }}.log"
 
       - name: "Run Tests"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
@@ -547,7 +557,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-          bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
+          turbo run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
       - name: "Upload Build/Test Logs"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true' && (failure() || cancelled() || matrix.os == 'windows-latest')
@@ -608,10 +618,19 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
+      - name: "Cache Turborepo"
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-ubuntu-latest-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-ubuntu-latest-${{ hashFiles('bun.lock') }}-
+            turbo-ubuntu-latest-
+
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Tests with Coverage"
-        run: bun run test:coverage
+        run: turbo run test:coverage
 
       - name: "Upload Coverage"
         uses: actions/upload-artifact@v6

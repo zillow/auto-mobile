@@ -7,6 +7,8 @@ test/
 # Development files
 .eslint*
 tsconfig.json
+turbo.json
+.turbo/
 .nyc_output/
 coverage/
 *.tsbuildinfo

@@ -31,16 +31,16 @@ This document summarizes the AutoMobile repo layout and where to find key compon
 
 # Build & Validate TypeScript
 
-Bun is the primary task runner for TypeScript tooling.
+Bun is the primary task runner for TypeScript tooling. Turborepo provides task caching.
 
--
--```bash
--bun run build          # Compile TypeScript
--bun run lint           # Lint with auto-fix (run before manual fixes)
--bun test               # Run all tests
--bun test --bail        # Stop on first failure
--bun test <file>        # Run specific test file
--```
+```bash
+turbo run build        # Compile TypeScript (cached)
+turbo run lint         # Lint with auto-fix (cached)
+turbo run test         # Run all tests (cached)
+turbo run lint build test  # Run all with caching + parallelism
+bun test --bail        # Stop on first failure (no cache)
+bun test <file>        # Run specific test file (no cache)
+```
 
 # MCP Tools Reference
 

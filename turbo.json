@@ -1,0 +1,50 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "globalDependencies": ["tsconfig.json"],
+  "tasks": {
+    "build": {
+      "outputs": ["dist/**"],
+      "inputs": [
+        "src/**",
+        "build.ts",
+        "schemas/**",
+        "scripts/build-ios-assets.js",
+        "package.json"
+      ],
+      "env": ["AUTOMOBILE_SOURCEMAP_INCLUDE_DEPS"],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
+    },
+    "lint": {
+      "inputs": [
+        "src/**",
+        "test/**",
+        "scripts/**/*.ts",
+        "eslint.config.mjs"
+      ],
+      "outputs": [],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
+    },
+    "test": {
+      "inputs": [
+        "src/**",
+        "test/**",
+        "package.json",
+        "bunfig.toml"
+      ],
+      "outputs": [],
+      "env": ["AUTOMOBILE_TEST_MODE"],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS", "DEBUG_ADB_EXEC"]
+    },
+    "test:coverage": {
+      "inputs": [
+        "src/**",
+        "test/**",
+        "package.json",
+        "bunfig.toml"
+      ],
+      "outputs": ["coverage/**"],
+      "env": ["AUTOMOBILE_TEST_MODE"],
+      "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
+    }
+  }
+}

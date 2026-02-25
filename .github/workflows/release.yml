@@ -90,13 +90,13 @@ jobs:
           bash scripts/generate-release-constants.sh
 
       - name: Run tests
-        run: bun run test
+        run: turbo run test
 
       - name: Run lint
-        run: bun run lint
+        run: turbo run lint
 
       - name: Build TypeScript with injected checksum
-        run: bun run build
+        run: turbo run build
 
       - name: Create release notes
         id: release_notes
