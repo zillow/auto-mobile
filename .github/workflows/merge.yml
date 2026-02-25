@@ -245,14 +245,18 @@ jobs:
       - name: "Run Lint"
         env:
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: turbo run lint --output-logs=errors-only --log-order=grouped
 
       - name: "Run Build"
         shell: bash
         env:
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: |
           set -euo pipefail
           mkdir -p ci-logs
@@ -264,7 +268,9 @@ jobs:
           # Force AdbClient into test mode on Windows to prevent adb daemon startup
           AUTOMOBILE_TEST_MODE: ${{ matrix.os == 'windows-latest' && 'true' || '' }}
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: |
           set -euo pipefail
           mkdir -p ci-logs
@@ -761,7 +767,9 @@ jobs:
       - name: "Run Tests with Coverage"
         env:
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: turbo run test:coverage --output-logs=errors-only
 
       - name: "Generate Coverage Badge"

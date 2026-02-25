@@ -92,19 +92,25 @@ jobs:
       - name: Run tests
         env:
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: turbo run test --output-logs=errors-only
 
       - name: Run lint
         env:
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: turbo run lint --output-logs=errors-only
 
       - name: Build TypeScript with injected checksum
         env:
           TURBO_TELEMETRY_DISABLED: "1"
+          TURBO_NO_UPDATE_NOTIFIER: "1"
           DO_NOT_TRACK: "1"
+          NO_COLOR: "1"
         run: turbo run build --output-logs=errors-only
 
       - name: Create release notes

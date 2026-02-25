@@ -30,7 +30,9 @@ runs:
       shell: ${{ inputs.shell }}
       env:
         TURBO_TELEMETRY_DISABLED: "1"
+        TURBO_NO_UPDATE_NOTIFIER: "1"
         DO_NOT_TRACK: "1"
+        NO_COLOR: "1"
       run: |
         turbo run build --output-logs=errors-only
 

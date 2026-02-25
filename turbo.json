@@ -5,6 +5,7 @@
   "globalDependencies": ["tsconfig.json"],
   "tasks": {
     "build": {
+      "description": "Compile TypeScript source to dist/",
       "outputs": ["dist/**"],
       "inputs": [
         "src/**",
@@ -18,6 +19,7 @@
       "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
     },
     "lint": {
+      "description": "Run ESLint with auto-fix on source and test files",
       "inputs": [
         "src/**",
         "test/**",
@@ -29,6 +31,7 @@
       "passThroughEnv": ["CI", "GITHUB_ACTIONS"]
     },
     "test": {
+      "description": "Run Bun test suite",
       "inputs": [
         "src/**",
         "test/**",
@@ -41,6 +44,7 @@
       "passThroughEnv": ["CI", "GITHUB_ACTIONS", "DEBUG_ADB_EXEC"]
     },
     "test:coverage": {
+      "description": "Run tests with coverage reporting to coverage/",
       "inputs": [
         "src/**",
         "test/**",
