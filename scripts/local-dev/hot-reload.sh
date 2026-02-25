@@ -237,7 +237,7 @@ hash_ts_state() {
 # Build TypeScript
 build_typescript() {
   log_info "Building TypeScript..."
-  if (cd "${PROJECT_ROOT}" && bun run build); then
+  if (cd "${PROJECT_ROOT}" && bunx turbo run build --output-logs=errors-only); then
     log_info "TypeScript build complete."
     return 0
   else

@@ -35,7 +35,7 @@ runs:
         DO_NOT_TRACK: "1"
         NO_COLOR: "1"
       run: |
-        turbo run build --output-logs=errors-only
+        bunx turbo run build --output-logs=errors-only
 
     - name: "Globally Install AutoMobile"
       shell: ${{ inputs.shell }}

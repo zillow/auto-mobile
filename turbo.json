@@ -35,6 +35,8 @@
       "inputs": [
         "src/**",
         "test/**",
+        "schemas/**",
+        "scripts/**",
         "package.json",
         "bunfig.toml"
       ],
@@ -48,6 +50,8 @@
       "inputs": [
         "src/**",
         "test/**",
+        "schemas/**",
+        "scripts/**",
         "package.json",
         "bunfig.toml"
       ],
