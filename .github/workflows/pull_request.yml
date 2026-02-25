@@ -862,9 +862,6 @@ jobs:
         with:
           xcode-version: "26.0"
 
-      - name: "Ensure iOS Simulator runtime"
-        uses: ./.github/actions/ensure-ios-simulator-runtime
-
       - name: "Install XcodeGen"
         run: brew install xcodegen
 
