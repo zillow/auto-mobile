@@ -5,9 +5,10 @@ import { ObserveResult } from "./ObserveResult";
  */
 export interface BiometricAuthResult {
   success: boolean;
-  action: "match" | "fail" | "cancel";
+  action: "match" | "fail" | "cancel" | "error";
   modality: "any" | "fingerprint" | "face";
   fingerprintId?: number;
+  errorCode?: number;
   supported: boolean | "partial";
   observation?: ObserveResult;
   error?: string;

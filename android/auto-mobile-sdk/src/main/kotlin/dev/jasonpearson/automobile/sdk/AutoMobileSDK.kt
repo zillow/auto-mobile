@@ -6,6 +6,7 @@ import dev.jasonpearson.automobile.protocol.NavigationSourceType
 import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.anr.AutoMobileAnr
+import dev.jasonpearson.automobile.sdk.biometrics.AutoMobileBiometrics
 import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
@@ -70,6 +71,7 @@ object AutoMobileSDK {
     AutoMobileFailures.initialize(this.context!!)
     AutoMobileCrashes.initialize(this.context!!)
     AutoMobileAnr.initialize(this.context!!)
+    AutoMobileBiometrics.initialize(this.context!!)
   }
 
   /**

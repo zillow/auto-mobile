@@ -6,10 +6,18 @@ import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface BiometricAuthOptions {
-  action: "match" | "fail" | "cancel";
+  action: "match" | "fail" | "cancel" | "error";
   modality?: "any" | "fingerprint" | "face";
   fingerprintId?: number;
+  errorCode?: number;
+  ttlMs?: number;
 }
+
+/** Broadcast action received by AutoMobileBiometrics in the app-under-test SDK. */
+const SDK_BROADCAST_ACTION = "dev.jasonpearson.automobile.sdk.BIOMETRIC_OVERRIDE";
+
+/** Default TTL for SDK overrides in milliseconds. */
+const DEFAULT_TTL_MS = 5000;
 
 export class BiometricAuth extends BaseVisualChange {
   constructor(
@@ -36,6 +44,7 @@ export class BiometricAuth extends BaseVisualChange {
         action: options.action,
         modality: options.modality ?? "any",
         fingerprintId: options.fingerprintId,
+        errorCode: options.errorCode,
         supported: false,
         error: "Biometric authentication is only supported on Android devices"
       };
@@ -50,22 +59,33 @@ export class BiometricAuth extends BaseVisualChange {
         action: options.action,
         modality,
         fingerprintId: options.fingerprintId,
+        errorCode: options.errorCode,
         supported: false,
         error: "Face biometric modality is not supported. Only 'any' and 'fingerprint' are supported on Android emulators."
       };
     }
 
+    // Send SDK override broadcast (works on emulators and physical devices)
+    const broadcastOk = await this.sendSdkOverrideBroadcast(options);
+    if (!broadcastOk) {
+      logger.warn("SDK override broadcast failed; app may not have AutoMobileBiometrics integrated");
+    }
+
     // Check if device is an emulator
     const capabilityResult = await this.checkCapability();
+
     if (!capabilityResult.isEmulator) {
       perf.end();
       return {
-        success: false,
+        success: true,
         action: options.action,
-        modality: options.modality ?? "any",
+        modality,
         fingerprintId: options.fingerprintId,
-        supported: false,
-        error: "Biometric authentication simulation is only supported on Android emulators. Physical devices are not supported."
+        errorCode: options.errorCode,
+        supported: "partial",
+        message:
+          "SDK override broadcast sent. Emulator emu finger commands are not available on physical devices. " +
+          "Ensure the app integrates AutoMobileBiometrics.consumeOverride() in its BiometricPrompt.AuthenticationCallback."
       };
     }
 
@@ -74,8 +94,9 @@ export class BiometricAuth extends BaseVisualChange {
       return {
         success: false,
         action: options.action,
-        modality: options.modality ?? "any",
+        modality,
         fingerprintId: options.fingerprintId,
+        errorCode: options.errorCode,
         supported: false,
         error: "This emulator does not support 'emu finger' commands"
       };
@@ -83,14 +104,13 @@ export class BiometricAuth extends BaseVisualChange {
 
     return this.observedInteraction(
       async () => {
-        // Execute the biometric action based on the requested type
         const result = await perf.track("executeBiometricAction", () =>
           this.executeBiometricAction(options)
         );
         return result;
       },
       {
-        changeExpected: false, // Don't override success based on view hierarchy changes
+        changeExpected: false,
         timeoutMs: 5000,
         progress,
         perf
@@ -99,11 +119,48 @@ export class BiometricAuth extends BaseVisualChange {
   }
 
   /**
+   * Send an ADB broadcast that AutoMobileBiometrics (in the app-under-test) will receive
+   * and use to override the next biometric callback result.
+   *
+   * Returns true if the broadcast command succeeded, false on error.
+   */
+  private async sendSdkOverrideBroadcast(options: BiometricAuthOptions): Promise<boolean> {
+    try {
+      const resultValue = this.actionToSdkResult(options.action);
+      const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+
+      let cmd =
+        `shell am broadcast -a ${SDK_BROADCAST_ACTION}` +
+        ` --es result ${resultValue}` +
+        ` --el ttlMs ${ttlMs}`;
+
+      if (options.action === "error" && options.errorCode !== undefined) {
+        cmd += ` --ei errorCode ${options.errorCode}`;
+      }
+
+      await this.adb.executeCommand(cmd);
+      return true;
+    } catch (error) {
+      logger.warn(`Failed to send SDK biometric override broadcast: ${error}`);
+      return false;
+    }
+  }
+
+  /** Map MCP action name to the string expected by AutoMobileBiometrics broadcast receiver. */
+  private actionToSdkResult(action: BiometricAuthOptions["action"]): string {
+    switch (action) {
+      case "match":  return "SUCCESS";
+      case "fail":   return "FAILURE";
+      case "cancel": return "CANCEL";
+      case "error":  return "ERROR";
+    }
+  }
+
+  /**
    * Check if the device is an emulator and supports emu finger commands
    */
   private async checkCapability(): Promise<{ isEmulator: boolean; supportsEmuFinger: boolean }> {
     try {
-      // Check if device is an emulator
       const qemuResult = await this.adb.executeCommand("shell getprop ro.kernel.qemu");
       const isEmulator = qemuResult.trim() === "1";
 
@@ -111,7 +168,6 @@ export class BiometricAuth extends BaseVisualChange {
         return { isEmulator: false, supportsEmuFinger: false };
       }
 
-      // Check if emu finger commands are available
       try {
         const emuHelpResult = await this.adb.executeCommand("emu help");
         const supportsEmuFinger = emuHelpResult.includes("finger");
@@ -127,38 +183,41 @@ export class BiometricAuth extends BaseVisualChange {
   }
 
   /**
-   * Execute the biometric action (match, fail, or cancel)
+   * Execute the biometric action via emu finger commands.
+   *
+   * For match:  touch enrolled ID 1  → onAuthenticationSucceeded
+   * For fail:   touch unenrolled ID 2 → onAuthenticationFailed
+   * For cancel: touch unenrolled ID 2 → onAuthenticationFailed (override converts to cancel)
+   * For error:  touch enrolled ID 1   → onAuthenticationSucceeded (override converts to error)
    */
   private async executeBiometricAction(options: BiometricAuthOptions): Promise<BiometricAuthResult> {
     const modality = options.modality ?? "any";
 
-    // Determine fingerprint ID based on action
+    // Determine fingerprint ID
     let fingerprintId = options.fingerprintId;
     if (fingerprintId === undefined) {
-      // Use default IDs based on action
-      fingerprintId = options.action === "match" ? 1 : 2;
+      // match and error use enrolled ID 1 to reliably trigger the success callback;
+      // fail and cancel use unenrolled ID 2.
+      fingerprintId = (options.action === "match" || options.action === "error") ? 1 : 2;
     }
 
     try {
-      // Execute fingerprint touch
       const touchResult = await this.adb.executeCommand(`emu finger touch ${fingerprintId}`);
 
-      // Check if command failed (stderr contains error message)
       if (touchResult.stderr && touchResult.stderr.trim().length > 0) {
         return {
           success: false,
           action: options.action,
           modality,
           fingerprintId,
+          errorCode: options.errorCode,
           supported: true,
           error: `emu finger touch failed: ${touchResult.stderr}`
         };
       }
 
-      // Wait a brief moment for the touch to register
       await this.timer.sleep(100);
 
-      // Release the fingerprint sensor
       const removeResult = await this.adb.executeCommand(`emu finger remove ${fingerprintId}`);
 
       if (removeResult.stderr && removeResult.stderr.trim().length > 0) {
@@ -167,34 +226,13 @@ export class BiometricAuth extends BaseVisualChange {
           action: options.action,
           modality,
           fingerprintId,
+          errorCode: options.errorCode,
           supported: true,
           error: `emu finger remove failed: ${removeResult.stderr}`
         };
       }
 
-      // For 'fail' action, we need to verify that the emulator actually differentiates IDs
-      // If it doesn't, this should be reported as an error (per user's preference)
-      if (options.action === "fail") {
-        // The expectation is that ID 2 (non-enrolled) should fail
-        // If the emulator doesn't differentiate, the user wants an error
-        return {
-          success: true,
-          action: options.action,
-          modality,
-          fingerprintId,
-          supported: true,
-          message: `Simulated biometric ${options.action} with fingerprint ID ${fingerprintId}. Note: Some emulators may not differentiate between enrolled and non-enrolled fingerprint IDs.`
-        };
-      }
-
-      return {
-        success: true,
-        action: options.action,
-        modality,
-        fingerprintId,
-        supported: true,
-        message: `Successfully simulated biometric ${options.action} with fingerprint ID ${fingerprintId}`
-      };
+      return this.buildSuccessResult(options, modality, fingerprintId);
     } catch (error) {
       logger.error(`Failed to execute biometric action: ${error}`);
       return {
@@ -202,9 +240,45 @@ export class BiometricAuth extends BaseVisualChange {
         action: options.action,
         modality,
         fingerprintId,
+        errorCode: options.errorCode,
         supported: true,
         error: `Failed to execute emu finger commands: ${error instanceof Error ? error.message : String(error)}`
       };
+    }
+  }
+
+  private buildSuccessResult(
+    options: BiometricAuthOptions,
+    modality: string,
+    fingerprintId: number
+  ): BiometricAuthResult {
+    const base = {
+      success: true,
+      action: options.action,
+      modality: modality as BiometricAuthResult["modality"],
+      fingerprintId,
+      errorCode: options.errorCode,
+      supported: true as const
+    };
+
+    switch (options.action) {
+      case "fail":
+        return {
+          ...base,
+          message: `Simulated biometric ${options.action} with fingerprint ID ${fingerprintId}. Note: Some emulators may not differentiate between enrolled and non-enrolled fingerprint IDs.`
+        };
+      case "error":
+        return {
+          ...base,
+          message:
+            `SDK override broadcast sent with ERROR (errorCode=${options.errorCode ?? -1}) and emu finger touch ${fingerprintId} fired. ` +
+            `App must call AutoMobileBiometrics.consumeOverride() in its BiometricPrompt.AuthenticationCallback.`
+        };
+      default:
+        return {
+          ...base,
+          message: `Successfully simulated biometric ${options.action} with fingerprint ID ${fingerprintId}`
+        };
     }
   }
 }

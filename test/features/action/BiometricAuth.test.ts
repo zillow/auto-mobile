@@ -26,7 +26,6 @@ describe("BiometricAuth", () => {
   let device: BootedDevice;
 
   beforeEach(() => {
-    // Create fakes for testing
     fakeAdb = new FakeAdbExecutor();
     fakeObserveScreen = new FakeObserveScreen();
     fakeWindow = new FakeWindow();
@@ -34,24 +33,24 @@ describe("BiometricAuth", () => {
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
 
-    // Create a mock device
     device = {
       deviceId: "test-device",
       platform: "android"
     } as BootedDevice;
 
-    // Set up default fake responses
     fakeWindow.configureCachedActiveWindow(null);
     fakeWindow.configureActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
     fakeObserveScreen.setObserveResult(() => createObserveResult());
 
-    // Set up emulator detection (device is an emulator)
+    // Emulator detection
     fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "1", stderr: "" });
     fakeAdb.setCommandResponse("emu help", { stdout: "finger - fingerprint commands\nhelp - show this help", stderr: "" });
 
+    // SDK broadcast (matches any am broadcast command for biometric override)
+    fakeAdb.setCommandResponse("BIOMETRIC_OVERRIDE", { stdout: "Broadcast completed (1 receivers)", stderr: "" });
+
     biometricAuth = new BiometricAuth(device, fakeAdb, fakeTimer);
 
-    // Replace the internal managers with our fakes
     (biometricAuth as any).observeScreen = fakeObserveScreen;
     (biometricAuth as any).window = fakeWindow;
     (biometricAuth as any).awaitIdle = fakeAwaitIdle;
@@ -71,7 +70,6 @@ describe("BiometricAuth", () => {
       expect(result.supported).toBe(true);
       expect(result.observation).toBeDefined();
 
-      // Verify correct commands were executed
       const executedCommands = fakeAdb.getExecutedCommands();
       expect(executedCommands.some(cmd => cmd.includes("emu finger touch 1"))).toBe(true);
       expect(executedCommands.some(cmd => cmd.includes("emu finger remove 1"))).toBe(true);
@@ -106,6 +104,18 @@ describe("BiometricAuth", () => {
       expect(result.success).toBe(true);
       expect(result.modality).toBe("fingerprint");
     });
+
+    test("should send SDK override broadcast with SUCCESS for match", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "match" });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd =>
+        cmd.includes("BIOMETRIC_OVERRIDE") && cmd.includes("SUCCESS")
+      )).toBe(true);
+    });
   });
 
   describe("execute - fail action", () => {
@@ -134,6 +144,18 @@ describe("BiometricAuth", () => {
       expect(result.success).toBe(true);
       expect(result.message).toContain("may not differentiate");
     });
+
+    test("should send SDK override broadcast with FAILURE for fail", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 2", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 2", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "fail" });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd =>
+        cmd.includes("BIOMETRIC_OVERRIDE") && cmd.includes("FAILURE")
+      )).toBe(true);
+    });
   });
 
   describe("execute - cancel action", () => {
@@ -146,6 +168,155 @@ describe("BiometricAuth", () => {
       expect(result.success).toBe(true);
       expect(result.action).toBe("cancel");
       expect(result.supported).toBe(true);
+    });
+
+    test("should send SDK override broadcast with CANCEL for cancel", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 2", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 2", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "cancel" });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd =>
+        cmd.includes("BIOMETRIC_OVERRIDE") && cmd.includes("CANCEL")
+      )).toBe(true);
+    });
+  });
+
+  describe("execute - error action", () => {
+    test("should use enrolled fingerprint ID 1 for error action", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "error", errorCode: 7 });
+
+      expect(result.success).toBe(true);
+      expect(result.action).toBe("error");
+      expect(result.fingerprintId).toBe(1);
+      expect(result.errorCode).toBe(7);
+      expect(result.supported).toBe(true);
+      expect(result.observation).toBeDefined();
+    });
+
+    test("should send SDK override broadcast with ERROR and errorCode", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "error", errorCode: 7 });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd =>
+        cmd.includes("BIOMETRIC_OVERRIDE") && cmd.includes("ERROR") && cmd.includes("7")
+      )).toBe(true);
+    });
+
+    test("should include SDK integration note in error action message", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "error", errorCode: 7 });
+
+      expect(result.message).toContain("consumeOverride");
+    });
+
+    test("should use custom fingerprint ID for error action", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 3", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 3", { stdout: "", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "error", errorCode: 1, fingerprintId: 3 });
+
+      expect(result.fingerprintId).toBe(3);
+    });
+
+    test("should pass ttlMs to SDK broadcast", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "error", errorCode: 7, ttlMs: 10000 });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd =>
+        cmd.includes("BIOMETRIC_OVERRIDE") && cmd.includes("10000")
+      )).toBe(true);
+    });
+  });
+
+  describe("SDK broadcast", () => {
+    test("should send broadcast before emu finger commands", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "match" });
+
+      const cmds = fakeAdb.getExecutedCommands();
+      const broadcastIdx = cmds.findIndex(cmd => cmd.includes("BIOMETRIC_OVERRIDE"));
+      const touchIdx = cmds.findIndex(cmd => cmd.includes("emu finger touch 1"));
+      expect(broadcastIdx).toBeGreaterThanOrEqual(0);
+      expect(touchIdx).toBeGreaterThan(broadcastIdx);
+    });
+
+    test("should include default ttlMs in broadcast", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      await biometricAuth.execute({ action: "match" });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd =>
+        cmd.includes("BIOMETRIC_OVERRIDE") && cmd.includes("ttlMs") && cmd.includes("5000")
+      )).toBe(true);
+    });
+
+    test("should still proceed if broadcast fails", async () => {
+      // Make broadcast fail
+      fakeAdb.setCommandResponse("BIOMETRIC_OVERRIDE", { stdout: "", stderr: "broadcast failed" });
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "match" });
+
+      // Emu finger path should still work
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("physical device support", () => {
+    test("should return partial support on physical devices with SDK broadcast", async () => {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "0", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "match" });
+
+      expect(result.success).toBe(true);
+      expect(result.supported).toBe("partial");
+      expect(result.message).toContain("consumeOverride");
+    });
+
+    test("should send SDK broadcast to physical devices", async () => {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "0", stderr: "" });
+
+      await biometricAuth.execute({ action: "match" });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd => cmd.includes("BIOMETRIC_OVERRIDE"))).toBe(true);
+    });
+
+    test("should not send emu finger commands to physical devices", async () => {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "0", stderr: "" });
+
+      await biometricAuth.execute({ action: "match" });
+
+      const executedCommands = fakeAdb.getExecutedCommands();
+      expect(executedCommands.some(cmd => cmd.includes("emu finger"))).toBe(false);
+    });
+
+    test("should support error action on physical devices via SDK broadcast", async () => {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "0", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "error", errorCode: 7 });
+
+      expect(result.success).toBe(true);
+      expect(result.supported).toBe("partial");
+      expect(result.errorCode).toBe(7);
     });
   });
 
@@ -161,19 +332,7 @@ describe("BiometricAuth", () => {
       expect(result.error).toContain("only supported on Android");
     });
 
-    test("should reject physical devices", async () => {
-      // Set device as physical (not emulator)
-      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "0", stderr: "" });
-
-      const result = await biometricAuth.execute({ action: "match" });
-
-      expect(result.success).toBe(false);
-      expect(result.supported).toBe(false);
-      expect(result.error).toContain("only supported on Android emulators");
-    });
-
     test("should reject emulators without emu finger support", async () => {
-      // Device is emulator but doesn't support emu finger
       fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "1", stderr: "" });
       fakeAdb.setCommandResponse("emu help", { stdout: "help - show this help", stderr: "" });
 
@@ -222,14 +381,15 @@ describe("BiometricAuth", () => {
       expect(result.error).toContain("emu finger touch failed");
     });
 
-    test("should handle capability check failures gracefully", async () => {
-      // Make capability check fail
+    test("should treat capability check failures as physical device (partial support)", async () => {
+      // When getprop fails, the device is treated as a physical device (non-emulator)
+      // which returns supported: "partial" with the SDK broadcast still sent.
       fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "", stderr: "Error" });
 
       const result = await biometricAuth.execute({ action: "match" });
 
-      expect(result.success).toBe(false);
-      expect(result.supported).toBe(false);
+      expect(result.success).toBe(true);
+      expect(result.supported).toBe("partial");
     });
   });
 

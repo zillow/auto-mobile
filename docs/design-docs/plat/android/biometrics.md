@@ -1,8 +1,8 @@
 # Biometrics Stubbing
 
-<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> <kbd>🤖 Emulator Only</kbd>
+<kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd>
 
-> **Current state:** The `biometricAuth` MCP tool is fully implemented and tested for Android emulators via `adb emu finger touch/remove`. Physical Android devices and face/iris modalities are not supported. The optional SDK hook (`AutoMobileBiometrics.overrideResult()`) is <kbd>❌ Not Implemented</kbd>. See the [Status Glossary](../../status-glossary.md) for chip definitions.
+> **Current state:** The `biometricAuth` MCP tool is fully implemented and tested for Android emulators via `adb emu finger touch/remove`. Physical Android devices receive an SDK broadcast override (`supported: "partial"`). Face/iris modalities are not supported. The `AutoMobileBiometrics` SDK hook is <kbd>✅ Implemented</kbd>. See the [Status Glossary](../../status-glossary.md) for chip definitions.
 
 ## Goal
 
@@ -14,17 +14,21 @@ when emulator support is not sufficient.
 
 ```typescript
 biometricAuth({
-  action: "match" | "fail" | "cancel",
+  action: "match" | "fail" | "cancel" | "error",
   modality: "any" | "fingerprint" | "face",
-  fingerprintId?: number
+  fingerprintId?: number,
+  errorCode?: number,   // BiometricPrompt.ERROR_* constant; used with action: "error"
+  ttlMs?: number        // SDK override TTL in ms (default: 5000)
 })
 ```
 
 Behavior:
 
 - `modality: any` prefers fingerprint on emulator (highest support).
-- `action: match` should succeed if enrollment exists.
-- `action: fail` should simulate a non-matching biometric.
+- `action: match` — succeeds if enrollment exists.
+- `action: fail` — simulates a non-matching biometric.
+- `action: cancel` — simulates user cancellation via the SDK override.
+- `action: error` — injects a hard `BiometricPrompt` error; requires SDK integration.
 
 ## Emulator implementation (API 29/35)
 
@@ -100,22 +104,76 @@ Notes:
 
 ## App-under-test integration (AutoMobile SDK)
 
-When emulator-only support is not enough, add a debug-only SDK hook to
-bypass or simulate biometric callbacks within the app-under-test.
+`AutoMobileBiometrics` is a debug-only SDK hook that makes biometric
+authentication flows deterministic without physical hardware interaction.
 
-Suggested SDK entrypoint:
+### SDK API
 
-```text
-AutoMobileBiometrics.overrideResult(
-  result = SUCCESS | FAILURE | CANCEL,
-  ttlMs = 5000
-)
+```kotlin
+// Initialize (called automatically by AutoMobileSDK.initialize):
+AutoMobileBiometrics.initialize(applicationContext)
+
+// Set an override (called by test code or triggered via MCP broadcast):
+AutoMobileBiometrics.overrideResult(BiometricResult.Success, ttlMs = 5000L)
+AutoMobileBiometrics.overrideResult(BiometricResult.Failure)
+AutoMobileBiometrics.overrideResult(BiometricResult.Cancel)
+AutoMobileBiometrics.overrideResult(BiometricResult.Error(errorCode = 7))
+
+// Clear a pending override (call in @Before test setup):
+AutoMobileBiometrics.clearOverride()
+
+// Consume the override inside BiometricPrompt.AuthenticationCallback:
+val override = AutoMobileBiometrics.consumeOverride()
 ```
 
-Notes:
+### App integration pattern
 
-- This is a build-time opt-in for apps we can modify.
-- It can bypass the system prompt to make tests deterministic.
+Call `consumeOverride()` inside every branch of `BiometricPrompt.AuthenticationCallback`
+before delegating to your real handler:
+
+```kotlin
+object : BiometricPrompt.AuthenticationCallback() {
+    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+        when (val override = AutoMobileBiometrics.consumeOverride()) {
+            is BiometricResult.Failure -> handleFailure()
+            is BiometricResult.Cancel  -> handleCancel()
+            is BiometricResult.Error   -> handleError(override.errorCode, override.errorMessage)
+            is BiometricResult.Success, null -> handleSuccess()
+        }
+    }
+    override fun onAuthenticationFailed() {
+        when (val override = AutoMobileBiometrics.consumeOverride()) {
+            is BiometricResult.Success -> handleSuccess()
+            is BiometricResult.Error   -> handleError(override.errorCode, override.errorMessage)
+            is BiometricResult.Cancel  -> handleCancel()
+            is BiometricResult.Failure, null -> handleFailure()
+        }
+    }
+    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+        when (val override = AutoMobileBiometrics.consumeOverride()) {
+            is BiometricResult.Success -> handleSuccess()
+            is BiometricResult.Failure -> handleFailure()
+            is BiometricResult.Cancel  -> handleCancel()
+            is BiometricResult.Error, null -> handleError(errorCode, errString.toString())
+        }
+    }
+}
+```
+
+### How MCP-triggered overrides work
+
+1. `biometricAuth` MCP tool sends `am broadcast` with override → SDK stores it.
+2. MCP tool fires `adb emu finger touch 1` (emulator) to trigger the callback.
+3. App calls `consumeOverride()` → override is consumed atomically, real result is swapped.
+
+On physical devices, only the broadcast is sent (`supported: "partial"`). The override will
+be applied when the biometric prompt fires normally.
+
+### Override semantics
+
+- The override is single-use: consumed by the first `consumeOverride()` call.
+- Default TTL is 5000 ms; expired overrides are discarded.
+- Call `clearOverride()` in `@Before` test setup to prevent stale state.
 
 ## Plan
 

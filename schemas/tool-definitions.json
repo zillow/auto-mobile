@@ -1,7 +1,7 @@
 [
   {
     "name": "biometricAuth",
-    "description": "Simulate biometric authentication (fingerprint) on Android emulators. Trigger match/fail/cancel actions for testing biometric prompts.",
+    "description": "Simulate biometric authentication (fingerprint) on Android emulators, or inject a deterministic result via the AutoMobile SDK on any device. Supports match/fail/cancel/error actions. The SDK broadcast path requires the app to integrate AutoMobileBiometrics.consumeOverride().",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -11,9 +11,10 @@
           "enum": [
             "match",
             "fail",
-            "cancel"
+            "cancel",
+            "error"
           ],
-          "description": "Biometric action: 'match' triggers successful authentication, 'fail' simulates non-matching biometric, 'cancel' cancels the prompt"
+          "description": "Biometric action: 'match' triggers successful authentication, 'fail' simulates a non-matching biometric, 'cancel' cancels the prompt, 'error' injects a hard error (requires AutoMobileBiometrics SDK integration in the app)."
         },
         "modality": {
           "description": "Biometric modality (default: 'any'). Currently only 'fingerprint' is reliably supported on Android emulators. 'face' is not consistently supported.",
@@ -25,7 +26,15 @@
           ]
         },
         "fingerprintId": {
-          "description": "Fingerprint ID to simulate (default: 1 for 'match', 2 for 'fail'). Use enrolled ID (typically 1) for match, non-enrolled ID (typically 2) for fail.",
+          "description": "Fingerprint ID to simulate (default: 1 for 'match'/'error', 2 for 'fail'/'cancel'). Use enrolled ID (typically 1) for match/error, non-enrolled ID (typically 2) for fail/cancel.",
+          "type": "number"
+        },
+        "errorCode": {
+          "description": "BiometricPrompt error code to inject when action is 'error' (e.g. 7 for ERROR_LOCKOUT, 1 for ERROR_HW_UNAVAILABLE). Requires AutoMobileBiometrics SDK integration in the app.",
+          "type": "number"
+        },
+        "ttlMs": {
+          "description": "How long the SDK override remains active in milliseconds (default: 5000). The override is cleared after the first authentication callback or when the TTL expires.",
           "type": "number"
         },
         "sessionUuid": {
