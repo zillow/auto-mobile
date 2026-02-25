@@ -2,7 +2,7 @@ import Foundation
 import QuartzCore
 
 #if canImport(UIKit) && os(iOS)
-import UIKit
+    import UIKit
 #endif
 
 /// FPS monitor that uses CADisplayLink to measure actual frame delivery timing.
@@ -18,16 +18,16 @@ import UIKit
 /// Reference: WWDC sessions on hitches and frame pacing
 public class DisplayLinkFPSMonitor: PerformanceMetricsProvider {
     /// How often to report aggregated metrics (in seconds)
-    public static let defaultReportIntervalSeconds: Double = 0.5
+    public static let defaultReportIntervalSeconds = 0.5
 
     /// Frame time thresholds for jank detection
     /// - 60Hz budget: 16.67ms
     /// - 120Hz budget: 8.33ms
     /// We use 2x the 60Hz budget as the jank threshold (33.33ms = definitely dropped frames)
-    public static let defaultJankThresholdMs: Double = 33.33
+    public static let defaultJankThresholdMs = 33.33
 
     #if canImport(UIKit) && os(iOS)
-    private var displayLink: CADisplayLink?
+        private var displayLink: CADisplayLink?
     #endif
     private var monitoringCallback: (@Sendable (PerformanceSnapshot) -> Void)?
     private var _isMonitoring = false
@@ -35,9 +35,9 @@ public class DisplayLinkFPSMonitor: PerformanceMetricsProvider {
 
     // Frame timing tracking using CADisplayLink timestamps
     private var lastLinkTimestamp: CFTimeInterval = 0
-    private var frameCount: Int = 0
+    private var frameCount = 0
     private var frameTimes: [Double] = []
-    private var jankFrameCount: Int = 0
+    private var jankFrameCount = 0
     private var lastReportTime: CFTimeInterval = 0
 
     /// Report interval in seconds
@@ -84,26 +84,26 @@ public class DisplayLinkFPSMonitor: PerformanceMetricsProvider {
         resetMetrics()
 
         #if canImport(UIKit) && os(iOS)
-        // Create display link on the main thread
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+            // Create display link on the main thread
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
 
-            let displayLink = CADisplayLink(target: self, selector: #selector(self.displayLinkFired))
+                let displayLink = CADisplayLink(target: self, selector: #selector(self.displayLinkFired))
 
-            // Use .common mode to ensure callbacks continue during scrolling/gestures
-            // Reference: UIKit Animation Debugging skill - Pattern 6
-            displayLink.add(to: .main, forMode: .common)
+                // Use .common mode to ensure callbacks continue during scrolling/gestures
+                // Reference: UIKit Animation Debugging skill - Pattern 6
+                displayLink.add(to: .main, forMode: .common)
 
-            self.lock.lock()
-            self.displayLink = displayLink
-            self.lastLinkTimestamp = 0 // Will be set on first callback
-            self.lastReportTime = CACurrentMediaTime()
-            self.lock.unlock()
+                self.lock.lock()
+                self.displayLink = displayLink
+                self.lastLinkTimestamp = 0 // Will be set on first callback
+                self.lastReportTime = CACurrentMediaTime()
+                self.lock.unlock()
 
-            print("[DisplayLinkFPSMonitor] Started monitoring")
-        }
+                print("[DisplayLinkFPSMonitor] Started monitoring")
+            }
         #else
-        print("[DisplayLinkFPSMonitor] CADisplayLink not available on this platform")
+            print("[DisplayLinkFPSMonitor] CADisplayLink not available on this platform")
         #endif
     }
 
@@ -115,8 +115,8 @@ public class DisplayLinkFPSMonitor: PerformanceMetricsProvider {
         monitoringCallback = nil
 
         #if canImport(UIKit) && os(iOS)
-        displayLink?.invalidate()
-        displayLink = nil
+            displayLink?.invalidate()
+            displayLink = nil
         #endif
 
         print("[DisplayLinkFPSMonitor] Stopped monitoring")
@@ -131,51 +131,52 @@ public class DisplayLinkFPSMonitor: PerformanceMetricsProvider {
     // MARK: - Display Link Callback
 
     #if canImport(UIKit) && os(iOS)
-    @objc private func displayLinkFired(_ link: CADisplayLink) {
-        lock.lock()
+        @objc
+        private func displayLinkFired(_ link: CADisplayLink) {
+            lock.lock()
 
-        // Use link.timestamp - the time when the frame will be displayed
-        // This is the proper way to measure actual frame intervals
-        // Reference: Display Performance skill - "UIScreen Lies, Actual Presentation Tells Truth"
-        let currentTimestamp = link.timestamp
+            // Use link.timestamp - the time when the frame will be displayed
+            // This is the proper way to measure actual frame intervals
+            // Reference: Display Performance skill - "UIScreen Lies, Actual Presentation Tells Truth"
+            let currentTimestamp = link.timestamp
 
-        if lastLinkTimestamp > 0 {
-            let frameDuration = currentTimestamp - lastLinkTimestamp
+            if lastLinkTimestamp > 0 {
+                let frameDuration = currentTimestamp - lastLinkTimestamp
 
-            if frameDuration > 0 {
-                let frameTimeMs = frameDuration * 1000.0
-                frameTimes.append(frameTimeMs)
-                frameCount += 1
+                if frameDuration > 0 {
+                    let frameTimeMs = frameDuration * 1000.0
+                    frameTimes.append(frameTimeMs)
+                    frameCount += 1
 
-                // Check for jank (frame time > threshold indicates dropped frames)
-                // A frame taking >33ms means we missed at least one vsync at 60Hz
-                if frameTimeMs > jankThresholdMs {
-                    jankFrameCount += 1
+                    // Check for jank (frame time > threshold indicates dropped frames)
+                    // A frame taking >33ms means we missed at least one vsync at 60Hz
+                    if frameTimeMs > jankThresholdMs {
+                        jankFrameCount += 1
+                    }
                 }
             }
-        }
 
-        lastLinkTimestamp = currentTimestamp
+            lastLinkTimestamp = currentTimestamp
 
-        // Check if we should report
-        let currentTime = CACurrentMediaTime()
-        let timeSinceLastReport = currentTime - lastReportTime
+            // Check if we should report
+            let currentTime = CACurrentMediaTime()
+            let timeSinceLastReport = currentTime - lastReportTime
 
-        if timeSinceLastReport >= reportInterval {
-            let snapshot = createSnapshot()
-            let callback = monitoringCallback
-            resetMetrics()
-            lastReportTime = currentTime
-            lock.unlock()
+            if timeSinceLastReport >= reportInterval {
+                let snapshot = createSnapshot()
+                let callback = monitoringCallback
+                resetMetrics()
+                lastReportTime = currentTime
+                lock.unlock()
 
-            // Call callback outside the lock
-            if let snapshot = snapshot {
-                callback?(snapshot)
+                // Call callback outside the lock
+                if let snapshot = snapshot {
+                    callback?(snapshot)
+                }
+            } else {
+                lock.unlock()
             }
-        } else {
-            lock.unlock()
         }
-    }
     #endif
 
     // MARK: - Metrics Calculation
@@ -260,7 +261,7 @@ extension DisplayLinkFPSMonitor {
 
         var totalCpu: Double = 0
 
-        for i in 0..<Int(threadCount) {
+        for i in 0 ..< Int(threadCount) {
             var threadInfo = thread_basic_info()
             var threadInfoCount = mach_msg_type_number_t(THREAD_INFO_MAX)
 

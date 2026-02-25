@@ -92,12 +92,14 @@ struct SettingsTab: View {
 }
 
 struct StorageSettingsView: View {
-    @State private var documents: Double = 125.5
-    @State private var cache: Double = 45.2
-    @State private var other: Double = 12.8
+    @State private var documents = 125.5
+    @State private var cache = 45.2
+    @State private var other = 12.8
     @Environment(\.autoMobileTheme) private var theme
 
-    var total: Double { documents + cache + other }
+    var total: Double {
+        documents + cache + other
+    }
 
     var body: some View {
         List {
@@ -199,7 +201,7 @@ struct CacheSettingsView: View {
         .navigationTitle("Clear Cache")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Clear Cache?", isPresented: $showingClearAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Clear", role: .destructive) {
                 clearCache()
             }

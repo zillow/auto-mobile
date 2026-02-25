@@ -89,7 +89,9 @@ public class XCTestService {
             print(
                 "[XCTestService] Hierarchy debouncer active (polling every \(HierarchyDebouncer.defaultPollIntervalMs)ms)"
             )
-            print("[XCTestService] FPS monitor active (reporting every \(DisplayLinkFPSMonitor.defaultReportIntervalSeconds)s)")
+            print(
+                "[XCTestService] FPS monitor active (reporting every \(DisplayLinkFPSMonitor.defaultReportIntervalSeconds)s)"
+            )
             print("[XCTestService] Ready to accept connections")
         }
     #else
@@ -106,8 +108,6 @@ public class XCTestService {
         server.stop()
         print("[XCTestService] Service stopped")
     }
-
-
 }
 
 // MARK: - Convenience Extensions

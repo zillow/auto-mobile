@@ -135,7 +135,8 @@ public class ElementLocator: ElementLocating {
                     }
                 }
 
-            let isCurrentAppInForeground = (stateInfo.currentAppState ?? 0) >= 4 // .runningForeground only (3 = .runningBackground)
+            let isCurrentAppInForeground = (stateInfo.currentAppState ?? 0) >=
+                4 // .runningForeground only (3 = .runningBackground)
             let isCurrentAppSpringboard = stateInfo.currentBundleId == "com.apple.springboard"
 
             // If we have an app (not springboard) and it's in foreground, we're good
@@ -328,7 +329,11 @@ public class ElementLocator: ElementLocating {
         }
 
         /// Collect all potential bundle IDs from springboard element tree
-        private func collectBundleIdsFromElement(_ element: XCUIElementSnapshot, into bundleIds: inout [String], depth: Int = 0) {
+        private func collectBundleIdsFromElement(
+            _ element: XCUIElementSnapshot,
+            into bundleIds: inout [String],
+            depth: Int = 0
+        ) {
             let identifier = element.identifier
 
             // Many springboard elements have identifiers like "com.apple.AppName-window"
@@ -525,7 +530,9 @@ public class ElementLocator: ElementLocating {
             }
 
             if !combined.isEmpty {
-                print("[ElementLocator] Found \(combined.count) system alert(s): appAlerts=\(appAlerts.count), springboardAlerts=\(springboardAlerts.count)")
+                print(
+                    "[ElementLocator] Found \(combined.count) system alert(s): appAlerts=\(appAlerts.count), springboardAlerts=\(springboardAlerts.count)"
+                )
             }
 
             return combined
@@ -596,7 +603,7 @@ public class ElementLocator: ElementLocating {
             // Alert-type elements are SKIPPED here because they are extracted separately
             // by collectAlertElements() and added as top-level system alerts. This ensures
             // permission dialogs are always visible and never lost to hierarchy optimization.
-            var childNodes: [UIElementInfo]? = nil
+            var childNodes: [UIElementInfo]?
             if depth < ElementLocator.maxDepth {
                 let children = snapshot.children
                 if !children.isEmpty {
@@ -656,7 +663,7 @@ public class ElementLocator: ElementLocating {
             let isPassword = snapshot.elementType == .secureTextField
 
             // Only include actions for text input elements (click is implied by clickable)
-            var actions: [String]? = nil
+            var actions: [String]?
             if isEnabled && (snapshot.elementType == .textField || snapshot.elementType == .textView ||
                 snapshot.elementType == .secureTextField)
             {
@@ -744,7 +751,7 @@ public class ElementLocator: ElementLocating {
                 element.selected == "true"
 
             // First, recursively optimize children
-            var optimizedChildren: [UIElementInfo]? = nil
+            var optimizedChildren: [UIElementInfo]?
             if let children = element.node {
                 let optimized = children.flatMap { child in
                     optimizeHierarchy(child, isRoot: false)
@@ -995,7 +1002,7 @@ public class ElementLocator: ElementLocating {
             return nil
         }
 
-        public func trackObservedBundleId(_ bundleId: String) {
+        public func trackObservedBundleId(_: String) {
             // no-op on non-iOS
         }
     #endif
