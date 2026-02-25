@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Install jq"
         run: |
@@ -74,7 +74,7 @@ jobs:
 
       - name: "Create or Update Issue"
         if: always() && env.FAILED == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -177,7 +177,7 @@ jobs:
 
       - name: "Close Issue if Passed"
         if: always() && env.FAILED != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             // Search for existing dead code issue

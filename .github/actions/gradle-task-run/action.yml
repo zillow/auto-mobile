@@ -78,7 +78,7 @@ runs:
   using: "composite"
   steps:
     - name: "Install JDK"
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: 'zulu'
         java-version: '21'
@@ -235,7 +235,7 @@ runs:
         files: "**/build/test-results/testDebugUnitTest/TEST-*.xml"
 
     - name: "Publish Test Report"
-      uses: mikepenz/action-junit-report@v4
+      uses: mikepenz/action-junit-report@v6
       if: steps.junit-reports-exist.outputs.files_exists == 'true'
       with:
         report_paths: '**/build/test-results/testDebugUnitTest/TEST-*.xml'
