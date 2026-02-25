@@ -25,6 +25,7 @@ runs:
           bun pm cache rm
           bun install --frozen-lockfile
         }
+        echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
 
     - name: "Build AutoMobile"
       shell: ${{ inputs.shell }}
