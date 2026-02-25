@@ -127,7 +127,7 @@ run_xcodegen() {
   return 1
 }
 
-# Build XCTestService using xcodebuild build-for-testing
+# Build CtrlProxy iOS using xcodebuild build-for-testing
 build_ctrl_proxy_ios() {
   if ! command -v xcodebuild >/dev/null 2>&1; then
     log_error "xcodebuild not found. Install Xcode."
@@ -169,7 +169,7 @@ get_xctestrun_path() {
   echo ""
 }
 
-# Start XCTestService on a simulator
+# Start CtrlProxy iOS on a simulator
 start_ctrl_proxy_ios() {
   local simulator_id="$1"
   local port="${CTRL_PROXY_IOS_PORT:-8765}"
@@ -177,7 +177,7 @@ start_ctrl_proxy_ios() {
   xctestrun_path="$(get_xctestrun_path)"
 
   if [[ -z "${simulator_id}" ]]; then
-    log_warn "No booted simulator available; cannot start XCTestService."
+    log_warn "No booted simulator available; cannot start CtrlProxy iOS."
     return 1
   fi
 
@@ -218,7 +218,7 @@ start_ctrl_proxy_ios() {
   local existing_pids
   existing_pids=$(pgrep -f "xcodebuild.*test.*CtrlProxy" 2>/dev/null || true)
   if [[ -n "${existing_pids}" ]]; then
-    log_info "Killing orphaned XCTestService xcodebuild processes: ${existing_pids}"
+    log_info "Killing orphaned CtrlProxy iOS xcodebuild processes: ${existing_pids}"
     echo "${existing_pids}" | xargs kill 2>/dev/null || true
     sleep 2
     # Force kill if still running
@@ -231,7 +231,7 @@ start_ctrl_proxy_ios() {
   fi
 
   echo "" >> "${XCODEBUILD_LOG}"
-  echo "=== XCTestService starting at $(date) ===" >> "${XCODEBUILD_LOG}"
+  echo "=== CtrlProxy iOS starting at $(date) ===" >> "${XCODEBUILD_LOG}"
   (cd "${CTRL_PROXY_IOS_DIR}" && "${cmd[@]}") >> "${XCODEBUILD_LOG}" 2>&1 &
   XCODEBUILD_PID=$!
   log_info "CtrlProxy iOS started (PID ${XCODEBUILD_PID})"
@@ -239,7 +239,7 @@ start_ctrl_proxy_ios() {
   return 0
 }
 
-# Stop XCTestService process
+# Stop CtrlProxy iOS process
 stop_ctrl_proxy_ios() {
   if [[ -n "${XCODEBUILD_PID}" ]] && kill -0 "${XCODEBUILD_PID}" 2>/dev/null; then
     log_info "Stopping CtrlProxy iOS (PID ${XCODEBUILD_PID})..."

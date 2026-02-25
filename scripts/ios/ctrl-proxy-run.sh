@@ -1,17 +1,17 @@
 #!/bin/bash
 #
-# XCTestService Run Script
-# Builds (if needed) and runs XCTestService on a booted iOS Simulator
+# CtrlProxy iOS Run Script
+# Builds (if needed) and runs CtrlProxy iOS on a booted iOS Simulator
 #
 # Usage:
-#   ./scripts/ios/xctestservice-run.sh [--rebuild]
+#   ./scripts/ios/ctrl-proxy-run.sh [--rebuild]
 #
 # Options:
 #   --rebuild    Force rebuild even if artifacts exist
 #
 # Environment Variables:
-#   XCTESTSERVICE_PORT    Port for XCTestService (default: 8765)
-#   XCTESTSERVICE_TIMEOUT Timeout in seconds (default: 3600)
+#   CTRL_PROXY_IOS_PORT    Port for CtrlProxy iOS (default: 8765)
+#   CTRL_PROXY_IOS_TIMEOUT Timeout in seconds (default: 3600)
 
 set -e
 
@@ -39,13 +39,13 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default paths and settings
-DERIVED_DATA="/tmp/automobile-xctestservice"
-PORT="${XCTESTSERVICE_PORT:-8765}"
-TIMEOUT="${XCTESTSERVICE_TIMEOUT:-3600}"
-RUNNER_BINARY="${DERIVED_DATA}/Build/Products/Debug-iphonesimulator/XCTestServiceUITests-Runner.app/XCTestServiceUITests-Runner"
+DERIVED_DATA="/tmp/automobile-ctrl-proxy"
+PORT="${CTRL_PROXY_IOS_PORT:-8765}"
+TIMEOUT="${CTRL_PROXY_IOS_TIMEOUT:-3600}"
+RUNNER_BINARY="${DERIVED_DATA}/Build/Products/Debug-iphonesimulator/CtrlProxyUITests-Runner.app/CtrlProxyUITests-Runner"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  XCTestService Run${NC}"
+echo -e "${CYAN}  CtrlProxy iOS Run${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
@@ -66,8 +66,8 @@ echo ""
 
 # Check if build is needed
 if [ "${FORCE_REBUILD}" = true ] || [ ! -f "${RUNNER_BINARY}" ]; then
-    echo -e "${BLUE}Building XCTestService...${NC}"
-    "${SCRIPT_DIR}/xctestservice-build-for-testing.sh"
+    echo -e "${BLUE}Building CtrlProxy iOS...${NC}"
+    "${SCRIPT_DIR}/ctrl-proxy-build-for-testing.sh"
 fi
 
 if [ ! -f "${RUNNER_BINARY}" ]; then
@@ -78,12 +78,12 @@ fi
 echo -e "${GREEN}Using runner binary:${NC} ${RUNNER_BINARY}"
 echo ""
 
-# Run XCTestService via simctl spawn (lighter than xcodebuild test-without-building)
-echo -e "${BLUE}Starting XCTestService...${NC}"
+# Run CtrlProxy iOS via simctl spawn (lighter than xcodebuild test-without-building)
+echo -e "${BLUE}Starting CtrlProxy iOS...${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
 echo ""
 
 xcrun simctl spawn "${SIMULATOR_ID}" \
-    --setenv XCTESTSERVICE_PORT="${PORT}" \
-    --setenv XCTESTSERVICE_TIMEOUT="${TIMEOUT}" \
+    --setenv CTRL_PROXY_IOS_PORT="${PORT}" \
+    --setenv CTRL_PROXY_IOS_TIMEOUT="${TIMEOUT}" \
     "${RUNNER_BINARY}"

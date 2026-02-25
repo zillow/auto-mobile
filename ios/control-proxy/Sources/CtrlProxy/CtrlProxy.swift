@@ -3,7 +3,7 @@ import Foundation
     import XCTest
 #endif
 
-/// Main XCTestService that coordinates WebSocket server, element locator, and gesture performer
+/// Main CtrlProxy iOS service that coordinates WebSocket server, element locator, and gesture performer
 /// Similar to Appium's WebDriverAgent but matching Android AccessibilityService protocol
 public class CtrlProxy {
     public static let defaultPort: UInt16 = 8765

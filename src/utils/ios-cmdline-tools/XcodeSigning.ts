@@ -330,7 +330,7 @@ export class XcodeSigningManager {
   }
 
   public async detectTeamIdsFromXcode(): Promise<string[]> {
-    const projectPath = join(process.cwd(), "ios", "CtrlProxy iOS", "CtrlProxy iOS.xcodeproj");
+    const projectPath = join(process.cwd(), "ios", "control-proxy", "CtrlProxy.xcodeproj");
     try {
       if (this.dependencies.platform() !== "darwin") {
         const available = await this.dependencies.xcodebuild.isAvailable();
@@ -570,6 +570,6 @@ export class XcodeSigningManager {
   }
 
   private entitlementsDirectory(): string {
-    return join(this.dependencies.homedir(), ".automobile", "xctestservice", "entitlements");
+    return join(this.dependencies.homedir(), ".automobile", "ctrl-proxy", "entitlements");
   }
 }

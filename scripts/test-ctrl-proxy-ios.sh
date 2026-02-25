@@ -108,7 +108,7 @@ fi
 echo ""
 
 # =============================================================================
-# Test 2: Check if XCTestService is running (health endpoint + process check)
+# Test 2: Check if CtrlProxy iOS is running (health endpoint + process check)
 # =============================================================================
 echo -e "${BLUE}[2/5] Checking if CtrlProxy iOS is Running${NC}"
 echo ""

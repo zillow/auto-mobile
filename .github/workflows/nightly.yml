@@ -19,13 +19,13 @@ jobs:
       RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
-  build-xctestservice-ipa:
-    uses: ./.github/workflows/build-xctestservice-ipa.yml
+  build-ctrl-proxy-ios-ipa:
+    uses: ./.github/workflows/build-ctrl-proxy-ios-ipa.yml
 
   update-sha256:
     name: "Update SHA256 Checksums"
     runs-on: ubuntu-latest
-    needs: [build-control-proxy-apk, build-xctestservice-ipa]
+    needs: [build-control-proxy-apk, build-ctrl-proxy-ios-ipa]
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -39,20 +39,20 @@ jobs:
       - name: "Download IPA artifact"
         uses: actions/download-artifact@v7
         with:
-          name: xctestservice-ipa
+          name: ctrl-proxy-ios-ipa
           path: /tmp
 
       - name: "Verify APK SHA256"
         run: bash scripts/ci/verify-transit-sha256.sh /tmp/control-proxy-debug.apk "${{ needs.build-control-proxy-apk.outputs.sha256 }}"
 
       - name: "Verify IPA SHA256"
-        run: bash scripts/ci/verify-transit-sha256.sh /tmp/XCTestService.ipa "${{ needs.build-xctestservice-ipa.outputs.sha256 }}"
+        run: bash scripts/ci/verify-transit-sha256.sh /tmp/control-proxy.ipa "${{ needs.build-ctrl-proxy-ios-ipa.outputs.sha256 }}"
 
       - name: "Get current SHA256 values from source"
         id: current
         run: |
           APK_CURRENT=$(grep 'APK_SHA256_CHECKSUM' src/constants/release.ts | sed 's/.*"\([^"]*\)".*/\1/')
-          IPA_CURRENT=$(grep 'XCTESTSERVICE_SHA256_CHECKSUM' src/constants/release.ts | sed 's/.*"\([^"]*\)".*/\1/')
+          IPA_CURRENT=$(grep 'IOS_CTRL_PROXY_SHA256_CHECKSUM' src/constants/release.ts | sed 's/.*"\([^"]*\)".*/\1/')
           echo "apk_sha256=$APK_CURRENT" >> $GITHUB_OUTPUT
           echo "ipa_sha256=$IPA_CURRENT" >> $GITHUB_OUTPUT
           echo "Current APK SHA256: ${APK_CURRENT:-(empty)}"
@@ -63,7 +63,7 @@ jobs:
         run: |
           NEW_APK="${{ needs.build-control-proxy-apk.outputs.sha256 }}"
           OLD_APK="${{ steps.current.outputs.apk_sha256 }}"
-          NEW_IPA="${{ needs.build-xctestservice-ipa.outputs.sha256 }}"
+          NEW_IPA="${{ needs.build-ctrl-proxy-ios-ipa.outputs.sha256 }}"
           OLD_IPA="${{ steps.current.outputs.ipa_sha256 }}"
 
           APK_CHANGED="false"
@@ -100,7 +100,7 @@ jobs:
         if: steps.check.outputs.needed == 'true'
         env:
           APK_SHA256_CHECKSUM: ${{ needs.build-control-proxy-apk.outputs.sha256 }}
-          XCTESTSERVICE_SHA256_CHECKSUM: ${{ needs.build-xctestservice-ipa.outputs.sha256 }}
+          IOS_CTRL_PROXY_SHA256_CHECKSUM: ${{ needs.build-ctrl-proxy-ios-ipa.outputs.sha256 }}
         run: bash scripts/generate-release-constants.sh
 
       - name: "Build PR title"
@@ -111,11 +111,11 @@ jobs:
           IPA_CHANGED="${{ steps.check.outputs.ipa_changed }}"
 
           if [ "$APK_CHANGED" = "true" ] && [ "$IPA_CHANGED" = "true" ]; then
-            echo "title=chore: update accessibility service APK and XCTestService IPA SHA256" >> $GITHUB_OUTPUT
+            echo "title=chore: update accessibility service APK and CtrlProxy iOS IPA SHA256" >> $GITHUB_OUTPUT
           elif [ "$APK_CHANGED" = "true" ]; then
             echo "title=chore: update accessibility service APK SHA256" >> $GITHUB_OUTPUT
           else
-            echo "title=chore: update XCTestService IPA SHA256" >> $GITHUB_OUTPUT
+            echo "title=chore: update CtrlProxy iOS IPA SHA256" >> $GITHUB_OUTPUT
           fi
 
       - name: "Create PR for SHA256 update"
@@ -128,7 +128,7 @@ jobs:
             ${{ steps.pr-title.outputs.title }}
 
             APK: ${{ steps.current.outputs.apk_sha256 || '(empty)' }} -> ${{ needs.build-control-proxy-apk.outputs.sha256 }}${{ steps.check.outputs.apk_changed == 'true' && ' (changed)' || ' (unchanged)' }}
-            IPA: ${{ steps.current.outputs.ipa_sha256 || '(empty)' }} -> ${{ needs.build-xctestservice-ipa.outputs.sha256 }}${{ steps.check.outputs.ipa_changed == 'true' && ' (changed)' || ' (unchanged)' }}
+            IPA: ${{ steps.current.outputs.ipa_sha256 || '(empty)' }} -> ${{ needs.build-ctrl-proxy-ios-ipa.outputs.sha256 }}${{ steps.check.outputs.ipa_changed == 'true' && ' (changed)' || ' (unchanged)' }}
           title: ${{ steps.pr-title.outputs.title }}
           body: |
             ## Automated Checksum Update
@@ -138,12 +138,12 @@ jobs:
             | Artifact | Previous | New | Changed |
             |----------|----------|-----|---------|
             | **APK** | `${{ steps.current.outputs.apk_sha256 || '(empty)' }}` | `${{ needs.build-control-proxy-apk.outputs.sha256 }}` | ${{ steps.check.outputs.apk_changed == 'true' && '✅ Yes' || 'No' }} |
-            | **IPA** | `${{ steps.current.outputs.ipa_sha256 || '(empty)' }}` | `${{ needs.build-xctestservice-ipa.outputs.sha256 }}` | ${{ steps.check.outputs.ipa_changed == 'true' && '✅ Yes' || 'No' }} |
+            | **IPA** | `${{ steps.current.outputs.ipa_sha256 || '(empty)' }}` | `${{ needs.build-ctrl-proxy-ios-ipa.outputs.sha256 }}` | ${{ steps.check.outputs.ipa_changed == 'true' && '✅ Yes' || 'No' }} |
 
             ### Why did this happen?
 
             SHA256 checksums change when any of these change:
-            - Source code in `android/control-proxy/src/` or `ios/XCTestService/`
+            - Source code in `android/control-proxy/src/` or `ios/control-proxy/`
             - Build configuration (`build.gradle.kts` or `project.yml`)
             - Dependencies or SDK versions
 

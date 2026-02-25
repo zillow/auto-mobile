@@ -1,5 +1,5 @@
+@testable import CtrlProxy
 import XCTest
-@testable import XCTestService
 
 /// Simple reference wrapper for use in test closures to avoid Swift concurrency warnings.
 private final class Box<T>: @unchecked Sendable {

@@ -1,17 +1,17 @@
 #!/bin/bash
 #
-# XCTestService Build-for-Testing Script
-# Builds XCTestService for iOS Simulator testing and installs to expected location
+# CtrlProxy iOS Build-for-Testing Script
+# Builds CtrlProxy iOS for iOS Simulator testing and installs to expected location
 #
 # Usage:
-#   ./scripts/ios/xctestservice-build-for-testing.sh [--install]
+#   ./scripts/ios/ctrl-proxy-build-for-testing.sh [--install]
 #
 # Options:
-#   --install    Install to /tmp/automobile-xctestservice after build
+#   --install    Install to /tmp/automobile-ctrl-proxy after build
 #
 # Environment Variables:
-#   AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA  Override the default derived data path
-#                                          (default: /tmp/automobile-xctestservice)
+#   AUTOMOBILE_CTRL_PROXY_DERIVED_DATA  Override the default derived data path
+#                                       (default: /tmp/automobile-ctrl-proxy)
 
 set -e
 
@@ -38,15 +38,15 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-XCTESTSERVICE_DIR="${PROJECT_ROOT}/ios/XCTestService"
-XCODEPROJ="${XCTESTSERVICE_DIR}/XCTestService.xcodeproj"
+CTRL_PROXY_IOS_DIR="${PROJECT_ROOT}/ios/control-proxy"
+XCODEPROJ="${CTRL_PROXY_IOS_DIR}/CtrlProxy.xcodeproj"
 
-# Default derived data path (matches XCTestServiceBuilder.ts)
-DEFAULT_DERIVED_DATA="/tmp/automobile-xctestservice"
-DERIVED_DATA="${AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
+# Default derived data path (matches IOSCtrlProxyBuilder.ts)
+DEFAULT_DERIVED_DATA="/tmp/automobile-ctrl-proxy"
+DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  XCTestService Build for Testing${NC}"
+echo -e "${CYAN}  CtrlProxy iOS Build for Testing${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
@@ -76,13 +76,13 @@ echo ""
 # Generate Xcode project if needed
 if [ ! -d "${XCODEPROJ}" ]; then
     echo -e "${BLUE}Generating Xcode project...${NC}"
-    cd "${XCTESTSERVICE_DIR}"
+    cd "${CTRL_PROXY_IOS_DIR}"
     xcodegen generate
     cd "${PROJECT_ROOT}"
 fi
 
 # Build for testing
-echo -e "${BLUE}Building XCTestService for testing...${NC}"
+echo -e "${BLUE}Building CtrlProxy iOS for testing...${NC}"
 echo ""
 
 BUILD_START=$(date +%s)
@@ -164,5 +164,5 @@ echo -e "To run tests manually:"
 echo -e "  xcodebuild test-without-building \\"
 echo -e "    -xctestrun \"${XCTESTRUN_FILE}\" \\"
 echo -e "    -destination 'platform=iOS Simulator,name=iPhone 15' \\"
-echo -e "    -only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService"
+echo -e "    -only-testing:CtrlProxyUITests/CtrlProxyUITests/testRunService"
 echo ""

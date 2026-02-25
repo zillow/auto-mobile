@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# XCTestService Create IPA Script
-# Builds XCTestService and packages it as a distributable ZIP (named XCTestService.ipa)
+# CtrlProxy iOS Create IPA Script
+# Builds CtrlProxy iOS and packages it as a distributable ZIP (named control-proxy.ipa)
 #
 # Usage:
-#   ./scripts/ios/xctestservice-create-ipa.sh [--output <path>]
+#   ./scripts/ios/ctrl-proxy-create-ipa.sh [--output <path>]
 #
 # Options:
-#   --output <path>   Output path for the IPA file (default: ./XCTestService.ipa)
+#   --output <path>   Output path for the IPA file (default: ./control-proxy.ipa)
 #
 # Environment Variables:
 #   GITHUB_OUTPUT   If set, outputs ipa_path and ipa_sha256 for GitHub Actions
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # Parse arguments
-OUTPUT_PATH="./XCTestService.ipa"
+OUTPUT_PATH="./control-proxy.ipa"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output)
@@ -49,14 +49,14 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-XCTESTSERVICE_DIR="${PROJECT_ROOT}/ios/XCTestService"
-XCODEPROJ="${XCTESTSERVICE_DIR}/XCTestService.xcodeproj"
+CTRL_PROXY_IOS_DIR="${PROJECT_ROOT}/ios/control-proxy"
+XCODEPROJ="${CTRL_PROXY_IOS_DIR}/CtrlProxy.xcodeproj"
 
 # Use a temporary derived data path for clean builds
-DERIVED_DATA="$(mktemp -d)/automobile-xctestservice"
+DERIVED_DATA="$(mktemp -d)/automobile-ctrl-proxy"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  XCTestService Create IPA${NC}"
+echo -e "${CYAN}  CtrlProxy iOS Create IPA${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
@@ -87,13 +87,13 @@ echo ""
 # Generate Xcode project if needed
 if [ ! -d "${XCODEPROJ}" ]; then
     echo -e "${BLUE}Generating Xcode project...${NC}"
-    cd "${XCTESTSERVICE_DIR}"
+    cd "${CTRL_PROXY_IOS_DIR}"
     xcodegen generate
     cd "${PROJECT_ROOT}"
 fi
 
 # Build for testing
-echo -e "${BLUE}Building XCTestService for testing...${NC}"
+echo -e "${BLUE}Building CtrlProxy iOS for testing...${NC}"
 echo ""
 
 BUILD_START=$(date +%s)
@@ -128,8 +128,8 @@ fi
 
 REQUIRED_ARTIFACTS=(
     "${SIM_DIR}/CtrlProxyApp.app"
-    "${SIM_DIR}/XCTestServiceUITests-Runner.app"
-    "${SIM_DIR}/XCTestServiceTests.xctest"
+    "${SIM_DIR}/CtrlProxyUITests-Runner.app"
+    "${SIM_DIR}/CtrlProxyTests.xctest"
 )
 
 ALL_FOUND=true
@@ -173,7 +173,7 @@ IPA_SHA256=$(shasum -a 256 "${OUTPUT_PATH}" | cut -d' ' -f1)
 IPA_SIZE=$(stat -f%z "${OUTPUT_PATH}" 2>/dev/null || stat -c%s "${OUTPUT_PATH}" 2>/dev/null)
 
 # Compute SHA256 of runner binary
-RUNNER_BINARY="${SIM_DIR}/XCTestServiceUITests-Runner.app/XCTestServiceUITests-Runner"
+RUNNER_BINARY="${SIM_DIR}/CtrlProxyUITests-Runner.app/CtrlProxyUITests-Runner"
 RUNNER_SHA256=$(shasum -a 256 "${RUNNER_BINARY}" | cut -d' ' -f1)
 
 echo ""

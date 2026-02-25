@@ -1,4 +1,4 @@
-name: "Build XCTestService IPA"
+name: "Build CtrlProxy iOS IPA"
 
 on:
   workflow_call:
@@ -7,12 +7,12 @@ on:
         description: "SHA256 checksum of the built IPA"
         value: ${{ jobs.build.outputs.sha256 }}
       runner_sha256:
-        description: "SHA256 checksum of the XCTestServiceUITests-Runner binary"
+        description: "SHA256 checksum of the CtrlProxyUITests-Runner binary"
         value: ${{ jobs.build.outputs.runner_sha256 }}
 
 jobs:
   build:
-    name: "Build XCTestService IPA"
+    name: "Build CtrlProxy iOS IPA"
     runs-on: macos-26
     outputs:
       sha256: ${{ steps.checksum.outputs.ipa_sha256 }}
@@ -47,13 +47,13 @@ jobs:
       - name: "Install xcpretty"
         run: gem install xcpretty
 
-      - name: "Build XCTestService IPA"
+      - name: "Build CtrlProxy iOS IPA"
         id: checksum
-        run: ./scripts/ios/xctestservice-create-ipa.sh --output /tmp/XCTestService.ipa
+        run: ./scripts/ios/ctrl-proxy-create-ipa.sh --output /tmp/control-proxy.ipa
 
-      - name: "Upload XCTestService IPA"
+      - name: "Upload CtrlProxy iOS IPA"
         uses: actions/upload-artifact@v6
         with:
-          name: xctestservice-ipa
-          path: /tmp/XCTestService.ipa
+          name: ctrl-proxy-ios-ipa
+          path: /tmp/control-proxy.ipa
           retention-days: 7

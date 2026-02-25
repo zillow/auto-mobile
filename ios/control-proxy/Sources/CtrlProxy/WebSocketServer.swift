@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-/// WebSocket server for XCTestService
+/// WebSocket server for CtrlProxy iOS
 /// Implements RFC 6455 WebSocket protocol over TCP
 public class WebSocketServer: WebSocketServing {
     public enum ServerError: Error {
@@ -16,7 +16,7 @@ public class WebSocketServer: WebSocketServing {
     private let port: UInt16
     private let commandHandler: CommandHandler
     private let perfProvider: PerfProvider
-    private let queue = DispatchQueue(label: "com.xctestservice.server")
+    private let queue = DispatchQueue(label: "com.ctrlproxy.server")
 
     public var isRunning: Bool {
         listener != nil

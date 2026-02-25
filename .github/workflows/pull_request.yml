@@ -91,7 +91,7 @@ jobs:
 
             // Check if title matches the automated SHA256 update pattern
             const titleMatches = pr.title === 'chore: update accessibility service APK SHA256' ||
-                                 pr.title === 'chore: update XCTestService IPA SHA256';
+                                 pr.title === 'chore: update CtrlProxy iOS IPA SHA256';
 
             // Get list of changed files
             const { data: files } = await github.rest.pulls.listFiles({
@@ -848,8 +848,8 @@ jobs:
       - name: "Build Xcode Projects"
         run: ./scripts/ios/xcode-build.sh
 
-  ios-xctestservice-build:
-    name: "Build XCTestService for Testing"
+  ios-ctrl-proxy-build:
+    name: "Build CtrlProxy iOS for Testing"
     runs-on: macos-26
     needs: detect-changes
     if: needs.detect-changes.outputs.ios_should_run == 'true'
@@ -871,20 +871,20 @@ jobs:
       - name: "Install xcpretty"
         run: gem install xcpretty
 
-      - name: "Build XCTestService for Testing"
-        run: ./scripts/ios/xctestservice-build-for-testing.sh
+      - name: "Build CtrlProxy iOS for Testing"
+        run: ./scripts/ios/ctrl-proxy-build-for-testing.sh
 
-      - name: "Upload XCTestService Artifacts"
+      - name: "Upload CtrlProxy iOS Artifacts"
         uses: actions/upload-artifact@v6
         with:
-          name: xctestservice-simulator-xcode26
-          path: /tmp/automobile-xctestservice/Build/Products
+          name: ctrl-proxy-simulator-xcode26
+          path: /tmp/automobile-ctrl-proxy/Build/Products
           retention-days: 1
 
   ios-xctest-runner-simulator-tests:
     name: "XCTestRunner Simulator Tests"
     runs-on: macos-26
-    needs: [detect-changes, ios-xctestservice-build]
+    needs: [detect-changes, ios-ctrl-proxy-build]
     if: needs.detect-changes.outputs.ios_should_run == 'true'
     timeout-minutes: 30
     steps:
@@ -899,11 +899,11 @@ jobs:
       - name: "Ensure iOS Simulator runtime"
         uses: ./.github/actions/ensure-ios-simulator-runtime
 
-      - name: "Download XCTestService Artifacts"
+      - name: "Download CtrlProxy iOS Artifacts"
         uses: actions/download-artifact@v7
         with:
-          name: xctestservice-simulator-xcode26
-          path: /tmp/automobile-xctestservice/Build/Products
+          name: ctrl-proxy-simulator-xcode26
+          path: /tmp/automobile-ctrl-proxy/Build/Products
 
       - name: "Setup Bun"
         uses: oven-sh/setup-bun@v2
@@ -921,12 +921,12 @@ jobs:
           xcrun simctl boot "${DEVICE}"
           xcrun simctl bootstatus "${DEVICE}" -b
 
-      - name: "Verify XCTestService Artifacts"
+      - name: "Verify CtrlProxy iOS Artifacts"
         run: |
-          echo "Checking XCTestService artifacts..."
-          ls -la /tmp/automobile-xctestservice/Build/Products/
-          ls -la /tmp/automobile-xctestservice/Build/Products/Debug-iphonesimulator/ || true
-          XCTESTRUN=$(find /tmp/automobile-xctestservice/Build/Products -name "*.xctestrun" | head -1)
+          echo "Checking CtrlProxy iOS artifacts..."
+          ls -la /tmp/automobile-ctrl-proxy/Build/Products/
+          ls -la /tmp/automobile-ctrl-proxy/Build/Products/Debug-iphonesimulator/ || true
+          XCTESTRUN=$(find /tmp/automobile-ctrl-proxy/Build/Products -name "*.xctestrun" | head -1)
           echo "xctestrun file: ${XCTESTRUN}"
 
       - name: "Run Reminders integration tests"
@@ -1848,7 +1848,7 @@ jobs:
       - ios-swift-test
       - ios-xcodegen
       - ios-xcode-build
-      - ios-xctestservice-build
+      - ios-ctrl-proxy-build
       - ios-xctest-runner-simulator-tests
     runs-on: ubuntu-latest
     steps:
@@ -1859,7 +1859,7 @@ jobs:
             "${{ needs.ios-swift-test.result }}" \
             "${{ needs.ios-xcodegen.result }}" \
             "${{ needs.ios-xcode-build.result }}" \
-            "${{ needs.ios-xctestservice-build.result }}" \
+            "${{ needs.ios-ctrl-proxy-build.result }}" \
             "${{ needs.ios-xctest-runner-simulator-tests.result }}" \
           )
           for r in "${results[@]}"; do

@@ -1,9 +1,9 @@
 import XCTest
 
-// Note: XCTestService sources are compiled directly into this target (not imported as framework)
+// Note: CtrlProxy sources are compiled directly into this target (not imported as framework)
 // This gives XCTest access for XCUIApplication support
 
-/// XCUITest runner that starts the XCTestService WebSocket server
+/// XCUITest runner that starts the CtrlProxy iOS WebSocket server
 /// Similar to Appium's WebDriverAgent, but matching Android AccessibilityService protocol
 ///
 /// Usage:
@@ -13,9 +13,9 @@ import XCTest
 /// 4. Send commands matching Android AccessibilityService protocol
 ///
 /// Environment Variables:
-/// - XCTESTSERVICE_PORT: Server port (default: 8765)
-/// - XCTESTSERVICE_BUNDLE_ID: Target app bundle ID (optional)
-/// - XCTESTSERVICE_TIMEOUT: How long to keep server running in seconds (default: forever)
+/// - CTRL_PROXY_IOS_PORT: Server port (default: 8765)
+/// - CTRL_PROXY_IOS_BUNDLE_ID: Target app bundle ID (optional)
+/// - CTRL_PROXY_IOS_TIMEOUT: How long to keep server running in seconds (default: forever)
 ///
 final class CtrlProxyUITests: XCTestCase {
     private var service: CtrlProxy?
@@ -36,7 +36,7 @@ final class CtrlProxyUITests: XCTestCase {
         let bundleId = getBundleId()
 
         print("========================================")
-        print("  XCTestService")
+        print("  CtrlProxy iOS")
         print("========================================")
         print("Port: \(port)")
         print("Bundle ID: \(bundleId ?? "default")")
@@ -62,7 +62,7 @@ final class CtrlProxyUITests: XCTestCase {
         // The expectation is intentionally never fulfilled; .timedOut is the
         // expected result for a normal timed shutdown. The process is killed
         // externally by the MCP stop() path before the timeout elapses.
-        let keepAlive = expectation(description: "XCTestService keep-alive")
+        let keepAlive = expectation(description: "CtrlProxy iOS keep-alive")
         let result = XCTWaiter().wait(for: [keepAlive], timeout: getTimeout() ?? 86400)
         XCTAssertEqual(result, .timedOut, "Expected service to run until timeout")
     }
@@ -83,13 +83,13 @@ final class CtrlProxyUITests: XCTestCase {
     /// Test that launches a specific app and starts the service
     func testLaunchAppAndRunService() throws {
         guard let bundleId = getBundleId() else {
-            throw XCTSkip("XCTESTSERVICE_BUNDLE_ID environment variable not set")
+            throw XCTSkip("CTRL_PROXY_IOS_BUNDLE_ID environment variable not set")
         }
 
         service = CtrlProxy(port: getPort())
         try service?.start(bundleId: bundleId)
 
-        let keepAlive = expectation(description: "XCTestService keep-alive")
+        let keepAlive = expectation(description: "CtrlProxy iOS keep-alive")
         let result = XCTWaiter().wait(for: [keepAlive], timeout: getTimeout() ?? 300)
         XCTAssertEqual(result, .timedOut, "Expected service to run until timeout")
     }
@@ -97,7 +97,7 @@ final class CtrlProxyUITests: XCTestCase {
     // MARK: - Configuration Helpers
 
     private func getPort() -> UInt16 {
-        if let portString = ProcessInfo.processInfo.environment["XCTESTSERVICE_PORT"],
+        if let portString = ProcessInfo.processInfo.environment["CTRL_PROXY_IOS_PORT"],
            let port = UInt16(portString)
         {
             return port
@@ -106,11 +106,11 @@ final class CtrlProxyUITests: XCTestCase {
     }
 
     private func getBundleId() -> String? {
-        return ProcessInfo.processInfo.environment["XCTESTSERVICE_BUNDLE_ID"]
+        return ProcessInfo.processInfo.environment["CTRL_PROXY_IOS_BUNDLE_ID"]
     }
 
     private func getTimeout() -> TimeInterval? {
-        if let timeoutString = ProcessInfo.processInfo.environment["XCTESTSERVICE_TIMEOUT"],
+        if let timeoutString = ProcessInfo.processInfo.environment["CTRL_PROXY_IOS_TIMEOUT"],
            let timeout = TimeInterval(timeoutString)
         {
             return timeout

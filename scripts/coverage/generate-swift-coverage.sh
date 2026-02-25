@@ -13,7 +13,7 @@ OUTPUT_FILE="${PROJECT_ROOT}/coverage/swift-coverage-badge.json"
 # Core library packages only — excludes scaffold apps (XcodeCompanion, XcodeExtension)
 # and iOS-only packages (XCTestRunner) that require a simulator.
 TESTABLE_PACKAGES=(
-  "XCTestService"
+  "control-proxy"
 )
 
 total_lines=0

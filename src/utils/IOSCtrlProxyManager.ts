@@ -695,12 +695,12 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
       throw new Error("CtrlProxy runner binary not found. Download the CtrlProxy bundle before starting.");
     }
 
-    const timeout = process.env.XCTESTSERVICE_TIMEOUT || "86400";
+    const timeout = process.env.CTRL_PROXY_IOS_TIMEOUT || "86400";
     const command = [
       "xcrun simctl spawn",
       `"${this.device.deviceId}"`,
-      `--setenv XCTESTSERVICE_PORT=${this.servicePort}`,
-      `--setenv XCTESTSERVICE_TIMEOUT=${timeout}`,
+      `--setenv CTRL_PROXY_IOS_PORT=${this.servicePort}`,
+      `--setenv CTRL_PROXY_IOS_TIMEOUT=${timeout}`,
       `"${runnerBinaryPath}"`,
       "2>&1"
     ].join(" ");
@@ -946,7 +946,7 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
       `-xctestrun "${xctestrunPath}"`,
       "-destination", `id=${this.device.deviceId}`,
       "-only-testing:CtrlProxyUITests/CtrlProxyUITests/testRunService",
-      `XCTESTSERVICE_PORT=${this.servicePort}`,
+      `CTRL_PROXY_IOS_PORT=${this.servicePort}`,
       ...signingArgs,
       "2>&1"
     ].join(" ");
@@ -972,8 +972,8 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
   }
 
   private async verifyInstalledAppBundle(): Promise<void> {
-    if (process.env.AUTOMOBILE_IOS_SKIP_XCTESTSERVICE_APP_HASH === "true" ||
-        process.env.AUTOMOBILE_IOS_SKIP_XCTESTSERVICE_APP_HASH === "1") {
+    if (process.env.AUTOMOBILE_IOS_SKIP_CTRL_PROXY_APP_HASH === "true" ||
+        process.env.AUTOMOBILE_IOS_SKIP_CTRL_PROXY_APP_HASH === "1") {
       return;
     }
 

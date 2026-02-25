@@ -1,5 +1,5 @@
+@testable import CtrlProxy
 import XCTest
-@testable import XCTestService
 
 final class CommandHandlerTests: XCTestCase {
     var fakeTimeProvider: FakeTimeProvider!

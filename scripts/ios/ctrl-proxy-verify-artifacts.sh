@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# XCTestService Verify Artifacts Script
-# Verifies that XCTestService build artifacts exist and are valid
+# CtrlProxy iOS Verify Artifacts Script
+# Verifies that CtrlProxy iOS build artifacts exist and are valid
 #
 # Usage:
-#   ./scripts/ios/xctestservice-verify-artifacts.sh
+#   ./scripts/ios/ctrl-proxy-verify-artifacts.sh
 #
 # Environment Variables:
-#   AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA  Override the default derived data path
-#                                          (default: /tmp/automobile-xctestservice)
+#   AUTOMOBILE_CTRL_PROXY_DERIVED_DATA  Override the default derived data path
+#                                       (default: /tmp/automobile-ctrl-proxy)
 #
 # Exit Codes:
 #   0 - All artifacts found
@@ -25,13 +25,13 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default derived data path
-DEFAULT_DERIVED_DATA="/tmp/automobile-xctestservice"
-DERIVED_DATA="${AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
+DEFAULT_DERIVED_DATA="/tmp/automobile-ctrl-proxy"
+DERIVED_DATA="${AUTOMOBILE_CTRL_PROXY_DERIVED_DATA:-${DEFAULT_DERIVED_DATA}}"
 PRODUCTS_DIR="${DERIVED_DATA}/Build/Products"
 SIM_DIR="${PRODUCTS_DIR}/Debug-iphonesimulator"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  XCTestService Artifact Verification${NC}"
+echo -e "${CYAN}  CtrlProxy iOS Artifact Verification${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Derived data:${NC} ${DERIVED_DATA}"
@@ -40,7 +40,7 @@ echo ""
 # Check if products directory exists
 if [ ! -d "${PRODUCTS_DIR}" ]; then
     echo -e "${RED}Error: Products directory not found: ${PRODUCTS_DIR}${NC}"
-    echo -e "${YELLOW}Run ./scripts/ios/xctestservice-build-for-testing.sh first${NC}"
+    echo -e "${YELLOW}Run ./scripts/ios/ctrl-proxy-build-for-testing.sh first${NC}"
     exit 1
 fi
 

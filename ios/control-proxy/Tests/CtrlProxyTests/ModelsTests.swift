@@ -1,5 +1,5 @@
+@testable import CtrlProxy
 import XCTest
-@testable import XCTestService
 
 final class ModelsTests: XCTestCase {
     // MARK: - PerfTiming Tests

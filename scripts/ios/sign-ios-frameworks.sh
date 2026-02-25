@@ -24,7 +24,7 @@ STRICT_MODE="${IOS_SIGNING_STRICT:-false}"
 
 PACKAGES=(
   "XCTestRunner"
-  "XCTestService"
+  "control-proxy"
 )
 
 for package in "${PACKAGES[@]}"; do
