@@ -166,7 +166,7 @@ describe("TapOnElement TalkBack mode detection", () => {
     test("dispatches to accessibility-based tap method for element without resource-id", async () => {
       const element = {
         "bounds": { left: 0, top: 0, right: 100, bottom: 100 },
-        text: "Settings",
+        "text": "Settings",
       } as any;
 
       await (tapOnElement as any).executeAndroidTap(

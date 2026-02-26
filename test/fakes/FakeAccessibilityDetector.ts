@@ -14,6 +14,7 @@ export class FakeAccessibilityDetector implements AccessibilityDetector {
   };
   private detectionCallCount = 0;
   private invalidatedDevices: string[] = [];
+  private invalidationCountAtFirstDetection: number | null = null;
 
   /**
    * Configure the detection result for a specific device
@@ -60,11 +61,20 @@ export class FakeAccessibilityDetector implements AccessibilityDetector {
   /**
    * Reset fake state
    */
+  /**
+   * Returns the number of invalidateCache calls that had occurred before the
+   * first detectMethod call.  Useful for verifying cache-before-check ordering.
+   */
+  getInvalidationCountBefore(_method: "detectMethod"): number {
+    return this.invalidationCountAtFirstDetection ?? 0;
+  }
+
   reset(): void {
     this.detectionResults.clear();
     this.defaultResult = { enabled: false, service: "unknown" };
     this.detectionCallCount = 0;
     this.invalidatedDevices = [];
+    this.invalidationCountAtFirstDetection = null;
   }
 
   async isAccessibilityEnabled(
@@ -82,6 +92,9 @@ export class FakeAccessibilityDetector implements AccessibilityDetector {
     _adb: AdbExecutor,
     _featureFlags?: FeatureFlagService
   ): Promise<AccessibilityService> {
+    if (this.invalidationCountAtFirstDetection === null) {
+      this.invalidationCountAtFirstDetection = this.invalidatedDevices.length;
+    }
     this.detectionCallCount++;
     const result = this.detectionResults.get(deviceId) || this.defaultResult;
     return result.service;

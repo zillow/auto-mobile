@@ -28,10 +28,17 @@ Installed Services:
     Package: com.google.android.marvin.talkback
 `;
 
-const DIALOG_XML_WITH_ALLOW = `<?xml version="1.0" encoding="UTF-8"?>
+const DIALOG_XML_WITH_BUTTON1 = `<?xml version="1.0" encoding="UTF-8"?>
 <hierarchy><node index="0" text="" resource-id="android:id/content">
   <node index="0" text="Allow TalkBack to have full control?" resource-id="" />
   <node index="1" text="Allow" resource-id="android:id/button1" bounds="[180,684][540,740]" />
+</hierarchy>`;
+
+// Same dialog but with a non-English "Allow" text — resource-id should still match
+const DIALOG_XML_NON_ENGLISH = `<?xml version="1.0" encoding="UTF-8"?>
+<hierarchy><node index="0" text="" resource-id="android:id/content">
+  <node index="0" text="TalkBack に全画面制御を許可しますか？" resource-id="" />
+  <node index="1" text="許可" resource-id="android:id/button1" bounds="[180,684][540,740]" />
 </hierarchy>`;
 
 function makeExecResult(stdout: string) {
@@ -103,6 +110,17 @@ describe("TalkBackToggle", () => {
       expect(fakeDetector.getInvalidatedDevices()).toContain(ANDROID_DEVICE.deviceId);
     });
 
+    test("invalidates cache before idempotency check to avoid stale state", async () => {
+      fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
+      fakeDetector.setDefaultResult(false);
+
+      const toggle = new TalkBackToggle(ANDROID_DEVICE, fakeAdb, fakeDetector, fakeTimer);
+      await toggle.toggle(true);
+
+      // Cache must have been invalidated at least once before detectMethod was called
+      expect(fakeDetector.getInvalidationCountBefore("detectMethod")).toBeGreaterThanOrEqual(1);
+    });
+
     test("attempts dialog dismissal after enabling", async () => {
       fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
       fakeDetector.setDefaultResult(false);
@@ -113,11 +131,26 @@ describe("TalkBackToggle", () => {
       expect(fakeAdb.wasCommandExecuted("shell uiautomator dump /dev/tty")).toBe(true);
     });
 
-    test("taps Allow button when permission dialog is present", async () => {
+    test("taps Allow button when permission dialog is present (English)", async () => {
       fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
       fakeAdb.setCommandResponse(
         "shell uiautomator dump /dev/tty",
-        makeExecResult(DIALOG_XML_WITH_ALLOW)
+        makeExecResult(DIALOG_XML_WITH_BUTTON1)
+      );
+      fakeDetector.setDefaultResult(false);
+
+      const toggle = new TalkBackToggle(ANDROID_DEVICE, fakeAdb, fakeDetector, fakeTimer);
+      await toggle.toggle(true);
+
+      // Center of [180,684][540,740] = (360, 712)
+      expect(fakeAdb.wasCommandExecuted("shell input tap 360 712")).toBe(true);
+    });
+
+    test("taps Allow button on non-English locale using resource-id", async () => {
+      fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
+      fakeAdb.setCommandResponse(
+        "shell uiautomator dump /dev/tty",
+        makeExecResult(DIALOG_XML_NON_ENGLISH)
       );
       fakeDetector.setDefaultResult(false);
 
@@ -166,6 +199,24 @@ describe("TalkBackToggle", () => {
 
       expect(result.applied).toBe(true);
       expect(fakeAdb.wasCommandExecuted("accessibility_enabled 1")).toBe(true);
+    });
+
+    test("appends TalkBack to existing services list when enabling", async () => {
+      fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
+      fakeAdb.setCommandResponse(
+        "settings get secure enabled_accessibility_services",
+        makeExecResult("com.example.other/OtherService")
+      );
+      fakeDetector.setDefaultResult(false);
+
+      const toggle = new TalkBackToggle(ANDROID_DEVICE, fakeAdb, fakeDetector, fakeTimer);
+      await toggle.toggle(true);
+
+      expect(
+        fakeAdb.wasCommandExecuted(
+          "shell settings put secure enabled_accessibility_services com.example.other/OtherService:com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService"
+        )
+      ).toBe(true);
     });
   });
 

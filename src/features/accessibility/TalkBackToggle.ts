@@ -35,9 +35,11 @@ export class TalkBackToggle {
       };
     }
 
-    // Step 2: Idempotency — skip if TalkBack is already in the requested state.
-    // Use detectMethod rather than isAccessibilityEnabled so that other active
-    // services (e.g. CtrlProxy) do not cause a false positive.
+    // Step 2: Idempotency — invalidate stale cache, then check if TalkBack is
+    // already in the requested state.  Use detectMethod rather than
+    // isAccessibilityEnabled so that other active services (e.g. CtrlProxy)
+    // do not cause a false positive.
+    this.detector.invalidateCache(this.device.deviceId);
     const detectedService = await this.detector.detectMethod(
       this.device.deviceId,
       this.adb
@@ -53,12 +55,7 @@ export class TalkBackToggle {
 
     // Step 3: Apply ADB commands
     if (enabled) {
-      await this.adb.executeCommand(
-        `shell settings put secure enabled_accessibility_services ${serviceComponent}`
-      );
-      await this.adb.executeCommand(
-        "shell settings put secure accessibility_enabled 1"
-      );
+      await this.enableTalkBack(serviceComponent);
       // Step 4: Best-effort permission dialog dismissal
       await this.dismissPermissionDialog();
     } else {
@@ -73,6 +70,35 @@ export class TalkBackToggle {
       applied: true,
       currentState: enabled
     };
+  }
+
+  /**
+   * Add TalkBack to the enabled services list while preserving any other
+   * active accessibility services (e.g. CtrlProxy).
+   */
+  private async enableTalkBack(serviceComponent: string): Promise<void> {
+    const result = await this.adb.executeCommand(
+      "shell settings get secure enabled_accessibility_services"
+    );
+    const currentServices = result.stdout.trim();
+
+    const otherServices: string[] = [];
+    if (currentServices && currentServices !== "null") {
+      for (const s of currentServices.split(":")) {
+        const trimmed = s.trim();
+        if (trimmed && !trimmed.includes(TALKBACK_PACKAGE) && !trimmed.includes("TalkBackService")) {
+          otherServices.push(trimmed);
+        }
+      }
+    }
+
+    const updatedServices = [...otherServices, serviceComponent].join(":");
+    await this.adb.executeCommand(
+      `shell settings put secure enabled_accessibility_services ${updatedServices}`
+    );
+    await this.adb.executeCommand(
+      "shell settings put secure accessibility_enabled 1"
+    );
   }
 
   /**
@@ -145,19 +171,23 @@ export class TalkBackToggle {
 
   /**
    * After enabling TalkBack, Android shows a permission dialog that must be
-   * accepted before automation can continue.  Retry a few times to allow the
-   * dialog time to appear, then tap "Allow".
+   * accepted before automation can continue.  Check immediately (no initial
+   * delay), then retry with delays to allow the dialog time to appear.
+   * Match the positive button by resource-id for locale independence.
    */
   private async dismissPermissionDialog(): Promise<void> {
     for (let attempt = 0; attempt < DIALOG_DISMISS_RETRIES; attempt++) {
-      await this.timer.sleep(DIALOG_DISMISS_DELAY_MS);
+      if (attempt > 0) {
+        await this.timer.sleep(DIALOG_DISMISS_DELAY_MS);
+      }
       try {
         const dumpResult = await this.adb.executeCommand(
           "shell uiautomator dump /dev/tty"
         );
         const xml = dumpResult.stdout;
 
-        const nodeMatch = /<node[^>]*text="Allow"[^>]*\/>/.exec(xml);
+        // Match by resource-id rather than text to support non-English locales
+        const nodeMatch = /<node[^>]*resource-id="android:id\/button1"[^>]*\/?>/.exec(xml);
         if (nodeMatch) {
           const boundsMatch = /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(
             nodeMatch[0]
