@@ -295,6 +295,48 @@ describe("TapOnElement TalkBack mode detection", () => {
       expect(result.element["resource-id"]).toBe("parent:id");
     });
 
+    test("resolves text-only child to clickable parent with resource-id under TalkBack (requireResourceId=true)", () => {
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              "class": "android.widget.LinearLayout",
+              "clickable": "true",
+              "bounds": "[0,0][200,80]",
+              "resource-id": "com.example:id/settings_row"
+            },
+            node: [
+              {
+                $: {
+                  "class": "android.widget.TextView",
+                  "text": "Settings",
+                  "bounds": "[10,10][190,70]"
+                  // no resource-id
+                }
+              }
+            ]
+          }
+        }
+      } as any;
+
+      const textOnlyChild = {
+        bounds: { left: 10, top: 10, right: 190, bottom: 70 },
+        text: "Settings"
+        // no resource-id
+      } as any;
+
+      // requireResourceId=true simulates TalkBack mode
+      const result = (tapOnElement as any).resolveTapTargetElement(
+        textOnlyChild,
+        viewHierarchy,
+        "tap",
+        true
+      );
+
+      expect(result.usedParent).toBe(true);
+      expect(result.element["resource-id"]).toBe("com.example:id/settings_row");
+    });
+
     test("prefers long-clickable parent for longPress", () => {
       const viewHierarchy = {
         hierarchy: {

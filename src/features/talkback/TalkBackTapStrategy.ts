@@ -8,13 +8,17 @@ import type { TalkBackNavigationDriver } from "./TalkBackNavigationDriver";
 
 export interface TalkBackTapResult {
   success: boolean;
-  method: "focus-navigation" | "coordinate-fallback";
+  /**
+   * - "focus-navigation": navigated via swipe gestures and activated with double-tap
+   * - "accessibility-action": dispatched a direct accessibility action (ACTION_CLICK / ACTION_LONG_CLICK)
+   * - "coordinate-fallback": fell back to coordinate-based gesture dispatch
+   */
+  method: "focus-navigation" | "accessibility-action" | "coordinate-fallback";
   error?: string;
 }
 
 export type TalkBackTapAction = "tap" | "doubleTap";
 export type TalkBackFallbackAction = "tap" | "doubleTap" | "longPress";
-export type TalkBackLongPressAction = "longPress";
 
 interface TalkBackTapStrategyDependencies {
   matcher?: FocusElementMatcher;
@@ -59,7 +63,7 @@ export class TalkBackTapStrategy {
    * 5. Activates it with double-tap (with ACTION_CLICK fallback)
    *
    * @param deviceId - The device ID
-   * @param element - The target element (must have resource-id)
+   * @param element - The target element (must have at least one of resource-id, text, or content-desc)
    * @param action - The action to perform ("tap" or "doubleTap")
    * @param driver - The TalkBack navigation driver
    * @returns Result indicating success/failure and method used
@@ -88,8 +92,8 @@ export class TalkBackTapStrategy {
       // Build selector from available fields (include bounds for disambiguation in list views)
       const targetSelector = {
         ...(resourceId ? { resourceId } : {}),
-        text: elementText,
-        contentDesc: elementContentDesc,
+        ...(elementText ? { text: elementText } : {}),
+        ...(elementContentDesc ? { contentDesc: elementContentDesc } : {}),
         bounds: element.bounds
       };
 
@@ -261,7 +265,7 @@ export class TalkBackTapStrategy {
       const longClickResult = await driver.requestAction("long_click", resourceId);
       if (longClickResult.success) {
         logger.info(`[TalkBackTapStrategy] Long press via ACTION_LONG_CLICK succeeded`);
-        return { success: true, method: "focus-navigation" };
+        return { success: true, method: "accessibility-action" };
       }
       logger.warn(
         `[TalkBackTapStrategy] ACTION_LONG_CLICK failed (${longClickResult.error}), ` +
@@ -298,7 +302,7 @@ export class TalkBackTapStrategy {
             error: `Activation failed: double-tap and ACTION_CLICK both failed`
           };
         }
-        return { success: true, method: "focus-navigation" };
+        return { success: true, method: "accessibility-action" };
       }
       return {
         success: false,
@@ -324,13 +328,13 @@ export class TalkBackTapStrategy {
             error: `Activation failed: second tap and ACTION_CLICK both failed`
           };
         }
-      } else {
-        return {
-          success: false,
-          method: "focus-navigation",
-          error: `Activation failed: second tap failed`
-        };
+        return { success: true, method: "accessibility-action" };
       }
+      return {
+        success: false,
+        method: "focus-navigation",
+        error: `Activation failed: second tap failed`
+      };
     }
 
     logger.info(`[TalkBackTapStrategy] Element activated successfully via focus navigation`);

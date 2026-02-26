@@ -12,7 +12,7 @@ import type { TalkBackNavigationDriver } from "../../src/features/talkback/TalkB
 export class FakeTalkBackTapStrategy {
   tapResult: TalkBackTapResult = { success: true, method: "focus-navigation" };
   fallbackResult: TalkBackTapResult = { success: true, method: "coordinate-fallback" };
-  longPressResult: TalkBackTapResult = { success: true, method: "focus-navigation" };
+  longPressResult: TalkBackTapResult = { success: true, method: "accessibility-action" };
 
   tapCalls: Array<{
     deviceId: string;

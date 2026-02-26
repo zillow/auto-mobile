@@ -160,10 +160,47 @@ describe("TalkBackTapStrategy", () => {
       const result = await strategy.executeTap("device-1", element, "tap", driver);
 
       expect(result.success).toBe(true);
-      expect(result.method).toBe("focus-navigation");
+      expect(result.method).toBe("accessibility-action");
       expect(driver.getTapCount()).toBe(1); // Only first tap attempted
       expect(driver.getActionCount()).toBe(1); // ACTION_CLICK fallback
       expect(driver.actionHistory[0]).toEqual({ action: "click", resourceId: "test:id/button" });
+    });
+
+    test("returns failure when text-only element activation double-tap fails (no ACTION_CLICK fallback)", async () => {
+      const element = {
+        bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+        text: "Button"
+      } as Element;
+
+      driver.setElements([element], 0);
+
+      spyOn(mockExecutor, "navigateToElement").mockResolvedValue(true);
+      driver.setTapResult({ success: false, totalTimeMs: 1, error: "tap failed" });
+
+      const result = await strategy.executeTap("device-1", element, "tap", driver);
+
+      expect(result.success).toBe(false);
+      expect(result.method).toBe("focus-navigation");
+      expect(driver.getActionCount()).toBe(0); // No ACTION_CLICK attempted without resource-id
+    });
+
+    test("returns failure when text-only element second tap fails (no ACTION_CLICK fallback)", async () => {
+      const element = {
+        bounds: { left: 0, top: 0, right: 100, bottom: 100 },
+        text: "Button"
+      } as Element;
+
+      driver.setElements([element], 0);
+
+      spyOn(mockExecutor, "navigateToElement").mockResolvedValue(true);
+      driver.queueTapResult({ success: true, totalTimeMs: 1 }); // first tap succeeds
+      driver.setTapResult({ success: false, totalTimeMs: 1, error: "second tap failed" });
+
+      const result = await strategy.executeTap("device-1", element, "tap", driver);
+
+      expect(result.success).toBe(false);
+      expect(result.method).toBe("focus-navigation");
+      expect(driver.getActionCount()).toBe(0); // No ACTION_CLICK attempted without resource-id
     });
 
     test("returns error if both double-tap and ACTION_CLICK fail", async () => {
@@ -231,7 +268,7 @@ describe("TalkBackTapStrategy", () => {
       const result = await strategy.executeLongPress(50, 50, 1000, element, driver);
 
       expect(result.success).toBe(true);
-      expect(result.method).toBe("focus-navigation");
+      expect(result.method).toBe("accessibility-action");
       expect(driver.actionHistory).toHaveLength(1);
       expect(driver.actionHistory[0]).toEqual({ action: "long_click", resourceId: "test:id/button" });
       expect(driver.getTapCount()).toBe(0); // No coordinate taps
