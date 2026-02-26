@@ -2,6 +2,9 @@ import Foundation
 #if canImport(XCTest) && os(iOS)
     import XCTest
 #endif
+#if os(iOS)
+    import UIKit
+#endif
 
 /// Handles WebSocket commands matching Android AccessibilityService protocol
 public class CommandHandler: CommandHandling {
@@ -97,6 +100,9 @@ public class CommandHandler: CommandHandling {
 
             case RequestType.addHighlight.rawValue:
                 return try handleAddHighlight(request, startTime: startTime)
+
+            case RequestType.getVoiceOverState.rawValue:
+                return try handleGetVoiceOverState(request, startTime: startTime)
 
             default:
                 return WebSocketResponse.error(
@@ -386,6 +392,20 @@ public class CommandHandler: CommandHandling {
         )
     }
 
+    private func handleGetVoiceOverState(_ request: WebSocketRequest, startTime: Date) throws -> VoiceOverStateResponse {
+        #if os(iOS)
+        let enabled = UIAccessibility.isVoiceOverRunning
+        #else
+        let enabled = false
+        #endif
+
+        return VoiceOverStateResponse(
+            requestId: request.requestId,
+            enabled: enabled,
+            totalTimeMs: totalTimeMs(from: startTime)
+        )
+    }
+
     // MARK: - Helpers
 
     private func totalTimeMs(from startTime: Date) -> Int64 {
@@ -422,6 +442,8 @@ public class CommandHandler: CommandHandling {
             return ResponseType.launchAppResult.rawValue
         case RequestType.requestClipboard.rawValue:
             return ResponseType.clipboardResult.rawValue
+        case RequestType.getVoiceOverState.rawValue:
+            return ResponseType.voiceOverStateResult.rawValue
         default:
             return "error"
         }

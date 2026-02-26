@@ -543,6 +543,27 @@ public struct ConnectedEvent: Codable {
     }
 }
 
+// MARK: - VoiceOver State Response
+
+/// Response to get_voiceover_state command
+public struct VoiceOverStateResponse: Codable {
+    public let type: String
+    public let timestamp: Int64
+    public let requestId: String?
+    public let success: Bool
+    public let enabled: Bool
+    public let totalTimeMs: Int64?
+
+    public init(requestId: String?, enabled: Bool, totalTimeMs: Int64?) {
+        type = ResponseType.voiceOverStateResult.rawValue
+        timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        self.requestId = requestId
+        self.success = true
+        self.enabled = enabled
+        self.totalTimeMs = totalTimeMs
+    }
+}
+
 // MARK: - Request Types (matching Android)
 
 public enum RequestType: String {
@@ -575,6 +596,7 @@ public enum RequestType: String {
     case getCurrentFocus = "get_current_focus"
     case getTraversalOrder = "get_traversal_order"
     case addHighlight = "add_highlight"
+    case getVoiceOverState = "get_voiceover_state"
 }
 
 // MARK: - Response Types (matching Android)
@@ -597,5 +619,6 @@ public enum ResponseType: String {
     case currentFocusResult = "current_focus_result"
     case traversalOrderResult = "traversal_order_result"
     case highlightResponse = "highlight_response"
+    case voiceOverStateResult = "voiceover_state_result"
     case connected
 }

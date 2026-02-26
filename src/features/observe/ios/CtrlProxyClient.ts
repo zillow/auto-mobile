@@ -78,6 +78,7 @@ import { CtrlProxyText } from "./CtrlProxyText";
 import { CtrlProxyHierarchy } from "./CtrlProxyHierarchy";
 import { CtrlProxyScreenshot } from "./CtrlProxyScreenshot";
 import { CtrlProxyNavigation } from "./CtrlProxyNavigation";
+import { CtrlProxyVoiceOver } from "./CtrlProxyVoiceOver";
 
 // Import types
 import type {
@@ -99,6 +100,7 @@ import type {
   CtrlProxyPerfTiming,
   CtrlProxyPerformanceSnapshot,
   CtrlProxyCachedHierarchy,
+  CtrlProxyVoiceOverResult,
   WebSocketMessage,
 } from "./types";
 
@@ -182,6 +184,10 @@ export interface CtrlProxyService {
     timeoutMs?: number, perf?: PerformanceTracker
   ): Promise<CtrlProxyScreenshotResult>;
 
+  requestVoiceOverState(
+    timeoutMs?: number, perf?: PerformanceTracker
+  ): Promise<CtrlProxyVoiceOverResult>;
+
   ensureConnected(perf?: PerformanceTracker): Promise<boolean>;
   isConnected(): boolean;
   waitForConnection(maxAttempts?: number, delayMs?: number): Promise<boolean>;
@@ -230,6 +236,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
   private _hierarchy: CtrlProxyHierarchy | null = null;
   private _screenshot: CtrlProxyScreenshot | null = null;
   private _navigation: CtrlProxyNavigation | null = null;
+  private _voiceOver: CtrlProxyVoiceOver | null = null;
 
   // Logging tag for base class
   protected readonly logTag = "CtrlProxyClient";
@@ -406,6 +413,13 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
     return this._navigation;
   }
 
+  private get voiceOver(): CtrlProxyVoiceOver {
+    if (!this._voiceOver) {
+      this._voiceOver = new CtrlProxyVoiceOver(this.createDelegateContext());
+    }
+    return this._voiceOver;
+  }
+
   // ===========================================================================
   // DeviceServiceClient abstract method implementations
   // ===========================================================================
@@ -561,6 +575,15 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
             totalTimeMs: message.totalTimeMs ?? 0,
             error: message.error,
             perfTiming: message.perfTiming
+          };
+          break;
+
+        case "voiceover_state_result":
+          result = {
+            success: message.success ?? true,
+            enabled: (message as { enabled?: boolean }).enabled ?? false,
+            totalTimeMs: message.totalTimeMs ?? 0,
+            error: message.error,
           };
           break;
 
@@ -784,6 +807,16 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
     timeoutMs: number = 5000, perf?: PerformanceTracker
   ): Promise<CtrlProxyScreenshotResult> {
     return this.screenshot.requestScreenshot(timeoutMs, perf);
+  }
+
+  // ===========================================================================
+  // Delegated Public Methods - VoiceOver
+  // ===========================================================================
+
+  async requestVoiceOverState(
+    timeoutMs: number = 5000, perf?: PerformanceTracker
+  ): Promise<CtrlProxyVoiceOverResult> {
+    return this.voiceOver.requestVoiceOverState(timeoutMs, perf);
   }
 
   // ===========================================================================

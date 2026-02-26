@@ -4,11 +4,11 @@ import { FeatureFlagService } from "../../features/featureFlags/FeatureFlagServi
 /**
  * Type representing the detected accessibility service
  */
-export type AccessibilityService = "talkback" | "unknown";
+export type AccessibilityService = "talkback" | "voiceover" | "unknown";
 
 /**
- * Interface for accessibility detection
- * Detects and caches TalkBack/VoiceOver state on devices
+ * Interface for Android accessibility detection
+ * Detects and caches TalkBack state on Android devices via ADB
  */
 export interface AccessibilityDetector {
   /**

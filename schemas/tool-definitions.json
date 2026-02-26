@@ -3511,6 +3511,7 @@
               "type": "string",
               "enum": [
                 "talkback",
+                "voiceover",
                 "unknown"
               ]
             }

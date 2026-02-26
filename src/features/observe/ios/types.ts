@@ -149,6 +149,14 @@ export type CtrlProxyLaunchAppResult = BaseResult;
 /** Action result from CtrlProxy iOS */
 export type CtrlProxyActionResult = ActionTimingResult;
 
+/** VoiceOver state result from CtrlProxy iOS */
+export interface CtrlProxyVoiceOverResult {
+  success: boolean;
+  enabled: boolean;
+  totalTimeMs?: number;
+  error?: string;
+}
+
 /**
  * Interface for cached hierarchy with metadata
  */

@@ -309,4 +309,69 @@ final class CommandHandlerTests: XCTestCase {
         XCTAssertFalse(errorResponse.success ?? true)
         XCTAssertTrue(errorResponse.error?.contains("Unknown command") ?? false)
     }
+
+    // MARK: - VoiceOver State Tests
+
+    func testGetVoiceOverStateReturnsResponse() {
+        let request = WebSocketRequest(
+            type: "get_voiceover_state",
+            requestId: "voiceover-123"
+        )
+
+        let response = commandHandler.handle(request)
+
+        guard let voResponse = response as? VoiceOverStateResponse else {
+            XCTFail("Expected VoiceOverStateResponse, got \(type(of: response))")
+            return
+        }
+
+        XCTAssertEqual(voResponse.requestId, "voiceover-123")
+        XCTAssertEqual(voResponse.type, "voiceover_state_result")
+        XCTAssertTrue(voResponse.success)
+        // enabled is false in SPM tests (macOS, no UIAccessibility)
+        XCTAssertFalse(voResponse.enabled)
+        XCTAssertNotNil(voResponse.totalTimeMs)
+    }
+
+    func testGetVoiceOverStateWithNilRequestId() {
+        let request = WebSocketRequest(
+            type: "get_voiceover_state"
+        )
+
+        let response = commandHandler.handle(request)
+
+        guard let voResponse = response as? VoiceOverStateResponse else {
+            XCTFail("Expected VoiceOverStateResponse")
+            return
+        }
+
+        XCTAssertNil(voResponse.requestId)
+        XCTAssertEqual(voResponse.type, "voiceover_state_result")
+        XCTAssertTrue(voResponse.success)
+    }
+
+    func testGetVoiceOverStateIsEncodable() throws {
+        let request = WebSocketRequest(
+            type: "get_voiceover_state",
+            requestId: "encode-test"
+        )
+
+        let response = commandHandler.handle(request)
+
+        guard let voResponse = response as? VoiceOverStateResponse else {
+            XCTFail("Expected VoiceOverStateResponse")
+            return
+        }
+
+        // Verify the response can be JSON encoded (required for WebSocket serialization)
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(voResponse)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        XCTAssertNotNil(json)
+        XCTAssertEqual(json?["type"] as? String, "voiceover_state_result")
+        XCTAssertEqual(json?["requestId"] as? String, "encode-test")
+        XCTAssertEqual(json?["success"] as? Bool, true)
+        XCTAssertNotNil(json?["enabled"])
+    }
 }

@@ -26,6 +26,7 @@ import { Element } from "../../models/Element";
 import { RecompositionTracker } from "../performance/RecompositionTracker";
 import { PredictiveUIState } from "./PredictiveUIState";
 import { accessibilityDetector } from "../../utils/AccessibilityDetector";
+import { iosVoiceOverDetector } from "../../utils/IosVoiceOverDetector";
 import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
@@ -1135,12 +1136,6 @@ export class RealObserveScreen implements ObserveScreen {
     perf: PerformanceTracker,
     signal?: AbortSignal
   ): Promise<void> {
-    // Only run on Android for now (iOS VoiceOver detection is Phase 2)
-    if (this.device.platform !== "android") {
-      logger.debug("[AccessibilityDetector] Skipping detection, only Android is supported");
-      return;
-    }
-
     try {
       await perf.track("accessibilityDetection", async () => {
         throwIfAborted(signal);
@@ -1148,31 +1143,42 @@ export class RealObserveScreen implements ObserveScreen {
         // Get feature flag service instance
         const featureFlags = FeatureFlagService.getInstance();
 
-        // Detect accessibility state
-        const enabled = await accessibilityDetector.isAccessibilityEnabled(
-          this.device.deviceId,
-          this.adb,
-          featureFlags
-        );
+        if (this.device.platform === "android") {
+          // Detect TalkBack state via ADB
+          const enabled = await accessibilityDetector.isAccessibilityEnabled(
+            this.device.deviceId,
+            this.adb,
+            featureFlags
+          );
 
-        const service = await accessibilityDetector.detectMethod(
-          this.device.deviceId,
-          this.adb,
-          featureFlags
-        );
+          const service = await accessibilityDetector.detectMethod(
+            this.device.deviceId,
+            this.adb,
+            featureFlags
+          );
 
-        // Attach to result
-        result.accessibilityState = {
-          enabled,
-          service,
-        };
+          result.accessibilityState = { enabled, service };
+          logger.debug(
+            `[AccessibilityDetector] Android accessibility state: enabled=${enabled}, service=${service}`
+          );
+        } else if (this.device.platform === "ios") {
+          // Detect VoiceOver state via CtrlProxy WebSocket
+          const client = IOSCtrlProxyClient.getInstance(this.device);
+          const enabled = await iosVoiceOverDetector.isVoiceOverEnabled(
+            this.device.deviceId,
+            client,
+            featureFlags
+          );
 
-        logger.debug(
-          `[AccessibilityDetector] Accessibility state: enabled=${enabled}, service=${service}`
-        );
+          result.accessibilityState = {
+            enabled,
+            service: enabled ? "voiceover" : "unknown",
+          };
+          logger.debug(`[IosVoiceOverDetector] iOS VoiceOver state: enabled=${enabled}`);
+        }
       });
     } catch (error) {
-      logger.error(`[AccessibilityDetector] Failed to detect accessibility state: ${error}`);
+      logger.error(`[detectAccessibilityState] Failed to detect accessibility state: ${error}`);
       // Don't fail the entire observation if detection fails
       // Result will simply not include accessibilityState field
     }

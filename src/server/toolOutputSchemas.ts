@@ -130,5 +130,5 @@ export const freshnessSchema = z.object({
 
 export const accessibilityStateSchema = z.object({
   enabled: z.boolean(),
-  service: z.enum(["talkback", "unknown"])
+  service: z.enum(["talkback", "voiceover", "unknown"])
 }).passthrough();
