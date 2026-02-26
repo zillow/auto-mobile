@@ -29,7 +29,7 @@ export const biometricAuthSchema = addDeviceTargetingToSchema(z.object({
     "How long the SDK override remains active in milliseconds (default: 5000). The override is cleared after the first authentication callback or when the TTL expires."
   )
 }).refine(
-  (data) => data.errorCode === undefined || data.action === "error",
+  data => data.errorCode === undefined || data.action === "error",
   { message: "errorCode is only applicable when action is 'error'", path: ["errorCode"] }
 ));
 
