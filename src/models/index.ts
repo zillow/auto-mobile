@@ -1,3 +1,4 @@
+export * from "./AccessibilityResult";
 export * from "./ActionableError";
 export * from "./ActiveWindowInfo";
 export * from "./AndroidUser";
