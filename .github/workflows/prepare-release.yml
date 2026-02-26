@@ -59,7 +59,7 @@ jobs:
           name: ctrl-proxy-ios-ipa
           path: /tmp
 
-      - name: "Download Accessibility Service APK"
+      - name: "Download CtrlProxy APK"
         uses: actions/download-artifact@v7
         with:
           name: control-proxy-apk
@@ -96,7 +96,7 @@ jobs:
             ## Summary
             - Bump versions to v${{ inputs.version }}
             - Update CHANGELOG.md from closed issues since the last tag
-            - Refresh Accessibility Service APK SHA256 checksum
+            - Refresh CtrlProxy APK SHA256 checksum
             - Refresh CtrlProxy iOS IPA SHA256 checksum
 
             ## Automation

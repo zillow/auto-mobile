@@ -28,7 +28,7 @@ inputs:
     default: "./"
     required: "true"
   accessibility-apk-path:
-    description: "Optional path to accessibility service APK to install before running the script"
+    description: "Optional path to CtrlProxy APK to install before running the script"
     default: ""
     required: "false"
   gradle-home-directory:

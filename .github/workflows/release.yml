@@ -57,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: "Download Accessibility Service APK"
+      - name: "Download CtrlProxy APK"
         uses: actions/download-artifact@v7
         with:
           name: control-proxy-apk
@@ -135,7 +135,7 @@ jobs:
           # Add checksum to notes
           APK_CHECKSUM="${{ steps.verify_checksum.outputs.checksum }}"
           IPA_CHECKSUM="${{ steps.verify_ipa_checksum.outputs.checksum }}"
-          NOTES="${NOTES}"$'\n\n'"## Accessibility Service APK"$'\n\n'"**SHA256 Checksum:** \`${APK_CHECKSUM}\`"$'\n\n'"Download the APK from the release assets below."
+          NOTES="${NOTES}"$'\n\n'"## CtrlProxy APK"$'\n\n'"**SHA256 Checksum:** \`${APK_CHECKSUM}\`"$'\n\n'"Download the APK from the release assets below."
           NOTES="${NOTES}"$'\n\n'"## CtrlProxy iOS IPA"$'\n\n'"**SHA256 Checksum:** \`${IPA_CHECKSUM}\`"$'\n\n'"Download the IPA from the release assets below."
 
           # Save to file for GitHub release

@@ -20,7 +20,7 @@ on:
 
 jobs:
   build:
-    name: "Build Accessibility Service"
+    name: "Build CtrlProxy APK"
     runs-on: ubuntu-latest
     outputs:
       sha256: ${{ steps.checksum.outputs.sha256 }}

@@ -445,7 +445,7 @@ jobs:
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
-      - name: "Download Accessibility Service APK"
+      - name: "Download CtrlProxy APK"
         uses: actions/download-artifact@v7
         with:
           name: control-proxy-apk
@@ -488,7 +488,7 @@ jobs:
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
-      - name: "Download Accessibility Service APK"
+      - name: "Download CtrlProxy APK"
         uses: actions/download-artifact@v7
         with:
           name: control-proxy-apk
@@ -521,7 +521,7 @@ jobs:
           report_paths: '**/build/test-results/**/*.xml'
 
   android-control-proxy-unit-tests:
-    name: "Run Accessibility Service Unit Tests"
+    name: "Run CtrlProxy Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -573,7 +573,7 @@ jobs:
           path: core/build/outputs/aar/core-debug.aar
 
   build-android-control-proxy:
-    name: "Build Accessibility Service"
+    name: "Build CtrlProxy APK"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -594,7 +594,7 @@ jobs:
           release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
           release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
-      - name: "Store Accessibility Service APK"
+      - name: "Upload CtrlProxy APK"
         uses: actions/upload-artifact@v6
         with:
           name: control-proxy-apk

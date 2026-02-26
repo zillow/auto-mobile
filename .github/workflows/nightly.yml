@@ -111,9 +111,9 @@ jobs:
           IPA_CHANGED="${{ steps.check.outputs.ipa_changed }}"
 
           if [ "$APK_CHANGED" = "true" ] && [ "$IPA_CHANGED" = "true" ]; then
-            echo "title=chore: update accessibility service APK and CtrlProxy iOS IPA SHA256" >> $GITHUB_OUTPUT
+            echo "title=chore: update CtrlProxy APK and CtrlProxy iOS IPA SHA256" >> $GITHUB_OUTPUT
           elif [ "$APK_CHANGED" = "true" ]; then
-            echo "title=chore: update accessibility service APK SHA256" >> $GITHUB_OUTPUT
+            echo "title=chore: update CtrlProxy APK SHA256" >> $GITHUB_OUTPUT
           else
             echo "title=chore: update CtrlProxy iOS IPA SHA256" >> $GITHUB_OUTPUT
           fi
