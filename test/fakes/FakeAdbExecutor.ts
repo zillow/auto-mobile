@@ -7,6 +7,7 @@ import { BootedDevice, ExecResult, AndroidUser } from "../../src/models";
  */
 export class FakeAdbExecutor implements AdbExecutor {
   private commandResponses: Map<string, ExecResult> = new Map();
+  private commandErrors: Map<string, Error> = new Map();
   private defaultResponse: ExecResult = this.createExecResult("", "");
   private defaultError: Error | null = null;
   private executedCommands: string[] = [];
@@ -148,6 +149,15 @@ export class FakeAdbExecutor implements AdbExecutor {
   }
 
   /**
+   * Set an error to throw for commands matching a specific pattern
+   * @param commandPattern - Pattern to match against executed commands (substring match)
+   * @param error - Error to throw when pattern matches
+   */
+  setCommandError(commandPattern: string, error: Error): void {
+    this.commandErrors.set(commandPattern, error);
+  }
+
+  /**
    * Set default error to throw for all commands
    * @param error - Error to throw
    */
@@ -165,6 +175,13 @@ export class FakeAdbExecutor implements AdbExecutor {
     _signal?: AbortSignal
   ): Promise<ExecResult> {
     this.executedCommands.push(command);
+
+    // Check for per-command errors based on pattern matching
+    for (const [pattern, error] of this.commandErrors.entries()) {
+      if (command.includes(pattern)) {
+        throw error;
+      }
+    }
 
     // If a default error is configured, throw it
     if (this.defaultError) {

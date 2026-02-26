@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -14,6 +15,11 @@ import java.util.concurrent.atomic.AtomicReference
  * Allows test code or the AutoMobile MCP server to inject a known [BiometricResult] so that
  * `BiometricPrompt` flows are testable without requiring actual fingerprint/face hardware
  * interaction.
+ *
+ * **Dependency configuration:** This class lives in `src/main/` so the SDK can be published as
+ * a single artifact. Apps should declare it as `debugImplementation` to prevent it from shipping
+ * in release builds. Using `implementation` instead will include the broadcast receiver in
+ * production APKs.
  *
  * ## App integration
  *
@@ -160,6 +166,7 @@ object AutoMobileBiometrics {
         }
     }
 
+    @Synchronized
     private fun registerReceiver() {
         if (receiverRegistered) return
         val ctx = context ?: return
@@ -178,27 +185,46 @@ object AutoMobileBiometrics {
         }
     }
 
-    private val broadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val resultStr = intent.getStringExtra(EXTRA_RESULT) ?: run {
-                Log.w(TAG, "Biometric override broadcast missing '$EXTRA_RESULT' extra")
+    /**
+     * Process an incoming biometric override broadcast intent.
+     *
+     * Visible for testing: allows unit tests to invoke the receiver logic directly
+     * without going through Android's broadcast delivery mechanism.
+     */
+    @VisibleForTesting
+    internal fun handleBroadcastIntent(intent: Intent) {
+        val resultStr = intent.getStringExtra(EXTRA_RESULT) ?: run {
+            Log.w(TAG, "Biometric override broadcast missing '$EXTRA_RESULT' extra")
+            return
+        }
+        val ttlMs = intent.getLongExtra(EXTRA_TTL_MS, 5000L)
+
+        val result: BiometricResult = when (resultStr.uppercase()) {
+            "SUCCESS" -> BiometricResult.Success
+            "FAILURE" -> BiometricResult.Failure
+            "CANCEL" -> BiometricResult.Cancel
+            "ERROR" -> {
+                val errorCode = if (intent.hasExtra(EXTRA_ERROR_CODE)) {
+                    intent.getIntExtra(EXTRA_ERROR_CODE, -1)
+                } else {
+                    Log.w(TAG, "Biometric ERROR override broadcast missing '$EXTRA_ERROR_CODE' extra; " +
+                        "app will receive Error(-1) which is not a valid BiometricPrompt.ERROR_* constant (valid values start at 1)")
+                    -1
+                }
+                BiometricResult.Error(errorCode)
+            }
+            else -> {
+                Log.w(TAG, "Unknown biometric override result: '$resultStr'")
                 return
             }
-            val errorCode = intent.getIntExtra(EXTRA_ERROR_CODE, -1)
-            val ttlMs = intent.getLongExtra(EXTRA_TTL_MS, 5000L)
+        }
 
-            val result: BiometricResult = when (resultStr.uppercase()) {
-                "SUCCESS" -> BiometricResult.Success
-                "FAILURE" -> BiometricResult.Failure
-                "CANCEL" -> BiometricResult.Cancel
-                "ERROR" -> BiometricResult.Error(errorCode)
-                else -> {
-                    Log.w(TAG, "Unknown biometric override result: '$resultStr'")
-                    return
-                }
-            }
+        overrideResult(result, ttlMs)
+    }
 
-            overrideResult(result, ttlMs)
+    private val broadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            handleBroadcastIntent(intent)
         }
     }
 }

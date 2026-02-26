@@ -170,6 +170,16 @@ describe("BiometricAuth", () => {
       expect(result.supported).toBe(true);
     });
 
+    test("should use cancellation-specific message", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 2", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 2", { stdout: "", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "cancel" });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain("cancellation");
+    });
+
     test("should send SDK override broadcast with CANCEL for cancel", async () => {
       fakeAdb.setCommandResponse("emu finger touch 2", { stdout: "", stderr: "" });
       fakeAdb.setCommandResponse("emu finger remove 2", { stdout: "", stderr: "" });
@@ -217,6 +227,18 @@ describe("BiometricAuth", () => {
       const result = await biometricAuth.execute({ action: "error", errorCode: 7 });
 
       expect(result.message).toContain("consumeOverride");
+    });
+
+    test("should proceed when action is 'error' without errorCode (defaults to -1)", async () => {
+      fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
+      fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
+
+      const result = await biometricAuth.execute({ action: "error" }); // no errorCode
+
+      expect(result.success).toBe(true);
+      expect(result.errorCode).toBeUndefined();
+      // Message should show -1 as the default errorCode sent in the broadcast
+      expect(result.message).toContain("-1");
     });
 
     test("should use custom fingerprint ID for error action", async () => {
@@ -267,16 +289,17 @@ describe("BiometricAuth", () => {
       )).toBe(true);
     });
 
-    test("should still proceed if broadcast fails", async () => {
-      // Make broadcast fail
-      fakeAdb.setCommandResponse("BIOMETRIC_OVERRIDE", { stdout: "", stderr: "broadcast failed" });
+    test("should still proceed if broadcast throws", async () => {
+      // Make broadcast throw to simulate ADB failure
+      fakeAdb.setCommandError("BIOMETRIC_OVERRIDE", new Error("adb: device offline"));
       fakeAdb.setCommandResponse("emu finger touch 1", { stdout: "", stderr: "" });
       fakeAdb.setCommandResponse("emu finger remove 1", { stdout: "", stderr: "" });
 
       const result = await biometricAuth.execute({ action: "match" });
 
-      // Emu finger path should still work
+      // Emu finger path should still work despite broadcast failure
       expect(result.success).toBe(true);
+      expect(result.supported).toBe(true);
     });
   });
 
@@ -307,6 +330,17 @@ describe("BiometricAuth", () => {
 
       const executedCommands = fakeAdb.getExecutedCommands();
       expect(executedCommands.some(cmd => cmd.includes("emu finger"))).toBe(false);
+    });
+
+    test("should return failure when broadcast fails on physical devices", async () => {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "0", stderr: "" });
+      fakeAdb.setCommandError("BIOMETRIC_OVERRIDE", new Error("adb: device offline"));
+
+      const result = await biometricAuth.execute({ action: "match" });
+
+      expect(result.success).toBe(false);
+      expect(result.supported).toBe("partial");
+      expect(result.error).toContain("broadcast failed");
     });
 
     test("should support error action on physical devices via SDK broadcast", async () => {

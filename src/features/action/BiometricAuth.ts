@@ -76,6 +76,18 @@ export class BiometricAuth extends BaseVisualChange {
 
     if (!capabilityResult.isEmulator) {
       perf.end();
+      if (!broadcastOk) {
+        return {
+          success: false,
+          action: options.action,
+          modality,
+          fingerprintId: options.fingerprintId,
+          errorCode: options.errorCode,
+          supported: "partial",
+          error:
+            "SDK override broadcast failed; verify the app has AutoMobileBiometrics integrated and ADB is connected."
+        };
+      }
       return {
         success: true,
         action: options.action,
@@ -126,6 +138,13 @@ export class BiometricAuth extends BaseVisualChange {
    */
   private async sendSdkOverrideBroadcast(options: BiometricAuthOptions): Promise<boolean> {
     try {
+      if (options.action === "error" && options.errorCode === undefined) {
+        logger.warn(
+          "action 'error' sent without errorCode; app will receive BiometricResult.Error(-1) " +
+          "which is not a valid BiometricPrompt.ERROR_* constant (valid values start at 1)"
+        );
+      }
+
       const resultValue = this.actionToSdkResult(options.action);
       const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
 
@@ -191,7 +210,7 @@ export class BiometricAuth extends BaseVisualChange {
    * For error:  touch enrolled ID 1   → onAuthenticationSucceeded (override converts to error)
    */
   private async executeBiometricAction(options: BiometricAuthOptions): Promise<BiometricAuthResult> {
-    const modality = options.modality ?? "any";
+    const modality: "any" | "fingerprint" | "face" = options.modality ?? "any";
 
     // Determine fingerprint ID
     let fingerprintId = options.fingerprintId;
@@ -249,13 +268,13 @@ export class BiometricAuth extends BaseVisualChange {
 
   private buildSuccessResult(
     options: BiometricAuthOptions,
-    modality: string,
+    modality: "any" | "fingerprint" | "face",
     fingerprintId: number
   ): BiometricAuthResult {
     const base = {
       success: true,
       action: options.action,
-      modality: modality as BiometricAuthResult["modality"],
+      modality,
       fingerprintId,
       errorCode: options.errorCode,
       supported: true as const
@@ -266,6 +285,11 @@ export class BiometricAuth extends BaseVisualChange {
         return {
           ...base,
           message: `Simulated biometric ${options.action} with fingerprint ID ${fingerprintId}. Note: Some emulators may not differentiate between enrolled and non-enrolled fingerprint IDs.`
+        };
+      case "cancel":
+        return {
+          ...base,
+          message: `Biometric cancellation dispatched (fingerprint ID ${fingerprintId}).`
         };
       case "error":
         return {

@@ -30,7 +30,7 @@
           "type": "number"
         },
         "errorCode": {
-          "description": "BiometricPrompt error code to inject when action is 'error' (e.g. 7 for ERROR_LOCKOUT, 1 for ERROR_HW_UNAVAILABLE). Requires AutoMobileBiometrics SDK integration in the app.",
+          "description": "BiometricPrompt error code to inject (e.g. 7 for ERROR_LOCKOUT, 1 for ERROR_HW_UNAVAILABLE). Only valid when action is 'error'; providing it with any other action is a validation error.",
           "type": "number"
         },
         "ttlMs": {

@@ -177,11 +177,13 @@ be applied when the biometric prompt fires normally.
 
 ## Plan
 
-1. Implement emulator fingerprint support via `adb emu finger`.
-2. Add capability detection and clear error messages for unsupported devices.
-3. Add optional SDK hook for deterministic app-under-test flows.
+1. ✅ Implement emulator fingerprint support via `adb emu finger`.
+2. ✅ Add capability detection and clear error messages for unsupported devices.
+3. ✅ Add optional SDK hook for deterministic app-under-test flows.
 
 ## Risks
 
 - Emulator support is primarily fingerprint; face/iris is not consistent.
-- Physical devices may not allow simulation without device-owner privileges.
+- Physical device support requires app SDK integration (`AutoMobileBiometrics.consumeOverride()`).
+  The broadcast sets an override, but an actual biometric interaction is still needed to trigger
+  the callback. There is no way to programmatically inject a touch event on physical hardware.

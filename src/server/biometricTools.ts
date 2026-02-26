@@ -23,12 +23,15 @@ export const biometricAuthSchema = addDeviceTargetingToSchema(z.object({
     "Fingerprint ID to simulate (default: 1 for 'match'/'error', 2 for 'fail'/'cancel'). Use enrolled ID (typically 1) for match/error, non-enrolled ID (typically 2) for fail/cancel."
   ),
   errorCode: z.number().optional().describe(
-    "BiometricPrompt error code to inject when action is 'error' (e.g. 7 for ERROR_LOCKOUT, 1 for ERROR_HW_UNAVAILABLE). Requires AutoMobileBiometrics SDK integration in the app."
+    "BiometricPrompt error code to inject (e.g. 7 for ERROR_LOCKOUT, 1 for ERROR_HW_UNAVAILABLE). Only valid when action is 'error'; providing it with any other action is a validation error."
   ),
   ttlMs: z.number().optional().describe(
     "How long the SDK override remains active in milliseconds (default: 5000). The override is cleared after the first authentication callback or when the TTL expires."
   )
-}));
+}).refine(
+  (data) => data.errorCode === undefined || data.action === "error",
+  { message: "errorCode is only applicable when action is 'error'", path: ["errorCode"] }
+));
 
 /**
  * Register biometric authentication tools

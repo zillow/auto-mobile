@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.sdk.biometrics
 
+import android.content.Intent
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -125,6 +126,79 @@ class AutoMobileBiometricsTest {
     fun `Error equality is based on errorCode and errorMessage`() {
         assertEquals(BiometricResult.Error(7, "Lockout"), BiometricResult.Error(7, "Lockout"))
         assertTrue(BiometricResult.Error(7) != BiometricResult.Error(5))
+    }
+
+    // -------------------------------------------------------------------------
+    // Broadcast receiver round-trip (MCP integration path)
+    // Tests use handleBroadcastIntent() directly to exercise the receiver logic
+    // without relying on Android broadcast delivery infrastructure.
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `broadcast receiver sets Success override`() {
+        val intent = Intent(AutoMobileBiometrics.ACTION_BIOMETRIC_OVERRIDE).apply {
+            putExtra(AutoMobileBiometrics.EXTRA_RESULT, "SUCCESS")
+        }
+        AutoMobileBiometrics.handleBroadcastIntent(intent)
+
+        assertEquals(BiometricResult.Success, AutoMobileBiometrics.consumeOverride())
+    }
+
+    @Test
+    fun `broadcast receiver sets Failure override`() {
+        val intent = Intent(AutoMobileBiometrics.ACTION_BIOMETRIC_OVERRIDE).apply {
+            putExtra(AutoMobileBiometrics.EXTRA_RESULT, "FAILURE")
+        }
+        AutoMobileBiometrics.handleBroadcastIntent(intent)
+
+        assertEquals(BiometricResult.Failure, AutoMobileBiometrics.consumeOverride())
+    }
+
+    @Test
+    fun `broadcast receiver sets Cancel override`() {
+        val intent = Intent(AutoMobileBiometrics.ACTION_BIOMETRIC_OVERRIDE).apply {
+            putExtra(AutoMobileBiometrics.EXTRA_RESULT, "CANCEL")
+        }
+        AutoMobileBiometrics.handleBroadcastIntent(intent)
+
+        assertEquals(BiometricResult.Cancel, AutoMobileBiometrics.consumeOverride())
+    }
+
+    @Test
+    fun `broadcast receiver sets Error override with errorCode`() {
+        val intent = Intent(AutoMobileBiometrics.ACTION_BIOMETRIC_OVERRIDE).apply {
+            putExtra(AutoMobileBiometrics.EXTRA_RESULT, "ERROR")
+            putExtra(AutoMobileBiometrics.EXTRA_ERROR_CODE, 7)
+        }
+        AutoMobileBiometrics.handleBroadcastIntent(intent)
+
+        val result = AutoMobileBiometrics.consumeOverride()
+        assertNotNull(result)
+        assertTrue(result is BiometricResult.Error)
+        assertEquals(7, (result as BiometricResult.Error).errorCode)
+    }
+
+    @Test
+    fun `broadcast receiver uses -1 when errorCode extra is absent for ERROR result`() {
+        val intent = Intent(AutoMobileBiometrics.ACTION_BIOMETRIC_OVERRIDE).apply {
+            putExtra(AutoMobileBiometrics.EXTRA_RESULT, "ERROR")
+            // intentionally omit EXTRA_ERROR_CODE — app will receive Error(-1)
+        }
+        AutoMobileBiometrics.handleBroadcastIntent(intent)
+
+        val result = AutoMobileBiometrics.consumeOverride()
+        assertNotNull(result)
+        assertTrue(result is BiometricResult.Error)
+        assertEquals(-1, (result as BiometricResult.Error).errorCode)
+    }
+
+    @Test
+    fun `broadcast receiver ignores broadcast with missing result extra`() {
+        val intent = Intent(AutoMobileBiometrics.ACTION_BIOMETRIC_OVERRIDE)
+        // intentionally omit EXTRA_RESULT
+        AutoMobileBiometrics.handleBroadcastIntent(intent)
+
+        assertNull(AutoMobileBiometrics.consumeOverride())
     }
 
     // -------------------------------------------------------------------------
