@@ -8,8 +8,8 @@ import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeScreenshotCapturer } from "../../fakes/FakeScreenshotCapturer";
 import { FakeVisionAnalyzer } from "../../fakes/FakeVisionAnalyzer";
+import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import type { VisionFallbackConfig } from "../../../src/vision/VisionTypes";
-import { defaultTimer } from "../../../src/utils/SystemTimer";
 
 const enabledVisionConfig: VisionFallbackConfig = {
   enabled: true,
@@ -30,6 +30,7 @@ describe("DragAndDrop vision fallback", () => {
   let fakeObserveScreen: FakeObserveScreen;
   let fakeTimer: FakeTimer;
   let fakeCtrlProxy: FakeCtrlProxy;
+  let fakeAdbClientFactory: FakeAdbClientFactory;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let managerSpy: ReturnType<typeof spyOn> | null = null;
 
@@ -69,6 +70,7 @@ describe("DragAndDrop vision fallback", () => {
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
     fakeCtrlProxy = new FakeCtrlProxy();
+    fakeAdbClientFactory = new FakeAdbClientFactory();
     fakeObserveScreen.setObserveResult(() => createObserveResult());
 
     managerSpy = spyOn(AndroidCtrlProxyManager, "getInstance").mockReturnValue({
@@ -83,13 +85,12 @@ describe("DragAndDrop vision fallback", () => {
   });
 
   const createDragAndDrop = (capturer: FakeScreenshotCapturer, analyzer: FakeVisionAnalyzer) => {
-    const dnd = new DragAndDrop(device, null, defaultTimer, {
+    const dnd = new DragAndDrop(device, fakeAdbClientFactory, fakeTimer, {
       visionConfig: enabledVisionConfig,
       screenshotCapturer: capturer,
       visionAnalyzer: analyzer
     });
     (dnd as any).observeScreen = fakeObserveScreen;
-    (dnd as any).timer = fakeTimer;
     return dnd;
   };
 
@@ -155,13 +156,12 @@ describe("DragAndDrop vision fallback", () => {
     capturer.setPaths(["/screenshot.png"]);
     const analyzer = new FakeVisionAnalyzer();
 
-    const dnd = new DragAndDrop(device, null, defaultTimer, {
+    const dnd = new DragAndDrop(device, fakeAdbClientFactory, fakeTimer, {
       visionConfig: { ...enabledVisionConfig, enabled: false },
       screenshotCapturer: capturer,
       visionAnalyzer: analyzer
     });
     (dnd as any).observeScreen = fakeObserveScreen;
-    (dnd as any).timer = fakeTimer;
 
     const result = await dnd.execute({
       source: { text: "MissingSource" },
