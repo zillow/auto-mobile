@@ -3,9 +3,11 @@ import type { BootedDevice, ObserveResult, ViewHierarchyResult } from "../../../
 import { PinchOn } from "../../../src/features/action/PinchOn";
 import { CtrlProxyClient } from "../../../src/features/observe/android";
 import { AndroidCtrlProxyManager } from "../../../src/utils/CtrlProxyManager";
+import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
 import { FakeCtrlProxy } from "../../fakes/FakeCtrlProxy";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeTimer } from "../../fakes/FakeTimer";
+import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeScreenshotCapturer } from "../../fakes/FakeScreenshotCapturer";
 import { FakeVisionAnalyzer } from "../../fakes/FakeVisionAnalyzer";
 import type { VisionFallbackConfig } from "../../../src/vision/VisionTypes";
@@ -28,6 +30,8 @@ describe("PinchOn vision fallback", () => {
 
   let fakeObserveScreen: FakeObserveScreen;
   let fakeTimer: FakeTimer;
+  let fakeAwaitIdle: FakeAwaitIdle;
+  let fakeWindow: FakeWindow;
   let fakeCtrlProxy: FakeCtrlProxy;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let managerSpy: ReturnType<typeof spyOn> | null = null;
@@ -49,6 +53,9 @@ describe("PinchOn vision fallback", () => {
     fakeObserveScreen = new FakeObserveScreen();
     fakeTimer = new FakeTimer();
     fakeTimer.enableAutoAdvance();
+    fakeAwaitIdle = new FakeAwaitIdle();
+    fakeWindow = new FakeWindow();
+    fakeWindow.configureCachedActiveWindow(null);
     fakeCtrlProxy = new FakeCtrlProxy();
     fakeObserveScreen.setObserveResult(() => createObserveResult());
 
@@ -71,6 +78,8 @@ describe("PinchOn vision fallback", () => {
     });
     (pinchOn as any).observeScreen = fakeObserveScreen;
     (pinchOn as any).timer = fakeTimer;
+    (pinchOn as any).awaitIdle = fakeAwaitIdle;
+    (pinchOn as any).window = fakeWindow;
     return pinchOn;
   };
 
@@ -140,6 +149,8 @@ describe("PinchOn vision fallback", () => {
     });
     (pinchOn as any).observeScreen = fakeObserveScreen;
     (pinchOn as any).timer = fakeTimer;
+    (pinchOn as any).awaitIdle = fakeAwaitIdle;
+    (pinchOn as any).window = fakeWindow;
 
     const result = await pinchOn.execute({
       direction: "in",

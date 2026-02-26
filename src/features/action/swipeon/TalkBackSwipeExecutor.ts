@@ -47,11 +47,11 @@ export class TalkBackSwipeExecutor {
     }
 
     // Check if TalkBack is enabled (not just any accessibility service)
-    const accessibilityService = await this.accessibilityDetector.detectMethod(
-      this.device.id,
+    const detectedService = await this.accessibilityDetector.detectMethod(
+      this.device.deviceId,
       null
     );
-    const isTalkBackEnabled = accessibilityService === "talkback";
+    const isTalkBackEnabled = detectedService === "talkback";
 
     if (isTalkBackEnabled) {
       if (boomerangEnabled) {
@@ -198,15 +198,6 @@ export class TalkBackSwipeExecutor {
   ): Promise<SwipeResult> {
     // Try accessibility scroll actions if container is known and has resource-id
     if (containerElement && containerElement["resource-id"]) {
-      try {
-        // Clear accessibility focus before scrolling to ensure scroll affects content
-        logger.debug("[SwipeOn] Clearing accessibility focus before scroll");
-        await this.accessibilityService.requestAction("clear_focus", containerElement["resource-id"]);
-      } catch (error) {
-        logger.warn(`[SwipeOn] Failed to clear accessibility focus: ${error}`);
-        // Continue anyway
-      }
-
       // Map swipe direction to ACTION_SCROLL semantics (forward = down/right, backward = up/left).
       const scrollAction = (direction === "down" || direction === "right")
         ? "scroll_forward"
@@ -217,7 +208,9 @@ export class TalkBackSwipeExecutor {
       try {
         const result = await this.accessibilityService.requestAction(
           scrollAction,
-          containerElement["resource-id"]
+          containerElement["resource-id"],
+          5000,
+          perf || new NoOpPerformanceTracker()
         );
 
         if (result.success) {

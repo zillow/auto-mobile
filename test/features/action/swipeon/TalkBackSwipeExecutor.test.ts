@@ -18,7 +18,7 @@ describe("SwipeOn TalkBack mode detection", () => {
       {
         name: "test-device",
         platform: "android",
-        id: "emulator-5554",
+        deviceId: "emulator-5554",
       } as any,
       {} as any,  // adb
       {
@@ -235,7 +235,7 @@ describe("SwipeOn TalkBack mode detection", () => {
 
       // Enable TalkBack and invalidate cache
       fakeAccessibilityDetector.setTalkBackEnabled(true);
-      fakeAccessibilityDetector.invalidateCache();
+      fakeAccessibilityDetector.invalidateCache("emulator-5554");
 
       // Second swipe should use accessibility method
       await (swipeOn as any).talkBackExecutor.executeSwipeGesture(
@@ -257,7 +257,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         {
           name: "test-device",
           platform: "ios",
-          id: "test-ios-device",
+          deviceId: "test-ios-device",
         } as any,
         null,
         {
@@ -339,9 +339,9 @@ describe("SwipeOn TalkBack mode detection", () => {
         { duration: 300 }
       );
 
-      // Should call clear_focus and then scroll_forward
-      expect(requestActionSpy).toHaveBeenCalledWith("clear_focus", "test:id/scrollView");
-      expect(requestActionSpy).toHaveBeenCalledWith("scroll_forward", "test:id/scrollView");
+      // Should call scroll_forward (no clear_focus before scroll)
+      expect(requestActionSpy).toHaveBeenCalledWith("scroll_forward", "test:id/scrollView", 5000, expect.any(NoOpPerformanceTracker));
+      expect(requestActionSpy).not.toHaveBeenCalledWith("clear_focus", expect.anything());
     });
 
     test("maps up direction to scroll_backward", async () => {
@@ -359,7 +359,7 @@ describe("SwipeOn TalkBack mode detection", () => {
         { duration: 300 }
       );
 
-      expect(requestActionSpy).toHaveBeenCalledWith("scroll_backward", "test:id/scrollView");
+      expect(requestActionSpy).toHaveBeenCalledWith("scroll_backward", "test:id/scrollView", 5000, expect.any(NoOpPerformanceTracker));
     });
 
     test("falls back to two-finger swipe when ACTION_SCROLL fails", async () => {

@@ -160,19 +160,6 @@ export class ScrollUntilVisible {
       };
     }
 
-    // Clear accessibility focus before scrolling (only when focusTarget is requested)
-    if (isTalkBackEnabled && options.focusTarget) {
-      try {
-        await perf.track("clearAccessibilityFocus", async () => {
-          await this.deps.accessibilityService.clearAccessibilityFocus();
-          logger.info("[SwipeOn] Cleared accessibility focus before scrolling (focusTarget requested)");
-        });
-      } catch (error) {
-        logger.warn(`[SwipeOn] Failed to clear accessibility focus: ${error}`);
-        // Continue anyway - this is not a critical failure
-      }
-    }
-
     const swipeCoordinates = this.resolveContainerSwipeCoordinates(
       options,
       lastObservation.viewHierarchy!,
@@ -460,7 +447,7 @@ export class ScrollUntilVisible {
           return;
         }
 
-        await this.deps.accessibilityService.setAccessibilityFocus(resourceId);
+        await this.deps.accessibilityService.requestAction("focus", resourceId, 5000, perf);
         logger.info(`[SwipeOn] Set accessibility focus on element: ${resourceId}`);
       });
     } catch (error) {
