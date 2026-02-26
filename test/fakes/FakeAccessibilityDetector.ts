@@ -59,16 +59,16 @@ export class FakeAccessibilityDetector implements AccessibilityDetector {
   }
 
   /**
-   * Reset fake state
-   */
-  /**
    * Returns the number of invalidateCache calls that had occurred before the
    * first detectMethod call.  Useful for verifying cache-before-check ordering.
    */
-  getInvalidationCountBefore(_method: "detectMethod"): number {
+  getInvalidationCountBeforeFirstDetection(): number {
     return this.invalidationCountAtFirstDetection ?? 0;
   }
 
+  /**
+   * Reset fake state
+   */
   reset(): void {
     this.detectionResults.clear();
     this.defaultResult = { enabled: false, service: "unknown" };

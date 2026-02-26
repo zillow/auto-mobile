@@ -9,7 +9,7 @@ import { type Timer, defaultTimer } from "../../utils/SystemTimer";
 
 const TALKBACK_PACKAGE = "com.google.android.marvin.talkback";
 const TALKBACK_SERVICE_FALLBACK = `${TALKBACK_PACKAGE}/${TALKBACK_PACKAGE}.TalkBackService`;
-const DIALOG_DISMISS_RETRIES = 3;
+const DIALOG_DISMISS_RETRIES = 4; // 1 immediate + 3 × 500ms = 1500ms max wait
 const DIALOG_DISMISS_DELAY_MS = 500;
 
 export class TalkBackToggle {
@@ -77,21 +77,7 @@ export class TalkBackToggle {
    * active accessibility services (e.g. CtrlProxy).
    */
   private async enableTalkBack(serviceComponent: string): Promise<void> {
-    const result = await this.adb.executeCommand(
-      "shell settings get secure enabled_accessibility_services"
-    );
-    const currentServices = result.stdout.trim();
-
-    const otherServices: string[] = [];
-    if (currentServices && currentServices !== "null") {
-      for (const s of currentServices.split(":")) {
-        const trimmed = s.trim();
-        if (trimmed && !trimmed.includes(TALKBACK_PACKAGE) && !trimmed.includes("TalkBackService")) {
-          otherServices.push(trimmed);
-        }
-      }
-    }
-
+    const otherServices = await this.getOtherServices();
     const updatedServices = [...otherServices, serviceComponent].join(":");
     await this.adb.executeCommand(
       `shell settings put secure enabled_accessibility_services ${updatedServices}`
@@ -107,20 +93,7 @@ export class TalkBackToggle {
    * accessibility_enabled flag when no other services remain.
    */
   private async disableTalkBack(): Promise<void> {
-    const result = await this.adb.executeCommand(
-      "shell settings get secure enabled_accessibility_services"
-    );
-    const currentServices = result.stdout.trim();
-
-    const otherServices: string[] = [];
-    if (currentServices && currentServices !== "null") {
-      for (const s of currentServices.split(":")) {
-        const trimmed = s.trim();
-        if (trimmed && !trimmed.includes(TALKBACK_PACKAGE) && !trimmed.includes("TalkBackService")) {
-          otherServices.push(trimmed);
-        }
-      }
-    }
+    const otherServices = await this.getOtherServices();
 
     if (otherServices.length === 0) {
       await this.adb.executeCommand(
@@ -136,6 +109,28 @@ export class TalkBackToggle {
         `shell settings put secure enabled_accessibility_services ${otherServices.join(":")}`
       );
     }
+  }
+
+  /**
+   * Read the current enabled_accessibility_services setting and return all
+   * entries that are NOT part of TalkBack, preserving other active services.
+   */
+  private async getOtherServices(): Promise<string[]> {
+    const result = await this.adb.executeCommand(
+      "shell settings get secure enabled_accessibility_services"
+    );
+    const currentServices = result.stdout.trim();
+
+    const otherServices: string[] = [];
+    if (currentServices && currentServices !== "null") {
+      for (const s of currentServices.split(":")) {
+        const trimmed = s.trim();
+        if (trimmed && !trimmed.includes(TALKBACK_PACKAGE) && !trimmed.includes("TalkBackService")) {
+          otherServices.push(trimmed);
+        }
+      }
+    }
+    return otherServices;
   }
 
   /**
@@ -173,7 +168,9 @@ export class TalkBackToggle {
    * After enabling TalkBack, Android shows a permission dialog that must be
    * accepted before automation can continue.  Check immediately (no initial
    * delay), then retry with delays to allow the dialog time to appear.
-   * Match the positive button by resource-id for locale independence.
+   * Match the positive button by resource-id for locale independence, but
+   * only when the TalkBack dialog context is confirmed — android:id/button1
+   * is a generic ID reused by many dialogs.
    */
   private async dismissPermissionDialog(): Promise<void> {
     for (let attempt = 0; attempt < DIALOG_DISMISS_RETRIES; attempt++) {
@@ -185,6 +182,13 @@ export class TalkBackToggle {
           "shell uiautomator dump /dev/tty"
         );
         const xml = dumpResult.stdout;
+
+        // Guard: only tap when the TalkBack consent dialog is on screen.
+        // "TalkBack" is a brand name that stays untranslated in all locales,
+        // preventing accidental taps on unrelated system dialogs.
+        if (!xml.includes("TalkBack")) {
+          continue;
+        }
 
         // Match by resource-id rather than text to support non-English locales
         const nodeMatch = /<node[^>]*resource-id="android:id\/button1"[^>]*\/?>/.exec(xml);

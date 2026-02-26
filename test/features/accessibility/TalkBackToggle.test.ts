@@ -118,7 +118,7 @@ describe("TalkBackToggle", () => {
       await toggle.toggle(true);
 
       // Cache must have been invalidated at least once before detectMethod was called
-      expect(fakeDetector.getInvalidationCountBefore("detectMethod")).toBeGreaterThanOrEqual(1);
+      expect(fakeDetector.getInvalidationCountBeforeFirstDetection()).toBeGreaterThanOrEqual(1);
     });
 
     test("attempts dialog dismissal after enabling", async () => {
@@ -176,6 +176,27 @@ describe("TalkBackToggle", () => {
       expect(result.applied).toBe(true);
     });
 
+    test("does not tap button1 when it belongs to an unrelated dialog (no TalkBack context)", async () => {
+      // Simulate a system dialog that happens to use android:id/button1 but has no TalkBack text
+      const unrelatedDialogXml = `<?xml version="1.0" encoding="UTF-8"?>
+<hierarchy><node index="0" text="" resource-id="android:id/content">
+  <node index="0" text="Allow this app to access your location?" resource-id="" />
+  <node index="1" text="Allow" resource-id="android:id/button1" bounds="[180,684][540,740]" />
+</hierarchy>`;
+      fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
+      fakeAdb.setCommandResponse(
+        "shell uiautomator dump /dev/tty",
+        makeExecResult(unrelatedDialogXml)
+      );
+      fakeDetector.setDefaultResult(false);
+
+      const toggle = new TalkBackToggle(ANDROID_DEVICE, fakeAdb, fakeDetector, fakeTimer);
+      const result = await toggle.toggle(true);
+
+      expect(fakeAdb.wasCommandExecuted("shell input tap")).toBe(false);
+      expect(result.applied).toBe(true);
+    });
+
     test("is idempotent when TalkBack is already enabled", async () => {
       fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
       fakeDetector.setDefaultResult(true, "talkback");
@@ -217,6 +238,7 @@ describe("TalkBackToggle", () => {
           "shell settings put secure enabled_accessibility_services com.example.other/OtherService:com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService"
         )
       ).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 1")).toBe(true);
     });
   });
 
@@ -344,6 +366,22 @@ describe("TalkBackToggle", () => {
 
       expect(result.supported).toBe(false);
       expect(result.applied).toBe(false);
+    });
+  });
+
+  describe("ADB error propagation during apply phase", () => {
+    test("propagates ADB error thrown during enable when TalkBack is installed", async () => {
+      // dumpsys succeeds so detectInstalledService() passes (TalkBack is found)
+      fakeAdb.setCommandResponse("dumpsys accessibility", makeExecResult(DUMPSYS_WITH_TALKBACK));
+      // The apply phase reads the current services list; make that command throw
+      fakeAdb.setCommandError(
+        "settings get secure enabled_accessibility_services",
+        new Error("ADB command failed during apply")
+      );
+      fakeDetector.setDefaultResult(false);
+
+      const toggle = new TalkBackToggle(ANDROID_DEVICE, fakeAdb, fakeDetector, fakeTimer);
+      await expect(toggle.toggle(true)).rejects.toThrow();
     });
   });
 

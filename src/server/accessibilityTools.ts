@@ -5,7 +5,7 @@ import { ActionableError, BootedDevice } from "../models";
 import { createJSONToolResponse, createStructuredToolResponse } from "../utils/toolUtils";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { TalkBackToggle } from "../features/accessibility/TalkBackToggle";
-import type { AccessibilityResult } from "../models/AccessibilityResult";
+import type { AccessibilityResult } from "../models";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import { accessibilityDetector } from "../utils/AccessibilityDetector";
 import { iosVoiceOverDetector } from "../utils/IosVoiceOverDetector";
@@ -38,10 +38,14 @@ export function registerAccessibilityTools() {
     if (device.platform === "android") {
       if (args.talkback !== undefined) {
         // Toggle TalkBack on Android
-        const result: AccessibilityResult = {};
-        const toggle = new TalkBackToggle(device);
-        result.talkback = await toggle.toggle(args.talkback);
-        return createJSONToolResponse(result);
+        try {
+          const result: AccessibilityResult = {};
+          const toggle = new TalkBackToggle(device);
+          result.talkback = await toggle.toggle(args.talkback);
+          return createJSONToolResponse(result);
+        } catch (error) {
+          throw new ActionableError(`Failed to toggle accessibility services: ${error}`);
+        }
       }
 
       // Detect current TalkBack state on Android
