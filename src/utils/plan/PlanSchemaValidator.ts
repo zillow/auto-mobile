@@ -62,6 +62,10 @@ export class PlanSchemaValidator {
 
     // Try multiple paths to support different execution contexts:
     const possiblePaths = [
+      // From Bun bundle: dist/src/index.js -> dist/schemas/ (1 level up)
+      path.join(__dirname, "../schemas/test-plan.schema.json"),
+      // From Bun bundle: dist/src/index.js -> package root schemas/ (2 levels up)
+      path.join(__dirname, "../../schemas/test-plan.schema.json"),
       // From source: src/utils/plan/PlanSchemaValidator.ts -> schemas/
       path.join(__dirname, "../../../schemas/test-plan.schema.json"),
       // From dist: dist/src/utils/plan/PlanSchemaValidator.js -> dist/schemas/

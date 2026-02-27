@@ -127,7 +127,11 @@ nav:
             - 'Screen Streaming': design-docs/plat/android/screen-streaming.md
             - 'CtrlProxy': design-docs/plat/android/control-proxy.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
-            - 'JUnitRunner': design-docs/plat/android/junitrunner.md
+            - 'JUnitRunner':
+              - 'Overview': design-docs/plat/android/junit-runner/index.md
+              - 'Project Setup': design-docs/plat/android/junit-runner/project-setup.md
+              - 'Writing Tests': design-docs/plat/android/junit-runner/writing-tests.md
+              - 'CI Integration': design-docs/plat/android/junit-runner/ci-integration.md
             - 'IDE Plugin':
               - 'Overview': design-docs/plat/android/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/android/ide-plugin/test-recording.md

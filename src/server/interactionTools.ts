@@ -663,11 +663,11 @@ export function registerInteractionTools() {
   const swipeOnHandler = async (device: BootedDevice, args: SwipeOnArgs, progress?: ProgressCallback) => {
     RecompositionTracker.getInstance().recordInteraction();
     const swipeOn = new SwipeOn(device);
-    const resolvedDirection = resolveSwipeDirection(args.direction, args.gestureType);
+    const resolvedDirection = resolveSwipeDirection({ direction: args.direction, gestureType: args.gestureType });
     const result = await swipeOn.execute({
       container: args.container,
       autoTarget: args.autoTarget ?? true,
-      direction: resolvedDirection,
+      direction: resolvedDirection.direction,
       lookFor: args.lookFor,
       speed: args.speed,
       includeSystemInsets: args.includeSystemInsets ?? false,

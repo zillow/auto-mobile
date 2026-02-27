@@ -97,7 +97,7 @@ Feature implementation status is indicated throughout these docs using chips. Se
 | Component | Purpose | Status |
 |-----------|---------|--------|
 | [Accessibility Service](plat/android/control-proxy.md) | Real-time view hierarchy access | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
-| [JUnitRunner](plat/android/junitrunner.md) | Test execution framework | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [JUnitRunner](plat/android/junit-runner/index.md) | Test execution framework | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
 | [IDE Plugin](plat/android/ide-plugin/overview.md) | Android Studio integration | <kbd>✅ Implemented</kbd> |
 | [Work Profiles](plat/android/work-profiles.md) | Enterprise device support | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
 
