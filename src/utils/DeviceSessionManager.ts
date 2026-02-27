@@ -578,10 +578,12 @@ export class DeviceSessionManager implements DeviceSessionManager {
     }
 
     if (!this.simulatorAppOpened) {
-      this.simulatorAppOpened = true;
-      await this.simctl!.openSimulatorApp().catch(err =>
-        logger.warn(`[DeviceSessionManager] Failed to open Simulator.app: ${err}`)
-      );
+      try {
+        await this.simctl!.openSimulatorApp();
+        this.simulatorAppOpened = true;
+      } catch (err) {
+        logger.warn(`[DeviceSessionManager] Failed to open Simulator.app: ${err}`);
+      }
     }
 
     // Create a device object for the CtrlProxy iOS clients

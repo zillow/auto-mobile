@@ -16,6 +16,11 @@ export class FakeSimCtlClient {
   private containerPaths = new Map<string, string>();
   private containerErrors = new Map<string, Error>();
   private methodCalls = new Map<string, Array<Record<string, unknown>>>();
+  private openSimulatorAppError: Error | null = null;
+
+  setOpenSimulatorAppError(error: Error | null): void {
+    this.openSimulatorAppError = error;
+  }
 
   setDeviceInfo(udid: string, info: AppleDevice | null): void {
     this.deviceInfo.set(udid, info);
@@ -90,5 +95,8 @@ export class FakeSimCtlClient {
 
   async openSimulatorApp(): Promise<void> {
     this.recordCall("openSimulatorApp", {});
+    if (this.openSimulatorAppError) {
+      throw this.openSimulatorAppError;
+    }
   }
 }

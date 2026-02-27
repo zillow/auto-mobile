@@ -329,4 +329,32 @@ describe("DeviceSessionManager iOS openSimulatorApp", () => {
 
     expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(0);
   });
+
+  test("should retry openSimulatorApp on subsequent verifications after a failure", async () => {
+    const fakeSimctl = new FakeSimCtlClient();
+    fakeSimctl.setDeviceInfo("ios-sim-1", {
+      udid: "ios-sim-1",
+      name: "iPhone 15",
+      state: "Booted",
+      isAvailable: true,
+    });
+
+    const manager = DeviceSessionManager.createInstance(
+      new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils, fakeSimctl as any)
+    );
+
+    // First call: openSimulatorApp throws — flag must NOT be set
+    fakeSimctl.setOpenSimulatorAppError(new Error("open: command not found"));
+    await manager.verifyIosDevice("ios-sim-1");
+    expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(1);
+
+    // Second call: open succeeds now — flag gets set
+    fakeSimctl.setOpenSimulatorAppError(null);
+    await manager.verifyIosDevice("ios-sim-1");
+    expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(2);
+
+    // Third call: flag is set, no retry
+    await manager.verifyIosDevice("ios-sim-1");
+    expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(2);
+  });
 });
