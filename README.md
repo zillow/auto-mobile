@@ -44,7 +44,7 @@ It can do all this by being an MCP server that uses standard platform tools like
 - 🤖 **Fast UX Inspection** Kotlin Accessibility Service and Swift XCTestService to enable fast, accurate observations. 10x faster than the next fastest observation toolkit.
 - 🦾 **Full Touch Injection** Tap, Swipe, Pinch, Drag & Drop, Shake with automatic element targeting.
 - ♻️ **Tool Feedback** [Observations](docs/design-docs/mcp/observe/index.md) drive the [interaction loop](docs/design-docs/mcp/interaction-loop.md) for all [tool calls](docs/design-docs/mcp/tools.md).
-- 🧪 **Test Execution** [Kotlin JUnitRunner](docs/design-docs/plat/android/junitrunner.md) & [Swift XCTestRunner](docs/design-docs/plat/ios/xctestrunner.md) execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.
+- 🧪 **Test Execution** [Kotlin JUnitRunner](docs/design-docs/plat/android/junit-runner/index.md) & [Swift XCTestRunner](docs/design-docs/plat/ios/xctestrunner.md) execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.
 
 ## Get Started
 
