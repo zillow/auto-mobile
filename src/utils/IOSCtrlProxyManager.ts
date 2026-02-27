@@ -407,6 +407,14 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
     // would fail the HTTP health check and incorrectly trigger a restart.
     if (await this.isCtrlProxyProcessAlive()) {
       logger.info("[IOSCtrlProxy] CtrlProxy process is alive, skipping start");
+      // On physical devices the iproxy tunnel may have been stopped independently
+      // (e.g. by a temporary disconnect) while the XCTest process kept running.
+      // Re-establishing it here is a no-op when the tunnel is already up, and
+      // self-heals the connection when it is not.
+      if (!this.isSimulator()) {
+        await this.startIproxyTunnel();
+        this.startIproxyMonitoring();
+      }
       return;
     }
 

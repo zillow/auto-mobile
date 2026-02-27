@@ -168,7 +168,7 @@ describe("IOSCtrlProxyManager", function() {
       fakeExecutor = new FakeProcessExecutor();
     });
 
-    test("start() skips spawning when tracked CtrlProxy PID is alive", async function() {
+    test("start() skips spawning when tracked CtrlProxy PID is alive (simulator)", async function() {
       const manager = IOSCtrlProxyManager.createForTestingWithDeps(
         testDevice, // simulator UUID
         fakeTimer,
@@ -189,6 +189,31 @@ describe("IOSCtrlProxyManager", function() {
       // Process is alive → no simctl spawn or exec for starting the binary
       expect(fakeExecutor.wasCommandExecuted("simctl")).toBe(false);
       expect(fakeExecutor.getSpawnedProcesses().length).toBe(0);
+    });
+
+    test("start() re-establishes iproxy tunnel when CtrlProxy is alive but tunnel is gone (physical device)", async function() {
+      fakeExecutor.setCommandResponse("idevice_id -l", createExecResult(`${physicalDevice.deviceId}\n`, ""));
+
+      const fakeProcess = new FakeChildProcess();
+      fakeExecutor.setNextSpawnProcess(fakeProcess);
+
+      const manager = IOSCtrlProxyManager.createForTestingWithDeps(
+        physicalDevice,
+        fakeTimer,
+        undefined,
+        fakeExecutor
+      );
+
+      // Simulate: CtrlProxy process is alive but iproxy tunnel was stopped
+      (manager as unknown as { xcTestProcessId: number }).xcTestProcessId = 12345;
+      // iproxyProcessId is null → tunnel is gone
+
+      fakeTimer.enableAutoAdvance();
+      await manager.start();
+
+      // iproxy should have been (re-)spawned even though CtrlProxy was alive
+      expect(fakeExecutor.getSpawnedProcesses().length).toBe(1);
+      expect(fakeExecutor.getSpawnedProcesses()[0].command).toBe("iproxy");
     });
 
     test("startProcessMonitoring uses the injected timer so tests can control it", function() {
