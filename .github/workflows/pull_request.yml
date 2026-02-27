@@ -916,6 +916,23 @@ jobs:
           cd ios/XCTestRunner
           swift test --filter RemindersLaunchPlanTests 2>&1
 
+  ios-spm-root-package-build:
+    name: "Build Root SPM Package"
+    runs-on: macos-26
+    needs: detect-changes
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v6
+
+      - name: "Select Xcode 26.0"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.0"
+
+      - name: "Build root Package.swift"
+        run: swift build -c release 2>&1
+
   # =============================================================================
   # Android Build and Test Jobs (Android-related changes only)
   # =============================================================================
@@ -1829,6 +1846,7 @@ jobs:
       - ios-xcode-build
       - ios-ctrl-proxy-build
       - ios-xctest-runner-simulator-tests
+      - ios-spm-root-package-build
     runs-on: ubuntu-latest
     steps:
       - name: "Check results"
@@ -1840,6 +1858,7 @@ jobs:
             "${{ needs.ios-xcode-build.result }}" \
             "${{ needs.ios-ctrl-proxy-build.result }}" \
             "${{ needs.ios-xctest-runner-simulator-tests.result }}" \
+            "${{ needs.ios-spm-root-package-build.result }}" \
           )
           for r in "${results[@]}"; do
             if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then

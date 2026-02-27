@@ -292,5 +292,10 @@ jobs:
           echo "implementation(\"dev.jasonpearson.auto-mobile:auto-mobile-sdk:${{ steps.version.outputs.version }}\")" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Swift Package Manager" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`swift" >> $GITHUB_STEP_SUMMARY
+          echo ".package(url: \"https://github.com/${{ github.repository }}\", from: \"${{ steps.version.outputs.version }}\")" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Checksums Baked Into Package" >> $GITHUB_STEP_SUMMARY
           echo "The npm package includes the APK and IPA checksums at build time, ensuring integrity verification." >> $GITHUB_STEP_SUMMARY

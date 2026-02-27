@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "XCTestRunner",
+    name: "auto-mobile",
     platforms: [
         .iOS(.v15),
         .macOS(.v13),
@@ -13,18 +13,10 @@ let package = Package(
             targets: ["XCTestRunner"]
         ),
     ],
-    dependencies: [],
     targets: [
         .target(
             name: "XCTestRunner",
-            dependencies: []
-        ),
-        .testTarget(
-            name: "XCTestRunnerTests",
-            dependencies: ["XCTestRunner"],
-            resources: [
-                .process("Resources"),
-            ]
+            path: "ios/XCTestRunner/Sources/XCTestRunner"
         ),
     ]
 )
