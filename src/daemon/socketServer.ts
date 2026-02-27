@@ -195,7 +195,21 @@ export class UnixSocketServer {
 
         const mcpClient = await this.getMcpClient();
 
-        const result = await this.handleIdeRequest(mcpClient, request);
+        let result;
+        try {
+          result = await this.handleIdeRequest(mcpClient, request);
+        } catch (ideError) {
+          const ideErrorMessage = ideError instanceof Error ? ideError.message : String(ideError);
+          if (ideErrorMessage.includes("Session not found")) {
+            logger.warn("MCP client session expired, reconnecting and retrying...");
+            this.mcpClient = null;
+            this.mcpClientPromise = null;
+            const freshClient = await this.getMcpClient();
+            result = await this.handleIdeRequest(freshClient, request);
+          } else {
+            throw ideError;
+          }
+        }
 
         return {
           id: request.id,

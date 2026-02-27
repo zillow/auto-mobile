@@ -68,6 +68,10 @@ export class PlanSchemaValidator {
       path.join(__dirname, "../../schemas/test-plan.schema.json"),
       // From source: src/utils/plan/PlanSchemaValidator.ts -> schemas/
       path.join(__dirname, "../../../schemas/test-plan.schema.json"),
+      // From Bun-bundled dist/src/index.js: dist/src/../../ = project root schemas/
+      path.join(__dirname, "../../schemas/test-plan.schema.json"),
+      // From dist/src/: one level up to dist/, then schemas/
+      path.join(__dirname, "../schemas/test-plan.schema.json"),
       // From dist: dist/src/utils/plan/PlanSchemaValidator.js -> dist/schemas/
       path.join(__dirname, "../../../../schemas/test-plan.schema.json"),
       // From cwd (project root)
