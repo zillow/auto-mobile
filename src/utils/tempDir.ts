@@ -5,7 +5,7 @@
  * Uses os.tmpdir() as the base for portability across platforms.
  */
 
-import fs from "fs-extra";
+import fs from "node:fs";
 import os from "os";
 import path from "path";
 
@@ -40,7 +40,7 @@ export function getTempDir(subdirectory: string): string {
  */
 export function ensureSecureTempDirSync(subdirectory: string): string {
   const dir = getTempDir(subdirectory);
-  fs.ensureDirSync(dir, { mode: SECURE_DIR_MODE });
+  fs.mkdirSync(dir, { recursive: true, mode: SECURE_DIR_MODE });
   return dir;
 }
 

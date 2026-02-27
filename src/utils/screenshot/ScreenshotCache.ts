@@ -1,5 +1,5 @@
-import fs from "fs-extra";
 import path from "path";
+import { pathExists } from "../filesystem/DefaultFileSystem";
 import { logger } from "../logger";
 import { readFileAsync, readdirAsync } from "../io";
 import { Timer, defaultTimer } from "../SystemTimer";
@@ -85,7 +85,7 @@ export class ScreenshotCache {
    */
   static async getScreenshotFiles(cacheDir: string): Promise<string[]> {
     try {
-      if (!await fs.pathExists(cacheDir)) {
+      if (!await pathExists(cacheDir)) {
         logger.debug(`Cache directory does not exist: ${cacheDir}`);
         return [];
       }

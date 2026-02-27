@@ -1,7 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { platform } from "node:os";
 import path from "node:path";
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
+import { pathExists } from "../../utils/filesystem/DefaultFileSystem";
 import { ActionableError, type BootedDevice } from "../../models";
 import { defaultTimer } from "../../utils/SystemTimer";
 import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
@@ -333,7 +334,7 @@ export class FfmpegVideoProcessingBackend implements VideoCaptureBackend {
       throw new ActionableError("Missing iOS capture path for FFmpeg processing.");
     }
 
-    const exists = await fs.pathExists(capturePath);
+    const exists = await pathExists(capturePath);
     if (!exists) {
       throw new ActionableError(`iOS recording file missing at ${capturePath}`);
     }
@@ -368,13 +369,13 @@ export class FfmpegVideoProcessingBackend implements VideoCaptureBackend {
       );
     }
 
-    const outputExists = await fs.pathExists(backendHandle.config.outputPath);
+    const outputExists = await pathExists(backendHandle.config.outputPath);
     if (!outputExists) {
       throw new ActionableError(`FFmpeg output file missing at ${backendHandle.config.outputPath}`);
     }
 
     try {
-      await fs.remove(capturePath);
+      await fsPromises.rm(capturePath, { recursive: true, force: true });
     } catch (error) {
       logger.warn(`[FfmpegVideo] Failed to remove raw recording ${capturePath}: ${error}`);
     }
@@ -610,7 +611,7 @@ export class FfmpegVideoProcessingBackend implements VideoCaptureBackend {
 
   private async getFileSize(filePath: string): Promise<number | undefined> {
     try {
-      const stats = await fs.stat(filePath);
+      const stats = await fsPromises.stat(filePath);
       return stats.size;
     } catch {
       return undefined;

@@ -12,7 +12,8 @@ import { GetDumpsysWindow } from "./GetDumpsysWindow";
 import { GetBackStack } from "./GetBackStack";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
-import fs from "fs-extra";
+import { existsSync, mkdirSync } from "node:fs";
+import { pathExists } from "../../utils/filesystem/DefaultFileSystem";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { AndroidCtrlProxyManager } from "../../utils/CtrlProxyManager";
@@ -164,8 +165,8 @@ export class RealObserveScreen implements ObserveScreen {
     this.timer = timer;
 
     // Ensure observe result cache directory exists
-    if (!fs.existsSync(RealObserveScreen.observeResultCacheDir)) {
-      fs.mkdirSync(RealObserveScreen.observeResultCacheDir, { recursive: true });
+    if (!existsSync(RealObserveScreen.observeResultCacheDir)) {
+      mkdirSync(RealObserveScreen.observeResultCacheDir, { recursive: true });
     }
   }
 
@@ -216,7 +217,7 @@ export class RealObserveScreen implements ObserveScreen {
       return;
     }
 
-    const exists = await fs.pathExists(screenshotResult.path);
+    const exists = await pathExists(screenshotResult.path);
     if (!exists) {
       RealObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot file missing after capture");
       logger.warn(`[OBSERVE] Screenshot capture reported success but file missing: ${screenshotResult.path}`);
@@ -1191,14 +1192,14 @@ export class RealObserveScreen implements ObserveScreen {
     try {
       const cachedPath = RealObserveScreen.getRecentCachedScreenshotPath();
       if (cachedPath) {
-        const exists = await fs.pathExists(cachedPath);
+        const exists = await pathExists(cachedPath);
         if (exists) {
           return cachedPath;
         }
       }
 
       const cacheDir = getTempDir(TEMP_SUBDIRS.SCREENSHOTS);
-      if (!fs.existsSync(cacheDir)) {
+      if (!existsSync(cacheDir)) {
         return undefined;
       }
 

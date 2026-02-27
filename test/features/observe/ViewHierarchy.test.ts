@@ -4,23 +4,12 @@ import { FakeAdbClientFactory } from "../../fakes/FakeAdbClientFactory";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { CtrlProxyClient } from "../../../src/features/observe/android";
-import fs from "fs-extra";
-import { promisify } from "util";
 
-// Create a mock readFile function that returns some fake screenshot data
-const mockReadFile = promisify((path: string, callback: (err: any, data?: Buffer) => void) => {
-  // Return fake screenshot data for any path
-  setImmediate(() => callback(null, Buffer.from("fake screenshot data")));
-});
-
-// Override the readFileAsync function for tests that need it
-const originalReadFile = fs.readFile;
-const setupReadFileMock = () => {
-  (fs as any).readFile = mockReadFile;
-};
-const teardownReadFileMock = () => {
-  (fs as any).readFile = originalReadFile;
-};
+// Note: the previous version of this file patched fs-extra's readFile to mock
+// screenshot reads. That dependency has been removed from production code, so
+// the mock was already ineffective and has been deleted along with the import.
+const setupReadFileMock = () => { /* no-op: patched dependency was removed */ };
+const teardownReadFileMock = () => { /* no-op: patched dependency was removed */ };
 
 describe("ViewHierarchy", function() {
   describe("Unit Tests for Public Methods", function() {

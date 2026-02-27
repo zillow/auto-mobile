@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const fs = require('fs-extra');
+const { promises: fsPromises } = require('node:fs');
 const path = require('path');
 
 async function copyIOSAssets() {
@@ -11,11 +11,12 @@ async function copyIOSAssets() {
     console.log('Copying XCTestService project to dist directory...');
 
     // Ensure the destination directory exists
-    await fs.ensureDir(path.dirname(destXCTestDir));
+    await fsPromises.mkdir(path.dirname(destXCTestDir), { recursive: true });
 
     // Copy the entire XCTestService directory
-    await fs.copy(sourceXCTestDir, destXCTestDir, {
-      filter: (src) => {
+    await fsPromises.cp(sourceXCTestDir, destXCTestDir, {
+      recursive: true,
+      filter: async (src, dst) => {
         // Skip node_modules and other unnecessary directories
         return !src.includes('node_modules') &&
           !src.includes('.git') &&

@@ -1,5 +1,12 @@
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
+import path from "node:path";
 import { logger } from "../../utils/logger";
+
+async function ensureFile(filePath: string): Promise<void> {
+  await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
+  const handle = await fsPromises.open(filePath, "a");
+  await handle.close();
+}
 import type {
   RecordingHandle,
   RecordingResult,
@@ -11,7 +18,7 @@ let warnedNoopBackend = false;
 
 export class NoopVideoCaptureBackend implements VideoCaptureBackend {
   async start(config: VideoCaptureConfig): Promise<RecordingHandle> {
-    await fs.ensureFile(config.outputPath);
+    await ensureFile(config.outputPath);
 
     if (!warnedNoopBackend) {
       warnedNoopBackend = true;
@@ -28,11 +35,11 @@ export class NoopVideoCaptureBackend implements VideoCaptureBackend {
   }
 
   async stop(handle: RecordingHandle): Promise<RecordingResult> {
-    await fs.ensureFile(handle.outputPath);
+    await ensureFile(handle.outputPath);
 
     let sizeBytes = 0;
     try {
-      const stats = await fs.stat(handle.outputPath);
+      const stats = await fsPromises.stat(handle.outputPath);
       sizeBytes = stats.size;
     } catch {
       sizeBytes = 0;

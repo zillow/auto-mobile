@@ -81,8 +81,6 @@
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "async-mutex": "^0.5.0",
-    "fs-extra": "^11.3.3",
-    "glob": "^13.0.1",
     "jimp": "^1.6.0",
     "js-tiktoken": "^1.0.21",
     "js-yaml": "^4.1.1",
@@ -96,22 +94,19 @@
   },
   "//overrides": {
     "lodash": "CVE-2025-13465: prototype pollution in _.unset and _.omit",
-    "tar": "CVE-2026-24842: Arbitrary file read/write via hardlink target escape through symlink chain",
-    "minimatch": "CVE minimatch ReDoS via repeated wildcards with non-matching literal in pattern",
-    "hono": "CVE hono timing comparison hardening in basicAuth and bearerAuth",
-    "qs": "CVE qs arrayLimit bypass in comma parsing allows denial of service"
+    "tar": "CVE-2026-26960 (GHSA-83g3-92jg-28cx): Arbitrary file read/write via hardlink target escape through symlink chain",
+    "hono": "GHSA-gq3j-xvxp-8hrf: timing comparison hardening in basicAuth and bearerAuth",
+    "qs": "CVE-2026-2391 (GHSA-w7fw-mjwx-w883): arrayLimit bypass in comma parsing allows denial of service"
   },
   "overrides": {
     "lodash": "^4.17.23",
-    "tar": ">=7.5.8",
-    "minimatch": ">=10.2.1",
-    "hono": ">=4.11.10",
-    "qs": ">=6.14.2"
+    "tar": "^7.5.8",
+    "hono": "^4.11.10",
+    "qs": "^6.14.2"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",
     "@stylistic/eslint-plugin": "^5.7.0",
-    "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.0.9",
     "@types/pixelmatch": "^5.2.6",
     "@types/pngjs": "^6.0.5",

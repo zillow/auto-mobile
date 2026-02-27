@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
 import path from "path";
 import { logger } from "../logger";
 import { readFileAsync } from "../io";
@@ -223,7 +223,7 @@ export class ScreenshotMatcher {
       // Sort files by modification time (newest first) to check recent screenshots first
       const filesWithStats = await Promise.all(
         screenshotFiles.map(async filePath => {
-          const stats = await fs.stat(filePath);
+          const stats = await fsPromises.stat(filePath);
           return { filePath, mtime: stats.mtime.getTime() };
         })
       );

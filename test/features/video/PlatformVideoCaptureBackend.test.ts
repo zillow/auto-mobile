@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import os from "node:os";
 import path from "node:path";
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
 import { PlatformVideoCaptureBackend } from "../../../src/features/video/PlatformVideoCaptureBackend";
 import type {
   RecordingHandle,
@@ -15,11 +15,11 @@ describe("PlatformVideoCaptureBackend - Unit Tests", () => {
 
   beforeEach(async () => {
     backend = new PlatformVideoCaptureBackend();
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "platform-video-test-"));
+    tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "platform-video-test-"));
   });
 
   afterEach(async () => {
-    await fs.remove(tempDir);
+    await fsPromises.rm(tempDir, { recursive: true, force: true });
   });
 
   describe("Interface Compliance", () => {
@@ -181,7 +181,7 @@ describe("PlatformVideoCaptureBackend - Integration Tests", () => {
   let iosDevice: BootedDevice;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "platform-video-integration-"));
+    tempDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "platform-video-integration-"));
 
     androidDevice = {
       platform: "android",
@@ -197,7 +197,7 @@ describe("PlatformVideoCaptureBackend - Integration Tests", () => {
   });
 
   afterEach(async () => {
-    await fs.remove(tempDir);
+    await fsPromises.rm(tempDir, { recursive: true, force: true });
   });
 
   describe("Configuration Structure", () => {

@@ -1,7 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
-import type { WriteStream } from "node:fs";
-import fs from "fs-extra";
+import { createWriteStream, type WriteStream } from "node:fs";
+import { promises as fsPromises } from "node:fs";
+import { pathExists } from "../../utils/filesystem/DefaultFileSystem";
 import { ActionableError, BootedDevice } from "../../models";
 import { defaultTimer } from "../../utils/SystemTimer";
 import { defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
@@ -316,7 +317,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
     const { exitState, exitPromise } = createExitTracker(process, stderr);
 
     // Create a placeholder for outputStream since AndroidBackendHandle expects it
-    const outputStream = fs.createWriteStream(config.outputPath);
+    const outputStream = createWriteStream(config.outputPath);
     outputStream.end(); // Close it immediately since we'll write later
 
     const backendHandle: AndroidBackendHandle = {
@@ -420,7 +421,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
 
     try {
       await this.scaleWithFfmpeg(handle.rawOutputPath, handle.outputPath, resolution);
-      await fs.remove(handle.rawOutputPath);
+      await fsPromises.rm(handle.rawOutputPath, { recursive: true, force: true });
     } catch (error) {
       logger.warn(`[VideoCapture] Failed to scale iOS recording: ${error}`);
       await this.replaceOutputFile(handle.rawOutputPath, handle.outputPath);
@@ -436,7 +437,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
 
   private async getFileSize(filePath: string): Promise<number | undefined> {
     try {
-      const stats = await fs.stat(filePath);
+      const stats = await fsPromises.stat(filePath);
       return stats.size;
     } catch {
       return undefined;
@@ -448,14 +449,14 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       return;
     }
 
-    const sourceExists = await fs.pathExists(sourcePath);
+    const sourceExists = await pathExists(sourcePath);
     if (!sourceExists) {
       logger.warn(`[VideoCapture] Missing iOS recording at ${sourcePath}`);
       return;
     }
 
-    await fs.remove(destinationPath);
-    await fs.move(sourcePath, destinationPath, { overwrite: true });
+    await fsPromises.rm(destinationPath, { recursive: true, force: true });
+    await fsPromises.rename(sourcePath, destinationPath);
   }
 
   private async isFfmpegAvailable(): Promise<boolean> {

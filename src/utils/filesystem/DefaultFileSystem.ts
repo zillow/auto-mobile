@@ -1,6 +1,15 @@
-import fs from "fs";
-import fsExtra from "fs-extra";
+import fs from "node:fs";
+import { promises as fsPromises } from "node:fs";
 import { readFileAsync, readdirAsync } from "../io";
+
+export async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsPromises.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Interface for file system operations
@@ -106,7 +115,7 @@ export class DefaultFileSystem implements FileSystem {
   }
 
   async readFileBuffer(filePath: string): Promise<Buffer> {
-    return fsExtra.readFile(filePath);
+    return fsPromises.readFile(filePath);
   }
 
   async readdir(dirPath: string): Promise<string[]> {
@@ -118,20 +127,16 @@ export class DefaultFileSystem implements FileSystem {
   }
 
   async pathExists(filePath: string): Promise<boolean> {
-    return fsExtra.pathExists(filePath);
+    return pathExists(filePath);
   }
 
   async stat(filePath: string): Promise<{ size: number; mtimeMs: number }> {
-    const stats = await fsExtra.stat(filePath);
+    const stats = await fsPromises.stat(filePath);
     return { size: stats.size, mtimeMs: stats.mtimeMs };
   }
 
   async writeFile(filePath: string, content: string, encoding: string = "utf8"): Promise<void> {
-    return new Promise((resolve, reject) => {
-      fsExtra.writeFile(filePath, content, { encoding } as any, err => {
-        if (err) {reject(err);} else {resolve();}
-      });
-    });
+    await fsPromises.writeFile(filePath, content, { encoding } as any);
   }
 
   async writeFileBuffer(filePath: string, data: Buffer): Promise<void> {
@@ -139,22 +144,18 @@ export class DefaultFileSystem implements FileSystem {
   }
 
   async ensureDir(dirPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      fsExtra.ensureDir(dirPath, err => {
-        if (err) {reject(err);} else {resolve();}
-      });
-    });
+    await fsPromises.mkdir(dirPath, { recursive: true });
   }
 
   async unlink(filePath: string): Promise<void> {
-    await fsExtra.unlink(filePath);
+    await fsPromises.unlink(filePath);
   }
 
   async remove(filePath: string): Promise<void> {
-    await fsExtra.remove(filePath);
+    await fsPromises.rm(filePath, { recursive: true, force: true });
   }
 
   async rename(oldPath: string, newPath: string): Promise<void> {
-    await fsExtra.rename(oldPath, newPath);
+    await fsPromises.rename(oldPath, newPath);
   }
 }

@@ -1,7 +1,8 @@
 import { beforeEach, afterEach, describe, expect, test } from "bun:test";
 import os from "node:os";
 import path from "node:path";
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
+import { pathExists } from "../../../src/utils/filesystem/DefaultFileSystem";
 import {
   VideoRecorderService,
   parseVideoRecordingConfig,
@@ -102,7 +103,7 @@ describe("VideoRecorderService", () => {
   });
 
   afterEach(async () => {
-    await fs.remove(archiveRoot);
+    await fsPromises.rm(archiveRoot, { recursive: true, force: true });
   });
 
   describe("startRecording", () => {
@@ -123,7 +124,7 @@ describe("VideoRecorderService", () => {
     test("creates output directory", async () => {
       await service.startRecording();
       const dir = path.join(archiveRoot, "rec-1");
-      expect(await fs.pathExists(dir)).toBe(true);
+      expect(await pathExists(dir)).toBe(true);
     });
 
     test("passes outputName through", async () => {

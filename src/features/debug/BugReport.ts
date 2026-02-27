@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
 import os from "os";
 import path from "path";
 import { randomBytes } from "crypto";
@@ -337,7 +337,7 @@ export class BugReport {
       const screenshot = await this.takeScreenshot.execute();
       if (screenshot && screenshot.success && screenshot.path) {
         // Read the screenshot file and convert to base64
-        const imageBuffer = await fs.readFile(screenshot.path);
+        const imageBuffer = await fsPromises.readFile(screenshot.path);
         result.screenshot = imageBuffer.toString("base64");
       }
     } catch (error) {
@@ -350,11 +350,11 @@ export class BugReport {
    */
   private async saveReport(result: BugReportResult, saveDir: string): Promise<void> {
     try {
-      await fs.ensureDir(saveDir);
+      await fsPromises.mkdir(saveDir, { recursive: true });
       const filePath = path.join(saveDir, `${result.reportId}.json`);
       result.savedTo = filePath;
       result.savedToInstructions = `To file a bug report:\n1. Attach this JSON file to your GitHub issue at https://github.com/kaeawc/auto-mobile/issues\n2. Describe what you were trying to do and what went wrong\n3. Include any relevant steps to reproduce the issue`;
-      await fs.writeJson(filePath, result, { spaces: 2 });
+      await fsPromises.writeFile(filePath, JSON.stringify(result, null, 2), "utf8");
       logger.info(`[BugReport] Saved report to ${filePath}`);
     } catch (error) {
       result.errors?.push(`Failed to save report: ${error}`);
@@ -367,6 +367,6 @@ export class BugReport {
    */
   private async createSecureTempDir(): Promise<string> {
     const prefix = path.join(os.tmpdir(), "auto-mobile-bug-reports-");
-    return await fs.mkdtemp(prefix);
+    return await fsPromises.mkdtemp(prefix);
   }
 }

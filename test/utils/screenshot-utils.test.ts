@@ -1,24 +1,24 @@
 import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { ScreenshotUtils } from "../../src/utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../src/utils/constants";
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
 import path from "path";
+import os from "os";
 import sharp from "sharp";
 import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("ScreenshotUtils", function() {
-  const testDir = "/tmp/test-screenshots";
+  let testDir: string;
   let fakeTimer: FakeTimer;
 
   beforeEach(async function() {
-    // Create test directory
-    await fs.ensureDir(testDir);
+    testDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "test-screenshots-"));
     fakeTimer = new FakeTimer();
   });
 
   afterEach(async function() {
     // Clean up test directory
-    await fs.remove(testDir);
+    await fsPromises.rm(testDir, { recursive: true, force: true });
   });
 
   describe("Image Format Detection", function() {
@@ -177,9 +177,9 @@ describe("ScreenshotUtils", function() {
   describe("File Operations", function() {
     test("should get screenshot files from directory", async function() {
       // Create test files
-      await fs.writeFile(path.join(testDir, "screenshot1.png"), Buffer.alloc(10));
-      await fs.writeFile(path.join(testDir, "screenshot2.webp"), Buffer.alloc(10));
-      await fs.writeFile(path.join(testDir, "not-screenshot.txt"), Buffer.alloc(10));
+      await fsPromises.writeFile(path.join(testDir, "screenshot1.png"), Buffer.alloc(10));
+      await fsPromises.writeFile(path.join(testDir, "screenshot2.webp"), Buffer.alloc(10));
+      await fsPromises.writeFile(path.join(testDir, "not-screenshot.txt"), Buffer.alloc(10));
 
       const files = await ScreenshotUtils.getScreenshotFiles(testDir);
 
@@ -233,7 +233,7 @@ describe("ScreenshotUtils", function() {
 
       const timestamp = fakeTimer.now();
       const testFilename = `screenshot_${timestamp}.png`;
-      await fs.writeFile(path.join(testDir, testFilename), baseImage);
+      await fsPromises.writeFile(path.join(testDir, testFilename), baseImage);
 
       const result = await ScreenshotUtils.findSimilarScreenshots(
         baseImage,
@@ -268,7 +268,7 @@ describe("ScreenshotUtils", function() {
 
       // Save a very different image
       const timestamp = fakeTimer.now();
-      await fs.writeFile(path.join(testDir, `screenshot_${timestamp}.png`), differentImage);
+      await fsPromises.writeFile(path.join(testDir, `screenshot_${timestamp}.png`), differentImage);
 
       const result = await ScreenshotUtils.findSimilarScreenshots(
         targetImage,
@@ -319,7 +319,7 @@ describe("ScreenshotUtils", function() {
         fakeTimer.advanceTime(1);
         const timestamp = fakeTimer.now();
         const filename = `screenshot_${timestamp}.png`;
-        await fs.writeFile(path.join(testDir, filename), testImage);
+        await fsPromises.writeFile(path.join(testDir, filename), testImage);
       }
 
       const result = await ScreenshotUtils.findSimilarScreenshots(

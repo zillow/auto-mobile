@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+import { promises as fsPromises, type Stats } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -153,7 +153,7 @@ export class VideoRecorderService {
     const startedAt = this.now().toISOString();
     const recordingDir = this.getRecordingDir(recordingId);
 
-    await fs.ensureDir(recordingDir);
+    await fsPromises.mkdir(recordingDir, { recursive: true });
 
     const fileName = buildRecordingFileName(recordingId, startedAt, config.format);
     const outputPath = path.join(recordingDir, fileName);
@@ -236,9 +236,9 @@ export class VideoRecorderService {
     return path.join(this.archiveRoot, recordingId);
   }
 
-  private async safeStat(filePath: string): Promise<fs.Stats | null> {
+  private async safeStat(filePath: string): Promise<Stats | null> {
     try {
-      return await fs.stat(filePath);
+      return await fsPromises.stat(filePath);
     } catch {
       this.log.warn(`[VideoRecorderService] Missing recording file at ${filePath}`);
       return null;

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import os from "node:os";
 import path from "node:path";
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeVideoCaptureBackend } from "../fakes/FakeVideoCaptureBackend";
 import { FakeHighlightClient } from "../fakes/FakeHighlightClient";
@@ -27,7 +27,7 @@ describe("videoRecordingManager", () => {
   let testDevice: BootedDevice;
 
   beforeAll(async () => {
-    archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-video-"));
+    archiveRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), "auto-mobile-video-"));
   });
 
   beforeEach(async () => {
@@ -35,7 +35,8 @@ describe("videoRecordingManager", () => {
     fakeBackend = new FakeVideoCaptureBackend();
     fakeBackend.setNowProvider(() => new Date(fakeTimer.now()));
     fakeHighlightClient = new FakeHighlightClient();
-    await fs.emptyDir(archiveRoot);
+    await fsPromises.rm(archiveRoot, { recursive: true, force: true });
+    await fsPromises.mkdir(archiveRoot, { recursive: true });
 
     const service = new VideoRecorderService({
       backend: fakeBackend,
@@ -64,7 +65,7 @@ describe("videoRecordingManager", () => {
   });
 
   afterAll(async () => {
-    await fs.remove(archiveRoot);
+    await fsPromises.rm(archiveRoot, { recursive: true, force: true });
   });
 
   const waitForRecordingCount = async (expected: number): Promise<void> => {

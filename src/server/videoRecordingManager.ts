@@ -1,5 +1,6 @@
-import fs from "fs-extra";
+import { promises as fsPromises } from "node:fs";
 import path from "node:path";
+import { pathExists } from "../utils/filesystem/DefaultFileSystem";
 import {
   ActionableError,
   BootedDevice,
@@ -442,7 +443,7 @@ async function resolveConfigInput(
 
 async function getFileSize(filePath: string): Promise<number> {
   try {
-    const stats = await fs.stat(filePath);
+    const stats = await fsPromises.stat(filePath);
     return stats.size;
   } catch {
     logger.warn(`[VideoRecording] Missing recording file at ${filePath}`);
@@ -707,8 +708,8 @@ async function deleteVideoRecording(recordingId: string): Promise<boolean> {
   }
 
   const recordingDir = path.dirname(record.filePath);
-  if (await fs.pathExists(recordingDir)) {
-    await fs.remove(recordingDir);
+  if (await pathExists(recordingDir)) {
+    await fsPromises.rm(recordingDir, { recursive: true, force: true });
   }
 
   const deleted = await recordingRepository.deleteRecording(recordingId);
