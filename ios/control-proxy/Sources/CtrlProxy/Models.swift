@@ -558,7 +558,7 @@ public struct VoiceOverStateResponse: Codable {
         type = ResponseType.voiceOverStateResult.rawValue
         timestamp = Int64(Date().timeIntervalSince1970 * 1000)
         self.requestId = requestId
-        self.success = true
+        success = true
         self.enabled = enabled
         self.totalTimeMs = totalTimeMs
     }

@@ -10,7 +10,8 @@ import { PlatformDeviceManager } from "../../src/utils/interfaces/DeviceUtils";
 export class FakeDeviceClientProvider implements DeviceClientProvider {
   constructor(
     private readonly fakeAdb: AdbExecutor,
-    private readonly fakeDeviceUtils: PlatformDeviceManager
+    private readonly fakeDeviceUtils: PlatformDeviceManager,
+    private readonly fakeSimctl?: SimCtlClient
   ) {}
 
   getAdb(): AdbExecutor {
@@ -18,8 +19,7 @@ export class FakeDeviceClientProvider implements DeviceClientProvider {
   }
 
   getSimctl(): SimCtlClient | undefined {
-    // Tests use fakeDeviceUtils instead
-    return undefined;
+    return this.fakeSimctl;
   }
 
   getAndroidEmulator(): AndroidEmulatorClient | undefined {

@@ -4,8 +4,11 @@ import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
 import { FakeDeviceClientProvider } from "../fakes/FakeDeviceClientProvider";
 import { FakeCtrlProxyManager } from "../fakes/FakeCtrlProxyManager";
+import { FakeSimCtlClient } from "../fakes/FakeSimCtlClient";
 import { AndroidCtrlProxyManager } from "../../src/utils/CtrlProxyManager";
+import { IOSCtrlProxyManager } from "../../src/utils/IOSCtrlProxyManager";
 import { CtrlProxyClient } from "../../src/features/observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../../src/features/observe/ios/CtrlProxyClient";
 import { Window } from "../../src/features/observe/Window";
 import { BootedDevice, AppearanceConfigInput } from "../../src/models";
 import { serverConfig } from "../../src/utils/ServerConfig";
@@ -226,5 +229,104 @@ describe("DeviceSessionManager", () => {
 
     // Should have fallen through and checked status since service wasn't responsive
     expect(accessibilityManager.wasMethodCalled("isInstalled")).toBe(true);
+  });
+});
+
+describe("DeviceSessionManager iOS openSimulatorApp", () => {
+  let fakeAdb: FakeAdbExecutor;
+  let fakeDeviceUtils: FakeDeviceUtils;
+  let originalIOSCtrlProxyManagerGetInstance: typeof IOSCtrlProxyManager.getInstance;
+  let originalIOSCtrlProxyClientGetInstance: typeof IOSCtrlProxyClient.getInstance;
+  let originalAppearanceDefaults: AppearanceConfigInput;
+
+  beforeEach(() => {
+    fakeAdb = new FakeAdbExecutor();
+    fakeDeviceUtils = new FakeDeviceUtils();
+
+    originalAppearanceDefaults = serverConfig.getAppearanceDefaults();
+    serverConfig.setAppearanceDefaults({
+      ...originalAppearanceDefaults,
+      applyOnConnect: false,
+      syncWithHost: false,
+      defaultMode: "light"
+    });
+
+    originalIOSCtrlProxyManagerGetInstance = IOSCtrlProxyManager.getInstance;
+    originalIOSCtrlProxyClientGetInstance = IOSCtrlProxyClient.getInstance;
+
+    IOSCtrlProxyManager.getInstance = () =>
+      ({
+        getServicePort: () => 8080,
+        isRunning: async () => false,
+        setup: async () => ({ success: false, error: "skipped in test" }),
+        resetSetupState: () => {},
+      } as any);
+
+    IOSCtrlProxyClient.getInstance = () =>
+      ({
+        isConnected: () => false,
+      } as any);
+  });
+
+  afterEach(() => {
+    IOSCtrlProxyManager.getInstance = originalIOSCtrlProxyManagerGetInstance;
+    IOSCtrlProxyClient.getInstance = originalIOSCtrlProxyClientGetInstance;
+    serverConfig.setAppearanceDefaults(originalAppearanceDefaults);
+  });
+
+  test("should call openSimulatorApp once on the first booted iOS device verification", async () => {
+    const fakeSimctl = new FakeSimCtlClient();
+    fakeSimctl.setDeviceInfo("ios-sim-1", {
+      udid: "ios-sim-1",
+      name: "iPhone 15",
+      state: "Booted",
+      isAvailable: true,
+    });
+
+    const manager = DeviceSessionManager.createInstance(
+      new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils, fakeSimctl as any)
+    );
+
+    await manager.verifyIosDevice("ios-sim-1");
+
+    expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(1);
+  });
+
+  test("should not call openSimulatorApp again on subsequent verifications", async () => {
+    const fakeSimctl = new FakeSimCtlClient();
+    fakeSimctl.setDeviceInfo("ios-sim-1", {
+      udid: "ios-sim-1",
+      name: "iPhone 15",
+      state: "Booted",
+      isAvailable: true,
+    });
+
+    const manager = DeviceSessionManager.createInstance(
+      new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils, fakeSimctl as any)
+    );
+
+    await manager.verifyIosDevice("ios-sim-1");
+    await manager.verifyIosDevice("ios-sim-1");
+    await manager.verifyIosDevice("ios-sim-1");
+
+    expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(1);
+  });
+
+  test("should not call openSimulatorApp when device is not booted", async () => {
+    const fakeSimctl = new FakeSimCtlClient();
+    fakeSimctl.setDeviceInfo("ios-sim-1", {
+      udid: "ios-sim-1",
+      name: "iPhone 15",
+      state: "Shutdown",
+      isAvailable: true,
+    });
+
+    const manager = DeviceSessionManager.createInstance(
+      new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils, fakeSimctl as any)
+    );
+
+    await manager.verifyIosDevice("ios-sim-1");
+
+    expect(fakeSimctl.getMethodCalls("openSimulatorApp")).toHaveLength(0);
   });
 });

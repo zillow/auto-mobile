@@ -206,6 +206,11 @@ export interface SimCtl {
    * @param deviceId - Optional device ID (defaults to current device or "booted")
    */
   setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void>;
+
+  /**
+   * Open Simulator.app so the booted simulator is visible
+   */
+  openSimulatorApp(): Promise<void>;
 }
 
 interface SimctlHostControlRunner {
@@ -901,6 +906,10 @@ export class SimCtlClient implements SimCtl {
   async setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void> {
     const targetDevice = deviceId || this.device?.deviceId || "booted";
     await this.executeCommand(`ui ${targetDevice} appearance ${mode}`);
+  }
+
+  async openSimulatorApp(): Promise<void> {
+    await this.execAsync("open", ["-a", "Simulator"]);
   }
 }
 

@@ -87,4 +87,8 @@ export class FakeSimCtlClient {
   async terminateApp(bundleId: string, deviceId?: string): Promise<void> {
     this.recordCall("terminateApp", { bundleId, deviceId });
   }
+
+  async openSimulatorApp(): Promise<void> {
+    this.recordCall("openSimulatorApp", {});
+  }
 }

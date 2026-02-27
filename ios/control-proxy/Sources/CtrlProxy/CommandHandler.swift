@@ -392,11 +392,16 @@ public class CommandHandler: CommandHandling {
         )
     }
 
-    private func handleGetVoiceOverState(_ request: WebSocketRequest, startTime: Date) throws -> VoiceOverStateResponse {
+    private func handleGetVoiceOverState(
+        _ request: WebSocketRequest,
+        startTime: Date
+    )
+        throws -> VoiceOverStateResponse
+    {
         #if os(iOS)
-        let enabled = UIAccessibility.isVoiceOverRunning
+            let enabled = UIAccessibility.isVoiceOverRunning
         #else
-        let enabled = false
+            let enabled = false
         #endif
 
         return VoiceOverStateResponse(

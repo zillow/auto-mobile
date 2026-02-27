@@ -156,6 +156,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
   private readonly adbFactory: AdbClientFactory;
   private _adb: AdbExecutor | undefined;
   private window: Window | undefined;
+  private simulatorAppOpened = false;
 
   // Track devices that have push update listeners registered
   private static pushUpdateListenersRegistered: Set<string> = new Set();
@@ -574,6 +575,13 @@ export class DeviceSessionManager implements DeviceSessionManager {
       logger.info(`iOS simulator ${deviceId} is not booted (state: ${deviceInfo.state})`);
       // Note: We could auto-boot here if desired, but keeping consistent with current behavior
       return;
+    }
+
+    if (!this.simulatorAppOpened) {
+      this.simulatorAppOpened = true;
+      await this.simctl!.openSimulatorApp().catch(err =>
+        logger.warn(`[DeviceSessionManager] Failed to open Simulator.app: ${err}`)
+      );
     }
 
     // Create a device object for the CtrlProxy iOS clients
