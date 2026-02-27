@@ -154,6 +154,141 @@ describe("IOSCtrlProxyManager", function() {
       expect(fakeExecutor.getSpawnedProcesses().length).toBe(2);
     });
   });
+
+  describe("restart prevention", function() {
+    let physicalDevice: BootedDevice;
+    let fakeExecutor: FakeProcessExecutor;
+
+    beforeEach(function() {
+      physicalDevice = {
+        deviceId: "00008030001E28C11E",
+        platform: "ios",
+        name: "iPhone"
+      };
+      fakeExecutor = new FakeProcessExecutor();
+    });
+
+    test("start() skips spawning when tracked CtrlProxy PID is alive", async function() {
+      const manager = IOSCtrlProxyManager.createForTestingWithDeps(
+        testDevice, // simulator UUID
+        fakeTimer,
+        undefined,
+        fakeExecutor
+      );
+
+      // Simulate an already-tracked process (as if startOnSimulator ran previously)
+      (manager as unknown as { xcTestProcessId: number }).xcTestProcessId = 12345;
+
+      // Health check fails (CtrlProxy appears busy/unresponsive) — this used to trigger a restart
+      fakeExecutor.setCommandResponse("curl -s", createExecResult("", ""));
+      // kill -0 succeeds by default (FakeProcessExecutor never throws) → process alive
+
+      fakeTimer.enableAutoAdvance();
+      await manager.start();
+
+      // Process is alive → no simctl spawn or exec for starting the binary
+      expect(fakeExecutor.wasCommandExecuted("simctl")).toBe(false);
+      expect(fakeExecutor.getSpawnedProcesses().length).toBe(0);
+    });
+
+    test("startProcessMonitoring uses the injected timer so tests can control it", function() {
+      const manager = IOSCtrlProxyManager.createForTestingWithDeps(
+        testDevice,
+        fakeTimer,
+        undefined,
+        fakeExecutor
+      );
+
+      expect(fakeTimer.getPendingIntervals().length).toBe(0);
+
+      (manager as unknown as { startProcessMonitoring: () => void }).startProcessMonitoring();
+
+      expect(fakeTimer.getPendingIntervals().length).toBe(1);
+      expect(fakeTimer.getPendingIntervals()[0]).toBe(30000);
+    });
+
+    describe("iproxy monitor uses process liveness not health endpoint", function() {
+      beforeEach(function() {
+        fakeExecutor.setCommandResponse("idevice_id -l", createExecResult(`${physicalDevice.deviceId}\n`, ""));
+      });
+
+      test("does not restart iproxy when process is alive even if health check fails", async function() {
+        const fakeProcess = new FakeChildProcess();
+        fakeExecutor.setNextSpawnProcess(fakeProcess);
+        const manager = IOSCtrlProxyManager.createForTestingWithDeps(
+          physicalDevice, fakeTimer, undefined, fakeExecutor
+        );
+
+        await (manager as unknown as { startIproxyTunnel: () => Promise<void> }).startIproxyTunnel();
+        expect(fakeExecutor.getSpawnedProcesses().length).toBe(1);
+
+        // Health endpoint fails (would have triggered restart in old code)
+        fakeExecutor.setCommandResponse("curl -s", createExecResult("", ""));
+        // kill -0 succeeds by default → iproxy process alive
+
+        (manager as unknown as { startIproxyMonitoring: () => void }).startIproxyMonitoring();
+
+        // Fire one monitor interval
+        fakeTimer.advanceTime(5000);
+        for (let i = 0; i < 5; i++) {await Promise.resolve();}
+
+        // iproxy is alive → no restart scheduled
+        expect(fakeExecutor.getSpawnedProcesses().length).toBe(1);
+      });
+
+      test("restarts iproxy when iproxyProcessId is null (process gone)", async function() {
+        const fakeProcess1 = new FakeChildProcess();
+        const fakeProcess2 = new FakeChildProcess();
+        fakeExecutor.setNextSpawnProcess(fakeProcess1);
+        const manager = IOSCtrlProxyManager.createForTestingWithDeps(
+          physicalDevice, fakeTimer, undefined, fakeExecutor
+        );
+
+        await (manager as unknown as { startIproxyTunnel: () => Promise<void> }).startIproxyTunnel();
+
+        // Simulate iproxy process dying between monitor ticks (clears tracking state)
+        (manager as unknown as { iproxyProcessId: null }).iproxyProcessId = null;
+        (manager as unknown as { iproxyProcess: null }).iproxyProcess = null;
+
+        fakeExecutor.setNextSpawnProcess(fakeProcess2);
+
+        (manager as unknown as { startIproxyMonitoring: () => void }).startIproxyMonitoring();
+
+        // Fire monitor — sees no tracked process → schedules restart
+        fakeTimer.advanceTime(5000);
+        for (let i = 0; i < 5; i++) {await Promise.resolve();}
+
+        // Fire restart timer (first attempt = 1000 ms base delay)
+        fakeTimer.advanceTime(1000);
+        for (let i = 0; i < 5; i++) {await Promise.resolve();}
+
+        expect(fakeExecutor.getSpawnedProcesses().length).toBe(2);
+      });
+
+      test("resumes iproxy monitoring after scheduled restart completes", async function() {
+        const fakeProcess1 = new FakeChildProcess();
+        const fakeProcess2 = new FakeChildProcess();
+        fakeExecutor.setNextSpawnProcess(fakeProcess1);
+        const manager = IOSCtrlProxyManager.createForTestingWithDeps(
+          physicalDevice, fakeTimer, undefined, fakeExecutor
+        );
+
+        await (manager as unknown as { startIproxyTunnel: () => Promise<void> }).startIproxyTunnel();
+
+        // Process exit triggers scheduleIproxyRestart
+        fakeProcess1.emit("exit", 1, null);
+
+        fakeExecutor.setNextSpawnProcess(fakeProcess2);
+
+        // Fire restart timer (1000 ms base delay for first attempt)
+        fakeTimer.advanceTime(1000);
+        for (let i = 0; i < 5; i++) {await Promise.resolve();}
+
+        // After restart, startIproxyMonitoring() should have been called → new interval pending
+        expect(fakeTimer.getPendingIntervals().length).toBe(1);
+      });
+    });
+  });
 });
 
 function createExecResult(stdout: string, stderr: string): ExecResult {
