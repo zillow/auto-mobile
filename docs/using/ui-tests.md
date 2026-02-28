@@ -48,7 +48,7 @@ final class RemindersTests: AutoMobileTestCase {
 
 ## Running a Test
 
-AutoMobile supports Android with [JUnitRunner](../design-docs/plat/android/junit-runner/index.md) and iOS with [XCTestRunner](../design-docs/plat/ios/xctestrunner.md). We avoid conventional UI test harnesses like Android's connectedAndroidTest and iOS's XCUITest in favor of proxying all device setup and interaction via AutoMobile. Therefore you can think of AutoMobile's tests as closer to UI snapshot tests that can run as JVM or XCTest unit tests.
+AutoMobile supports Android with [JUnitRunner](../design-docs/plat/android/junit-runner/index.md) and iOS with [XCTestRunner](../design-docs/plat/ios/xctestrunner/index.md). We avoid conventional UI test harnesses like Android's connectedAndroidTest and iOS's XCUITest in favor of proxying all device setup and interaction via AutoMobile. Therefore you can think of AutoMobile's tests as closer to UI snapshot tests that can run as JVM or XCTest unit tests.
 
 This approach allows AutoMobile to manage device pooling, support multi-client tests, and automatically optimize test selection based on timing data.
 

@@ -107,5 +107,5 @@ Feature implementation status is indicated throughout these docs using chips. Se
 |-----------|---------|--------|
 | [iOS Overview](plat/ios/index.md) | Architecture and status | <kbd>📱 Simulator Only</kbd> |
 | [CtrlProxy iOS](plat/ios/ctrl-proxy-ios.md) | WebSocket automation server | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
-| [XCTestRunner](plat/ios/xctestrunner.md) | Test execution framework | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
+| [XCTestRunner](plat/ios/xctestrunner/index.md) | Test execution framework | <kbd>✅ Implemented</kbd> <kbd>🧪 Tested</kbd> |
 | [Xcode Integration](plat/ios/ide-plugin/overview.md) | Companion app + editor extension | <kbd>⚠️ Partial</kbd> |

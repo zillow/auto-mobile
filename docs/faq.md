@@ -6,7 +6,7 @@
 - Measure [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [screen transitions](using/perf-analysis/screen-transition.md).
 - Audit accessibility compliance with [contrast ratios](using/a11y.md#contrast) & [tap targets](using/a11y.md#tap-targets).
 - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
-- Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junit-runner/index.md) and [XCTestRunner for iOS](design-docs/plat/ios/xctestrunner.md).
+- Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junit-runner/index.md) and [XCTestRunner for iOS](design-docs/plat/ios/xctestrunner/index.md).
 
 #### Why another MCP? Aren't they all worthless?
 

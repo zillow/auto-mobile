@@ -60,5 +60,5 @@ Server to client response:
 
 ## See also
 
-- [CtrlProxy iOS](xctestrunner.md) - Touch injection via native XCUITest APIs.
+- [CtrlProxy iOS](xctestrunner/index.md) - Touch injection via native XCUITest APIs.
 - [MCP tool reference](../../mcp/tools.md)
