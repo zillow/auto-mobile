@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Install jq"
         run: |

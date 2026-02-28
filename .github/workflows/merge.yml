@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -61,6 +63,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -83,6 +87,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run XMLStarlet"
         shell: "bash"
@@ -97,6 +103,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run ktfmt"
         shell: "bash"
@@ -109,6 +117,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run ShellCheck"
         shell: "bash"
@@ -121,6 +131,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Validate MkDocs Navigation"
         shell: "bash"
@@ -133,6 +145,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Validate Claude Plugin"
         shell: "bash"
@@ -145,6 +159,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Create contributing file"
         shell: "bash"
@@ -171,6 +187,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run Interactive Installer"
         shell: bash
@@ -230,6 +248,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Cache Turborepo"
         uses: actions/cache@v4
@@ -303,6 +323,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -350,6 +372,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -365,6 +389,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Install XcodeGen"
         run: brew install xcodegen
@@ -385,6 +411,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -416,6 +444,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -442,6 +472,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -485,6 +517,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -529,6 +563,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -551,6 +587,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -581,6 +619,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -609,6 +649,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -663,6 +705,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Read library version"
         id: library-version
@@ -727,6 +771,8 @@ jobs:
 #    steps:
 #      - name: "Git Checkout"
 #        uses: actions/checkout@v6
+with:
+  lfs: true
 #
 #      - uses: ./.github/actions/setup-auto-mobile-npm-package
 #
@@ -752,6 +798,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Cache Turborepo"
         uses: actions/cache@v4
@@ -792,6 +840,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -821,6 +871,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode 15.4"
         uses: maxim-lobanov/setup-xcode@v1
@@ -853,6 +905,7 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v6
         with:
+          lfs: true
           fetch-depth: 0  # Fetch full history for git-revision-date-localized plugin
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -913,6 +966,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -961,6 +1016,7 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v6
         with:
+          lfs: true
           fetch-depth: 0
 
       - name: "Extract version and create tag"
@@ -1004,6 +1060,7 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v6
         with:
+          lfs: true
           token: ${{ secrets.AUTO_MOBILE_PR_TOKEN }}
 
       - name: "Update badge counts"

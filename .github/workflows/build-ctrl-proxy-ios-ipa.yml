@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: "Checkout code"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode 26.0"
         uses: maxim-lobanov/setup-xcode@v1

@@ -33,6 +33,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Check for documentation-only changes"
         id: filter
@@ -197,6 +199,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -236,6 +240,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -258,6 +264,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -272,6 +280,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run XMLStarlet"
         shell: "bash"
@@ -288,6 +298,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run ktfmt"
         shell: "bash"
@@ -302,6 +314,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run ShellCheck"
         shell: "bash"
@@ -316,6 +330,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Validate MkDocs Navigation"
         shell: "bash"
@@ -330,6 +346,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Validate Claude Plugin"
         shell: "bash"
@@ -344,6 +362,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Create contributing file"
         shell: "bash"
@@ -376,6 +396,8 @@ jobs:
       - name: "Git Checkout"
         if: needs.detect-changes.outputs.docs_only != 'true'
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run Interactive Installer"
         if: needs.detect-changes.outputs.docs_only != 'true'
@@ -444,6 +466,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Initialize CodeQL"
         uses: github/codeql-action/init@v4
@@ -474,6 +498,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -513,6 +539,8 @@ jobs:
       - name: "Git Checkout"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Cache Bun dependencies"
         if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
@@ -595,6 +623,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -636,6 +666,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Cache Turborepo"
         uses: actions/cache@v4
@@ -676,6 +708,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -707,6 +741,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode 15.4"
         uses: maxim-lobanov/setup-xcode@v1
@@ -744,6 +780,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -792,6 +830,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -809,6 +849,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Install XcodeGen"
         run: brew install xcodegen
@@ -830,6 +872,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode ${{ matrix.config.xcode }}"
         uses: maxim-lobanov/setup-xcode@v1
@@ -850,6 +894,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode 26.0"
         uses: maxim-lobanov/setup-xcode@v1
@@ -878,6 +924,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode 26.2"
         uses: maxim-lobanov/setup-xcode@v1
@@ -924,6 +972,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Select Xcode 26.0"
         uses: maxim-lobanov/setup-xcode@v1
@@ -948,6 +998,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -982,6 +1034,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1043,6 +1097,8 @@ jobs:
 
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1107,6 +1163,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1153,6 +1211,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -1177,6 +1237,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1209,6 +1271,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -1239,6 +1303,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1273,6 +1339,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - name: "Run hadolint"
         uses: hadolint/hadolint-action@v3.1.0
@@ -1293,6 +1361,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1338,6 +1408,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1383,6 +1455,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -1429,6 +1503,8 @@ jobs:
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
+        with:
+          lfs: true
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
