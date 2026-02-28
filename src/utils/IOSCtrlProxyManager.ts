@@ -407,6 +407,14 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
     // would fail the HTTP health check and incorrectly trigger a restart.
     if (await this.isCtrlProxyProcessAlive()) {
       logger.info("[IOSCtrlProxy] CtrlProxy process is alive, skipping start");
+      // On physical devices the iproxy tunnel may have been stopped independently
+      // (e.g. by a temporary disconnect) while the XCTest process kept running.
+      // Re-establishing it here is a no-op when the tunnel is already up, and
+      // self-heals the connection when it is not.
+      if (!this.isSimulator()) {
+        await this.startIproxyTunnel();
+        this.startIproxyMonitoring();
+      }
       return;
     }
 
@@ -899,8 +907,12 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
   }
 
   /**
-   * Check if the tracked CtrlProxy process is alive.
+   * Check if the tracked CtrlProxy process is alive AND still the real CtrlProxy.
    * Used by startInternal() to skip spawning when the process is merely slow.
+   *
+   * We require both a PID liveness check AND a health endpoint response so that
+   * a stale xcTestProcessId that has been PID-reused by a different process does
+   * not produce a false "alive" result and cause setup() to silently skip restart.
    */
   private async isCtrlProxyProcessAlive(): Promise<boolean> {
     if (!this.xcTestProcessId) {
@@ -917,7 +929,15 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
         return false;
       }
     }
-    return this.isProcessRunning(this.xcTestProcessId);
+    // First check PID liveness (fast, no network). If the PID is already gone
+    // we can skip the health check entirely.
+    if (!await this.isProcessRunning(this.xcTestProcessId)) {
+      return false;
+    }
+    // Also verify CtrlProxy identity via the health endpoint.  A different
+    // process could have reused the same PID after CtrlProxy exited without
+    // its exit being recorded (e.g. clean exit not caught by the exec callback).
+    return this.checkHealthEndpoint();
   }
 
   /**
