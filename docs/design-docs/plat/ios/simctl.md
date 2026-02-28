@@ -28,5 +28,5 @@ system-level simulator behaviors.
 
 ## See also
 
-- [CtrlProxy iOS](xctestrunner.md) - Touch injection and element queries.
+- [CtrlProxy iOS](xctestrunner/index.md) - Touch injection and element queries.
 - [iOS overview](index.md)
