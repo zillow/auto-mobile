@@ -84,6 +84,7 @@ nav:
           - 'Screen Transition': using/perf-analysis/screen-transition.md
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
       - 'Accessibility': using/a11y.md
+      - 'TalkBack Testing': using/talkback.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
       - 'Status Glossary': design-docs/status-glossary.md
