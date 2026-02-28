@@ -931,7 +931,7 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
     }
     // First check PID liveness (fast, no network). If the PID is already gone
     // we can skip the health check entirely.
-    if (!this.isProcessRunning(this.xcTestProcessId)) {
+    if (!await this.isProcessRunning(this.xcTestProcessId)) {
       return false;
     }
     // Also verify CtrlProxy identity via the health endpoint.  A different
