@@ -121,9 +121,9 @@ When TalkBack is enabled, `observe` includes two additional fields in its result
 ```json
 {
   "accessibilityFocusedElement": {
-    "resourceId": "com.example.app:id/btn_submit",
+    "resource-id": "com.example.app:id/btn_submit",
     "text": "Submit",
-    "contentDescription": "Submit form",
+    "content-desc": "Submit form",
     "bounds": { "left": 32, "top": 640, "right": 320, "bottom": 704 }
   }
 }

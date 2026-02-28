@@ -14,9 +14,9 @@
  *   checked state: "Accept terms and conditions, not checked". The child
  *   TextView ("Accept terms") does not appear as a separate element.
  *
- *   When targeting a merged node, use tapOn({ contentDesc }) rather than
- *   tapOn({ text }), because the element's text field is often empty or absent
- *   on merged nodes. The content-desc is the reliable identifier.
+ *   When targeting a merged node or a field whose text is empty, use
+ *   tapOn({ elementId }) to target by resource-id. tapOn only accepts
+ *   text or elementId — contentDesc is not a supported selector.
  *
  * This script is a demonstration — it uses simulated responses to show the
  * expected call sequence and response shapes without requiring a real device.
@@ -35,8 +35,7 @@ import type { Element } from "../src/models/Element";
 
 interface TapOnArgs {
   text?: string;
-  resourceId?: string;
-  contentDesc?: string;
+  elementId?: string;
 }
 
 interface InputTextArgs {
@@ -392,8 +391,8 @@ function createMockClient(): MockClient {
 
     async tapOn(args: TapOnArgs): Promise<{ success: boolean; message: string }> {
       // Under TalkBack, tapOn issues ACTION_CLICK on the AccessibilityNodeInfo.
-      // For the merged checkbox node, the target is identified by contentDesc
-      // rather than text, because the merged parent node has no text of its own.
+      // tapOn only accepts text or elementId. For nodes with empty text (merged
+      // nodes, hint-only fields), use elementId (resource-id) to target them.
       return {
         success: true,
         message: `Tapped element (TalkBack: ACTION_CLICK on node): ${JSON.stringify(args)}`,
@@ -475,7 +474,7 @@ async function main(): Promise<void> {
     console.log(`  content-desc: "${checkboxInitial["content-desc"] ?? ""}"`);
     console.log(`  text:         "${checkboxInitial.text ?? ""}"`);
     console.log(
-      "  Note: text is empty. Use contentDesc to target this element in tapOn."
+      "  Note: text is empty. Use elementId (resource-id) to target this element in tapOn."
     );
   }
 
@@ -484,7 +483,8 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------------
   printStep(2, "Tap name field");
 
-  const tapNameResult = await client.tapOn({ contentDesc: "Full name" });
+  // text is empty on this input; use elementId (resource-id) instead
+  const tapNameResult = await client.tapOn({ elementId: "com.example.app:id/name_input" });
   printResult("tapOn result", tapNameResult);
 
   printStep(3, "Enter name");
@@ -497,7 +497,8 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------------
   printStep(4, "Tap email field");
 
-  const tapEmailResult = await client.tapOn({ contentDesc: "Email address" });
+  // text is empty on this input; use elementId (resource-id) instead
+  const tapEmailResult = await client.tapOn({ elementId: "com.example.app:id/email_input" });
   printResult("tapOn result", tapEmailResult);
 
   printStep(5, "Enter email address");
@@ -530,22 +531,25 @@ async function main(): Promise<void> {
   console.log("  label TextView) into this single accessibility node. The child");
   console.log('  TextView "Accept terms" does NOT appear separately in observe().');
   console.log("  The framework builds the content-desc from the label and the");
-  console.log("  current checked state. Use this string with tapOn({ contentDesc }).");
+  console.log("  current checked state. text is empty on the merged node.");
+  console.log("  Use elementId (resource-id) to target it reliably with tapOn.");
 
   // -------------------------------------------------------------------------
-  // Step 5: Tap the checkbox using contentDesc.
-  // Use contentDesc rather than text because the merged node's text field is
-  // empty. The content-desc is the only reliable identifier for merged nodes.
+  // Step 5: Tap the checkbox using elementId.
+  // tapOn only accepts text or elementId. Since the merged node's text field
+  // is empty, use elementId (the node's resource-id) to target it.
+  // The resource-id is stable regardless of how the content-desc changes with
+  // checked/unchecked state, making it the most reliable selector here.
   // -------------------------------------------------------------------------
-  printStep(7, "Tap merged checkbox node using contentDesc");
-  console.log("Note: text is empty on merged nodes. contentDesc is the correct");
-  console.log("      field to use for tapOn targeting.");
+  printStep(7, "Tap merged checkbox node using elementId");
+  console.log("Note: text is empty on merged nodes. Use elementId (resource-id)");
+  console.log("      to target them — tapOn does not accept contentDesc.");
   console.log(
-    `      Target content-desc: "${checkboxBeforeTap["content-desc"] ?? ""}"`
+    `      Target resource-id: "${checkboxBeforeTap["resource-id"] ?? ""}"`
   );
 
   const tapCheckboxResult = await client.tapOn({
-    contentDesc: checkboxBeforeTap["content-desc"],
+    elementId: checkboxBeforeTap["resource-id"],
   });
   printResult("tapOn result", tapCheckboxResult);
 
@@ -616,7 +620,7 @@ async function main(): Promise<void> {
   console.log("  - tapOn uses ACTION_CLICK internally (transparent to agent).");
   console.log("  - inputText uses ACTION_SET_TEXT in both modes (no change).");
   console.log("  - Merged nodes expose a combined content-desc, not child text.");
-  console.log("  - Use tapOn({ contentDesc }) to target merged accessibility nodes.");
+  console.log("  - Use tapOn({ elementId }) to target merged nodes (text is empty on them).");
   console.log("  - Checkbox state is reflected in the content-desc suffix");
   console.log('    ("not checked" vs "checked") — read it to verify toggle.');
   console.log("  - accessibilityFocusedElement tracks TalkBack cursor position.");

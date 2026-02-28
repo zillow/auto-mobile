@@ -166,9 +166,10 @@ function printResults(results: BenchmarkResult[]): void {
 }
 
 /**
- * Print pass/fail for each acceptance criterion
+ * Print pass/fail for each acceptance criterion.
+ * Returns true if all criteria pass, false if any fail.
  */
-function printAcceptanceCriteria(results: BenchmarkResult[]): void {
+function printAcceptanceCriteria(results: BenchmarkResult[]): boolean {
   console.log("Acceptance Criteria:");
   console.log("─".repeat(60));
 
@@ -177,6 +178,8 @@ function printAcceptanceCriteria(results: BenchmarkResult[]): void {
   const afterInvalidate = results.find(r => r.name.startsWith("3."));
   const featureFlag = results.find(r => r.name.startsWith("4."));
 
+  let allPassed = true;
+
   // Cache miss: first detection must complete within the simulated ADB time + <50ms overhead
   if (cold) {
     // The simulated ADB call takes ~30ms. Total must be <50ms overhead on top of that.
@@ -184,6 +187,7 @@ function printAcceptanceCriteria(results: BenchmarkResult[]): void {
     const simulatedAdbMs = 30;
     const overhead = cold.avgPerIteration - simulatedAdbMs;
     const pass = overhead < 50;
+    if (!pass) {allPassed = false;}
     console.log(
       `  ${pass ? "PASS" : "FAIL"} Cache miss overhead <50ms:     ${overhead.toFixed(2)} ms (total: ${cold.avgPerIteration.toFixed(2)} ms)`
     );
@@ -192,6 +196,7 @@ function printAcceptanceCriteria(results: BenchmarkResult[]): void {
   // Cache hit: warm calls must be very fast
   if (warm) {
     const pass = warm.avgPerIteration < 5;
+    if (!pass) {allPassed = false;}
     console.log(
       `  ${pass ? "PASS" : "FAIL"} Cache hit (warm) <5ms:         ${warm.avgPerIteration.toFixed(2)} ms`
     );
@@ -202,6 +207,7 @@ function printAcceptanceCriteria(results: BenchmarkResult[]): void {
     const simulatedAdbMs = 30;
     const overhead = afterInvalidate.avgPerIteration - simulatedAdbMs;
     const pass = overhead < 50;
+    if (!pass) {allPassed = false;}
     console.log(
       `  ${pass ? "PASS" : "FAIL"} Post-invalidate overhead <50ms: ${overhead.toFixed(2)} ms (total: ${afterInvalidate.avgPerIteration.toFixed(2)} ms)`
     );
@@ -210,12 +216,14 @@ function printAcceptanceCriteria(results: BenchmarkResult[]): void {
   // Feature flag override: no ADB call, must be sub-millisecond
   if (featureFlag) {
     const pass = featureFlag.avgPerIteration < 1 && featureFlag.adbCallCount === 0;
+    if (!pass) {allPassed = false;}
     console.log(
       `  ${pass ? "PASS" : "FAIL"} Feature flag override <1ms:    ${featureFlag.avgPerIteration.toFixed(3)} ms, ADB calls: ${featureFlag.adbCallCount}`
     );
   }
 
   console.log();
+  return allPassed;
 }
 
 /**
@@ -373,8 +381,12 @@ async function main() {
   // Print all results
   printResults(results);
 
-  // Print acceptance criteria pass/fail
-  printAcceptanceCriteria(results);
+  // Print acceptance criteria pass/fail and exit non-zero if any fail
+  const allPassed = printAcceptanceCriteria(results);
+  if (!allPassed) {
+    console.error("ERROR: One or more acceptance criteria failed.");
+    process.exit(1);
+  }
 
   // Summary
   const cold = results[0];
@@ -389,4 +401,7 @@ async function main() {
 }
 
 // Run benchmark
-main().catch(console.error);
+main().catch((e: unknown) => {
+  console.error(e);
+  process.exit(1);
+});

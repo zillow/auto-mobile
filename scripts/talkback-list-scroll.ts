@@ -35,23 +35,18 @@ import type { Element } from "../src/models/Element";
 
 interface TapOnArgs {
   text?: string;
-  resourceId?: string;
-  contentDesc?: string;
+  elementId?: string;
 }
 
 interface SwipeOnArgs {
-  // The element to swipe on (typically the scrollable container).
-  resourceId?: string;
-  text?: string;
+  // Container to scroll — scoped by elementId or text, matching the swipeOn schema.
+  container?: { elementId: string } | { text: string };
   // Direction of scroll — "up" scrolls content upward (ACTION_SCROLL_FORWARD).
   direction: "up" | "down" | "left" | "right";
   // When provided, AutoMobile repeats the scroll action until this element
   // becomes visible in the hierarchy or a retry limit is reached.
-  lookFor?: {
-    text?: string;
-    resourceId?: string;
-    contentDesc?: string;
-  };
+  // lookFor matches the swipeOnLookForSchema: elementId or text (not both).
+  lookFor?: { elementId: string } | { text: string };
 }
 
 interface MockClient {
@@ -397,8 +392,10 @@ async function main(): Promise<void> {
   );
   console.log("      lookFor causes AutoMobile to repeat the action until the target appears.");
 
+  // container scopes the scroll to the RecyclerView. Use { elementId } or { text },
+  // matching the swipeOn schema — top-level resourceId is not accepted.
   const swipeResult = await client.swipeOn({
-    resourceId: "com.example.app:id/item_list",
+    container: { elementId: "com.example.app:id/item_list" },
     direction: "up",
     lookFor: { text: targetText },
   });
