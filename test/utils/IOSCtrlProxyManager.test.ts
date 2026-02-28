@@ -179,8 +179,8 @@ describe("IOSCtrlProxyManager", function() {
       // Simulate an already-tracked process (as if startOnSimulator ran previously)
       (manager as unknown as { xcTestProcessId: number }).xcTestProcessId = 12345;
 
-      // Health check fails (CtrlProxy appears busy/unresponsive) — this used to trigger a restart
-      fakeExecutor.setCommandResponse("curl -s", createExecResult("", ""));
+      // Health endpoint responds → confirms this PID really is CtrlProxy (not a PID-reused process)
+      fakeExecutor.setCommandResponse("curl -s", createExecResult("ok", ""));
       // kill -0 succeeds by default (FakeProcessExecutor never throws) → process alive
 
       fakeTimer.enableAutoAdvance();
@@ -193,6 +193,8 @@ describe("IOSCtrlProxyManager", function() {
 
     test("start() re-establishes iproxy tunnel when CtrlProxy is alive but tunnel is gone (physical device)", async function() {
       fakeExecutor.setCommandResponse("idevice_id -l", createExecResult(`${physicalDevice.deviceId}\n`, ""));
+      // Health endpoint responds → confirms the tracked PID really is CtrlProxy
+      fakeExecutor.setCommandResponse("curl -s", createExecResult("ok", ""));
 
       const fakeProcess = new FakeChildProcess();
       fakeExecutor.setNextSpawnProcess(fakeProcess);

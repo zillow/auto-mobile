@@ -907,8 +907,12 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
   }
 
   /**
-   * Check if the tracked CtrlProxy process is alive.
+   * Check if the tracked CtrlProxy process is alive AND still the real CtrlProxy.
    * Used by startInternal() to skip spawning when the process is merely slow.
+   *
+   * We require both a PID liveness check AND a health endpoint response so that
+   * a stale xcTestProcessId that has been PID-reused by a different process does
+   * not produce a false "alive" result and cause setup() to silently skip restart.
    */
   private async isCtrlProxyProcessAlive(): Promise<boolean> {
     if (!this.xcTestProcessId) {
@@ -925,7 +929,15 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
         return false;
       }
     }
-    return this.isProcessRunning(this.xcTestProcessId);
+    // First check PID liveness (fast, no network). If the PID is already gone
+    // we can skip the health check entirely.
+    if (!this.isProcessRunning(this.xcTestProcessId)) {
+      return false;
+    }
+    // Also verify CtrlProxy identity via the health endpoint.  A different
+    // process could have reused the same PID after CtrlProxy exited without
+    // its exit being recorded (e.g. clean exit not caught by the exec callback).
+    return this.checkHealthEndpoint();
   }
 
   /**

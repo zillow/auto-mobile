@@ -185,7 +185,7 @@ describe("UnixSocketServer MCP session reconnect", () => {
       const isFailing = clientsCreated === 1;
       return createFakeMcpClient({
         listTools: async () => {
-          if (isFailing) throw new Error("Session not found");
+          if (isFailing) {throw new Error("Session not found");}
           return { tools: [] };
         },
       });
