@@ -265,12 +265,13 @@ Presses a hardware or soft button.
 
 ```yaml
 - tool: pressButton
-  button: home      # home | lock | volumeUp | volumeDown
+  button: home
 ```
 
-!!! warning "Button values are lowercase camelCase"
-    Use `home`, `lock`, `volumeUp`, `volumeDown`. The values differ from Android's `home`,
-    `back`, `power` set — iOS does not have a back button.
+!!! warning "Only `home` is supported on iOS"
+    The iOS runtime only supports `button: home`. Other values (`lock`, `volumeUp`, `volumeDown`)
+    are rejected with "Unsupported iOS button" at execution time. iOS has no back button —
+    use `launchApp` with `clearAppData: false` to bring an app back to the foreground.
 
 ### `terminateApp`
 
@@ -437,7 +438,7 @@ Plans are validated against a JSON schema before execution. Common validation er
 | Error | Cause | Fix |
 |---|---|---|
 | `Missing required property 'tool'` | A step is missing the `tool` key | Add `tool: <toolName>` to the step |
-| `Invalid option for 'button'` | Unrecognised button name | Use `home`, `lock`, `volumeUp`, or `volumeDown` |
+| `Invalid option for 'button'` | Unsupported button name | Only `home` is supported on iOS |
 | `waitFor` with only `timeout` | Missing `text` or `elementId` in `waitFor` | Add `text: "…"` or `elementId: "…"` |
 | `Unknown property 'foo'` | Misspelled or Android-only field | Check the [MCP Tools](../../../mcp/tools.md) reference |
 

@@ -153,7 +153,8 @@ auto-mobile --daemon start &
 # Build for testing
 xcodebuild build-for-testing \
   -scheme YourApp \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
+  -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -derivedDataPath build/DerivedData
 
 # Run only the AutoMobile test bundle
 xcodebuild test-without-building \

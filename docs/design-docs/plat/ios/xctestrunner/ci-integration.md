@@ -226,10 +226,11 @@ The `simulator-tests` job runs unit tests using `-skip-testing:YourAppAutoMobile
 
 ```bash
 # scripts/ios/xcode-test-without-building.sh
+# -skip-testing:YourAppAutoMobileTests excludes the AutoMobile bundle
 xcodebuild test-without-building \
   -xctestrun "$xctestrun_file" \
   -destination "platform=iOS Simulator,id=$booted_udid" \
-  -skip-testing:YourAppAutoMobileTests \   # ← excludes AutoMobile bundle
+  -skip-testing:YourAppAutoMobileTests \
   -enableCodeCoverage NO \
   -parallel-testing-enabled YES \
   -skipMacroValidation

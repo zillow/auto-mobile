@@ -157,7 +157,11 @@ nav:
             - 'simctl Integration': design-docs/plat/ios/simctl.md
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
             - 'Managed Apple IDs': design-docs/plat/ios/managed-apple-ids.md
-            - 'XCTest Runner': design-docs/plat/ios/xctestrunner.md
+            - 'XCTest Runner':
+              - 'Overview': design-docs/plat/ios/xctestrunner/index.md
+              - 'Project Setup': design-docs/plat/ios/xctestrunner/project-setup.md
+              - 'Writing Tests': design-docs/plat/ios/xctestrunner/writing-tests.md
+              - 'CI Integration': design-docs/plat/ios/xctestrunner/ci-integration.md
             - 'testmanagerd': design-docs/plat/ios/testmanagerd.md
             - 'Xcode Integration':
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
