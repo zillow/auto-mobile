@@ -42,6 +42,8 @@ import {
   DefaultTalkBackNavigationDriverFactory,
   type TalkBackNavigationDriverFactory
 } from "../talkback/TalkBackNavigationDriver";
+import type { IosVoiceOverDetector } from "../../utils/interfaces/IosVoiceOverDetector";
+import { iosVoiceOverDetector as defaultIosVoiceOverDetector } from "../../utils/IosVoiceOverDetector";
 
 type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
 
@@ -58,6 +60,7 @@ export interface TapOnElementDependencies {
   elementSelector?: ElementSelector;
   talkBackStrategy?: TalkBackTapStrategy;
   talkBackDriverFactory?: TalkBackNavigationDriverFactory;
+  iosVoiceOverDetector?: IosVoiceOverDetector;
 }
 
 /**
@@ -77,6 +80,7 @@ export class TapOnElement extends BaseVisualChange {
   private viewHierarchy: ViewHierarchy;
   private talkBackStrategy: TalkBackTapStrategy;
   private talkBackDriverFactory: TalkBackNavigationDriverFactory;
+  private iosVoiceOverDetector: IosVoiceOverDetector;
   private static readonly SEARCH_UNTIL_DEFAULT_MS = 500;
   private static readonly SEARCH_UNTIL_MIN_MS = 100;
   private static readonly SEARCH_UNTIL_MAX_MS = 12000;
@@ -102,6 +106,7 @@ export class TapOnElement extends BaseVisualChange {
     this.elementSelector = options.elementSelector ?? new DefaultElementSelector();
     this.talkBackStrategy = options.talkBackStrategy ?? new TalkBackTapStrategy({ timer: this.timer });
     this.talkBackDriverFactory = options.talkBackDriverFactory ?? new DefaultTalkBackNavigationDriverFactory(this.adbFactory);
+    this.iosVoiceOverDetector = options.iosVoiceOverDetector ?? defaultIosVoiceOverDetector;
   }
 
   /**
@@ -697,6 +702,12 @@ export class TapOnElement extends BaseVisualChange {
           const isTalkBackEnabled = this.device.platform === "android"
             ? (await this.accessibilityDetector.detectMethod(this.device.id, this.adb)) === "talkback"
             : false;
+          const isVoiceOverEnabled = this.device.platform === "ios"
+            ? await this.iosVoiceOverDetector.isVoiceOverEnabled(
+              this.device.id,
+              IOSCtrlProxyClient.getInstance(this.device)
+            )
+            : false;
           const { element: tapElement, usedParent } = this.resolveTapTargetElement(
             element,
             viewHierarchy,
@@ -731,7 +742,7 @@ export class TapOnElement extends BaseVisualChange {
                 );
                 break;
               case "ios":
-                await this.executeiOSTap(action, tapPoint.x, tapPoint.y, longPressDuration);
+                await this.executeiOSTap(action, tapPoint.x, tapPoint.y, longPressDuration, tapElement, isVoiceOverEnabled);
                 break;
               default:
                 throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
@@ -960,8 +971,29 @@ export class TapOnElement extends BaseVisualChange {
    * @param x - X coordinate
    * @param y - Y coordinate
    * @param durationMs - Long press duration in milliseconds
+   * @param element - The target element (for VoiceOver label resolution)
+   * @param isVoiceOverEnabled - Whether VoiceOver is active
    */
   private async executeiOSTap(
+    action: string,
+    x: number,
+    y: number,
+    durationMs: number,
+    element?: Element,
+    isVoiceOverEnabled?: boolean
+  ): Promise<void> {
+    if (isVoiceOverEnabled && element) {
+      await this.executeIOSTapWithVoiceOver(action, element, x, y, durationMs);
+      return;
+    }
+
+    await this.executeiOSTapWithCoordinates(action, x, y, durationMs);
+  }
+
+  /**
+   * Execute iOS tap using coordinate-based input (standard mode)
+   */
+  private async executeiOSTapWithCoordinates(
     action: string,
     x: number,
     y: number,
@@ -991,6 +1023,48 @@ export class TapOnElement extends BaseVisualChange {
       if (!result.success) {
         throw new ActionableError(`CtrlProxy iOS tap failed: ${result.error}`);
       }
+    }
+  }
+
+  /**
+   * Execute iOS tap using VoiceOver accessibility actions.
+   * Falls back to coordinate-based tap if no label is resolvable or if the action fails.
+   *
+   * @param action - The tap action to perform
+   * @param element - The target element
+   * @param x - Fallback X coordinate
+   * @param y - Fallback Y coordinate
+   * @param durationMs - Long press duration in milliseconds
+   */
+  private async executeIOSTapWithVoiceOver(
+    action: string,
+    element: Element,
+    x: number,
+    y: number,
+    durationMs: number
+  ): Promise<void> {
+    // Resolve accessibility label: ios-accessibility-label > text > fallback
+    const label = (element["ios-accessibility-label"] as string | undefined)
+      ?? (typeof element.text === "string" && element.text ? element.text : undefined);
+
+    if (!label) {
+      logger.info("[TapOnElement] VoiceOver: no label available, falling back to coordinate tap");
+      await this.executeiOSTapWithCoordinates(action, x, y, durationMs);
+      return;
+    }
+
+    // Map action to VoiceOver action
+    const voiceOverAction: "activate" | "long_press" = action === "longPress" ? "long_press" : "activate";
+
+    const client = IOSCtrlProxyClient.getInstance(this.device);
+    const result = await client.requestVoiceOverActivate(label, voiceOverAction);
+
+    if (!result.success) {
+      logger.warn(
+        `[TapOnElement] VoiceOver action failed for label "${label}": ${result.error ?? "unknown error"}, ` +
+        `falling back to coordinate tap at (${x}, ${y})`
+      );
+      await this.executeiOSTapWithCoordinates(action, x, y, durationMs);
     }
   }
 

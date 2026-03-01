@@ -14,6 +14,10 @@ import {
   CtrlProxyPerfTiming,
   CtrlProxyHierarchy
 } from "../../src/features/observe/ios";
+import type {
+  CtrlProxyVoiceOverResult,
+  CtrlProxyVoiceOverActionResult,
+} from "../../src/features/observe/ios/types";
 import { ViewHierarchyResult } from "../../src/models";
 import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
 import { PerformanceTracker } from "../../src/utils/PerformanceTracker";
@@ -92,6 +96,24 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
   private pinchResult: CtrlProxyPinchResult | null = null;
   private tapResult: CtrlProxyTapResult | null = null;
   private swipeResult: CtrlProxySwipeResult | null = null;
+  private voiceOverState: boolean = false;
+  private voiceOverActivateResult: CtrlProxyVoiceOverActionResult | null = null;
+  private multiFingerSwipeResult: CtrlProxySwipeResult | null = null;
+
+  // VoiceOver call history
+  private voiceOverActivateHistory: Array<{
+    label: string;
+    action: "activate" | "long_press";
+  }> = [];
+
+  private multiFingerSwipeHistory: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    fingerCount: number;
+    duration: number;
+  }> = [];
 
   // MARK: - Configuration Methods
 
@@ -175,6 +197,27 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
    */
   setPinchResult(result: CtrlProxyPinchResult | null): void {
     this.pinchResult = result;
+  }
+
+  /**
+   * Configure VoiceOver enabled state
+   */
+  setVoiceOverState(enabled: boolean): void {
+    this.voiceOverState = enabled;
+  }
+
+  /**
+   * Configure VoiceOver activate result (null = default success)
+   */
+  setVoiceOverActivateResult(result: CtrlProxyVoiceOverActionResult | null): void {
+    this.voiceOverActivateResult = result;
+  }
+
+  /**
+   * Configure multi-finger swipe result (null = default success)
+   */
+  setMultiFingerSwipeResult(result: CtrlProxySwipeResult | null): void {
+    this.multiFingerSwipeResult = result;
   }
 
   // MARK: - Assertion Methods
@@ -282,6 +325,27 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
   }
 
   /**
+   * Get VoiceOver activate call history
+   */
+  getVoiceOverActivateHistory(): Array<{ label: string; action: "activate" | "long_press" }> {
+    return [...this.voiceOverActivateHistory];
+  }
+
+  /**
+   * Get multi-finger swipe call history
+   */
+  getMultiFingerSwipeHistory(): Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    fingerCount: number;
+    duration: number;
+  }> {
+    return [...this.multiFingerSwipeHistory];
+  }
+
+  /**
    * Clear all call history
    */
   clearHistory(): void {
@@ -294,6 +358,8 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
     this.screenshotRequestCount = 0;
     this.hierarchyRequestCount = 0;
     this.launchAppHistory = [];
+    this.voiceOverActivateHistory = [];
+    this.multiFingerSwipeHistory = [];
   }
 
   // MARK: - Private Helpers
@@ -654,6 +720,69 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
       data: this.screenshotData,
       format: this.screenshotFormat,
       timestamp: Date.now()
+    };
+  }
+
+  async requestVoiceOverState(
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyVoiceOverResult> {
+    await this.applyDelay("voiceOverState");
+    this.checkFailure("voiceOverState");
+
+    return {
+      success: true,
+      enabled: this.voiceOverState,
+      totalTimeMs: 10,
+    };
+  }
+
+  async requestVoiceOverActivate(
+    label: string,
+    action: "activate" | "long_press",
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyVoiceOverActionResult> {
+    await this.applyDelay("voiceOverActivate");
+    this.checkFailure("voiceOverActivate");
+
+    this.voiceOverActivateHistory.push({ label, action });
+
+    if (this.voiceOverActivateResult) {
+      return this.voiceOverActivateResult;
+    }
+
+    return {
+      success: true,
+      action,
+      totalTimeMs: 50,
+    };
+  }
+
+  async requestMultiFingerSwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    fingerCount: number,
+    duration: number = 300,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxySwipeResult> {
+    await this.applyDelay("multiFingerSwipe");
+    this.checkFailure("multiFingerSwipe");
+
+    this.multiFingerSwipeHistory.push({ x1, y1, x2, y2, fingerCount, duration });
+
+    if (this.multiFingerSwipeResult) {
+      return this.multiFingerSwipeResult;
+    }
+
+    return {
+      success: true,
+      totalTimeMs: duration,
+      gestureTimeMs: duration,
+      perfTiming: this.performanceTiming || undefined,
     };
   }
 

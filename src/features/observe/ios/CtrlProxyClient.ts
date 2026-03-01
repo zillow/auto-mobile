@@ -101,6 +101,7 @@ import type {
   CtrlProxyPerformanceSnapshot,
   CtrlProxyCachedHierarchy,
   CtrlProxyVoiceOverResult,
+  CtrlProxyVoiceOverActionResult,
   WebSocketMessage,
 } from "./types";
 
@@ -187,6 +188,15 @@ export interface CtrlProxyService {
   requestVoiceOverState(
     timeoutMs?: number, perf?: PerformanceTracker
   ): Promise<CtrlProxyVoiceOverResult>;
+
+  requestVoiceOverActivate(
+    label: string, action: "activate" | "long_press", timeoutMs?: number, perf?: PerformanceTracker
+  ): Promise<CtrlProxyVoiceOverActionResult>;
+
+  requestMultiFingerSwipe(
+    x1: number, y1: number, x2: number, y2: number,
+    fingerCount: number, duration?: number, timeoutMs?: number, perf?: PerformanceTracker
+  ): Promise<CtrlProxySwipeResult>;
 
   ensureConnected(perf?: PerformanceTracker): Promise<boolean>;
   isConnected(): boolean;
@@ -587,6 +597,24 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
           };
           break;
 
+        case "voiceover_action_result":
+          result = {
+            success: message.success ?? true,
+            action: (message as { action?: string }).action,
+            totalTimeMs: message.totalTimeMs ?? 0,
+            error: message.error,
+          };
+          break;
+
+        case "multi_finger_swipe_result":
+          result = {
+            success: message.success ?? true,
+            totalTimeMs: message.totalTimeMs ?? 0,
+            error: message.error,
+            perfTiming: message.perfTiming
+          };
+          break;
+
         default:
           // Handle error responses
           if (message.error) {
@@ -817,6 +845,25 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
     timeoutMs: number = 5000, perf?: PerformanceTracker
   ): Promise<CtrlProxyVoiceOverResult> {
     return this.voiceOver.requestVoiceOverState(timeoutMs, perf);
+  }
+
+  async requestVoiceOverActivate(
+    label: string,
+    action: "activate" | "long_press",
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyVoiceOverActionResult> {
+    return this.voiceOver.requestVoiceOverActivate(label, action, timeoutMs, perf);
+  }
+
+  async requestMultiFingerSwipe(
+    x1: number, y1: number, x2: number, y2: number,
+    fingerCount: number,
+    duration: number = 300,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxySwipeResult> {
+    return this.gestures.requestMultiFingerSwipe(x1, y1, x2, y2, fingerCount, duration, timeoutMs, perf);
   }
 
   // ===========================================================================

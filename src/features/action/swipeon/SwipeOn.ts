@@ -38,10 +38,13 @@ import {
 import { OverlayDetector } from "./OverlayDetector";
 import { AutoTargetSelector } from "./AutoTargetSelector";
 import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
+import { VoiceOverSwipeExecutor } from "./VoiceOverSwipeExecutor";
 import { ScrollUntilVisible } from "./ScrollUntilVisible";
 import { buildContainerFromElement } from "../../../utils/elementProperties";
 import { getScreenBounds } from "../../../utils/screenBounds";
 import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../../observe/ios";
+import { iosVoiceOverDetector as defaultIosVoiceOverDetector } from "../../../utils/IosVoiceOverDetector";
 
 export class SwipeOn extends BaseVisualChange {
   private executeGesture: GestureExecutor;
@@ -52,6 +55,7 @@ export class SwipeOn extends BaseVisualChange {
   private overlayDetector: OverlayDetector;
   private autoTargetSelector: AutoTargetSelector;
   private talkBackExecutor: TalkBackSwipeExecutor;
+  private voiceOverExecutor: VoiceOverSwipeExecutor;
   private scrollUntilVisible: ScrollUntilVisible;
   private visionConfig: VisionFallbackConfig;
   private screenshotCapturer: ScreenshotCapturer;
@@ -88,6 +92,13 @@ export class SwipeOn extends BaseVisualChange {
       this.accessibilityService,
       this.accessibilityDetector,
       this.timer
+    );
+    const iosVoiceOverDetector = dependencies.iosVoiceOverDetector ?? defaultIosVoiceOverDetector;
+    this.voiceOverExecutor = new VoiceOverSwipeExecutor(
+      device,
+      this.executeGesture,
+      IOSCtrlProxyClient.getInstance(device),
+      iosVoiceOverDetector
     );
     this.scrollUntilVisible = new ScrollUntilVisible({
       device,
@@ -400,17 +411,26 @@ export class SwipeOn extends BaseVisualChange {
         };
 
         const swipeResult = await perf.track("executeScreenSwipe", () =>
-          this.talkBackExecutor.executeSwipeGesture(
-            Math.floor(startX),
-            Math.floor(startY),
-            Math.floor(endX),
-            Math.floor(endY),
-            options.direction,
-            null, // No container for screen swipe
-            gestureOptions,
-            perf,
-            boomerang
-          )
+          this.device.platform === "ios"
+            ? this.voiceOverExecutor.executeSwipeGesture(
+              Math.floor(startX),
+              Math.floor(startY),
+              Math.floor(endX),
+              Math.floor(endY),
+              gestureOptions,
+              perf
+            )
+            : this.talkBackExecutor.executeSwipeGesture(
+              Math.floor(startX),
+              Math.floor(startY),
+              Math.floor(endX),
+              Math.floor(endY),
+              options.direction,
+              null, // No container for screen swipe
+              gestureOptions,
+              perf,
+              boomerang
+            )
         );
 
         perf.end();
@@ -466,17 +486,26 @@ export class SwipeOn extends BaseVisualChange {
         };
 
         const swipeResult = await perf.track("executeElementSwipe", () =>
-          this.talkBackExecutor.executeSwipeGesture(
-            Math.floor(startX),
-            Math.floor(startY),
-            Math.floor(endX),
-            Math.floor(endY),
-            options.direction,
-            element, // Use the container element
-            gestureOptions,
-            perf,
-            boomerang
-          )
+          this.device.platform === "ios"
+            ? this.voiceOverExecutor.executeSwipeGesture(
+              Math.floor(startX),
+              Math.floor(startY),
+              Math.floor(endX),
+              Math.floor(endY),
+              gestureOptions,
+              perf
+            )
+            : this.talkBackExecutor.executeSwipeGesture(
+              Math.floor(startX),
+              Math.floor(startY),
+              Math.floor(endX),
+              Math.floor(endY),
+              options.direction,
+              element, // Use the container element
+              gestureOptions,
+              perf,
+              boomerang
+            )
         );
 
         perf.end();

@@ -8,6 +8,7 @@ import { PerformanceTracker } from "../../../utils/PerformanceTracker";
 import { SwipeResult } from "../../../models/SwipeResult";
 import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
+import type { IosVoiceOverDetector } from "../../../utils/interfaces/IosVoiceOverDetector";
 
 export type SwipeOnResolvedOptions = SwipeOnOptions & { direction: SwipeDirection };
 
@@ -40,6 +41,7 @@ export interface SwipeOnDependencies {
   geometry?: import("../../../utils/interfaces/ElementGeometry").ElementGeometry;
   parser?: import("../../../utils/interfaces/ElementParser").ElementParser;
   accessibilityDetector?: AccessibilityDetector;
+  iosVoiceOverDetector?: IosVoiceOverDetector;
   visionConfig?: import("../../../vision/VisionTypes").VisionFallbackConfig;
   screenshotCapturer?: import("../../navigation/SelectionStateTracker").ScreenshotCapturer;
   visionAnalyzer?: import("../../../vision/VisionTypes").VisionAnalyzer;

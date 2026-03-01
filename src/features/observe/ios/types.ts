@@ -157,6 +157,14 @@ export interface CtrlProxyVoiceOverResult {
   error?: string;
 }
 
+/** VoiceOver action result from CtrlProxy iOS */
+export interface CtrlProxyVoiceOverActionResult {
+  success: boolean;
+  action?: string;
+  totalTimeMs?: number;
+  error?: string;
+}
+
 /**
  * Interface for cached hierarchy with metadata
  */
