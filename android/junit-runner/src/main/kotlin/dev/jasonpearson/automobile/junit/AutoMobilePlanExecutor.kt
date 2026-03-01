@@ -347,7 +347,23 @@ internal object AutoMobilePlanExecutor {
           val parsed = json.parseToJsonElement(text).jsonObject
           val success = parsed["success"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
           if (success == false) {
-            val errorMessage = parsed["error"]?.jsonPrimitive?.content ?: "AutoMobile plan failed"
+            val failedStepObj = parsed["failedStep"]?.jsonObject
+            val errorMessage = if (failedStepObj != null) {
+              val stepIndex = failedStepObj["stepIndex"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+              val tool = failedStepObj["tool"]?.jsonPrimitive?.content ?: "unknown"
+              val stepError = failedStepObj["error"]?.jsonPrimitive?.content ?: "Unknown step error"
+              val executedSteps = parsed["executedSteps"]?.jsonPrimitive?.content?.toIntOrNull()
+              val totalSteps = parsed["totalSteps"]?.jsonPrimitive?.content?.toIntOrNull()
+              buildString {
+                append("Test plan execution failed at step ${stepIndex + 1} ($tool):")
+                append("\n  Error: $stepError")
+                if (executedSteps != null && totalSteps != null) {
+                  append("\n  Executed: $executedSteps/$totalSteps steps")
+                }
+              }
+            } else {
+              parsed["error"]?.jsonPrimitive?.content ?: "AutoMobile plan failed"
+            }
             return ParsedToolResult(false, errorMessage)
           }
           return ParsedToolResult(true, "")
@@ -517,15 +533,19 @@ internal object AutoMobilePlanExecutor {
       toolResults: List<ToolResultEntry> = emptyList(),
   ): InternalExecutionResult {
 
+    val errorMessage =
+        "AutoMobile plan execution failed with exit code ${result.exitCode}" +
+            if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else ""
+
+    System.err.println(errorMessage)
+
     val ciMode = System.getProperty("automobile.ci.mode", "false").toBoolean()
     if (!options.aiAssistance || ciMode) {
       return InternalExecutionResult(
           success = false,
           exitCode = result.exitCode,
           output = result.output,
-          errorMessage =
-              "AutoMobile plan execution failed with exit code ${result.exitCode}" +
-                  if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "",
+          errorMessage = errorMessage,
           toolResults = toolResults,
       )
     }
@@ -537,9 +557,7 @@ internal object AutoMobilePlanExecutor {
         success = false,
         exitCode = result.exitCode,
         output = result.output,
-        errorMessage =
-            "AutoMobile plan execution failed with exit code ${result.exitCode}" +
-                if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "",
+        errorMessage = errorMessage,
         aiRecoveryAttempted = false,
         aiRecoverySuccessful = false,
         toolResults = toolResults,

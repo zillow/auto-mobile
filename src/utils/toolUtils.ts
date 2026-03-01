@@ -100,8 +100,10 @@ export const createImageToolResponse = DefaultToolResponseFormatter.createImageT
 export const createStructuredToolResponse = (content: any): {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: any;
+  success?: boolean;
+  error?: string;
 } => {
-  return {
+  const response: ReturnType<typeof createStructuredToolResponse> = {
     content: [
       {
         type: "text",
@@ -110,6 +112,15 @@ export const createStructuredToolResponse = (content: any): {
     ],
     structuredContent: content
   };
+  if (content && typeof content === "object") {
+    if ("success" in content) {
+      response.success = content.success;
+    }
+    if ("error" in content) {
+      response.error = content.error;
+    }
+  }
+  return response;
 };
 
 export const throwIfAborted = (signal?: AbortSignal): void => {
