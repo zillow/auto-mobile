@@ -55,7 +55,6 @@ echo ""
 
 # macOS packages (can be built and tested on macOS)
 MACOS_PACKAGES=(
-    "AXeAutomation"
     "XcodeCompanion"
     "XcodeExtension"
 )
