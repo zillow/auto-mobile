@@ -30,7 +30,7 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
 
       - name: "Download APK artifact"
         uses: actions/download-artifact@v7

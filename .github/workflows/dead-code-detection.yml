@@ -24,7 +24,7 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
 
       - name: "Install jq"
         run: |

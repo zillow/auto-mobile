@@ -28,7 +28,7 @@ jobs:
       - name: "Checkout code"
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
 
       - uses: ./.github/actions/gradle-task-run
         with:

@@ -100,7 +100,8 @@ export class SwipeOn extends BaseVisualChange {
       device,
       this.executeGesture,
       IOSCtrlProxyClient.getInstance(device),
-      iosVoiceOverDetector
+      iosVoiceOverDetector,
+      this.timer
     );
     this.scrollUntilVisible = new ScrollUntilVisible({
       device,
@@ -429,7 +430,8 @@ export class SwipeOn extends BaseVisualChange {
               Math.floor(endX),
               Math.floor(endY),
               gestureOptions,
-              perf
+              perf,
+              boomerang
             )
             : this.talkBackExecutor.executeSwipeGesture(
               Math.floor(startX),
@@ -504,7 +506,8 @@ export class SwipeOn extends BaseVisualChange {
               Math.floor(endX),
               Math.floor(endY),
               gestureOptions,
-              perf
+              perf,
+              boomerang
             )
             : this.talkBackExecutor.executeSwipeGesture(
               Math.floor(startX),

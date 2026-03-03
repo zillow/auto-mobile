@@ -33,7 +33,8 @@ export interface VoiceOverSwipeRunner {
     x2: number,
     y2: number,
     gestureOptions?: GestureOptions,
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    boomerang?: BoomerangConfig
   ): Promise<SwipeResult>;
 }
 

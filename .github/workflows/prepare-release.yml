@@ -34,7 +34,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
           fetch-depth: 0
           token: ${{ secrets.AUTO_MOBILE_PR_TOKEN }}
 

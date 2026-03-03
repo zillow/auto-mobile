@@ -18,3 +18,18 @@
 *.ttf filter=lfs diff=lfs merge=lfs -text
 *.otf filter=lfs diff=lfs merge=lfs -text
 *.pdf filter=lfs diff=lfs merge=lfs -text
+
+# Image assets under 100KB are committed directly to git — no LFS budget needed in CI
+test/fixtures/**/*.png -filter -diff -merge -text
+android/control-proxy/src/**/*.png -filter -diff -merge -text
+android/playground/app/src/main/res/drawable/auto_mobile_sm.png -filter -diff -merge -text
+android/playground/app/src/main/res/drawable/auto_mobile_sticker_sm.png -filter -diff -merge -text
+android/playground/app/src/main/res/drawable/auto_mobile_sticker_splash.png -filter -diff -merge -text
+android/playground/app/src/main/res/drawable/ic_launcher_foreground.png -filter -diff -merge -text
+android/playground/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png -filter -diff -merge -text
+android/art/presentation-chart-light.png -filter -diff -merge -text
+android/art/presentation-code-light.png -filter -diff -merge -text
+docs/img/auto-mobile.png -filter -diff -merge -text
+docs/img/auto_mobile_sticker_splash.png -filter -diff -merge -text
+docs/img/automobile_system_design.png -filter -diff -merge -text
+docs/img/favicon.ico -filter -diff -merge -text
