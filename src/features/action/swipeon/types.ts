@@ -32,6 +32,8 @@ export interface VoiceOverSwipeRunner {
     y1: number,
     x2: number,
     y2: number,
+    direction: SwipeDirection,
+    containerElement: Element | null,
     gestureOptions?: GestureOptions,
     perf?: PerformanceTracker,
     boomerang?: BoomerangConfig

@@ -324,7 +324,7 @@ public class CommandHandler: CommandHandling {
             throw CommandError.missingParameter("action")
         }
 
-        try gesturePerformer.performAction(action, resourceId: request.resourceId)
+        try gesturePerformer.performAction(action, resourceId: request.resourceId, label: request.label)
 
         return WebSocketResponse.success(
             type: ResponseType.actionResult.rawValue,

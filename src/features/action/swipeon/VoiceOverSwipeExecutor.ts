@@ -1,4 +1,4 @@
-import { BootedDevice, GestureOptions } from "../../../models";
+import { BootedDevice, Element, GestureOptions, SwipeDirection } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
 import { SwipeResult } from "../../../models/SwipeResult";
@@ -11,8 +11,12 @@ import { Timer } from "../../../utils/interfaces/Timer";
  * VoiceOverSwipeExecutor handles iOS VoiceOver-compatible swipe gestures.
  *
  * When VoiceOver is active on iOS, single-finger swipes navigate accessibility
- * focus rather than scrolling content. This executor uses 3-finger swipes
- * (multi-finger gestures) to scroll content while VoiceOver is running.
+ * focus rather than scrolling content. This executor uses the following fallback chain:
+ *
+ * 1. If a container element with resource-id is provided → accessibility scroll action
+ * 2. If a container element with content-desc is provided → accessibility scroll action (label)
+ * 3. If accessibility action fails or no container → 3-finger coordinate swipe
+ * 4. If 3-finger swipe fails → standard single-finger swipe
  *
  * Parallel to TalkBackSwipeExecutor for Android TalkBack.
  */
@@ -28,9 +32,10 @@ export class VoiceOverSwipeExecutor implements VoiceOverSwipeRunner {
   /**
    * Execute a swipe gesture with VoiceOver awareness.
    *
-   * If VoiceOver is enabled and the platform is iOS, performs a 3-finger swipe
-   * to scroll content. Falls back to standard single-finger swipe on failure
-   * or when VoiceOver is disabled.
+   * If VoiceOver is enabled and the platform is iOS:
+   *   - Tries accessibility scroll action via resource-id or content-desc
+   *   - Falls back to 3-finger swipe on failure
+   *   - Falls back to standard single-finger swipe if 3-finger also fails
    *
    * When boomerang is provided, performs a forward swipe, optional apex pause,
    * then a return swipe — using 3-finger swipes when VoiceOver is active.
@@ -39,6 +44,8 @@ export class VoiceOverSwipeExecutor implements VoiceOverSwipeRunner {
    * @param y1 - Start Y coordinate
    * @param x2 - End X coordinate
    * @param y2 - End Y coordinate
+   * @param direction - Swipe direction for mapping to scroll action
+   * @param containerElement - The scrollable container element, or null for screen swipe
    * @param gestureOptions - Optional gesture options (duration, scrollMode)
    * @param perf - Optional performance tracker
    * @param boomerang - Optional boomerang configuration
@@ -48,6 +55,8 @@ export class VoiceOverSwipeExecutor implements VoiceOverSwipeRunner {
     y1: number,
     x2: number,
     y2: number,
+    direction: SwipeDirection,
+    containerElement: Element | null,
     gestureOptions?: GestureOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     boomerang?: BoomerangConfig
@@ -76,7 +85,51 @@ export class VoiceOverSwipeExecutor implements VoiceOverSwipeRunner {
       return this.executeVoiceOverBoomerangGesture(x1, y1, x2, y2, gestureOptions, boomerang, perf);
     }
 
-    // VoiceOver is enabled: use 3-finger swipe to scroll content
+    // VoiceOver is enabled: try accessibility scroll action first
+    const scrollAction = (direction === "down" || direction === "right")
+      ? "scroll_forward"
+      : "scroll_backward";
+
+    if (containerElement) {
+      const resourceId = containerElement["resource-id"];
+      const contentDesc = containerElement["content-desc"];
+
+      if (resourceId || contentDesc) {
+        const identifier = resourceId ?? contentDesc;
+        logger.info(`[VoiceOverSwipeExecutor] VoiceOver enabled, attempting accessibility scroll (${scrollAction}) on: ${identifier}`);
+
+        try {
+          const result = await this.iosClient.requestAction(
+            scrollAction,
+            resourceId || undefined,
+            !resourceId && contentDesc ? contentDesc : undefined
+          );
+
+          if (result.success) {
+            return {
+              success: true,
+              x1,
+              y1,
+              x2,
+              y2,
+              duration: gestureOptions?.duration ?? 300,
+            };
+          }
+
+          logger.warn(
+            `[VoiceOverSwipeExecutor] Accessibility scroll failed: ${result.error ?? "unknown error"}, ` +
+            `falling back to 3-finger swipe`
+          );
+        } catch (error) {
+          logger.warn(
+            `[VoiceOverSwipeExecutor] Accessibility scroll error: ${error}, ` +
+            `falling back to 3-finger swipe`
+          );
+        }
+      }
+    }
+
+    // Fall back to 3-finger swipe to scroll content
     const duration = gestureOptions?.duration ?? 300;
     logger.info("[VoiceOverSwipeExecutor] VoiceOver enabled, using 3-finger swipe");
 

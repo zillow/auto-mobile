@@ -102,6 +102,7 @@ import type {
   CtrlProxyCachedHierarchy,
   CtrlProxyVoiceOverResult,
   CtrlProxyVoiceOverActionResult,
+  CtrlProxyActionResult,
   WebSocketMessage,
 } from "./types";
 
@@ -192,6 +193,14 @@ export interface CtrlProxyService {
   requestVoiceOverActivate(
     label: string, action: "activate" | "long_press", timeoutMs?: number, perf?: PerformanceTracker
   ): Promise<CtrlProxyVoiceOverActionResult>;
+
+  requestAction(
+    action: string,
+    resourceId?: string,
+    label?: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyActionResult>;
 
   requestMultiFingerSwipe(
     x1: number, y1: number, x2: number, y2: number,
@@ -854,6 +863,16 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
     perf?: PerformanceTracker
   ): Promise<CtrlProxyVoiceOverActionResult> {
     return this.voiceOver.requestVoiceOverActivate(label, action, timeoutMs, perf);
+  }
+
+  async requestAction(
+    action: string,
+    resourceId?: string,
+    label?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyActionResult> {
+    return this.voiceOver.requestAction(action, resourceId, label, timeoutMs, perf);
   }
 
   async requestMultiFingerSwipe(

@@ -17,6 +17,7 @@ import {
 import type {
   CtrlProxyVoiceOverResult,
   CtrlProxyVoiceOverActionResult,
+  CtrlProxyActionResult,
 } from "../../src/features/observe/ios/types";
 import { ViewHierarchyResult } from "../../src/models";
 import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
@@ -99,11 +100,18 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
   private voiceOverState: boolean = false;
   private voiceOverActivateResult: CtrlProxyVoiceOverActionResult | null = null;
   private multiFingerSwipeResult: CtrlProxySwipeResult | null = null;
+  private actionResult: CtrlProxyActionResult | null = null;
 
   // VoiceOver call history
   private voiceOverActivateHistory: Array<{
     label: string;
     action: "activate" | "long_press";
+  }> = [];
+
+  private actionHistory: Array<{
+    action: string;
+    resourceId?: string;
+    label?: string;
   }> = [];
 
   private multiFingerSwipeHistory: Array<{
@@ -220,6 +228,13 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
     this.multiFingerSwipeResult = result;
   }
 
+  /**
+   * Configure requestAction result (null = default success)
+   */
+  setActionResult(result: CtrlProxyActionResult | null): void {
+    this.actionResult = result;
+  }
+
   // MARK: - Assertion Methods
 
   /**
@@ -332,6 +347,13 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
   }
 
   /**
+   * Get requestAction call history
+   */
+  getActionHistory(): Array<{ action: string; resourceId?: string; label?: string }> {
+    return [...this.actionHistory];
+  }
+
+  /**
    * Get multi-finger swipe call history
    */
   getMultiFingerSwipeHistory(): Array<{
@@ -359,6 +381,7 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
     this.hierarchyRequestCount = 0;
     this.launchAppHistory = [];
     this.voiceOverActivateHistory = [];
+    this.actionHistory = [];
     this.multiFingerSwipeHistory = [];
   }
 
@@ -783,6 +806,29 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
       totalTimeMs: duration,
       gestureTimeMs: duration,
       perfTiming: this.performanceTiming || undefined,
+    };
+  }
+
+  async requestAction(
+    action: string,
+    resourceId?: string,
+    label?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyActionResult> {
+    await this.applyDelay("action");
+    this.checkFailure("action");
+
+    this.actionHistory.push({ action, resourceId, label });
+
+    if (this.actionResult) {
+      return this.actionResult;
+    }
+
+    return {
+      success: true,
+      action,
+      totalTimeMs: 50,
     };
   }
 

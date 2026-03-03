@@ -36,6 +36,7 @@ public struct WebSocketRequest: Codable {
     // Text input parameters
     public let text: String?
     public let resourceId: String?
+    public let label: String?
 
     // Action parameters
     public let action: String?
@@ -76,6 +77,7 @@ public struct WebSocketRequest: Codable {
         rotationDegrees: Float? = nil,
         text: String? = nil,
         resourceId: String? = nil,
+        label: String? = nil,
         action: String? = nil,
         bundleId: String? = nil,
         sinceTimestamp: Int64? = nil,
@@ -107,6 +109,7 @@ public struct WebSocketRequest: Codable {
         self.rotationDegrees = rotationDegrees
         self.text = text
         self.resourceId = resourceId
+        self.label = label
         self.action = action
         self.bundleId = bundleId
         self.sinceTimestamp = sinceTimestamp

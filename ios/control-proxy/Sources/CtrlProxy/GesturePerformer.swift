@@ -259,32 +259,35 @@ public class GesturePerformer: GesturePerforming {
 
         // MARK: - Actions
 
-        public func performAction(_ action: String, resourceId: String? = nil) throws {
+        public func performAction(_ action: String, resourceId: String? = nil, label: String? = nil) throws {
+            var element: XCUIElement? = nil
             if let resourceId = resourceId {
-                guard let element = elementLocator.findElement(byResourceId: resourceId) as? XCUIElement else {
-                    throw GestureError.elementNotFound(resourceId)
-                }
+                element = elementLocator.findElement(byResourceId: resourceId) as? XCUIElement
+            }
+            if element == nil, let label = label {
+                element = elementLocator.findElement(byText: label) as? XCUIElement
+            }
+            guard let found = element else {
+                throw GestureError.elementNotFound(resourceId ?? label ?? "unknown")
+            }
 
-                try runOnMainThread {
-                    switch action.lowercased() {
-                    case "click", "tap":
-                        element.tap()
-                    case "long_click", "long_press":
-                        element.press(forDuration: 1.0)
-                    case "double_tap", "double_click":
-                        element.doubleTap()
-                    case "scroll_forward":
-                        element.swipeUp()
-                    case "scroll_backward":
-                        element.swipeDown()
-                    case "focus":
-                        element.tap()
-                    default:
-                        throw GestureError.notSupported("Action: \(action)")
-                    }
+            try runOnMainThread {
+                switch action.lowercased() {
+                case "click", "tap":
+                    found.tap()
+                case "long_click", "long_press":
+                    found.press(forDuration: 1.0)
+                case "double_tap", "double_click":
+                    found.doubleTap()
+                case "scroll_forward":
+                    found.swipeUp()
+                case "scroll_backward":
+                    found.swipeDown()
+                case "focus":
+                    found.tap()
+                default:
+                    throw GestureError.notSupported("Action: \(action)")
                 }
-            } else {
-                throw GestureError.elementNotFound("resourceId required for action")
             }
         }
 
@@ -435,7 +438,7 @@ public class GesturePerformer: GesturePerforming {
             throw GestureError.notSupported("XCUITest only available on iOS")
         }
 
-        public func performAction(_: String, resourceId _: String?) throws {
+        public func performAction(_: String, resourceId _: String?, label _: String?) throws {
             throw GestureError.notSupported("XCUITest only available on iOS")
         }
 

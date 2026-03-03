@@ -74,8 +74,8 @@ public protocol GesturePerforming {
 
     // MARK: - Actions
 
-    /// Perform action on element
-    func performAction(_ action: String, resourceId: String?) throws
+    /// Perform action on element by resourceId or label (content-desc)
+    func performAction(_ action: String, resourceId: String?, label: String?) throws
 
     // MARK: - Screenshots
 

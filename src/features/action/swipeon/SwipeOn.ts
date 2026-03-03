@@ -429,6 +429,8 @@ export class SwipeOn extends BaseVisualChange {
               Math.floor(startY),
               Math.floor(endX),
               Math.floor(endY),
+              options.direction,
+              null, // No container for screen swipe
               gestureOptions,
               perf,
               boomerang
@@ -505,6 +507,8 @@ export class SwipeOn extends BaseVisualChange {
               Math.floor(startY),
               Math.floor(endX),
               Math.floor(endY),
+              options.direction,
+              element ?? null, // Use the container element
               gestureOptions,
               perf,
               boomerang

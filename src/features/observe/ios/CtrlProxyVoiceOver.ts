@@ -7,7 +7,7 @@
  */
 
 import type { PerformanceTracker } from "../../../utils/PerformanceTracker";
-import type { DelegateContext, CtrlProxyVoiceOverResult, CtrlProxyVoiceOverActionResult } from "./types";
+import type { DelegateContext, CtrlProxyVoiceOverResult, CtrlProxyVoiceOverActionResult, CtrlProxyActionResult } from "./types";
 
 /**
  * Delegate class for VoiceOver state detection via CtrlProxy WebSocket.
@@ -45,6 +45,52 @@ export class CtrlProxyVoiceOver {
     const message = {
       type: "get_voiceover_state",
       requestId,
+    };
+
+    const ws = this.context.getWebSocket();
+    ws?.send(JSON.stringify(message));
+
+    return promise;
+  }
+
+  /**
+   * Request an accessibility action on an element by resourceId or label.
+   *
+   * Used to perform scroll_forward/scroll_backward via the accessibility node system,
+   * more reliable than coordinate gestures when VoiceOver is active.
+   *
+   * @param action - The action to perform (e.g. "scroll_forward", "scroll_backward")
+   * @param resourceId - The resource-id / accessibility identifier of the target element
+   * @param label - The accessibility label (content-desc) as fallback when no resourceId
+   * @param timeoutMs - Request timeout in milliseconds (default: 5000)
+   * @param perf - Optional performance tracker
+   * @returns Action result
+   */
+  async requestAction(
+    action: string,
+    resourceId?: string,
+    label?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyActionResult> {
+    if (!await this.context.ensureConnected(perf)) {
+      return { success: false, error: "Not connected to CtrlProxy" };
+    }
+
+    const requestId = this.context.requestManager.generateId("action");
+    const promise = this.context.requestManager.register<CtrlProxyActionResult>(
+      requestId,
+      "action",
+      timeoutMs,
+      () => ({ success: false, error: "Timeout waiting for action_result" })
+    );
+
+    const message = {
+      type: "request_action",
+      requestId,
+      action,
+      resourceId: resourceId ?? null,
+      label: label ?? null,
     };
 
     const ws = this.context.getWebSocket();

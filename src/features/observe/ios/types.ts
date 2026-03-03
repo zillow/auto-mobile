@@ -147,7 +147,12 @@ export type CtrlProxyPressHomeResult = BaseResult;
 export type CtrlProxyLaunchAppResult = BaseResult;
 
 /** Action result from CtrlProxy iOS */
-export type CtrlProxyActionResult = ActionTimingResult;
+export interface CtrlProxyActionResult {
+  success: boolean;
+  action?: string;
+  totalTimeMs?: number;
+  error?: string;
+}
 
 /** VoiceOver state result from CtrlProxy iOS */
 export interface CtrlProxyVoiceOverResult {

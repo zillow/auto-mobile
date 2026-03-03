@@ -155,7 +155,7 @@ public class FakeGesturePerformer: GesturePerforming {
     private var setTextHistory: [TextCall] = []
     private var clearTextHistory: [String?] = []
     private var imeActionHistory: [String] = []
-    private var actionHistory: [(action: String, resourceId: String?)] = []
+    private var actionHistory: [(action: String, resourceId: String?, label: String?)] = []
     private var screenshotCallCount = 0
     private var pressHomeCallCount = 0
     private var appLaunchHistory: [String] = []
@@ -207,7 +207,7 @@ public class FakeGesturePerformer: GesturePerforming {
         imeActionHistory
     }
 
-    public func getActionHistory() -> [(action: String, resourceId: String?)] {
+    public func getActionHistory() -> [(action: String, resourceId: String?, label: String?)] {
         actionHistory
     }
 
@@ -327,9 +327,9 @@ public class FakeGesturePerformer: GesturePerforming {
         imeActionHistory.append(action)
     }
 
-    public func performAction(_ action: String, resourceId: String?) throws {
+    public func performAction(_ action: String, resourceId: String?, label: String?) throws {
         try checkFailure("action")
-        actionHistory.append((action: action, resourceId: resourceId))
+        actionHistory.append((action: action, resourceId: resourceId, label: label))
     }
 
     public func getScreenshot() throws -> Data {
