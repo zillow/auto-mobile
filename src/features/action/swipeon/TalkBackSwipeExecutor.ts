@@ -10,10 +10,10 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/Perfo
 import { CtrlProxyClient } from "../../observe/android";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
 import { SwipeResult } from "../../../models/SwipeResult";
-import { GestureExecutor, BoomerangConfig } from "./types";
+import { GestureExecutor, BoomerangConfig, TalkBackSwipeRunner } from "./types";
 import { Timer } from "../../../utils/interfaces/Timer";
 
-export class TalkBackSwipeExecutor {
+export class TalkBackSwipeExecutor implements TalkBackSwipeRunner {
   private static readonly DEFAULT_APEX_PAUSE_MS = 100;
   private static readonly DEFAULT_RETURN_SPEED = 1;
 
@@ -37,6 +37,7 @@ export class TalkBackSwipeExecutor {
     boomerang?: BoomerangConfig
   ): Promise<SwipeResult> {
     const boomerangEnabled = Boolean(boomerang);
+    logger.info(`[SwipeOn] executeSwipeGesture: direction=${direction}, (${x1},${y1})→(${x2},${y2}), duration=${gestureOptions?.duration}ms, boomerang=${boomerangEnabled}, container=${containerElement?.["resource-id"] ?? "none"}`);
 
     // Only check TalkBack for Android platform
     if (this.device.platform !== "android") {

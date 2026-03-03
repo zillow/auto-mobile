@@ -377,6 +377,7 @@ private final class FakeMCPClient: AutoMobileMCPClient {
         success: Bool,
         executedSteps: Int,
         totalSteps: Int,
+        // swiftlint:disable:next large_tuple
         failedStep: (stepIndex: Int, tool: String, error: String, device: String?)?,
         error: String?
     ) {

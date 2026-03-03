@@ -6,8 +6,9 @@ import {
 } from "../../../models";
 import { boundsArea, boundsEqual } from "../../../utils/bounds";
 import { getScreenBounds as getScreenBoundsFromSize } from "../../../utils/screenBounds";
+import { AutoTargetSelectorService } from "./types";
 
-export class AutoTargetSelector {
+export class AutoTargetSelector implements AutoTargetSelectorService {
   selectAutoTargetScrollable(
     scrollables: Element[],
     screenBounds: Element["bounds"] | null,

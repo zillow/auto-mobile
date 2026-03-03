@@ -2,7 +2,7 @@ import { BootedDevice, GestureOptions } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
 import { SwipeResult } from "../../../models/SwipeResult";
-import { GestureExecutor } from "./types";
+import { GestureExecutor, VoiceOverSwipeRunner } from "./types";
 import type { IosVoiceOverDetector } from "../../../utils/interfaces/IosVoiceOverDetector";
 import type { CtrlProxyService } from "../../observe/ios/CtrlProxyClient";
 
@@ -15,7 +15,7 @@ import type { CtrlProxyService } from "../../observe/ios/CtrlProxyClient";
  *
  * Parallel to TalkBackSwipeExecutor for Android TalkBack.
  */
-export class VoiceOverSwipeExecutor {
+export class VoiceOverSwipeExecutor implements VoiceOverSwipeRunner {
   constructor(
     private readonly device: BootedDevice,
     private readonly executeGesture: GestureExecutor,

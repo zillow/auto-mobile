@@ -62,30 +62,30 @@ interface MockClient {
 function makeListScreenObserve(): ObserveResult {
   // The list shows items 1–5. Item 15 exists but is off-screen below.
   const makeListItem = (n: number, accessibilityFocused: boolean): Element => ({
-    bounds: { left: 0, top: 80 + (n - 1) * 100, right: 720, bottom: 160 + (n - 1) * 100 },
-    text: `Item ${n}`,
+    "bounds": { left: 0, top: 80 + (n - 1) * 100, right: 720, bottom: 160 + (n - 1) * 100 },
+    "text": `Item ${n}`,
     "content-desc": `Item ${n}`,
     "resource-id": `com.example.app:id/list_item_${n}`,
     "class": "android.widget.LinearLayout",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": accessibilityFocused,
-    enabled: true,
+    "enabled": true,
   });
 
   const recyclerView: Element = {
-    bounds: { left: 0, top: 80, right: 720, bottom: 1200 },
-    text: undefined,
+    "bounds": { left: 0, top: 80, right: 720, bottom: 1200 },
+    "text": undefined,
     "content-desc": undefined,
     "resource-id": "com.example.app:id/item_list",
     "class": "androidx.recyclerview.widget.RecyclerView",
-    clickable: false,
-    focusable: false,
-    focused: false,
+    "clickable": false,
+    "focusable": false,
+    "focused": false,
     "accessibility-focused": false,
-    scrollable: true,
-    enabled: true,
+    "scrollable": true,
+    "enabled": true,
   };
 
   const visibleItems = [1, 2, 3, 4, 5].map(n => makeListItem(n, n === 1));
@@ -126,35 +126,35 @@ function makeAfterScrollObserve(): ObserveResult {
   // on accessibilityFocusedElement to confirm Item 15 is visible; it should
   // check observe().elements instead.
   const makeListItem = (n: number): Element => ({
-    bounds: {
+    "bounds": {
       left: 0,
       top: 80 + (n - 11) * 100,
       right: 720,
       bottom: 160 + (n - 11) * 100,
     },
-    text: `Item ${n}`,
+    "text": `Item ${n}`,
     "content-desc": `Item ${n}`,
     "resource-id": `com.example.app:id/list_item_${n}`,
     "class": "android.widget.LinearLayout",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   });
 
   const recyclerView: Element = {
-    bounds: { left: 0, top: 80, right: 720, bottom: 1200 },
-    text: undefined,
+    "bounds": { left: 0, top: 80, right: 720, bottom: 1200 },
+    "text": undefined,
     "content-desc": undefined,
     "resource-id": "com.example.app:id/item_list",
     "class": "androidx.recyclerview.widget.RecyclerView",
-    clickable: false,
-    focusable: false,
-    focused: false,
+    "clickable": false,
+    "focusable": false,
+    "focused": false,
     "accessibility-focused": false,
-    scrollable: true,
-    enabled: true,
+    "scrollable": true,
+    "enabled": true,
   };
 
   // Item 1 is off-screen but TalkBack focus is still reported on it.
@@ -162,16 +162,16 @@ function makeAfterScrollObserve(): ObserveResult {
   // focused node persists in the accessibility tree even after it is recycled
   // out of the visible viewport.
   const offScreenItem1: Element = {
-    bounds: { left: 0, top: -920, right: 720, bottom: -840 },
-    text: "Item 1",
+    "bounds": { left: 0, top: -920, right: 720, bottom: -840 },
+    "text": "Item 1",
     "content-desc": "Item 1",
     "resource-id": "com.example.app:id/list_item_1",
     "class": "android.widget.LinearLayout",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   const visibleItems = [11, 12, 13, 14, 15].map(n => makeListItem(n));
@@ -204,29 +204,29 @@ function makeDetailScreenObserve(): ObserveResult {
   // After tapping Item 15, the detail screen loads.
   // TalkBack auto-focuses the first element on the new screen.
   const titleElement: Element = {
-    bounds: { left: 32, top: 120, right: 688, bottom: 180 },
-    text: "Item 15",
+    "bounds": { left: 32, top: 120, right: 688, bottom: 180 },
+    "text": "Item 15",
     "content-desc": "Item 15",
     "resource-id": "com.example.app:id/detail_title",
     "class": "android.widget.TextView",
-    clickable: false,
-    focusable: true,
-    focused: false,
+    "clickable": false,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   const descriptionElement: Element = {
-    bounds: { left: 32, top: 200, right: 688, bottom: 320 },
-    text: "Description for Item 15.",
+    "bounds": { left: 32, top: 200, right: 688, bottom: 320 },
+    "text": "Description for Item 15.",
     "content-desc": "Description for Item 15.",
     "resource-id": "com.example.app:id/detail_description",
     "class": "android.widget.TextView",
-    clickable: false,
-    focusable: true,
-    focused: false,
+    "clickable": false,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   return {

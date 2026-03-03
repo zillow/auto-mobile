@@ -1,2 +1,2 @@
 export { SwipeOn } from "./SwipeOn";
-export type { GestureExecutor, SwipeOnDependencies } from "./types";
+export type { GestureExecutor, SwipeOnDependencies, VoiceOverSwipeRunner, AutoTargetSelectorService } from "./types";

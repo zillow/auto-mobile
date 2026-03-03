@@ -48,57 +48,57 @@ interface MockClient {
 
 function makeLoginScreenObserve(): ObserveResult {
   const usernameField: Element = {
-    bounds: { left: 32, top: 280, right: 688, bottom: 340 },
-    text: "",
+    "bounds": { left: 32, top: 280, right: 688, bottom: 340 },
+    "text": "",
     "content-desc": "Username",
     "resource-id": "com.example.app:id/username_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   const passwordField: Element = {
-    bounds: { left: 32, top: 380, right: 688, bottom: 440 },
-    text: "",
+    "bounds": { left: 32, top: 380, right: 688, bottom: 440 },
+    "text": "",
     "content-desc": "Password",
     "resource-id": "com.example.app:id/password_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   const loginButton: Element = {
-    bounds: { left: 32, top: 500, right: 688, bottom: 560 },
-    text: "Log in",
+    "bounds": { left: 32, top: 500, right: 688, bottom: 560 },
+    "text": "Log in",
     "content-desc": "Log in",
     "resource-id": "com.example.app:id/login_button",
     "class": "android.widget.Button",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   // TalkBack places its cursor on the first focusable element on screen load.
   // The accessibilityFocusedElement field tracks where the TalkBack cursor is.
   const talkbackCursorOnHeading: Element = {
-    bounds: { left: 32, top: 180, right: 688, bottom: 240 },
-    text: "Sign in to your account",
+    "bounds": { left: 32, top: 180, right: 688, bottom: 240 },
+    "text": "Sign in to your account",
     "content-desc": "Sign in to your account",
     "resource-id": "com.example.app:id/login_heading",
     "class": "android.widget.TextView",
-    clickable: false,
-    focusable: true,
-    focused: false,
+    "clickable": false,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   return {
@@ -140,16 +140,16 @@ function makeUsernameFieldFocusedObserve(): ObserveResult {
   // coordinate tap under TalkBack only announces the element; it does not
   // activate it.
   const usernameField: Element = {
-    bounds: { left: 32, top: 280, right: 688, bottom: 340 },
-    text: "",
+    "bounds": { left: 32, top: 280, right: 688, bottom: 340 },
+    "text": "",
     "content-desc": "Username",
     "resource-id": "com.example.app:id/username_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: true,
+    "clickable": true,
+    "focusable": true,
+    "focused": true,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   return {
@@ -177,16 +177,16 @@ function makeUsernameFieldFocusedObserve(): ObserveResult {
 
 function makePostLoginObserve(): ObserveResult {
   const welcomeText: Element = {
-    bounds: { left: 32, top: 120, right: 688, bottom: 180 },
-    text: "Welcome, user@example.com",
+    "bounds": { left: 32, top: 120, right: 688, bottom: 180 },
+    "text": "Welcome, user@example.com",
     "content-desc": "Welcome, user@example.com",
     "resource-id": "com.example.app:id/welcome_message",
     "class": "android.widget.TextView",
-    clickable: false,
-    focusable: true,
-    focused: false,
+    "clickable": false,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   // On navigation to a new screen, TalkBack auto-focuses the first element.

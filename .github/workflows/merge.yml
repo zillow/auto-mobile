@@ -771,8 +771,8 @@ jobs:
 #    steps:
 #      - name: "Git Checkout"
 #        uses: actions/checkout@v6
-with:
-  lfs: true
+#        with:
+#          lfs: true
 #
 #      - uses: ./.github/actions/setup-auto-mobile-npm-package
 #

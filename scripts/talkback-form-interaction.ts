@@ -55,30 +55,30 @@ interface MockClient {
 function makeFormScreenObserve(): ObserveResult {
   // Name field — standard EditText with a content-desc label.
   const nameField: Element = {
-    bounds: { left: 32, top: 200, right: 688, bottom: 260 },
-    text: "",
+    "bounds": { left: 32, top: 200, right: 688, bottom: 260 },
+    "text": "",
     "content-desc": "Full name",
     "resource-id": "com.example.app:id/name_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   // Email field.
   const emailField: Element = {
-    bounds: { left: 32, top: 300, right: 688, bottom: 360 },
-    text: "",
+    "bounds": { left: 32, top: 300, right: 688, bottom: 360 },
+    "text": "",
     "content-desc": "Email address",
     "resource-id": "com.example.app:id/email_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   // Checkbox with element merging.
@@ -95,34 +95,34 @@ function makeFormScreenObserve(): ObserveResult {
   // merging is active. Targeting the parent by content-desc is the correct
   // approach.
   const checkboxMerged: Element = {
-    bounds: { left: 32, top: 400, right: 688, bottom: 460 },
+    "bounds": { left: 32, top: 400, right: 688, bottom: 460 },
     // text is empty because the parent FrameLayout has no text of its own.
-    text: "",
+    "text": "",
     // content-desc is the merged string produced by the accessibility framework.
     "content-desc": "Accept terms and conditions, not checked",
     "resource-id": "com.example.app:id/terms_checkbox_container",
     "class": "android.widget.FrameLayout",
-    checkable: true,
-    checked: false,
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "checkable": true,
+    "checked": false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   // Submit button.
   const submitButton: Element = {
-    bounds: { left: 32, top: 520, right: 688, bottom: 580 },
-    text: "Submit",
+    "bounds": { left: 32, top: 520, right: 688, bottom: 580 },
+    "text": "Submit",
     "content-desc": "Submit",
     "resource-id": "com.example.app:id/submit_button",
     "class": "android.widget.Button",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   // TalkBack places its cursor on the first focusable element (the name field).
@@ -152,61 +152,61 @@ function makeCheckboxUncheckedObserve(): ObserveResult {
   // Returned after filling the name and email fields.
   // The checkbox is still unchecked; TalkBack cursor has moved to it.
   const nameField: Element = {
-    bounds: { left: 32, top: 200, right: 688, bottom: 260 },
-    text: "Jane Smith",
+    "bounds": { left: 32, top: 200, right: 688, bottom: 260 },
+    "text": "Jane Smith",
     "content-desc": "Full name",
     "resource-id": "com.example.app:id/name_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   const emailField: Element = {
-    bounds: { left: 32, top: 300, right: 688, bottom: 360 },
-    text: "jane@example.com",
+    "bounds": { left: 32, top: 300, right: 688, bottom: 360 },
+    "text": "jane@example.com",
     "content-desc": "Email address",
     "resource-id": "com.example.app:id/email_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   // The checkbox is not yet checked. The content-desc still ends with
   // "not checked". The agent targets this element using the full content-desc
   // string, since text is empty on the merged node.
   const checkboxUnchecked: Element = {
-    bounds: { left: 32, top: 400, right: 688, bottom: 460 },
-    text: "",
+    "bounds": { left: 32, top: 400, right: 688, bottom: 460 },
+    "text": "",
     "content-desc": "Accept terms and conditions, not checked",
     "resource-id": "com.example.app:id/terms_checkbox_container",
     "class": "android.widget.FrameLayout",
-    checkable: true,
-    checked: false,
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "checkable": true,
+    "checked": false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     // TalkBack cursor is now on the checkbox container.
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   const submitButton: Element = {
-    bounds: { left: 32, top: 520, right: 688, bottom: 580 },
-    text: "Submit",
+    "bounds": { left: 32, top: 520, right: 688, bottom: 580 },
+    "text": "Submit",
     "content-desc": "Submit",
     "resource-id": "com.example.app:id/submit_button",
     "class": "android.widget.Button",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   return {
@@ -237,58 +237,58 @@ function makeCheckboxCheckedObserve(): ObserveResult {
   // The agent can read this to confirm the tap succeeded without needing to
   // inspect the checked field directly.
   const nameField: Element = {
-    bounds: { left: 32, top: 200, right: 688, bottom: 260 },
-    text: "Jane Smith",
+    "bounds": { left: 32, top: 200, right: 688, bottom: 260 },
+    "text": "Jane Smith",
     "content-desc": "Full name",
     "resource-id": "com.example.app:id/name_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   const emailField: Element = {
-    bounds: { left: 32, top: 300, right: 688, bottom: 360 },
-    text: "jane@example.com",
+    "bounds": { left: 32, top: 300, right: 688, bottom: 360 },
+    "text": "jane@example.com",
     "content-desc": "Email address",
     "resource-id": "com.example.app:id/email_input",
     "class": "android.widget.EditText",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   // content-desc now ends with "checked" — the state has toggled.
   const checkboxChecked: Element = {
-    bounds: { left: 32, top: 400, right: 688, bottom: 460 },
-    text: "",
+    "bounds": { left: 32, top: 400, right: 688, bottom: 460 },
+    "text": "",
     "content-desc": "Accept terms and conditions, checked",
     "resource-id": "com.example.app:id/terms_checkbox_container",
     "class": "android.widget.FrameLayout",
-    checkable: true,
-    checked: true,
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "checkable": true,
+    "checked": true,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   const submitButton: Element = {
-    bounds: { left: 32, top: 520, right: 688, bottom: 580 },
-    text: "Submit",
+    "bounds": { left: 32, top: 520, right: 688, bottom: 580 },
+    "text": "Submit",
     "content-desc": "Submit",
     "resource-id": "com.example.app:id/submit_button",
     "class": "android.widget.Button",
-    clickable: true,
-    focusable: true,
-    focused: false,
+    "clickable": true,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   return {
@@ -317,29 +317,29 @@ function makeSuccessScreenObserve(): ObserveResult {
   // After submit, the app navigates to a confirmation screen.
   // TalkBack auto-focuses the first element of the new screen.
   const successHeading: Element = {
-    bounds: { left: 32, top: 280, right: 688, bottom: 340 },
-    text: "Registration successful",
+    "bounds": { left: 32, top: 280, right: 688, bottom: 340 },
+    "text": "Registration successful",
     "content-desc": "Registration successful",
     "resource-id": "com.example.app:id/success_heading",
     "class": "android.widget.TextView",
-    clickable: false,
-    focusable: true,
-    focused: false,
+    "clickable": false,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": true,
-    enabled: true,
+    "enabled": true,
   };
 
   const successBody: Element = {
-    bounds: { left: 32, top: 360, right: 688, bottom: 440 },
-    text: "A confirmation email has been sent to jane@example.com.",
+    "bounds": { left: 32, top: 360, right: 688, bottom: 440 },
+    "text": "A confirmation email has been sent to jane@example.com.",
     "content-desc": "A confirmation email has been sent to jane@example.com.",
     "resource-id": "com.example.app:id/success_body",
     "class": "android.widget.TextView",
-    clickable: false,
-    focusable: true,
-    focused: false,
+    "clickable": false,
+    "focusable": true,
+    "focused": false,
     "accessibility-focused": false,
-    enabled: true,
+    "enabled": true,
   };
 
   return {
@@ -436,7 +436,7 @@ async function main(): Promise<void> {
   console.log("Scenario: Fill a registration form with name, email, a merged");
   console.log("checkbox, and a submit button while TalkBack is active.");
   console.log("Demonstrates element merging: the checkbox surfaces as a single");
-  console.log('node with a content-desc that includes the checked state.');
+  console.log("node with a content-desc that includes the checked state.");
 
   const client = createMockClient();
 

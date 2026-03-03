@@ -4,13 +4,13 @@ import {
   Element,
   GestureOptions,
   ObserveResult,
+  SwipeDirection,
   SwipeOnOptions,
   SwipeOnResult,
   ViewHierarchyResult
 } from "../../../models";
 import { logger } from "../../../utils/logger";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../../utils/PerformanceTracker";
-import { CtrlProxyClient as AndroidCtrlProxyClient } from "../../observe/android";
 import { CtrlProxyClient as IOSCtrlProxyClient } from "../../observe/ios";
 import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
@@ -18,21 +18,28 @@ import type { ObserveScreen } from "../../observe/interfaces/ObserveScreen";
 import { AccessibilityDetector } from "../../../utils/interfaces/AccessibilityDetector";
 import { serverConfig } from "../../../utils/ServerConfig";
 import { Timer } from "../../../utils/SystemTimer";
-import { SwipeOnResolvedOptions, BoomerangConfig } from "./types";
-import { OverlayDetector } from "./OverlayDetector";
-import { TalkBackSwipeExecutor } from "./TalkBackSwipeExecutor";
+import { SwipeOnResolvedOptions, BoomerangConfig, TalkBackSwipeRunner, OverlayAnalyzer, ScrollAccessibilityService } from "./types";
 import { resolveContainerSwipeCoordinates } from "./resolveContainerSwipeCoordinates";
 import { getScreenBounds } from "../../../utils/screenBounds";
+
+function oppositeDirection(dir: SwipeDirection): SwipeDirection {
+  switch (dir) {
+    case "up":    return "down";
+    case "down":  return "up";
+    case "left":  return "right";
+    case "right": return "left";
+  }
+}
 
 export interface ScrollUntilVisibleDependencies {
   device: BootedDevice;
   finder: ElementFinder;
   geometry: ElementGeometry;
   observeScreen: ObserveScreen;
-  accessibilityService: AndroidCtrlProxyClient;
+  accessibilityService: ScrollAccessibilityService;
   accessibilityDetector: AccessibilityDetector;
-  overlayDetector: OverlayDetector;
-  talkBackExecutor: TalkBackSwipeExecutor;
+  overlayDetector: OverlayAnalyzer;
+  talkBackExecutor: TalkBackSwipeRunner;
   timer: Timer;
   getDuration: (options: SwipeOnResolvedOptions) => number;
   resolveBoomerangConfig: (options: SwipeOnResolvedOptions) => BoomerangConfig | undefined;
@@ -111,7 +118,7 @@ export class ScrollUntilVisible {
     let scrollIteration = 0;
     let lastFingerprint = this.computeHierarchyFingerprint(lastObservation.viewHierarchy!);
     let unchangedScrollCount = 0;
-    const maxUnchangedScrolls = 3;
+    const maxUnchangedScrolls = 1;
 
     const target = options.lookFor!.text
       ? `text "${options.lookFor!.text}"`
@@ -130,13 +137,18 @@ export class ScrollUntilVisible {
       return accessibilityService === "talkback";
     });
 
-    // First check if element is already visible
+    // First check if element is already visible within the container bounds
     foundElement = await perf.track("initialSearch", () =>
       this.findElementInHierarchy(options.lookFor!, lastObservation.viewHierarchy!, options.container)
     );
 
+    if (foundElement && !this.isElementWithinContainer(foundElement, containerElement.bounds)) {
+      logger.info(`[SwipeOn] Found ${target} initially but it is outside container bounds (element center y=${Math.floor((foundElement.bounds.top + foundElement.bounds.bottom) / 2)}, container=[${containerElement.bounds.top},${containerElement.bounds.bottom}]), will scroll`);
+      foundElement = null;
+    }
+
     if (foundElement) {
-      logger.info(`[SwipeOn] Element already visible, no scrolling needed`);
+      logger.info(`[SwipeOn] Element already visible at bounds=${JSON.stringify(foundElement.bounds)}, no scrolling needed`);
 
       // Set accessibility focus on found element if requested
       if (isTalkBackEnabled && options.focusTarget) {
@@ -168,18 +180,39 @@ export class ScrollUntilVisible {
     );
     const swipeWarning = swipeCoordinates.warning;
 
+    // Overshoot recovery state
+    let reverseMode = false;
+    const reverseDirection = oppositeDirection(options.direction);
+    let reverseBounds = containerElement.bounds;
+    if (options.includeSystemInsets !== true && lastObservation.systemInsets) {
+      const insets = lastObservation.systemInsets;
+      reverseBounds = {
+        left: Math.max(containerElement.bounds.left, insets.left),
+        top: Math.max(containerElement.bounds.top, insets.top),
+        right: Math.min(containerElement.bounds.right, lastObservation.screenSize?.width ?? containerElement.bounds.right) - insets.right,
+        bottom: Math.min(containerElement.bounds.bottom, lastObservation.screenSize?.height ?? containerElement.bounds.bottom) - insets.bottom
+      };
+    }
+    const reverseSwipeCoords = this.computeHalfScreenReverseCoords(reverseDirection, reverseBounds);
+    const reverseOptions = { ...lookForOptions, speed: "slow" as const };
+    logger.info(`[SwipeOn] Forward swipe: direction=${options.direction}, coords=(${Math.floor(swipeCoordinates.startX)},${Math.floor(swipeCoordinates.startY)})→(${Math.floor(swipeCoordinates.endX)},${Math.floor(swipeCoordinates.endY)})`);
+    logger.info(`[SwipeOn] Reverse swipe: direction=${reverseDirection}, coords=(${Math.floor(reverseSwipeCoords.startX)},${Math.floor(reverseSwipeCoords.startY)})→(${Math.floor(reverseSwipeCoords.endX)},${Math.floor(reverseSwipeCoords.endY)}), bounds=${JSON.stringify(reverseBounds)}`);
+
     // Scroll until element is found
     while (this.deps.timer.now() - startTime < maxTime) {
       scrollIteration++;
-      logger.info(`[SwipeOn] Iteration ${scrollIteration}: elapsed=${this.deps.timer.now() - startTime}ms`);
+      logger.info(`[SwipeOn] Iteration ${scrollIteration}: elapsed=${this.deps.timer.now() - startTime}ms, reverseMode=${reverseMode}, unchangedScrollCount=${unchangedScrollCount}/${maxUnchangedScrolls}`);
 
       // Perform scroll
-      const swipeDuration = this.deps.getDuration(lookForOptions);
-      const { startX, startY, endX, endY } = swipeCoordinates;
+      const activeCoords = reverseMode ? reverseSwipeCoords : swipeCoordinates;
+      const activeDirection = reverseMode ? reverseDirection : options.direction;
+      const activeDuration = this.deps.getDuration(reverseMode ? reverseOptions : lookForOptions);
+      const { startX, startY, endX, endY } = activeCoords;
+      logger.info(`[SwipeOn] Swipe: direction=${activeDirection}, coords=(${Math.floor(startX)},${Math.floor(startY)})→(${Math.floor(endX)},${Math.floor(endY)}), duration=${activeDuration}ms`);
 
       const boomerang = this.deps.resolveBoomerangConfig(options);
       const gestureOptions: GestureOptions = {
-        duration: swipeDuration,
+        duration: activeDuration,
         scrollMode: options.scrollMode
       };
 
@@ -191,7 +224,7 @@ export class ScrollUntilVisible {
             Math.floor(startY),
             Math.floor(endX),
             Math.floor(endY),
-            options.direction,
+            activeDirection,
             containerElement,
             gestureOptions,
             perf,
@@ -218,38 +251,66 @@ export class ScrollUntilVisible {
         throw new Error("Lost observation after swipe during scroll until visible.");
       }
 
+      // Wait for scroll animation to fully settle before inspecting the hierarchy.
+      // The post-swipe observation may reflect a mid-scroll position (the accessibility service
+      // can return a cached hierarchy captured before the fling decelerates to rest). Polling
+      // until two consecutive fingerprints match ensures we evaluate lookFor against the final
+      // idle state rather than a transient mid-scroll frame.
+      const elapsedMs = this.deps.timer.now() - startTime;
+      const idleCheckMaxMs = Math.min(1500, Math.max(0, maxTime - elapsedMs - 300));
+      if (idleCheckMaxMs > 100) {
+        lastObservation = await this.waitForScrollIdle(lastObservation, idleCheckMaxMs);
+      }
+
       // Check if hierarchy changed (detect scroll end)
       const currentFingerprint = this.computeHierarchyFingerprint(lastObservation.viewHierarchy!);
+      const fingerprintChanged = currentFingerprint !== lastFingerprint;
+      logger.info(`[SwipeOn] Iteration ${scrollIteration}: hierarchy ${fingerprintChanged ? "changed" : "UNCHANGED"} (fingerprint[0:40]="${currentFingerprint.slice(0, 40)}")`);
 
-      if (currentFingerprint === lastFingerprint) {
+      if (!fingerprintChanged) {
         unchangedScrollCount++;
-        logger.info(`[SwipeOn] Iteration ${scrollIteration}: hierarchy unchanged (${unchangedScrollCount}/${maxUnchangedScrolls})`);
+        logger.info(`[SwipeOn] Iteration ${scrollIteration}: unchanged count now ${unchangedScrollCount}/${maxUnchangedScrolls}`);
 
         if (unchangedScrollCount >= maxUnchangedScrolls) {
-          perf.end();
-          const elapsed = this.deps.timer.now() - startTime;
-          throw new ActionableError(
-            `Scroll reached end of container (no change after ${maxUnchangedScrolls} scrolls). ` +
-            `${target} not found after ${scrollIteration} iterations (${elapsed}ms).`
-          );
+          if (reverseMode) {
+            // Reverse also exhausted — element truly not found
+            perf.end();
+            const elapsed = this.deps.timer.now() - startTime;
+            throw new ActionableError(
+              `Scroll reached end of container (no change after ${maxUnchangedScrolls} scrolls). ` +
+              `${target} not found after ${scrollIteration} iterations (${elapsed}ms).`
+            );
+          }
+          // Switch to reverse half-screen recovery
+          reverseMode = true;
+          unchangedScrollCount = 0;
+          logger.info(`[SwipeOn] Reached end in forward direction without finding ${target}, switching to reverse half-screen recovery`);
         }
       } else {
         unchangedScrollCount = 0;
         lastFingerprint = currentFingerprint;
       }
 
-      // Check if target element is now visible
+      logger.info(`[SwipeOn] Iteration ${scrollIteration}: searching for ${target}`);
+
+      // Check if target element is now visible within the container bounds
       foundElement = await this.findElementInHierarchy(
         options.lookFor!,
         lastObservation.viewHierarchy!,
         options.container
       );
 
+      if (foundElement && !this.isElementWithinContainer(foundElement, containerElement.bounds)) {
+        logger.info(`[SwipeOn] Found ${target} but it is outside container bounds (element center y=${Math.floor((foundElement.bounds.top + foundElement.bounds.bottom) / 2)}, container=[${containerElement.bounds.top},${containerElement.bounds.bottom}]), continuing scroll`);
+        foundElement = null;
+      }
+
       if (foundElement) {
         const elapsed = this.deps.timer.now() - startTime;
-        logger.info(`[SwipeOn] Found ${target} after ${scrollIteration} iterations (${elapsed}ms)`);
+        logger.info(`[SwipeOn] Found ${target} after ${scrollIteration} iterations (${elapsed}ms), reverseMode=${reverseMode}, bounds=${JSON.stringify(foundElement.bounds)}`);
         break;
       }
+      logger.info(`[SwipeOn] Iteration ${scrollIteration}: ${target} not yet found`);
     }
 
     if (!foundElement) {
@@ -432,7 +493,7 @@ export class ScrollUntilVisible {
       return "";
     }
 
-    return JSON.stringify(viewHierarchy.hierarchy).slice(0, 1000);
+    return JSON.stringify(viewHierarchy.hierarchy);
   }
 
   private async setAccessibilityFocusOnElement(
@@ -453,6 +514,69 @@ export class ScrollUntilVisible {
     } catch (error) {
       logger.warn(`[SwipeOn] Failed to set accessibility focus: ${error}`);
     }
+  }
+
+  private isElementWithinContainer(
+    element: Element,
+    containerBounds: { top: number; bottom: number; left: number; right: number }
+  ): boolean {
+    const centerY = (element.bounds.top + element.bounds.bottom) / 2;
+    const centerX = (element.bounds.left + element.bounds.right) / 2;
+    return (
+      centerY >= containerBounds.top &&
+      centerY <= containerBounds.bottom &&
+      centerX >= containerBounds.left &&
+      centerX <= containerBounds.right
+    );
+  }
+
+  private computeHalfScreenReverseCoords(
+    reverseDir: SwipeDirection,
+    effectiveBounds: { left: number; top: number; right: number; bottom: number }
+  ): { startX: number; startY: number; endX: number; endY: number } {
+    const cx = (effectiveBounds.left + effectiveBounds.right) / 2;
+    const cy = (effectiveBounds.top + effectiveBounds.bottom) / 2;
+    const h = effectiveBounds.bottom - effectiveBounds.top;
+    const w = effectiveBounds.right - effectiveBounds.left;
+
+    switch (reverseDir) {
+      case "down":
+        return { startX: cx, startY: effectiveBounds.top + h * 0.25, endX: cx, endY: effectiveBounds.top + h * 0.75 };
+      case "up":
+        return { startX: cx, startY: effectiveBounds.bottom - h * 0.25, endX: cx, endY: effectiveBounds.top + h * 0.25 };
+      case "right":
+        return { startX: effectiveBounds.left + w * 0.25, startY: cy, endX: effectiveBounds.left + w * 0.75, endY: cy };
+      case "left":
+        return { startX: effectiveBounds.right - w * 0.25, startY: cy, endX: effectiveBounds.left + w * 0.25, endY: cy };
+    }
+  }
+
+  private async waitForScrollIdle(
+    currentObservation: ObserveResult,
+    maxWaitMs: number
+  ): Promise<ObserveResult> {
+    if (!currentObservation.viewHierarchy) {return currentObservation;}
+    const startTime = this.deps.timer.now();
+    const pollIntervalMs = 150;
+    let previousFingerprint = this.computeHierarchyFingerprint(currentObservation.viewHierarchy);
+    let latestObservation = currentObservation;
+
+    while (this.deps.timer.now() - startTime < maxWaitMs) {
+      const newObservation = await this.deps.observeScreen.execute();
+      if (!newObservation.viewHierarchy) {break;}
+      const newFingerprint = this.computeHierarchyFingerprint(newObservation.viewHierarchy);
+      if (newFingerprint === previousFingerprint) {
+        logger.info(`[SwipeOn] Scroll settled after ${this.deps.timer.now() - startTime}ms idle check`);
+        return newObservation;
+      }
+      logger.info(`[SwipeOn] Scroll still settling (elapsed=${this.deps.timer.now() - startTime}ms), retrying in ${pollIntervalMs}ms`);
+      previousFingerprint = newFingerprint;
+      latestObservation = newObservation;
+      await this.deps.timer.sleep(pollIntervalMs);
+    }
+
+    logger.info(`[SwipeOn] Scroll idle check reached ${maxWaitMs}ms limit, proceeding`);
+    return latestObservation;
   }
 
   private resolveContainerSwipeCoordinates(

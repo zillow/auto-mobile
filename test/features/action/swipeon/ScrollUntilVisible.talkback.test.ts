@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { ScrollUntilVisible } from "../../../../src/features/action/swipeon/ScrollUntilVisible";
 import { FakeAccessibilityDetector } from "../../../fakes/FakeAccessibilityDetector";
 import { FakeElementFinder } from "../../../fakes/FakeElementFinder";
 import { FakeTimer } from "../../../fakes/FakeTimer";
+import { FakeTalkBackSwipeExecutor } from "../../../fakes/FakeTalkBackSwipeExecutor";
+import { FakeOverlayDetector } from "../../../fakes/FakeOverlayDetector";
+import { FakeScrollAccessibilityService } from "../../../fakes/FakeScrollAccessibilityService";
+import { FakeElementGeometry } from "../../../fakes/FakeElementGeometry";
 import type { BootedDevice, Element, ObserveResult } from "../../../../src/models";
 import type { SwipeOnResolvedOptions } from "../../../../src/features/action/swipeon/types";
 
@@ -47,9 +51,9 @@ function makeScrollUntilVisible({
   accessibilityDetector: FakeAccessibilityDetector;
   finder: FakeElementFinder;
   timer: FakeTimer;
-  accessibilityService: { requestAction: ReturnType<typeof mock> };
+  accessibilityService: FakeScrollAccessibilityService;
   observeResults: ObserveResult[];
-  talkBackExecutor: { executeSwipeGesture: ReturnType<typeof mock> };
+  talkBackExecutor: FakeTalkBackSwipeExecutor;
 }): ScrollUntilVisible {
   let callIdx = 0;
 
@@ -59,15 +63,9 @@ function makeScrollUntilVisible({
       observeResults[Math.min(callIdx, observeResults.length - 1)]
   };
 
-  const fakeGeometry = {
-    getSwipeWithinBounds: () => ({ startX: 200, startY: 700, endX: 200, endY: 200 }),
-    getSwipeDurationFromSpeed: () => 300
-  };
+  const fakeGeometry = new FakeElementGeometry();
 
-  const fakeOverlayDetector = {
-    collectOverlayCandidates: () => [],
-    computeSafeSwipeCoordinates: () => null
-  };
+  const fakeOverlayDetector = new FakeOverlayDetector();
 
   // Each observedInteraction call advances to the next observation
   const observedInteraction = async (action: (obs: ObserveResult) => Promise<any>, _opts: any) => {
@@ -81,12 +79,12 @@ function makeScrollUntilVisible({
   return new ScrollUntilVisible({
     device: DEVICE,
     finder: finder as any,
-    geometry: fakeGeometry as any,
+    geometry: fakeGeometry,
     observeScreen: fakeObserveScreen as any,
-    accessibilityService: accessibilityService as any,
+    accessibilityService,
     accessibilityDetector,
-    overlayDetector: fakeOverlayDetector as any,
-    talkBackExecutor: talkBackExecutor as any,
+    overlayDetector: fakeOverlayDetector,
+    talkBackExecutor,
     timer,
     getDuration: () => 300,
     resolveBoomerangConfig: () => undefined,
@@ -104,24 +102,16 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
   let detector: FakeAccessibilityDetector;
   let finder: FakeElementFinder;
   let timer: FakeTimer;
-  let accessibilityService: { requestAction: ReturnType<typeof mock> };
-  let talkBackExecutor: { executeSwipeGesture: ReturnType<typeof mock> };
+  let accessibilityService: FakeScrollAccessibilityService;
+  let talkBackExecutor: FakeTalkBackSwipeExecutor;
 
   beforeEach(() => {
     detector = new FakeAccessibilityDetector();
     finder = new FakeElementFinder();
     timer = new FakeTimer();
     timer.enableAutoAdvance();
-    accessibilityService = {
-      requestAction: mock(async () => ({ success: true, action: "focus", totalTimeMs: 10 }))
-    };
-    talkBackExecutor = {
-      executeSwipeGesture: mock(async () => ({
-        success: true,
-        x1: 200, y1: 700, x2: 200, y2: 200,
-        duration: 300
-      }))
-    };
+    accessibilityService = new FakeScrollAccessibilityService();
+    talkBackExecutor = new FakeTalkBackSwipeExecutor();
   });
 
   describe("when TalkBack is disabled", () => {
@@ -146,7 +136,7 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
 
       expect(result.success).toBe(true);
       expect(result.found).toBe(true);
-      expect(accessibilityService.requestAction).not.toHaveBeenCalled();
+      expect(accessibilityService.requestActionCalls).toHaveLength(0);
     });
 
     test("does not call requestAction(focus) when element found after scrolling", async () => {
@@ -169,7 +159,7 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
       const result = await suv.execute({ ...BASE_OPTIONS, focusTarget: true });
 
       expect(result.success).toBe(true);
-      expect(accessibilityService.requestAction).not.toHaveBeenCalled();
+      expect(accessibilityService.requestActionCalls).toHaveLength(0);
     });
   });
 
@@ -195,7 +185,7 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
 
       expect(result.success).toBe(true);
       expect(result.found).toBe(true);
-      expect(accessibilityService.requestAction).not.toHaveBeenCalled();
+      expect(accessibilityService.requestActionCalls).toHaveLength(0);
     });
 
     test("calls requestAction(focus, resourceId) when focusTarget:true and element already visible", async () => {
@@ -216,12 +206,11 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
       expect(result.success).toBe(true);
       expect(result.found).toBe(true);
       expect(result.scrollIterations).toBe(0);
-      expect(accessibilityService.requestAction).toHaveBeenCalledWith(
-        "focus",
-        "test:id/target",
-        5000,
-        expect.anything()
-      );
+      expect(accessibilityService.requestActionCalls).toContainEqual({
+        action: "focus",
+        resourceId: "test:id/target",
+        timeoutMs: 5000
+      });
     });
 
     test("calls requestAction(focus) after scrolling finds element with focusTarget:true", async () => {
@@ -246,12 +235,11 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
       expect(result.success).toBe(true);
       expect(result.found).toBe(true);
       expect(result.scrollIterations).toBeGreaterThan(0);
-      expect(accessibilityService.requestAction).toHaveBeenCalledWith(
-        "focus",
-        "test:id/target",
-        5000,
-        expect.anything()
-      );
+      expect(accessibilityService.requestActionCalls).toContainEqual({
+        action: "focus",
+        resourceId: "test:id/target",
+        timeoutMs: 5000
+      });
     });
 
     test("does not call requestAction(focus) after scrolling finds element without focusTarget", async () => {
@@ -274,7 +262,7 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
       const result = await suv.execute(BASE_OPTIONS);
 
       expect(result.success).toBe(true);
-      expect(accessibilityService.requestAction).not.toHaveBeenCalled();
+      expect(accessibilityService.requestActionCalls).toHaveLength(0);
     });
 
     test("never calls requestAction(clear_focus) during scrolling", async () => {
@@ -301,7 +289,7 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
 
       await suv.execute({ ...BASE_OPTIONS, focusTarget: true });
 
-      expect(accessibilityService.requestAction).not.toHaveBeenCalledWith("clear_focus", expect.anything());
+      expect(accessibilityService.requestActionCalls.some(c => c.action === "clear_focus")).toBe(false);
     });
 
     test("skips focus if found element has no resource-id", async () => {
@@ -327,13 +315,11 @@ describe("ScrollUntilVisible TalkBack focus behavior", () => {
       const result = await suv.execute({ ...BASE_OPTIONS, focusTarget: true });
 
       expect(result.success).toBe(true);
-      expect(accessibilityService.requestAction).not.toHaveBeenCalled();
+      expect(accessibilityService.requestActionCalls).toHaveLength(0);
     });
 
     test("succeeds even when requestAction(focus) throws", async () => {
-      accessibilityService.requestAction = mock(async () => {
-        throw new Error("focus action failed");
-      });
+      accessibilityService.setRequestActionThrows(new Error("focus action failed"));
 
       finder.nextScrollableContainer = CONTAINER_ELEMENT;
       finder.nextElementByText = TARGET_ELEMENT;
@@ -359,8 +345,8 @@ describe("ScrollUntilVisible end-of-list detection", () => {
   let detector: FakeAccessibilityDetector;
   let finder: FakeElementFinder;
   let timer: FakeTimer;
-  let accessibilityService: { requestAction: ReturnType<typeof mock> };
-  let talkBackExecutor: { executeSwipeGesture: ReturnType<typeof mock> };
+  let accessibilityService: FakeScrollAccessibilityService;
+  let talkBackExecutor: FakeTalkBackSwipeExecutor;
 
   beforeEach(() => {
     detector = new FakeAccessibilityDetector();
@@ -368,16 +354,8 @@ describe("ScrollUntilVisible end-of-list detection", () => {
     finder = new FakeElementFinder();
     timer = new FakeTimer();
     timer.enableAutoAdvance();
-    accessibilityService = {
-      requestAction: mock(async () => ({ success: true, action: "focus", totalTimeMs: 10 }))
-    };
-    talkBackExecutor = {
-      executeSwipeGesture: mock(async () => ({
-        success: true,
-        x1: 200, y1: 700, x2: 200, y2: 200,
-        duration: 300
-      }))
-    };
+    accessibilityService = new FakeScrollAccessibilityService();
+    talkBackExecutor = new FakeTalkBackSwipeExecutor();
   });
 
   test("throws when hierarchy unchanged for maxUnchangedScrolls iterations", async () => {
@@ -435,23 +413,23 @@ describe("ScrollUntilVisible end-of-list detection", () => {
     let findCount = 0;
     finder.findElementByText = (_h: any, _t: any) => {
       findCount++;
-      // Found after 4 scrolls
-      return findCount > 4 ? TARGET_ELEMENT : null;
+      // Found after 3 calls: initial check + 1 forward miss + 1 reverse miss + found on 4th
+      return findCount > 3 ? TARGET_ELEMENT : null;
     };
 
-    // Two same, one different, two same — the different one resets the unchanged counter
+    // One same triggers reverseMode; subsequent changes in reverse reset the counter,
+    // allowing continued scrolling until the element is found.
     const sameA = makeObserveResult(10);
-    const sameB = makeObserveResult(20);
     const suv = makeScrollUntilVisible({
       accessibilityDetector: detector,
       finder,
       timer,
       accessibilityService,
-      observeResults: [sameA, sameA, makeObserveResult(30), sameB, sameB, makeObserveResult(40)],
+      observeResults: [sameA, sameA, makeObserveResult(30), makeObserveResult(40)],
       talkBackExecutor
     });
 
-    // Should not throw despite two repeated observations in a row (count resets on change)
+    // Should not throw — hierarchy changes during reverse reset the unchanged counter
     const result = await suv.execute(BASE_OPTIONS);
     expect(result.success).toBe(true);
   });

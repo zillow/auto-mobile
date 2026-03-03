@@ -9,11 +9,11 @@ import type { ElementFinder } from "../../../utils/interfaces/ElementFinder";
 import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
 import type { ElementParser } from "../../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../../utility/ElementParser";
-import { SwipeInterval, OverlayCandidate } from "./types";
+import { SwipeInterval, OverlayCandidate, OverlayAnalyzer } from "./types";
 import { boundsArea, boundsEqual, clamp } from "../../../utils/bounds";
 import { isTruthyFlag, buildContainerFromElement } from "../../../utils/elementProperties";
 
-export class OverlayDetector {
+export class OverlayDetector implements OverlayAnalyzer {
   private static readonly OVERLAY_PADDING = 8;
   private static readonly CANDIDATE_FRACTIONS = [0.5, 0.25, 0.75, 0.15, 0.85];
 

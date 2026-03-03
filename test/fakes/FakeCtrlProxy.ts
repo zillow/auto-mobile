@@ -7,6 +7,7 @@ import {
   A11ySetTextResult,
   A11yImeActionResult,
   A11ySelectAllResult,
+  A11yActionResult,
   AccessibilityHierarchyResponse,
   AndroidPerfTiming,
   AccessibilityHierarchy
@@ -65,6 +66,25 @@ export class FakeCtrlProxy implements CtrlProxy {
     duration?: number;
     timeoutMs?: number;
   }> = [];
+
+  private twoFingerSwipeHistory: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    duration: number;
+    offset: number;
+    timeoutMs: number;
+  }> = [];
+
+  private actionHistory: Array<{
+    action: string;
+    resourceId?: string;
+    timeoutMs?: number;
+  }> = [];
+
+  private actionResult: A11yActionResult | null = null;
+  private twoFingerSwipeResult: A11ySwipeResult | null = null;
 
   private setTextHistory: Array<{
     text: string;
@@ -160,6 +180,22 @@ export class FakeCtrlProxy implements CtrlProxy {
     this.pinchResult = result;
   }
 
+  /**
+   * Configure the result returned by requestAction
+   * @param result - The action result to return (or null for default success)
+   */
+  setActionResult(result: A11yActionResult | null): void {
+    this.actionResult = result;
+  }
+
+  /**
+   * Configure the result returned by requestTwoFingerSwipe
+   * @param result - The swipe result to return (or null for default success)
+   */
+  setTwoFingerSwipeResult(result: A11ySwipeResult | null): void {
+    this.twoFingerSwipeResult = result;
+  }
+
   // Assertion methods
 
   /**
@@ -240,6 +276,28 @@ export class FakeCtrlProxy implements CtrlProxy {
   }
 
   /**
+   * Get the history of requestAction calls
+   */
+  getActionHistory(): Array<{ action: string; resourceId?: string; timeoutMs?: number }> {
+    return [...this.actionHistory];
+  }
+
+  /**
+   * Get the history of requestTwoFingerSwipe calls
+   */
+  getTwoFingerSwipeHistory(): Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    duration: number;
+    offset: number;
+    timeoutMs: number;
+  }> {
+    return [...this.twoFingerSwipeHistory];
+  }
+
+  /**
    * Get the number of screenshot requests made
    * @returns Number of screenshot requests
    */
@@ -263,6 +321,8 @@ export class FakeCtrlProxy implements CtrlProxy {
     this.dragHistory = [];
     this.setTextHistory = [];
     this.imeActionHistory = [];
+    this.actionHistory = [];
+    this.twoFingerSwipeHistory = [];
     this.screenshotRequestCount = 0;
     this.hierarchyRequestCount = 0;
   }
@@ -577,6 +637,56 @@ export class FakeCtrlProxy implements CtrlProxy {
       data: this.screenshotData,
       format: this.screenshotFormat,
       timestamp: Date.now()
+    };
+  }
+
+  async requestAction(
+    action: string,
+    resourceId?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<A11yActionResult> {
+    await this.applyDelay("requestAction");
+    this.checkFailure("requestAction");
+
+    this.actionHistory.push({ action, resourceId, timeoutMs });
+
+    if (this.actionResult) {
+      return this.actionResult;
+    }
+
+    return {
+      success: true,
+      action,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestTwoFingerSwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration: number = 300,
+    offset: number = 100,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<A11ySwipeResult> {
+    await this.applyDelay("requestTwoFingerSwipe");
+    this.checkFailure("requestTwoFingerSwipe");
+
+    this.twoFingerSwipeHistory.push({ x1, y1, x2, y2, duration, offset, timeoutMs });
+
+    if (this.twoFingerSwipeResult) {
+      return this.twoFingerSwipeResult;
+    }
+
+    return {
+      success: true,
+      totalTimeMs: duration,
+      gestureTimeMs: duration,
+      perfTiming: this.performanceTiming || undefined
     };
   }
 

@@ -1,11 +1,10 @@
 import { Element, ObserveResult, ViewHierarchyResult } from "../../../models";
 import type { ElementGeometry } from "../../../utils/interfaces/ElementGeometry";
-import type { OverlayDetector } from "./OverlayDetector";
-import type { SwipeOnResolvedOptions } from "./types";
+import type { OverlayAnalyzer, SwipeOnResolvedOptions } from "./types";
 
 export function resolveContainerSwipeCoordinates(
   geometry: ElementGeometry,
-  overlayDetector: OverlayDetector,
+  overlayDetector: OverlayAnalyzer,
   options: SwipeOnResolvedOptions,
   viewHierarchy: ViewHierarchyResult,
   containerElement: Element,

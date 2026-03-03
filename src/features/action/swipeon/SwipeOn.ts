@@ -33,7 +33,9 @@ import {
   GestureExecutor,
   SwipeOnDependencies,
   SwipeOnResolvedOptions,
-  BoomerangConfig
+  BoomerangConfig,
+  VoiceOverSwipeRunner,
+  AutoTargetSelectorService
 } from "./types";
 import { OverlayDetector } from "./OverlayDetector";
 import { AutoTargetSelector } from "./AutoTargetSelector";
@@ -53,9 +55,9 @@ export class SwipeOn extends BaseVisualChange {
   private accessibilityService: CtrlProxyClient;
   private accessibilityDetector: AccessibilityDetector;
   private overlayDetector: OverlayDetector;
-  private autoTargetSelector: AutoTargetSelector;
+  private autoTargetSelector: AutoTargetSelectorService;
   private talkBackExecutor: TalkBackSwipeExecutor;
-  private voiceOverExecutor: VoiceOverSwipeExecutor;
+  private voiceOverExecutor: VoiceOverSwipeRunner;
   private scrollUntilVisible: ScrollUntilVisible;
   private visionConfig: VisionFallbackConfig;
   private screenshotCapturer: ScreenshotCapturer;
@@ -85,7 +87,7 @@ export class SwipeOn extends BaseVisualChange {
 
     // Initialize extracted modules
     this.overlayDetector = new OverlayDetector(this.finder, this.geometry, parser);
-    this.autoTargetSelector = new AutoTargetSelector();
+    this.autoTargetSelector = dependencies.autoTargetSelector ?? new AutoTargetSelector();
     this.talkBackExecutor = new TalkBackSwipeExecutor(
       device,
       this.executeGesture,
@@ -94,7 +96,7 @@ export class SwipeOn extends BaseVisualChange {
       this.timer
     );
     const iosVoiceOverDetector = dependencies.iosVoiceOverDetector ?? defaultIosVoiceOverDetector;
-    this.voiceOverExecutor = new VoiceOverSwipeExecutor(
+    this.voiceOverExecutor = dependencies.voiceOverExecutor ?? new VoiceOverSwipeExecutor(
       device,
       this.executeGesture,
       IOSCtrlProxyClient.getInstance(device),
@@ -203,19 +205,24 @@ export class SwipeOn extends BaseVisualChange {
       direction: resolvedDirection.direction as SwipeDirection
     };
 
+    logger.info(`[SwipeOn] execute: direction=${normalizedOptions.direction}, lookFor=${JSON.stringify(normalizedOptions.lookFor)}, container=${JSON.stringify(normalizedOptions.container)}, speed=${normalizedOptions.speed}, autoTarget=${normalizedOptions.autoTarget}`);
+
     try {
       // Determine which mode to use
       if (normalizedOptions.lookFor) {
         // Scroll-until-visible mode
+        logger.info(`[SwipeOn] Mode: scroll-until-visible`);
         return await this.scrollUntilVisible.execute(normalizedOptions, progress, perf);
       } else if (!normalizedOptions.container) {
         const autoTargetEnabled = normalizedOptions.autoTarget !== false;
         if (!autoTargetEnabled) {
+          logger.info(`[SwipeOn] Mode: screen swipe (autoTarget disabled)`);
           return await this.executeScreenSwipe(normalizedOptions, progress, perf);
         }
 
         const scrollableContext = await this.getScrollableContext();
         if (scrollableContext.scrollables.length === 0) {
+          logger.info(`[SwipeOn] Mode: screen swipe (no scrollables found)`);
           return await this.executeScreenSwipe(normalizedOptions, progress, perf);
         }
 
@@ -229,6 +236,7 @@ export class SwipeOn extends BaseVisualChange {
         );
 
         if (!autoTargetElement) {
+          logger.info(`[SwipeOn] Mode: screen swipe (scrollables found but none matched direction=${normalizedOptions.direction})`);
           const result = await this.executeScreenSwipe(normalizedOptions, progress, perf);
           return {
             ...result,
@@ -239,6 +247,7 @@ export class SwipeOn extends BaseVisualChange {
 
         const autoTargetContainer = buildContainerFromElement(autoTargetElement);
         if (!autoTargetContainer) {
+          logger.info(`[SwipeOn] Mode: screen swipe (auto-target element has no usable identifier)`);
           const result = await this.executeScreenSwipe(normalizedOptions, progress, perf);
           return {
             ...result,
@@ -247,6 +256,7 @@ export class SwipeOn extends BaseVisualChange {
           };
         }
 
+        logger.info(`[SwipeOn] Mode: auto-target element swipe (container=${JSON.stringify(autoTargetContainer)})`);
         const autoTargetResult = await this.executeElementSwipe(
           { ...normalizedOptions, container: autoTargetContainer },
           progress,
@@ -263,6 +273,7 @@ export class SwipeOn extends BaseVisualChange {
         };
       } else {
         // Container specified = swipe within container
+        logger.info(`[SwipeOn] Mode: element swipe (explicit container=${JSON.stringify(normalizedOptions.container)})`);
         return await this.executeElementSwipe(normalizedOptions, progress, perf);
       }
     } catch (error) {
