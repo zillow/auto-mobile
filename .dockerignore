@@ -18,9 +18,8 @@
 # -----------------------------------------------------------------------------
 # Node.js Dependencies & Build Artifacts
 # -----------------------------------------------------------------------------
-# Node modules are rebuilt inside container via npm ci
+# Node modules are rebuilt inside container via bun install
 node_modules/
-package-lock.json.bak
 .turbo/
 
 # npm artifacts

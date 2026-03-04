@@ -102,7 +102,13 @@
     "lodash": "^4.17.23",
     "tar": "^7.5.8",
     "hono": "^4.11.10",
-    "qs": "^6.14.2"
+    "qs": "^6.14.2",
+    "@ts-morph/common": {
+      "minimatch": "3.1.5"
+    },
+    "eslint-plugin-import": {
+      "minimatch": "3.1.5"
+    }
   },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",

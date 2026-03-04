@@ -162,7 +162,6 @@ jobs:
               - 'eslint.config.mjs'
               - 'knip.json'
               - 'mkdocs.yml'
-              - 'package-lock.json'
               - 'package.json'
               - 'tsconfig.json'
 
