@@ -5,6 +5,9 @@ export interface TalkBackResult {
   currentState?: boolean;
 }
 
-export interface AccessibilityResult {
-  talkback?: TalkBackResult;
+export interface VoiceOverResult {
+  supported: boolean;
+  applied: boolean;
+  reason?: string;
+  currentState?: boolean;
 }

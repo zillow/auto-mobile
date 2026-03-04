@@ -39,5 +39,21 @@ describe("accessibilityTools", () => {
     test("rejects talkback as a number", () => {
       expect(() => accessibilitySchema.parse({ talkback: 1 })).toThrow();
     });
+
+    test("accepts voiceover: true", () => {
+      expect(() => accessibilitySchema.parse({ voiceover: true })).not.toThrow();
+    });
+
+    test("accepts voiceover: false", () => {
+      expect(() => accessibilitySchema.parse({ voiceover: false })).not.toThrow();
+    });
+
+    test("rejects voiceover as a string", () => {
+      expect(() => accessibilitySchema.parse({ voiceover: "yes" })).toThrow();
+    });
+
+    test("rejects voiceover as a number", () => {
+      expect(() => accessibilitySchema.parse({ voiceover: 1 })).toThrow();
+    });
   });
 });

@@ -2,10 +2,10 @@ import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import type { ProgressCallback } from "./toolRegistry";
 import { ActionableError, BootedDevice } from "../models";
-import { createJSONToolResponse, createStructuredToolResponse } from "../utils/toolUtils";
+import { createStructuredToolResponse } from "../utils/toolUtils";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { TalkBackToggle } from "../features/accessibility/TalkBackToggle";
-import type { AccessibilityResult } from "../models";
+import { VoiceOverToggle } from "../features/accessibility/VoiceOverToggle";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import { accessibilityDetector } from "../utils/AccessibilityDetector";
 import { iosVoiceOverDetector } from "../utils/IosVoiceOverDetector";
@@ -21,12 +21,19 @@ export const accessibilitySchema = addDeviceTargetingToSchema(
       .optional()
       .describe(
         "Enable (true) or disable (false) TalkBack on the active Android device"
+      ),
+    voiceover: z
+      .boolean()
+      .optional()
+      .describe(
+        "Enable (true) or disable (false) VoiceOver on iOS Simulator"
       )
   })
 );
 
 export interface AccessibilityArgs {
   talkback?: boolean;
+  voiceover?: boolean;
 }
 
 export function registerAccessibilityTools() {
@@ -36,15 +43,21 @@ export function registerAccessibilityTools() {
     _progress?: ProgressCallback
   ) => {
     if (device.platform === "android") {
+      if (args.voiceover !== undefined) {
+        throw new ActionableError("VoiceOver is not supported on Android devices");
+      }
       if (args.talkback !== undefined) {
-        // Toggle TalkBack on Android
         try {
-          const result: AccessibilityResult = {};
           const toggle = new TalkBackToggle(device);
-          result.talkback = await toggle.toggle(args.talkback);
-          return createJSONToolResponse(result);
+          const talkback = await toggle.toggle(args.talkback);
+          if (!talkback.supported) {
+            throw new ActionableError(talkback.reason ?? "TalkBack toggle is not supported on this device");
+          }
+          const enabled = talkback.currentState ?? false;
+          const service = enabled ? "talkback" as const : "unknown" as const;
+          return createStructuredToolResponse({ enabled, service });
         } catch (error) {
-          throw new ActionableError(`Failed to toggle accessibility services: ${error}`);
+          throw error instanceof ActionableError ? error : new ActionableError(`Failed to toggle accessibility services: ${error}`);
         }
       }
 
@@ -59,6 +72,20 @@ export function registerAccessibilityTools() {
     }
 
     if (device.platform === "ios") {
+      if (args.talkback !== undefined) {
+        throw new ActionableError("TalkBack is not supported on iOS devices");
+      }
+      if (args.voiceover !== undefined) {
+        const toggle = new VoiceOverToggle(device);
+        const voiceover = await toggle.toggle(args.voiceover);
+        if (!voiceover.supported) {
+          throw new ActionableError(voiceover.reason ?? "VoiceOver toggle is not supported on this device");
+        }
+        const enabled = voiceover.currentState ?? false;
+        const service = enabled ? "voiceover" as const : "unknown" as const;
+        return createStructuredToolResponse({ enabled, service });
+      }
+
       // Detect current VoiceOver state on iOS
       iosVoiceOverDetector.invalidateCache(device.deviceId);
       const client = IOSCtrlProxyClient.getInstance(device);
@@ -74,7 +101,7 @@ export function registerAccessibilityTools() {
 
   ToolRegistry.registerDeviceAware(
     "accessibility",
-    "Check or control accessibility services. On Android: omit talkback to check TalkBack state, or pass talkback: true/false to enable/disable it. On iOS: checks VoiceOver state. Always returns fresh state from the device.",
+    "Check or control accessibility services. On Android: omit talkback to check TalkBack state, or pass talkback: true/false to enable/disable it. On iOS: omit voiceover to check VoiceOver state, or pass voiceover: true/false to enable/disable it (Simulator only). Always returns fresh state from the device.",
     accessibilitySchema,
     accessibilityHandler,
     false,
