@@ -4,20 +4,13 @@ import type { IosVoiceOverDetector } from "../../utils/interfaces/IosVoiceOverDe
 import { iosVoiceOverDetector } from "../../utils/IosVoiceOverDetector";
 import type { ProcessExecutor } from "../../utils/ProcessExecutor";
 import { DefaultProcessExecutor } from "../../utils/ProcessExecutor";
-import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios/CtrlProxyClient";
-import type { CtrlProxyService } from "../observe/ios/CtrlProxyClient";
 
 export class VoiceOverToggle {
-  private readonly ctrlProxyService: CtrlProxyService;
-
   constructor(
     private readonly device: BootedDevice,
     private readonly detector: IosVoiceOverDetector = iosVoiceOverDetector,
-    ctrlProxyService: CtrlProxyService | null = null,
     private readonly processExecutor: ProcessExecutor = new DefaultProcessExecutor()
-  ) {
-    this.ctrlProxyService = ctrlProxyService ?? IOSCtrlProxyClient.getInstance(device);
-  }
+  ) {}
 
   async toggle(enabled: boolean): Promise<VoiceOverResult> {
     if (!this.isSimulator()) {
@@ -28,20 +21,10 @@ export class VoiceOverToggle {
       };
     }
 
-    this.detector.invalidateCache(this.device.deviceId);
-    const currentlyEnabled = await this.detector.isVoiceOverEnabled(
-      this.device.deviceId,
-      this.ctrlProxyService
-    );
-
-    if (currentlyEnabled === enabled) {
-      return {
-        supported: true,
-        applied: false,
-        currentState: enabled
-      };
-    }
-
+    // Always run the simctl commands — they are idempotent and skipping them
+    // based on a detection result is unsafe: IosVoiceOverDetector maps
+    // detection failures to false, so a CtrlProxy outage would cause
+    // toggle(false) to silently no-op when VoiceOver is actually on.
     const boolValue = enabled ? "YES" : "NO";
     await this.processExecutor.exec(
       `xcrun simctl spawn ${this.device.deviceId} defaults write com.apple.Accessibility VoiceOverTouchEnabled -bool ${boolValue}`
@@ -50,6 +33,7 @@ export class VoiceOverToggle {
       `xcrun simctl spawn ${this.device.deviceId} notifyutil -p com.apple.accessibility.VoiceOverStatusDidChange`
     );
 
+    // Flush the detection cache so the next observe() reflects the new state.
     this.detector.invalidateCache(this.device.deviceId);
 
     return {

@@ -71,7 +71,7 @@ export function registerAccessibilityTools() {
         const result: AccessibilityResult = {};
         const toggle = new VoiceOverToggle(device);
         result.voiceover = await toggle.toggle(args.voiceover);
-        return createJSONToolResponse(result);
+        return createStructuredToolResponse(result);
       }
 
       // Detect current VoiceOver state on iOS

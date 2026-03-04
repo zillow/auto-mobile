@@ -2,7 +2,6 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { VoiceOverToggle } from "../../../src/features/accessibility/VoiceOverToggle";
 import { FakeIosVoiceOverDetector } from "../../fakes/FakeIosVoiceOverDetector";
 import { FakeProcessExecutor } from "../../fakes/FakeProcessExecutor";
-import { FakeIOSCtrlProxy } from "../../fakes/FakeIOSCtrlProxy";
 import type { BootedDevice } from "../../../src/models";
 
 const SIMULATOR_DEVICE: BootedDevice = {
@@ -20,22 +19,19 @@ const PHYSICAL_DEVICE: BootedDevice = {
 describe("VoiceOverToggle", () => {
   let fakeDetector: FakeIosVoiceOverDetector;
   let fakeExec: FakeProcessExecutor;
-  let fakeCtrlProxy: FakeIOSCtrlProxy;
 
   beforeEach(() => {
     fakeDetector = new FakeIosVoiceOverDetector();
     fakeExec = new FakeProcessExecutor();
-    fakeCtrlProxy = new FakeIOSCtrlProxy();
   });
 
   afterEach(() => {
     fakeDetector.reset();
-    fakeCtrlProxy.clearHistory();
   });
 
   describe("physical device", () => {
     test("returns supported:false for physical device UDID", async () => {
-      const toggle = new VoiceOverToggle(PHYSICAL_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+      const toggle = new VoiceOverToggle(PHYSICAL_DEVICE, fakeDetector, fakeExec);
       const result = await toggle.toggle(true);
 
       expect(result.supported).toBe(false);
@@ -44,7 +40,7 @@ describe("VoiceOverToggle", () => {
     });
 
     test("does not run any process commands for physical device", async () => {
-      const toggle = new VoiceOverToggle(PHYSICAL_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+      const toggle = new VoiceOverToggle(PHYSICAL_DEVICE, fakeDetector, fakeExec);
       await toggle.toggle(true);
 
       expect(fakeExec.getExecutedCommands()).toHaveLength(0);
@@ -52,10 +48,8 @@ describe("VoiceOverToggle", () => {
   });
 
   describe("enable VoiceOver on simulator", () => {
-    test("returns supported:true applied:true when VoiceOver is currently disabled", async () => {
-      fakeDetector.setVoiceOverEnabled(false);
-
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+    test("returns supported:true applied:true", async () => {
+      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeExec);
       const result = await toggle.toggle(true);
 
       expect(result.supported).toBe(true);
@@ -65,10 +59,9 @@ describe("VoiceOverToggle", () => {
     });
 
     test("runs correct xcrun simctl spawn commands when enabling", async () => {
-      fakeDetector.setVoiceOverEnabled(false);
       const udid = SIMULATOR_DEVICE.deviceId;
 
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeExec);
       await toggle.toggle(true);
 
       expect(
@@ -83,24 +76,22 @@ describe("VoiceOverToggle", () => {
       ).toBe(true);
     });
 
-    test("is idempotent when VoiceOver is already enabled", async () => {
-      fakeDetector.setVoiceOverEnabled(true);
+    test("always applies even when detection would report already-enabled (CtrlProxy-safe)", async () => {
+      // Simulates a CtrlProxy outage: detection always returns false regardless of reality.
+      // toggle(false) must still run simctl rather than silently no-op.
+      fakeDetector.setVoiceOverEnabled(false);
 
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
-      const result = await toggle.toggle(true);
+      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeExec);
+      const result = await toggle.toggle(false);
 
-      expect(result.supported).toBe(true);
-      expect(result.applied).toBe(false);
-      expect(result.currentState).toBe(true);
-      expect(fakeExec.getExecutedCommands()).toHaveLength(0);
+      expect(result.applied).toBe(true);
+      expect(fakeExec.wasCommandExecuted("VoiceOverTouchEnabled -bool NO")).toBe(true);
     });
   });
 
   describe("disable VoiceOver on simulator", () => {
-    test("returns supported:true applied:true when VoiceOver is currently enabled", async () => {
-      fakeDetector.setVoiceOverEnabled(true);
-
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+    test("returns supported:true applied:true", async () => {
+      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeExec);
       const result = await toggle.toggle(false);
 
       expect(result.supported).toBe(true);
@@ -109,10 +100,9 @@ describe("VoiceOverToggle", () => {
     });
 
     test("runs correct xcrun simctl spawn commands when disabling", async () => {
-      fakeDetector.setVoiceOverEnabled(true);
       const udid = SIMULATOR_DEVICE.deviceId;
 
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeExec);
       await toggle.toggle(false);
 
       expect(
@@ -126,50 +116,21 @@ describe("VoiceOverToggle", () => {
         )
       ).toBe(true);
     });
-
-    test("is idempotent when VoiceOver is already disabled", async () => {
-      fakeDetector.setVoiceOverEnabled(false);
-
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
-      const result = await toggle.toggle(false);
-
-      expect(result.supported).toBe(true);
-      expect(result.applied).toBe(false);
-      expect(result.currentState).toBe(false);
-      expect(fakeExec.getExecutedCommands()).toHaveLength(0);
-    });
   });
 
   describe("cache invalidation", () => {
-    test("invalidates cache before idempotency check", async () => {
-      fakeDetector.setVoiceOverEnabled(false);
-
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+    test("invalidates detector cache after applying", async () => {
+      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeExec);
       await toggle.toggle(true);
 
-      const invalidated = fakeDetector.getInvalidatedDevices();
-      expect(invalidated.length).toBeGreaterThanOrEqual(1);
-      expect(invalidated[0]).toBe(SIMULATOR_DEVICE.deviceId);
+      expect(fakeDetector.getInvalidatedDevices()).toContain(SIMULATOR_DEVICE.deviceId);
     });
 
-    test("invalidates cache again after applying the toggle", async () => {
-      fakeDetector.setVoiceOverEnabled(false);
-
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
+    test("does not invalidate cache for physical device (no commands run)", async () => {
+      const toggle = new VoiceOverToggle(PHYSICAL_DEVICE, fakeDetector, fakeExec);
       await toggle.toggle(true);
 
-      // Before check + after apply = at least 2 invalidations
-      expect(fakeDetector.getInvalidatedDevices().length).toBeGreaterThanOrEqual(2);
-    });
-
-    test("does not invalidate after apply when idempotent (no change needed)", async () => {
-      fakeDetector.setVoiceOverEnabled(true);
-
-      const toggle = new VoiceOverToggle(SIMULATOR_DEVICE, fakeDetector, fakeCtrlProxy, fakeExec);
-      await toggle.toggle(true);
-
-      // Only one invalidation before the check; no second one since no apply happened
-      expect(fakeDetector.getInvalidatedDevices().length).toBe(1);
+      expect(fakeDetector.getInvalidatedDevices()).toHaveLength(0);
     });
   });
 });

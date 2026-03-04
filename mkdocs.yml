@@ -85,6 +85,7 @@ nav:
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
       - 'Accessibility': using/a11y.md
       - 'TalkBack Testing': using/talkback.md
+      - 'VoiceOver Testing': using/voiceover.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
       - 'Status Glossary': design-docs/status-glossary.md
@@ -118,6 +119,7 @@ nav:
           - 'Accessibility':
              - 'Overview': design-docs/mcp/a11y/index.md
              - 'TalkBack/VoiceOver': design-docs/mcp/a11y/talkback-voiceover.md
+             - 'VoiceOver/TalkBack Parity': design-docs/mcp/a11y/voiceover-talkback-parity.md
           - 'Resources': design-docs/mcp/resources.md
           - 'Context Thresholds': design-docs/mcp/context-thresholds.md
           - 'Test Plan Validation': design-docs/mcp/test-plan-validation.md
