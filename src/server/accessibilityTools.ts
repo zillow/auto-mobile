@@ -13,7 +13,7 @@ import { iosVoiceOverDetector } from "../utils/IosVoiceOverDetector";
 import { CtrlProxyClient as IOSCtrlProxyClient } from "../features/observe/ios/CtrlProxyClient";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { logger } from "../utils/logger";
-import { accessibilityStateSchema } from "./toolOutputSchemas";
+import { accessibilityOutputSchema } from "./toolOutputSchemas";
 
 export const accessibilitySchema = addDeviceTargetingToSchema(
   z.object({
@@ -94,6 +94,6 @@ export function registerAccessibilityTools() {
     accessibilityHandler,
     false,
     false,
-    { outputSchema: accessibilityStateSchema }
+    { outputSchema: accessibilityOutputSchema }
   );
 }

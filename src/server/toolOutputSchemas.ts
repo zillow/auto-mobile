@@ -144,3 +144,10 @@ export const accessibilityToggleSchema = z.object({
   talkback: accessibilityToggleResultSchema.optional(),
   voiceover: accessibilityToggleResultSchema.optional()
 }).passthrough();
+
+// Union of detection response and toggle response for the accessibility tool.
+// The tool returns different shapes depending on whether a toggle arg was provided.
+export const accessibilityOutputSchema = z.union([
+  accessibilityStateSchema,
+  accessibilityToggleSchema
+]);
