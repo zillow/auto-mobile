@@ -4,8 +4,6 @@ This project includes Docker support for running AutoMobile in a containerized e
 
 ## For MCP Clients (Claude Desktop, Continue.dev, etc.)
 
-To use this Docker image with MCP clients, see the [MCP Client Configuration Guide](docs/mcp-docker-config.md) for complete setup instructions.
-
 **Quick example for Claude Desktop**:
 ```json
 {
@@ -49,7 +47,6 @@ docker pull kaeawc/auto-mobile:0.0
 docker pull kaeawc/auto-mobile:main-abc1234
 ```
 
-**For maintainers**: See [Docker Hub Setup Guide](docs/docker-hub-setup.md) for publishing credentials and workflow configuration.
 
 ## What's Included
 
@@ -90,10 +87,6 @@ docker-compose exec auto-mobile bash -c "cd android && ./gradlew build"
 - Docker Compose v2.0+
 - For ADB device access: Privileged mode and host networking (already configured)
 - For slim images without emulator: Host Android SDK + AVDs mounted into the container
-
-## Documentation
-
-For complete documentation, see [docs/docker.md](docs/docker.md)
 
 ## Platform Notes
 
@@ -255,4 +248,4 @@ docker build --platform=linux/amd64 -t auto-mobile:latest .
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | docker run --platform=linux/amd64 -i --rm --init auto-mobile:latest
 ```
 
-For more help, see the [full Docker documentation](docs/docker.md) and [MCP configuration guide](docs/mcp-docker-config.md).
+For more help, see the sections above or check the [FAQ](docs/faq.md).

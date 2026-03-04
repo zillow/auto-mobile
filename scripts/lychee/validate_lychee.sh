@@ -83,8 +83,8 @@ if [[ ! -f "$LYCHEE_CONFIG" ]]; then
     print_warning "Running with default configuration..."
 fi
 
-# Run lychee on docs directory
-print_status "Checking links in docs/ directory..."
+# Run lychee on docs directory and root markdown files
+print_status "Checking links in docs/ and root *.md files..."
 print_status ""
 
 cd "$PROJECT_ROOT"
@@ -117,9 +117,12 @@ suggest_similar_files() {
         fi
     fi
 
-    # Search for files with similar names in current tree
+    # Search for files with similar names in current tree (docs/ and root *.md)
     local suggestions
     suggestions=$(find docs/ -type f -name "*${basename_file}*" 2>/dev/null | head -5)
+    local root_suggestions
+    root_suggestions=$(find . -maxdepth 1 -type f -name "*${basename_file}*" 2>/dev/null | head -3)
+    suggestions="${suggestions}${root_suggestions:+$'\n'$root_suggestions}"
 
     if [[ -n "$suggestions" ]]; then
         if [[ "$found_suggestions" == false ]]; then
@@ -150,7 +153,7 @@ LYCHEE_ERRORS=$(mktemp)
 
 # Run lychee with config (if exists) or default settings
 if [[ -f "$LYCHEE_CONFIG" ]]; then
-    if lychee --config "$LYCHEE_CONFIG" $VERBOSE_FLAG "docs/" 2>&1 | tee "$LYCHEE_OUTPUT"; then
+    if lychee --config "$LYCHEE_CONFIG" $VERBOSE_FLAG "docs/" ./*.md 2>&1 | tee "$LYCHEE_OUTPUT"; then
         rm -f "$LYCHEE_OUTPUT" "$LYCHEE_ERRORS"
         print_status "✓ All links are valid"
         exit 0
@@ -191,7 +194,7 @@ if [[ -f "$LYCHEE_CONFIG" ]]; then
     fi
 else
     # Run with minimal default options
-    if lychee --max-concurrency 10 --timeout 20 $VERBOSE_FLAG "docs/" 2>&1 | tee "$LYCHEE_OUTPUT"; then
+    if lychee --max-concurrency 10 --timeout 20 $VERBOSE_FLAG "docs/" ./*.md 2>&1 | tee "$LYCHEE_OUTPUT"; then
         rm -f "$LYCHEE_OUTPUT" "$LYCHEE_ERRORS"
         print_status "✓ All links are valid"
         exit 0
