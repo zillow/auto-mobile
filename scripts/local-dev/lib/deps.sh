@@ -12,6 +12,7 @@
 #   parse_required_versions()  - Extract required versions from package.json
 #   version_gte()              - Semver comparison (returns 0 if $1 >= $2)
 #   ensure_gum()               - Check gum availability (installed by install.sh)
+#   ensure_git_lfs()           - Install git-lfs, configure hooks, pull unresolved objects
 #   ensure_auto_mobile()       - Build and npm link auto-mobile CLI
 #   ensure_dev_tools()         - Install brew packages, Java, manual tools if missing
 #   ensure_dependencies()      - Run all dependency checks via install.sh
@@ -191,6 +192,47 @@ brew_cask_install_if_missing() {
   fi
 }
 
+# Ensure git-lfs is installed and configured for this repository.
+# In non-interactive mode, exits non-zero with install instructions.
+# In interactive mode, prompts to install via Homebrew, then runs git lfs install
+# and git lfs pull if unresolved LFS objects are detected.
+ensure_git_lfs() {
+  if ! git lfs version >/dev/null 2>&1; then
+    if [[ ! -t 0 ]]; then
+      log_error "git-lfs is not installed. Without it, ~1,800 LFS-tracked source files will be missing."
+      log_error "Install it with:"
+      log_error "  brew install git-lfs && git lfs install && git lfs pull"
+      return 1
+    fi
+
+    if ! prompt_confirm "git-lfs is not installed. Install it now via Homebrew?" "yes"; then
+      log_error "git-lfs is required. Run: brew install git-lfs && git lfs install && git lfs pull"
+      return 1
+    fi
+
+    if ! brew_install_if_missing git-lfs git-lfs; then
+      log_error "Failed to install git-lfs. Run: brew install git-lfs"
+      return 1
+    fi
+  fi
+
+  log_info "Configuring git-lfs for this repository..."
+  if ! git -C "${PROJECT_ROOT}" lfs install 2>/dev/null; then
+    log_warn "git lfs install failed — LFS hooks may not be active"
+  fi
+
+  local unresolved
+  unresolved=$(git -C "${PROJECT_ROOT}" lfs ls-files 2>/dev/null | grep -c " - " || true)
+  if [[ "${unresolved}" -gt 0 ]]; then
+    log_info "Found ${unresolved} unresolved LFS file(s). Running git lfs pull..."
+    if ! run_with_spinner "Downloading LFS objects..." git -C "${PROJECT_ROOT}" lfs pull; then
+      log_warn "git lfs pull encountered errors — some LFS files may still be missing"
+    fi
+  else
+    log_info "All LFS objects present."
+  fi
+}
+
 # Ensure all development tools that clean-env-uninstall.sh removes are present.
 # Installs missing tools via Homebrew, project install scripts, or gem.
 ensure_dev_tools() {
@@ -296,6 +338,12 @@ ensure_dependencies() {
 
   # Install development tools (brew packages, Java, manual installs)
   ensure_dev_tools
+
+  # Ensure git-lfs is installed and LFS objects are checked out
+  if ! ensure_git_lfs; then
+    log_error "git-lfs setup failed."
+    return 1
+  fi
 
   # Build and npm link auto-mobile (local-dev specific)
   if ! ensure_auto_mobile; then
