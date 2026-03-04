@@ -49,7 +49,7 @@ export function registerAccessibilityTools() {
           const talkback = await toggle.toggle(args.talkback);
           const enabled = talkback.currentState ?? false;
           const service = enabled ? "talkback" as const : "unknown" as const;
-          return createStructuredToolResponse({ enabled, service, talkback });
+          return createStructuredToolResponse({ enabled, service });
         } catch (error) {
           throw new ActionableError(`Failed to toggle accessibility services: ${error}`);
         }
@@ -71,7 +71,7 @@ export function registerAccessibilityTools() {
         const voiceover = await toggle.toggle(args.voiceover);
         const enabled = voiceover.currentState ?? false;
         const service = enabled ? "voiceover" as const : "unknown" as const;
-        return createStructuredToolResponse({ enabled, service, voiceover });
+        return createStructuredToolResponse({ enabled, service });
       }
 
       // Detect current VoiceOver state on iOS

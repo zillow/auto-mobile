@@ -3514,50 +3514,6 @@
                 "voiceover",
                 "unknown"
               ]
-            },
-            "talkback": {
-              "type": "object",
-              "properties": {
-                "supported": {
-                  "type": "boolean"
-                },
-                "applied": {
-                  "type": "boolean"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "currentState": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "supported",
-                "applied"
-              ],
-              "additionalProperties": false
-            },
-            "voiceover": {
-              "type": "object",
-              "properties": {
-                "supported": {
-                  "type": "boolean"
-                },
-                "applied": {
-                  "type": "boolean"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "currentState": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "supported",
-                "applied"
-              ],
-              "additionalProperties": false
             }
           },
           "required": [
