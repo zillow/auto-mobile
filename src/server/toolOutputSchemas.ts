@@ -128,11 +128,6 @@ export const freshnessSchema = z.object({
   warning: z.string().optional()
 }).passthrough();
 
-export const accessibilityStateSchema = z.object({
-  enabled: z.boolean(),
-  service: z.enum(["talkback", "voiceover", "unknown"])
-}).passthrough();
-
 const accessibilityToggleResultSchema = z.object({
   supported: z.boolean(),
   applied: z.boolean(),
@@ -140,14 +135,12 @@ const accessibilityToggleResultSchema = z.object({
   currentState: z.boolean().optional()
 });
 
-export const accessibilityToggleSchema = z.object({
+// Single schema covering both detection-only and toggle responses.
+// Toggle paths include the same enabled/service fields as detection, plus the
+// talkback or voiceover toggle result, so callers always get a consistent shape.
+export const accessibilityStateSchema = z.object({
+  enabled: z.boolean(),
+  service: z.enum(["talkback", "voiceover", "unknown"]),
   talkback: accessibilityToggleResultSchema.optional(),
   voiceover: accessibilityToggleResultSchema.optional()
 }).passthrough();
-
-// Union of detection response and toggle response for the accessibility tool.
-// The tool returns different shapes depending on whether a toggle arg was provided.
-export const accessibilityOutputSchema = z.union([
-  accessibilityStateSchema,
-  accessibilityToggleSchema
-]);

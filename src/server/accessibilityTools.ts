@@ -2,18 +2,17 @@ import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import type { ProgressCallback } from "./toolRegistry";
 import { ActionableError, BootedDevice } from "../models";
-import { createJSONToolResponse, createStructuredToolResponse } from "../utils/toolUtils";
+import { createStructuredToolResponse } from "../utils/toolUtils";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { TalkBackToggle } from "../features/accessibility/TalkBackToggle";
 import { VoiceOverToggle } from "../features/accessibility/VoiceOverToggle";
-import type { AccessibilityResult } from "../models";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import { accessibilityDetector } from "../utils/AccessibilityDetector";
 import { iosVoiceOverDetector } from "../utils/IosVoiceOverDetector";
 import { CtrlProxyClient as IOSCtrlProxyClient } from "../features/observe/ios/CtrlProxyClient";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { logger } from "../utils/logger";
-import { accessibilityOutputSchema } from "./toolOutputSchemas";
+import { accessibilityStateSchema } from "./toolOutputSchemas";
 
 export const accessibilitySchema = addDeviceTargetingToSchema(
   z.object({
@@ -45,12 +44,12 @@ export function registerAccessibilityTools() {
   ) => {
     if (device.platform === "android") {
       if (args.talkback !== undefined) {
-        // Toggle TalkBack on Android
         try {
-          const result: AccessibilityResult = {};
           const toggle = new TalkBackToggle(device);
-          result.talkback = await toggle.toggle(args.talkback);
-          return createJSONToolResponse(result);
+          const talkback = await toggle.toggle(args.talkback);
+          const enabled = talkback.currentState ?? false;
+          const service = enabled ? "talkback" as const : "unknown" as const;
+          return createStructuredToolResponse({ enabled, service, talkback });
         } catch (error) {
           throw new ActionableError(`Failed to toggle accessibility services: ${error}`);
         }
@@ -68,10 +67,11 @@ export function registerAccessibilityTools() {
 
     if (device.platform === "ios") {
       if (args.voiceover !== undefined) {
-        const result: AccessibilityResult = {};
         const toggle = new VoiceOverToggle(device);
-        result.voiceover = await toggle.toggle(args.voiceover);
-        return createStructuredToolResponse(result);
+        const voiceover = await toggle.toggle(args.voiceover);
+        const enabled = voiceover.currentState ?? false;
+        const service = enabled ? "voiceover" as const : "unknown" as const;
+        return createStructuredToolResponse({ enabled, service, voiceover });
       }
 
       // Detect current VoiceOver state on iOS
@@ -94,6 +94,6 @@ export function registerAccessibilityTools() {
     accessibilityHandler,
     false,
     false,
-    { outputSchema: accessibilityOutputSchema }
+    { outputSchema: accessibilityStateSchema }
   );
 }
