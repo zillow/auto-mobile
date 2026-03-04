@@ -43,6 +43,9 @@ export function registerAccessibilityTools() {
     _progress?: ProgressCallback
   ) => {
     if (device.platform === "android") {
+      if (args.voiceover !== undefined) {
+        throw new ActionableError("VoiceOver is not supported on Android devices");
+      }
       if (args.talkback !== undefined) {
         try {
           const toggle = new TalkBackToggle(device);
@@ -69,6 +72,9 @@ export function registerAccessibilityTools() {
     }
 
     if (device.platform === "ios") {
+      if (args.talkback !== undefined) {
+        throw new ActionableError("TalkBack is not supported on iOS devices");
+      }
       if (args.voiceover !== undefined) {
         const toggle = new VoiceOverToggle(device);
         const voiceover = await toggle.toggle(args.voiceover);
