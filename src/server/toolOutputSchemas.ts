@@ -132,3 +132,15 @@ export const accessibilityStateSchema = z.object({
   enabled: z.boolean(),
   service: z.enum(["talkback", "voiceover", "unknown"])
 }).passthrough();
+
+const accessibilityToggleResultSchema = z.object({
+  supported: z.boolean(),
+  applied: z.boolean(),
+  reason: z.string().optional(),
+  currentState: z.boolean().optional()
+});
+
+export const accessibilityToggleSchema = z.object({
+  talkback: accessibilityToggleResultSchema.optional(),
+  voiceover: accessibilityToggleResultSchema.optional()
+}).passthrough();

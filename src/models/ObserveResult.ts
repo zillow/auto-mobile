@@ -204,7 +204,7 @@ export interface ObserveResult {
     /** Whether any accessibility service is enabled */
     enabled: boolean;
     /** The detected accessibility service type */
-    service: "talkback" | "unknown";
+    service: "talkback" | "voiceover" | "unknown";
   };
 
   /**
