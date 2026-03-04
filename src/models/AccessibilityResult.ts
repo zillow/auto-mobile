@@ -11,8 +11,3 @@ export interface VoiceOverResult {
   reason?: string;
   currentState?: boolean;
 }
-
-export interface AccessibilityResult {
-  talkback?: TalkBackResult;
-  voiceover?: VoiceOverResult;
-}

@@ -47,11 +47,14 @@ export function registerAccessibilityTools() {
         try {
           const toggle = new TalkBackToggle(device);
           const talkback = await toggle.toggle(args.talkback);
+          if (!talkback.supported) {
+            throw new ActionableError(talkback.reason ?? "TalkBack toggle is not supported on this device");
+          }
           const enabled = talkback.currentState ?? false;
           const service = enabled ? "talkback" as const : "unknown" as const;
           return createStructuredToolResponse({ enabled, service });
         } catch (error) {
-          throw new ActionableError(`Failed to toggle accessibility services: ${error}`);
+          throw error instanceof ActionableError ? error : new ActionableError(`Failed to toggle accessibility services: ${error}`);
         }
       }
 
@@ -69,6 +72,9 @@ export function registerAccessibilityTools() {
       if (args.voiceover !== undefined) {
         const toggle = new VoiceOverToggle(device);
         const voiceover = await toggle.toggle(args.voiceover);
+        if (!voiceover.supported) {
+          throw new ActionableError(voiceover.reason ?? "VoiceOver toggle is not supported on this device");
+        }
         const enabled = voiceover.currentState ?? false;
         const service = enabled ? "voiceover" as const : "unknown" as const;
         return createStructuredToolResponse({ enabled, service });

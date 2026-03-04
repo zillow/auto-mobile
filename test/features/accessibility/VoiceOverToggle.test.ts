@@ -36,7 +36,7 @@ describe("VoiceOverToggle", () => {
 
       expect(result.supported).toBe(false);
       expect(result.applied).toBe(false);
-      expect(result.reason).toBeDefined();
+      expect(result.reason).toBe("VoiceOver toggle is only supported on iOS Simulator");
     });
 
     test("does not run any process commands for physical device", async () => {
