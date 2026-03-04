@@ -83,6 +83,7 @@ LAST_TS_HASH=""
 # Track device/simulator state
 LAST_ADB_DEVICES=""
 LAST_SIMULATOR=""
+CTRL_PROXY_SIMULATOR=""      # Simulator CtrlProxy is currently targeting
 APK_NEEDS_INSTALL=false
 IOS_NEEDS_RESTART=false
 
@@ -641,8 +642,14 @@ unified_watch_loop() {
 
       if [[ "${current_simulator}" != "${LAST_SIMULATOR}" ]]; then
         if [[ -n "${current_simulator}" ]]; then
-          log_info "[iOS] Booted simulator: ${current_simulator}"
-          IOS_NEEDS_RESTART=true
+          if [[ "${current_simulator}" != "${CTRL_PROXY_SIMULATOR}" ]]; then
+            # Genuinely new/different simulator — restart CtrlProxy for it
+            log_info "[iOS] New booted simulator: ${current_simulator}"
+            IOS_NEEDS_RESTART=true
+          else
+            # Same simulator CtrlProxy is already targeting (reappeared after xcodebuild reboot)
+            log_info "[iOS] Simulator returned: ${current_simulator}"
+          fi
         else
           log_warn "[iOS] No booted simulator detected."
         fi
@@ -673,6 +680,7 @@ unified_watch_loop() {
       if [[ -n "${XCODEBUILD_PID}" ]] && ! kill -0 "${XCODEBUILD_PID}" 2>/dev/null; then
         log_warn "[iOS] CtrlProxy iOS process exited."
         XCODEBUILD_PID=""
+        CTRL_PROXY_SIMULATOR=""
         IOS_NEEDS_RESTART=true
       fi
 
@@ -680,6 +688,7 @@ unified_watch_loop() {
       if [[ "${IOS_NEEDS_RESTART}" == "true" ]] && [[ -n "${LAST_SIMULATOR}" ]]; then
         stop_ctrl_proxy_ios
         start_ctrl_proxy_ios "${LAST_SIMULATOR}"
+        CTRL_PROXY_SIMULATOR="${LAST_SIMULATOR}"
         IOS_NEEDS_RESTART=false
       fi
     fi
@@ -860,6 +869,7 @@ WATCHER_LOG="${PROJECT_ROOT}/scratch/hot-reload.log"
     if [[ -n "${initial_simulator}" ]]; then
       start_ctrl_proxy_ios "${initial_simulator}"
       LAST_SIMULATOR="${initial_simulator}"
+      CTRL_PROXY_SIMULATOR="${initial_simulator}"
     fi
   fi
 
