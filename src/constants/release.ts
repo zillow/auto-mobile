@@ -19,7 +19,7 @@ export const RELEASE_VERSION: string = "latest";
 export const APK_URL: string = RELEASE_VERSION === "latest"
   ? `https://github.com/kaeawc/auto-mobile/releases/latest/download/control-proxy-debug.apk`
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${RELEASE_VERSION}/control-proxy-debug.apk`;
-export const APK_SHA256_CHECKSUM: string = "2a0c1f0241ae7802779ba4bca84cb2a66dafadac5cb1d5c13c970c2c3be19ee6"; // Empty = skip verification (local dev only)
+export const APK_SHA256_CHECKSUM: string = "6c1899f71836624286a83fcebf309bfb4c7ec3a702b3a7e3defcad595c7beb90"; // Empty = skip verification (local dev only)
 
 /**
  * iOS CtrlProxy Release Constants
@@ -31,6 +31,6 @@ export const IOS_CTRL_PROXY_RELEASE_VERSION: string = "latest";
 export const IOS_CTRL_PROXY_IPA_URL: string = IOS_CTRL_PROXY_RELEASE_VERSION === "latest"
   ? "https://github.com/kaeawc/auto-mobile/releases/latest/download/control-proxy.ipa"
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${IOS_CTRL_PROXY_RELEASE_VERSION}/control-proxy.ipa`;
-export const IOS_CTRL_PROXY_SHA256_CHECKSUM: string = "e6f378698d9caa7fe4a527d4eb1c6ec240cf09e6575197051726c8e8ed0c922e"; // Empty = skip verification (local dev only)
+export const IOS_CTRL_PROXY_SHA256_CHECKSUM: string = "d8c84ad7a928bac489901aa6bddb729139e3bcc12fdeeb68f6f17d8495d31511"; // Empty = skip verification (local dev only)
 export const IOS_CTRL_PROXY_APP_HASH: string = ""; // Hash of CtrlProxyApp.app (device build), empty = skip verification
 export const IOS_CTRL_PROXY_RUNNER_SHA256: string = ""; // SHA256 of runner binary (CtrlProxyUITests-Runner), empty = skip verification
