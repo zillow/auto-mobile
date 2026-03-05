@@ -8,7 +8,7 @@ export type { ScreenshotUtils };
  * Adapter class that implements ScreenshotUtils interface
  * Delegates instance method calls to ScreenshotUtils static methods
  */
-export class ScreenshotUtilsAdapter implements ScreenshotUtils {
+class ScreenshotUtilsAdapter implements ScreenshotUtils {
   /**
    * Get screenshot from cache or load from disk
    * @param filePath Path to screenshot file

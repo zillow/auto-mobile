@@ -94,7 +94,7 @@ interface HostControlCtrlProxyIOSRunner {
 /**
  * Capabilities of the iOS device for CtrlProxy
  */
-export interface CtrlProxyIosCapabilities {
+interface CtrlProxyIosCapabilities {
   supportsXCTest: boolean;
   deviceType: "simulator" | "physical";
   iosVersion: string | null;

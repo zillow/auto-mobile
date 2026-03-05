@@ -34,14 +34,14 @@ export interface SelectionCaptureState {
   action: string;
 }
 
-export interface SelectionCaptureRequest {
+interface SelectionCaptureRequest {
   action: string;
   observation?: ObserveResult;
   element?: Element;
   signal?: AbortSignal;
 }
 
-export interface SelectionFinalizeRequest {
+interface SelectionFinalizeRequest {
   action: string;
   selectionState?: SelectionCaptureState | null;
   currentObservation?: ObserveResult;
@@ -50,7 +50,7 @@ export interface SelectionFinalizeRequest {
   signal?: AbortSignal;
 }
 
-export interface SelectionStateTrackerOptions {
+interface SelectionStateTrackerOptions {
   detector?: SelectionStateDetectorLike;
   screenshotCapturer: ScreenshotCapturer;
 }

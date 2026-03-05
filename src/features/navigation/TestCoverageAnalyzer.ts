@@ -4,7 +4,7 @@ import type { NavigationNode, NavigationEdge } from "../../db/types";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
-export interface CoverageGap {
+interface CoverageGap {
   type: "node" | "edge";
   id: number;
   screenName?: string;
@@ -14,7 +14,7 @@ export interface CoverageGap {
   recommendation: string;
 }
 
-export interface TestCoverageReport {
+interface TestCoverageReport {
   appId: string;
   generatedAt: number;
 
@@ -41,7 +41,7 @@ export interface TestCoverageReport {
   suggestedScenarios: TestScenario[];
 }
 
-export interface TestScenario {
+interface TestScenario {
   title: string;
   description: string;
   priority: "high" | "medium" | "low";
@@ -52,7 +52,7 @@ export interface TestScenario {
 /**
  * Analyzes test coverage for navigation graphs and generates recommendations.
  */
-export class TestCoverageAnalyzer {
+class TestCoverageAnalyzer {
   private navigationRepository: NavigationRepository;
   private timer: Timer;
 

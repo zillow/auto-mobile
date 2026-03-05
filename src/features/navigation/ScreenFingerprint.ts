@@ -78,7 +78,7 @@ export interface FingerprintResult {
 /**
  * Options for fingerprint computation
  */
-export interface FingerprintOptions {
+interface FingerprintOptions {
   /** Cached navigation ID from previous observation (for keyboard occlusion) */
   cachedNavigationId?: string;
   /** Timestamp of cached navigation ID */

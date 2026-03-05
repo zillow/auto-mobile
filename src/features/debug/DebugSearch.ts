@@ -14,7 +14,7 @@ import { DefaultElementParser } from "../utility/ElementParser";
 import { DefaultTextMatcher } from "../utility/TextMatcher";
 import { DefaultElementFinder } from "../utility/ElementFinder";
 
-export interface DebugSearchOptions {
+interface DebugSearchOptions {
   /**
    * Text to search for
    */

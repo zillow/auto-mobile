@@ -11,7 +11,7 @@ import {
 /**
  * Options for the hierarchy navigation detector.
  */
-export interface HierarchyNavigationDetectorOptions {
+interface HierarchyNavigationDetectorOptions {
   /** Debounce time in milliseconds (default: 100ms) */
   debounceMs?: number;
   /** Max time to wait for UI stability in milliseconds (default: 5000ms) */
@@ -31,7 +31,7 @@ export interface HierarchyNavigationUpdateMetrics {
  * Callback invoked when hierarchy-based navigation is detected.
  * Can be used to trigger screenshot capture from the owning service.
  */
-export type HierarchyNavigationCallback = (info: {
+type HierarchyNavigationCallback = (info: {
   packageName: string | null;
   screenFingerprint: string;
   timestamp: number;

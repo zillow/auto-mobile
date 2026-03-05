@@ -11,12 +11,12 @@ export interface AndroidToolsLocation {
   available_tools: string[];
 }
 
-export interface AndroidToolInfo {
+interface AndroidToolInfo {
   name: string;
   description: string;
 }
 
-export interface AndroidHomeWithSystemImages {
+interface AndroidHomeWithSystemImages {
   androidHome: string;
   systemImagesPath: string;
 }
@@ -253,7 +253,7 @@ export function getAvailableToolsInDirectory(toolsDir: string, systemDetection =
 /**
  * Get version information for Android command line tools at a specific location
  */
-export async function getAndroidToolsVersion(toolsPath: string, systemDetection = createDefaultSystemDetection()): Promise<string | undefined> {
+async function getAndroidToolsVersion(toolsPath: string, systemDetection = createDefaultSystemDetection()): Promise<string | undefined> {
   try {
     // Try to get version from various tools
     const binDir = join(toolsPath, "bin");
@@ -361,7 +361,7 @@ export async function detectAndroidSdkTools(systemDetection = createDefaultSyste
 /**
  * Detect Android command line tools available in PATH
  */
-export async function detectAndroidToolsInPath(systemDetection = createDefaultSystemDetection()): Promise<AndroidToolsLocation | null> {
+async function detectAndroidToolsInPath(systemDetection = createDefaultSystemDetection()): Promise<AndroidToolsLocation | null> {
   const availableTools: string[] = [];
   const toolPaths: Record<string, string> = {};
   logger.info("Looking for for Android SDK tools in PATH");

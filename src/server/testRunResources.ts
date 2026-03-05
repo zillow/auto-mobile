@@ -2,7 +2,7 @@ import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { logger } from "../utils/logger";
 import { TestExecutionRepository, TestRun, TestRunQueryOptions } from "../db/testExecutionRepository";
 
-export const TEST_RUN_RESOURCE_URIS = {
+const TEST_RUN_RESOURCE_URIS = {
   BASE: "automobile:test-runs",
 } as const;
 
@@ -20,7 +20,7 @@ const TEST_RUN_QUERY_PARAM_KEYS = new Set([
   "latestOnly",
 ] as const);
 
-export interface TestRunQueryArgs {
+interface TestRunQueryArgs {
   lookbackDays?: number;
   limit?: number;
   testClass?: string;
@@ -29,7 +29,7 @@ export interface TestRunQueryArgs {
   latestOnly?: boolean;
 }
 
-export interface TestRunResponseStep {
+interface TestRunResponseStep {
   id: number;
   index: number;
   action: string;
@@ -41,7 +41,7 @@ export interface TestRunResponseStep {
   errorMessage: string | null;
 }
 
-export interface TestRunResponseEntry {
+interface TestRunResponseEntry {
   id: number;
   testClass: string;
   testMethod: string;
@@ -60,7 +60,7 @@ export interface TestRunResponseEntry {
   sampleSize: number; // Total runs for this test (for history bar)
 }
 
-export interface TestRunResponse {
+interface TestRunResponse {
   testRuns: TestRunResponseEntry[];
   generatedAt: string;
   totalRuns: number;

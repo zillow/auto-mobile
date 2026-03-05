@@ -8,7 +8,7 @@ import { Timer, defaultTimer } from "./SystemTimer";
  * Interface for accessibility focus tracking operations.
  * Provides methods for tracking TalkBack cursor position and navigating the accessibility tree.
  */
-export interface AccessibilityFocusService {
+interface AccessibilityFocusService {
   /**
    * Get the current accessibility focus element (TalkBack cursor position).
    */
@@ -85,7 +85,7 @@ interface TraversalOrderCache {
 /**
  * Bounds for element matching
  */
-export interface SelectorBounds {
+interface SelectorBounds {
   left: number;
   top: number;
   right: number;
@@ -419,9 +419,3 @@ export class AccessibilityFocusTracker implements AccessibilityFocusService {
     );
   }
 }
-
-/**
- * Default singleton instance of AccessibilityFocusTracker.
- * Use this for production code. For testing, use AccessibilityFocusTracker.createForTesting().
- */
-export const defaultAccessibilityFocusTracker: AccessibilityFocusService = AccessibilityFocusTracker.getInstance();

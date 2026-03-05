@@ -89,8 +89,6 @@ export class DefaultToolResponseFormatter implements ToolResponseFormatter {
 
 // Export convenience functions for backward compatibility
 export const createJSONToolResponse = DefaultToolResponseFormatter.createJSONToolResponse;
-export const createImageToolResponse = DefaultToolResponseFormatter.createImageToolResponse;
-
 /**
  * Creates a structured tool response for tools with outputSchema.
  * MCP tools with outputSchema must return structuredContent.

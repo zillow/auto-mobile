@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import { join, relative } from "path";
 
-export interface AppBundleHasherDependencies {
+interface AppBundleHasherDependencies {
   readDir: (path: string) => Promise<string[]>;
   stat: (path: string) => Promise<{ isDirectory: () => boolean; isFile: () => boolean }>;
   readFile: (path: string) => Promise<Buffer>;

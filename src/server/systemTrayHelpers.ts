@@ -162,13 +162,13 @@ interface SystemTrayNotificationCandidate {
   element?: Element;
 }
 
-export interface SystemTrayNotificationMatch {
+interface SystemTrayNotificationMatch {
   candidate: SystemTrayNotificationCandidate;
   match: SystemTrayMatchResult;
   subHierarchy: ViewHierarchyResult;
 }
 
-export interface SystemTrayElementMatch {
+interface SystemTrayElementMatch {
   text: string;
   matchType: SystemTrayMatchType;
   element: Element;

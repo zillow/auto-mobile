@@ -5,7 +5,7 @@ type MigrationWarning = {
   stepIndex?: number;
 };
 
-export type PlanMigrationReport = {
+type PlanMigrationReport = {
   appliedMigrations: string[];
   warnings: MigrationWarning[];
   originalVersion: string;

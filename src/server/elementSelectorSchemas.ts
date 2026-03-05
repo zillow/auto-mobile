@@ -21,10 +21,6 @@ export const elementContainerSchema = createElementIdTextSelectorSchema({
   text: "Container text"
 });
 
-export const elementIdTextSelectorSchema = createElementIdTextSelectorSchema({
-  elementId: "Element resource ID / accessibility identifier",
-  text: "Element text"
-});
 
 export const elementIdTextFieldsSchema = z.object({
   elementId: z.string().describe("Element resource ID / accessibility identifier").optional(),

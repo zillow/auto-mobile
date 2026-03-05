@@ -6,21 +6,21 @@ import { SharpImageUtils } from "../../utils/image-utils";
 import { logger } from "../../utils/logger";
 import { UIStateExtractor } from "./UIStateExtractor";
 
-export interface VisualSelectionConfig {
+interface VisualSelectionConfig {
   minDifferencePercent?: number;
   minElementSizePx?: number;
   pixelmatchThreshold?: number;
   confidenceScale?: number;
 }
 
-export const DEFAULT_VISUAL_SELECTION_CONFIG: Required<VisualSelectionConfig> = {
+const DEFAULT_VISUAL_SELECTION_CONFIG: Required<VisualSelectionConfig> = {
   minDifferencePercent: 1,
   minElementSizePx: 4,
   pixelmatchThreshold: 0.1,
   confidenceScale: 5
 };
 
-export interface SelectionStateDetectorOptions {
+interface SelectionStateDetectorOptions {
   screenshotUtils?: ScreenshotUtils;
   imageUtils?: ImageUtils;
   config?: VisualSelectionConfig;

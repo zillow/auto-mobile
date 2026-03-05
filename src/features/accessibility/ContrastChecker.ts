@@ -58,7 +58,7 @@ interface ContrastResult {
 /**
  * Configuration options for contrast checking caches
  */
-export interface ContrastCheckConfig {
+interface ContrastCheckConfig {
   /** Enable multi-point sampling for contrast (default: true) */
   useMultiPointSampling?: boolean;
 
@@ -101,7 +101,7 @@ export interface ContrastCheckConfig {
 /**
  * Cache statistics for debugging and monitoring
  */
-export interface CacheStats {
+interface CacheStats {
   screenshots: {
     size: number;
     hits: number;

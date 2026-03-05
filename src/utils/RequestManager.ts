@@ -16,7 +16,7 @@ interface PendingRequest<T> {
 /**
  * Default error result factory for timed-out requests.
  */
-export type TimeoutErrorFactory<T> = (requestId: string, type: string, timeoutMs: number) => T;
+type TimeoutErrorFactory<T> = (requestId: string, type: string, timeoutMs: number) => T;
 
 /**
  * Manages pending requests with automatic timeout handling.

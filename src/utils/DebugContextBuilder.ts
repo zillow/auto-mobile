@@ -5,7 +5,7 @@ import { isDebugModeEnabled } from "./debug";
 /**
  * Debug information about an element search failure
  */
-export interface ElementSearchDebugInfo {
+interface ElementSearchDebugInfo {
   /**
    * What was being searched for
    */

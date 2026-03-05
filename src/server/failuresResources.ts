@@ -3,7 +3,7 @@ import { logger } from "../utils/logger";
 import { FailureAnalyticsRepository } from "../db/failureAnalyticsRepository";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
-export const FAILURES_RESOURCE_URIS = {
+const FAILURES_RESOURCE_URIS = {
   BASE: "automobile:failures",
   TIMELINE: "automobile:failures/timeline",
 } as const;
@@ -14,7 +14,7 @@ const failureAnalyticsRepository = new FailureAnalyticsRepository();
 
 export type FailureType = "crash" | "anr" | "tool_failure" | "nonfatal";
 export type FailureSeverity = "critical" | "high" | "medium" | "low";
-export type CaptureType = "screenshot" | "video";
+type CaptureType = "screenshot" | "video";
 
 export interface StackTraceElement {
   className: string;
@@ -44,7 +44,7 @@ export interface ScreenBreakdown {
   visitPercentage: number;
 }
 
-export interface DurationStats {
+interface DurationStats {
   minMs: number;
   maxMs: number;
   avgMs: number;
@@ -103,7 +103,7 @@ export interface FailureGroup {
   sampleOccurrences: FailureOccurrence[];
 }
 
-export interface FailuresResponse {
+interface FailuresResponse {
   groups: FailureGroup[];
   generatedAt: string;
 }
@@ -123,7 +123,7 @@ export interface PeriodTotals {
   nonfatals: number;
 }
 
-export interface TimelineResponse {
+interface TimelineResponse {
   dataPoints: TimelineDataPoint[];
   dateRange: string;
   aggregation: string;

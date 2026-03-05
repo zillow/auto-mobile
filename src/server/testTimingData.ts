@@ -4,9 +4,9 @@ import {
   TEST_EXECUTION_RETENTION_MAX_DAYS,
 } from "../db/testExecutionRepository";
 
-export const DEFAULT_TEST_TIMING_LOOKBACK_DAYS = TEST_EXECUTION_RETENTION_MAX_DAYS;
-export const DEFAULT_TEST_TIMING_LIMIT = 1000;
-export const DEFAULT_TEST_TIMING_MIN_SAMPLES = 1;
+const DEFAULT_TEST_TIMING_LOOKBACK_DAYS = TEST_EXECUTION_RETENTION_MAX_DAYS;
+const DEFAULT_TEST_TIMING_LIMIT = 1000;
+const DEFAULT_TEST_TIMING_MIN_SAMPLES = 1;
 export const TEST_TIMING_LIMIT_MAX = 5000;
 
 export interface TestTimingQueryArgs {
@@ -31,7 +31,7 @@ export interface TestTimingQueryArgs {
   sessionUuid?: string;
 }
 
-export interface TestTimingResponseEntry {
+interface TestTimingResponseEntry {
   testClass: string;
   testMethod: string;
   averageDurationMs: number;
@@ -48,7 +48,7 @@ export interface TestTimingResponseEntry {
   };
 }
 
-export interface TestTimingResponse {
+interface TestTimingResponse {
   testTimings: TestTimingResponseEntry[];
   generatedAt: string;
   totalTests: number;

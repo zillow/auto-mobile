@@ -12,7 +12,7 @@ import { NewMemoryAuditResult } from "../../db/types";
 /**
  * Represents a single memory threshold violation
  */
-export interface MemoryViolation {
+interface MemoryViolation {
   metric: string;
   threshold: number;
   actual: number;
@@ -23,7 +23,7 @@ export interface MemoryViolation {
 /**
  * Memory audit result
  */
-export interface MemoryAuditResult {
+interface MemoryAuditResult {
   passed: boolean;
   metrics: MemoryMetrics;
   violations: MemoryViolation[];

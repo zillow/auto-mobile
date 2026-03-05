@@ -4,7 +4,7 @@ const isDeviceDefinition = (device: PlanDevice): device is PlanDeviceDefinition 
   return typeof device === "object" && device !== null && !Array.isArray(device);
 };
 
-export type NormalizedPlanDevices = {
+type NormalizedPlanDevices = {
   labels: string[];
   definitions: PlanDeviceDefinition[];
   hasDefinitions: boolean;
@@ -41,8 +41,4 @@ export const normalizePlanDevices = (devices?: PlanDevice[]): NormalizedPlanDevi
 
 export const getPlanDeviceLabels = (devices?: PlanDevice[]): string[] => {
   return normalizePlanDevices(devices).labels;
-};
-
-export const hasDeviceDefinitions = (devices?: PlanDevice[]): boolean => {
-  return normalizePlanDevices(devices).hasDefinitions;
 };

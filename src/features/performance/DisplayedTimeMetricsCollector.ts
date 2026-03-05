@@ -4,7 +4,7 @@ import { logger } from "../../utils/logger";
 import { BootedDevice, DisplayedLogcatTag, DisplayedTimeMetric } from "../../models";
 import { NoOpPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 
-export interface DisplayedTimeCaptureOptions {
+interface DisplayedTimeCaptureOptions {
   packageName: string;
   startTimestampMs: number;
   endTimestampMs: number;

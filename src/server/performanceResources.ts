@@ -6,7 +6,7 @@ import {
   type PerformanceAuditQueryArgs,
 } from "./performanceData";
 
-export const PERFORMANCE_RESOURCE_URIS = {
+const PERFORMANCE_RESOURCE_URIS = {
   BASE: "automobile:performance-results",
 } as const;
 

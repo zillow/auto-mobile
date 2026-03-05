@@ -6,7 +6,7 @@ import {
   type TestTimingQueryArgs,
 } from "./testTimingData";
 
-export const TEST_TIMING_RESOURCE_URIS = {
+const TEST_TIMING_RESOURCE_URIS = {
   BASE: "automobile:test-timings",
 } as const;
 

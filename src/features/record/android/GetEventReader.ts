@@ -7,7 +7,7 @@ import type { CoordScaler } from "./AxisRanges";
 import { TouchFrameReconstructor } from "./TouchFrameReconstructor";
 import { GestureClassifier } from "./GestureClassifier";
 
-export interface GetEventReaderOptions {
+interface GetEventReaderOptions {
   deviceId: string;
   touchNode: TouchInputNode;
   scaler: CoordScaler;

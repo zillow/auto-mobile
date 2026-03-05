@@ -16,11 +16,11 @@ export interface CmdlineToolsInstaller {
   ): Promise<CmdlineToolsInstallResult>;
 }
 
-export interface CmdlineToolsInstallOptions {
+interface CmdlineToolsInstallOptions {
   force?: boolean;
 }
 
-export interface CmdlineToolsInstallResult {
+interface CmdlineToolsInstallResult {
   success: boolean;
   message: string;
   path: string;
@@ -43,18 +43,14 @@ export interface CmdlineToolsTempDirProvider {
   createTempDir(prefix: string): Promise<string>;
 }
 
-/**
- * @deprecated Use FileSystem from utils/filesystem/DefaultFileSystem instead
- */
-export type CmdlineToolsFileSystem = FileSystem;
 
-export interface CmdlineToolsDownloadSpec {
+interface CmdlineToolsDownloadSpec {
   version: string;
   baseUrl: string;
   platforms: Record<"darwin" | "linux" | "win32", { filename: string; checksum: string }>;
 }
 
-export interface CmdlineToolsInstallerDependencies {
+interface CmdlineToolsInstallerDependencies {
   fileSystem?: FileSystem;
   downloader?: CmdlineToolsDownloader;
   zipExtractor?: CmdlineToolsZipExtractor;

@@ -3,12 +3,12 @@ import { Resource, ResourceTemplate, ReadResourceRequestSchema, ListResourcesReq
 import { logger } from "../utils/logger";
 
 // Interface for resource content handlers
-export interface ResourceHandler {
+interface ResourceHandler {
   (): Promise<ResourceContent>;
 }
 
 // Interface for resource template handlers (with parameters)
-export interface ResourceTemplateHandler {
+interface ResourceTemplateHandler {
   (params: Record<string, string>): Promise<ResourceContent>;
 }
 
@@ -21,7 +21,7 @@ export interface ResourceContent {
 }
 
 // Interface for a registered resource
-export interface RegisteredResource {
+interface RegisteredResource {
   uri: string;
   name: string;
   description?: string;
@@ -30,7 +30,7 @@ export interface RegisteredResource {
 }
 
 // Interface for a registered resource template
-export interface RegisteredResourceTemplate {
+interface RegisteredResourceTemplate {
   uriTemplate: string;
   name: string;
   description?: string;

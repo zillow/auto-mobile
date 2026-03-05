@@ -1,16 +1,5 @@
 import { NavigationEdge, ScrollPosition } from "../../../utils/interfaces/NavigationGraph";
 
-/**
- * Result of UI state setup operations.
- */
-export interface UIStateSetupResult {
-  /** Array of setup actions that were performed (for logging/debugging) */
-  actions: string[];
-  /** Whether setup was successful */
-  success: boolean;
-  /** Error message if setup failed */
-  error?: string;
-}
 
 /**
  * Interface for setting up UI state before navigation steps.

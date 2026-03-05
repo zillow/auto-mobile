@@ -51,7 +51,7 @@ export function consumeSetupTiming(deviceId: string): TimingData | null {
  * - Update session cache after execution
  * - Share state across tool calls within same session
  */
-export interface ToolExecutionContext {
+interface ToolExecutionContext {
   sessionId?: string;
   deviceId?: string;
   devicePlatform?: Platform;
@@ -215,26 +215,4 @@ export async function updateSessionCache(
 
   session.cacheData.customData[cacheKey] = cacheValue;
   context.sessionManager.updateSessionCache(context.sessionId, session.cacheData);
-}
-
-/**
- * Get cached data from session
- *
- * Tools can use this to retrieve previously cached data
- * from earlier tool calls within the same session.
- */
-export function getSessionCache(
-  context: ToolExecutionContext,
-  cacheKey: string
-): any {
-  if (!context.sessionId || !context.sessionManager) {
-    return undefined;
-  }
-
-  const session = context.sessionManager.getSession(context.sessionId);
-  if (!session) {
-    return undefined;
-  }
-
-  return session.cacheData.customData?.[cacheKey];
 }

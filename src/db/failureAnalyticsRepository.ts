@@ -62,7 +62,7 @@ export interface RecordFailureInput {
 
 // Types for querying failures
 
-export interface FailuresQuery {
+interface FailuresQuery {
   type?: FailureType;
   severity?: FailureSeverity;
   startTime?: number;
@@ -71,13 +71,13 @@ export interface FailuresQuery {
   offset?: number;
 }
 
-export interface TimelineQuery {
+interface TimelineQuery {
   startTime: number;
   endTime: number;
   aggregation: "minute" | "hour" | "day" | "week";
 }
 
-export interface FailuresStreamQuery {
+interface FailuresStreamQuery {
   sinceTimestamp?: number;
   sinceId?: number;
   startTime?: number;
@@ -88,7 +88,7 @@ export interface FailuresStreamQuery {
   acknowledged?: boolean;
 }
 
-export interface FailureNotificationEntry {
+interface FailureNotificationEntry {
   id: number;
   occurrenceId: string;
   groupId: string;
@@ -99,7 +99,7 @@ export interface FailureNotificationEntry {
   acknowledged: boolean;
 }
 
-export interface FailuresStreamResponse {
+interface FailuresStreamResponse {
   notifications: FailureNotificationEntry[];
   lastTimestamp?: number;
   lastId?: number;

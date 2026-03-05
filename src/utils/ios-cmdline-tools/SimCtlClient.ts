@@ -304,7 +304,7 @@ function normalizeIosVersion(runtimeId: string | undefined, osVersion: string | 
  * It allows you to list, create, boot, and delete simulators.
  */
 
-export interface SimulatorList {
+interface SimulatorList {
   devices: { [runtimeId: string]: AppleDevice[] };
   pairs?: any;
   runtimes?: AppleDeviceRuntime[];

@@ -7,7 +7,6 @@ export const statAsync = fsPromises.stat;
 export const readdirAsync = fsPromises.readdir;
 
 // Additional promisified fs functions
-export const mkdirAsync = fsPromises.mkdir;
 export const renameAsync = fsPromises.rename;
 
 // Helper functions for common operations

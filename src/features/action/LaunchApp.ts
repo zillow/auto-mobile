@@ -23,7 +23,7 @@ export interface InstalledAppsProvider {
   listInstalledApps(): Promise<string[]>;
 }
 
-export interface LaunchAppDependencies {
+interface LaunchAppDependencies {
   targetUserDetector?: TargetUserDetector;
   installedAppsProvider?: InstalledAppsProvider;
   performanceTrackerFactory?: () => PerformanceTracker;

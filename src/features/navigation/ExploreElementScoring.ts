@@ -117,7 +117,7 @@ export function selectDepthFirst(
 /**
  * Weighted selection result with element and stats
  */
-export interface WeightedSelectionResult {
+interface WeightedSelectionResult {
   element: Element;
   stats: ElementSelectionStats;
 }
@@ -184,7 +184,7 @@ export function selectWeighted(
 /**
  * Ranked element for dry run
  */
-export interface RankedElement {
+interface RankedElement {
   element: Element;
   score: number;
   reason: string;

@@ -33,16 +33,8 @@ import {
 
 // Re-export types for convenience
 export type {
-  NavigationGraph,
   NavigationEvent,
-  NavigationNode,
   NavigationEdge,
-  NavigationGraphSummary,
-  NavigationGraphSummaryProvider,
-  NavigationGraphHistoryProvider,
-  NavigationGraphNodeDetail,
-  NavigationGraphNodeResource,
-  NavigationGraphNodeResourceProvider,
   UIState,
 };
 

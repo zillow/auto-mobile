@@ -7,7 +7,7 @@ import { isRunningInDocker } from "../dockerEnv";
 import { isHostControlAvailable, runXcodebuildExec, shouldUseHostControl } from "../hostControlClient";
 import { defaultTimer, Timer } from "../SystemTimer";
 
-export interface XcodebuildCommandOptions {
+interface XcodebuildCommandOptions {
   timeoutMs?: number;
   maxBuffer?: number;
 }

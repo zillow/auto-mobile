@@ -4,7 +4,7 @@ import { z } from "zod";
 // This schema accepts both for compatibility
 const booleanOrString = z.union([z.boolean(), z.literal("true"), z.literal("false")]).optional();
 
-export const elementBoundsSchema = z.object({
+const elementBoundsSchema = z.object({
   left: z.number().int(),
   top: z.number().int(),
   right: z.number().int(),
@@ -31,7 +31,7 @@ export const elementSchema = z.object({
   "selected": booleanOrString
 }).passthrough();
 
-export const selectedElementStateSchema = z.object({
+const selectedElementStateSchema = z.object({
   method: z.enum(["accessibility", "visual"]),
   confidence: z.number(),
   reason: z.string().optional()
@@ -81,7 +81,7 @@ export const scrollableCandidateSchema = z.object({
   className: z.string().optional()
 }).passthrough();
 
-export const predictionTargetSchema = z.object({
+const predictionTargetSchema = z.object({
   text: z.string().optional(),
   elementId: z.string().optional(),
   contentDesc: z.string().optional(),
@@ -97,7 +97,7 @@ export const predictionTargetSchema = z.object({
   }).optional()
 }).passthrough();
 
-export const predictedActionSchema = z.object({
+const predictedActionSchema = z.object({
   action: z.string(),
   target: predictionTargetSchema,
   predictedScreen: z.string(),
@@ -105,7 +105,7 @@ export const predictedActionSchema = z.object({
   confidence: z.number()
 }).passthrough();
 
-export const interactablePredictionSchema = z.object({
+const interactablePredictionSchema = z.object({
   elementId: z.string().optional(),
   elementText: z.string().optional(),
   elementContentDesc: z.string().optional(),

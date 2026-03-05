@@ -29,7 +29,7 @@ export interface DeviceClientProvider {
 /**
  * Default provider that lazily creates real clients
  */
-export class DefaultDeviceClientProvider implements DeviceClientProvider {
+class DefaultDeviceClientProvider implements DeviceClientProvider {
   private _adb: AdbExecutor | undefined;
   private _adbFactory: AdbClientFactory;
   private _simctl: SimCtlClient | undefined;

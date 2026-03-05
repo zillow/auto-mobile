@@ -17,7 +17,7 @@ import { defaultTimer } from "../utils/SystemTimer";
 /**
  * Query options for fetching failures
  */
-export interface FailureQueryOptions {
+interface FailureQueryOptions {
   /** Limit results to this many records */
   limit?: number;
   /** Filter by device ID */
@@ -39,7 +39,7 @@ export interface FailureQueryOptions {
 /**
  * Unified failure record type
  */
-export interface FailureRecord {
+interface FailureRecord {
   type: "crash" | "anr" | "tool_call_failure";
   id: number;
   timestamp: number;
@@ -478,14 +478,4 @@ export class FailureEventRepository {
       toolCallFailures: toolCallFailures.length,
     };
   }
-}
-
-// Singleton instance
-let failureRepositoryInstance: FailureEventRepository | null = null;
-
-export function getFailureEventRepository(): FailureEventRepository {
-  if (!failureRepositoryInstance) {
-    failureRepositoryInstance = new FailureEventRepository();
-  }
-  return failureRepositoryInstance;
 }

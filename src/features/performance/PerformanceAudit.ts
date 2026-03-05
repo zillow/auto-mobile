@@ -13,7 +13,7 @@ import { defaultTimer } from "../../utils/SystemTimer";
 /**
  * Performance metrics collected during audit
  */
-export interface PerformanceMetrics {
+interface PerformanceMetrics {
   // Frame timing metrics
   p50Ms: number | null;
   p90Ms: number | null;
@@ -61,7 +61,7 @@ export interface PerformanceAuditResult {
 /**
  * Represents a single performance threshold violation
  */
-export interface PerformanceViolation {
+interface PerformanceViolation {
   metric: string;
   threshold: number;
   actual: number;
@@ -72,7 +72,7 @@ export interface PerformanceViolation {
 /**
  * Options for metric collection
  */
-export interface CollectMetricsOptions {
+interface CollectMetricsOptions {
   measureTtff?: boolean;
   measureTti?: boolean;
 }

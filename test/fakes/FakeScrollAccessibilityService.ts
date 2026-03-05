@@ -1,6 +1,6 @@
 import type { ScrollAccessibilityService } from "../../src/features/action/swipeon/types";
 
-export type RequestActionCall = {
+type RequestActionCall = {
   action: string;
   resourceId?: string;
   timeoutMs?: number;

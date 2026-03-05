@@ -9,7 +9,7 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 /**
  * Result of a touch latency measurement
  */
-export interface TouchLatencyResult {
+interface TouchLatencyResult {
   /** Measured latency in milliseconds */
   latencyMs: number;
   /** Touch coordinates used for measurement */

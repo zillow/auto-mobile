@@ -13,7 +13,7 @@ export const DEVICE_IMAGE_RESOURCE_URIS = {
 } as const;
 
 // Device image info for resource response
-export interface DeviceImageInfo {
+interface DeviceImageInfo {
   name: string;
   platform: Platform;
   deviceId?: string;
@@ -44,7 +44,7 @@ export interface DeviceImagesResourceContent {
 }
 
 // Dependencies interface for dependency injection
-export interface DeviceImageResourcesDependencies {
+interface DeviceImageResourcesDependencies {
   deviceManager: PlatformDeviceManager;
   avdManager: AvdManager;
 }

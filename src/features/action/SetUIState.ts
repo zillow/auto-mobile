@@ -18,7 +18,7 @@ import type { ObserveScreen } from "../observe/interfaces/ObserveScreen";
 /**
  * Interface for TapOnElement dependency
  */
-export interface TapOnElementLike {
+interface TapOnElementLike {
   execute(
     options: { text?: string; elementId?: string; action: string; container?: { text?: string; elementId?: string } },
     progress?: ProgressCallback,
@@ -29,21 +29,21 @@ export interface TapOnElementLike {
 /**
  * Interface for InputText dependency
  */
-export interface InputTextLike {
+interface InputTextLike {
   execute(text: string, imeAction?: string): Promise<{ success: boolean; text: string; observation?: ObserveResult; error?: string }>;
 }
 
 /**
  * Interface for ClearText dependency
  */
-export interface ClearTextLike {
+interface ClearTextLike {
   execute(progress?: ProgressCallback): Promise<{ success: boolean; observation?: ObserveResult; error?: string }>;
 }
 
 /**
  * Interface for SwipeOn dependency
  */
-export interface SwipeOnLike {
+interface SwipeOnLike {
   execute(
     options: { direction: string; lookFor?: { text?: string; elementId?: string }; scrollToFind?: boolean },
     progress?: ProgressCallback
@@ -53,7 +53,7 @@ export interface SwipeOnLike {
 /**
  * Dependencies that can be injected for testing
  */
-export interface SetUIStateDependencies {
+interface SetUIStateDependencies {
   tapOnElement?: TapOnElementLike;
   inputText?: InputTextLike;
   clearText?: ClearTextLike;

@@ -37,7 +37,7 @@ export const defaultWebSocketFactory: WebSocketFactory = (url: string) => new We
 /**
  * Configuration for connection behavior.
  */
-export interface ConnectionConfig {
+interface ConnectionConfig {
   /** Maximum number of connection attempts before entering cooldown */
   maxConnectionAttempts: number;
   /** Time to wait after max attempts before allowing new attempts (ms) */
@@ -53,7 +53,7 @@ export interface ConnectionConfig {
 /**
  * Default connection configuration.
  */
-export const DEFAULT_CONNECTION_CONFIG: ConnectionConfig = {
+const DEFAULT_CONNECTION_CONFIG: ConnectionConfig = {
   maxConnectionAttempts: 3,
   connectionResetMs: 10000,
   reconnectDelayMs: 2000,

@@ -4,11 +4,11 @@ import { SystemConfigurationManager } from "../features/utility/SystemConfigurat
 import { BootedDevice, LocalizationSettingsResult } from "../models";
 import { logger } from "../utils/logger";
 
-export const LOCALIZATION_RESOURCE_TEMPLATES = {
+const LOCALIZATION_RESOURCE_TEMPLATES = {
   DEVICE_LOCALIZATION: "automobile:devices/{deviceId}/localization"
 } as const;
 
-export interface LocalizationResourceContent {
+interface LocalizationResourceContent {
   deviceId: string;
   platform: BootedDevice["platform"];
   locale: string | null;

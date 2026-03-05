@@ -3,7 +3,7 @@ import { Timer, defaultTimer } from "../SystemTimer";
 /**
  * Configuration for retry behavior.
  */
-export interface RetryOptions {
+interface RetryOptions {
   /**
    * Maximum number of attempts (including the initial attempt).
    * Default: 3
@@ -40,7 +40,7 @@ export interface RetryOptions {
 /**
  * Result of a retry operation.
  */
-export interface RetryResult<T> {
+interface RetryResult<T> {
   /** Whether the operation succeeded */
   success: boolean;
   /** The result value if successful */

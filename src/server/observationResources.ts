@@ -5,7 +5,7 @@ import { stringifyToolResponse } from "../utils/toolUtils";
 import { ScreenshotJobTracker } from "../utils/ScreenshotJobTracker";
 import * as realFs from "fs/promises";
 
-export interface ScreenshotFileSystem {
+interface ScreenshotFileSystem {
   stat(path: string): Promise<{ isFile(): boolean }>;
   readFile(path: string): Promise<Buffer>;
 }

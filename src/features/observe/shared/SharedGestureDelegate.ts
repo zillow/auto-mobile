@@ -11,7 +11,7 @@ import type { PerformanceTracker } from "../../../utils/PerformanceTracker";
 import type { DelegateContext, GestureTimingResult, BaseResult } from "./types";
 import { createMessage } from "../DeviceServiceUtils";
 
-export interface SharedGestureConfig {
+interface SharedGestureConfig {
   logTag: string;
   roundCoordinates: boolean;
 }

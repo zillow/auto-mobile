@@ -17,7 +17,7 @@ import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import type { ElementParser } from "../../utils/interfaces/ElementParser";
 import { DefaultElementParser } from "../utility/ElementParser";
 
-export interface BugReportOptions {
+interface BugReportOptions {
   /**
    * Optional app ID to filter logcat for specific app
    */

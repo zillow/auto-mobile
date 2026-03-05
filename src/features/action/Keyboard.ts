@@ -11,7 +11,7 @@ import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
-export type KeyboardAction = "open" | "close" | "detect";
+type KeyboardAction = "open" | "close" | "detect";
 
 export interface KeyboardHierarchyProvider {
   getViewHierarchy(signal?: AbortSignal): Promise<ViewHierarchyResult | null>;

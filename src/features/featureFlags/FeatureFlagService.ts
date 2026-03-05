@@ -5,7 +5,7 @@ import { SqliteFeatureFlagRepository } from "./FeatureFlagRepository";
 import type { FeatureFlagApplier } from "./FeatureFlagApplier";
 import { DefaultFeatureFlagApplier } from "./FeatureFlagApplier";
 
-export interface FeatureFlagState {
+interface FeatureFlagState {
   key: FeatureFlagKey;
   label: string;
   description: string;

@@ -6,7 +6,7 @@ import { logger } from "../utils/logger";
 import type { Timer } from "../utils/SystemTimer";
 import { defaultTimer } from "../utils/SystemTimer";
 
-export const TEST_EXECUTION_RETENTION_MAX_ROWS = 10_000;
+const TEST_EXECUTION_RETENTION_MAX_ROWS = 10_000;
 export const TEST_EXECUTION_RETENTION_MAX_DAYS = 90;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -73,7 +73,7 @@ export interface TestTimingQueryOptions {
   orderDirection?: "asc" | "desc";
 }
 
-export interface TestTimingStats {
+interface TestTimingStats {
   testClass: string;
   testMethod: string;
   averageDurationMs: number;
@@ -85,7 +85,7 @@ export interface TestTimingStats {
   stdDevDurationMs: number;
 }
 
-export interface TestRunStep {
+interface TestRunStep {
   id: number;
   stepIndex: number;
   action: string;

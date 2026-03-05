@@ -41,7 +41,7 @@ export class BunSqliteDialect implements Dialect {
   }
 }
 
-export interface BunSqliteDialectConfig {
+interface BunSqliteDialectConfig {
   database: BunDatabase;
 }
 

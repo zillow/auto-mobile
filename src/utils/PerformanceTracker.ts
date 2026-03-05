@@ -376,7 +376,7 @@ export function getMaxPerfTimingSizeBytes(): number {
 /**
  * Result of processing timing data with filtering and truncation
  */
-export interface ProcessedTimingData {
+interface ProcessedTimingData {
   data: TimingData;
   truncated?: boolean;
 }

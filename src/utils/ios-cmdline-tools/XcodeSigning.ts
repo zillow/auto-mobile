@@ -7,9 +7,9 @@ import type { ExecResult } from "../../models";
 import { logger } from "../logger";
 import { Xcodebuild, XcodebuildClient } from "./XcodebuildClient";
 
-export type SigningStyle = "automatic" | "manual";
+type SigningStyle = "automatic" | "manual";
 
-export interface SigningIdentity {
+interface SigningIdentity {
   name: string;
   fingerprint: string;
   validTo?: Date;
@@ -17,14 +17,14 @@ export interface SigningIdentity {
   issuer?: string;
 }
 
-export interface CertificateInfo {
+interface CertificateInfo {
   fingerprint: string;
   validTo?: Date;
   subject?: string;
   issuer?: string;
 }
 
-export interface ProvisioningProfile {
+interface ProvisioningProfile {
   uuid: string;
   name: string;
   teamIds: string[];
@@ -39,7 +39,7 @@ export interface ProvisioningProfile {
   path: string;
 }
 
-export interface SigningResolution {
+interface SigningResolution {
   style: SigningStyle;
   teamId?: string;
   identity?: SigningIdentity;
@@ -50,7 +50,7 @@ export interface SigningResolution {
   warnings: string[];
 }
 
-export interface XcodeSigningDependencies {
+interface XcodeSigningDependencies {
   platform: () => NodeJS.Platform;
   exec: (command: string) => Promise<ExecResult>;
   xcodebuild: Xcodebuild;

@@ -31,7 +31,7 @@ export interface CtrlProxyIosBuildResult {
 /**
  * CtrlProxy Build Configuration
  */
-export interface CtrlProxyIosBuildConfig {
+interface CtrlProxyIosBuildConfig {
   projectRoot: string;
   derivedDataPath: string;
   scheme: string;
@@ -39,7 +39,7 @@ export interface CtrlProxyIosBuildConfig {
   bundleCacheDir: string;
 }
 
-export interface CtrlProxyIosBuilderDependencies {
+interface CtrlProxyIosBuilderDependencies {
   downloader?: CtrlProxyIosBundleDownloader;
 }
 

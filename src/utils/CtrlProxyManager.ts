@@ -18,7 +18,7 @@ import { type ChecksumCalculator, DefaultChecksumCalculator } from "./ChecksumCa
 /**
  * Result of accessibility service setup
  */
-export interface AccessibilitySetupResult {
+interface AccessibilitySetupResult {
   success: boolean;
   message: string;
   error?: string;
@@ -44,7 +44,7 @@ export interface CtrlProxyManager {
   cleanupApk(apkPath: string): Promise<void>;
 }
 
-export interface AccessibilityVersionCheckResult {
+interface AccessibilityVersionCheckResult {
   status: "skipped" | "not_installed" | "compatible" | "upgraded" | "installed" | "reinstalled" | "failed";
   expectedSha256?: string;
   installedSha256?: string | null;
@@ -59,7 +59,7 @@ export interface AccessibilityVersionCheckResult {
   reinstallError?: string;
 }
 
-export interface ToggleCapabilities {
+interface ToggleCapabilities {
   supportsSettingsToggle: boolean;
   deviceType: "emulator" | "physical";
   apiLevel: number | null;

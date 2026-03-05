@@ -4,7 +4,7 @@ import { createToolExecutionContext, updateSessionCache } from "./ToolExecutionC
 import type { SessionOptions } from "./ToolExecutionContext";
 import { logger } from "../utils/logger";
 
-export type DeviceLabelMap = Record<string, string>;
+type DeviceLabelMap = Record<string, string>;
 
 const DEVICE_LABEL_CACHE_KEY = "deviceLabelMap";
 

@@ -20,7 +20,7 @@ export interface AdbClientFactory {
 /**
  * Default factory that creates real AdbClient instances.
  */
-export class DefaultAdbClientFactory implements AdbClientFactory {
+class DefaultAdbClientFactory implements AdbClientFactory {
   create(device?: BootedDevice | null, retryExecutor?: RetryExecutor): AdbExecutor {
     return new AdbClient(device ?? null, null, null, retryExecutor);
   }

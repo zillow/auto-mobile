@@ -3,16 +3,16 @@ import { ClearAppData } from "../features/action/ClearAppData";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { Logger, logger } from "../utils/logger";
 
-export interface AppCleanupConfig {
+interface AppCleanupConfig {
   appId: string;
   clearAppData?: boolean;
 }
 
-export interface ClearAppDataAction {
+interface ClearAppDataAction {
   execute(appId: string): Promise<ClearAppDataResult>;
 }
 
-export interface TerminateAppAction {
+interface TerminateAppAction {
   execute(
     appId: string,
     options?: {
@@ -26,7 +26,7 @@ export interface AppCleanupService {
   cleanup(device: BootedDevice, config: AppCleanupConfig): Promise<void>;
 }
 
-export interface AppCleanupDependencies {
+interface AppCleanupDependencies {
   createClearAppData?: (device: BootedDevice) => ClearAppDataAction;
   createTerminateApp?: (device: BootedDevice) => TerminateAppAction;
   logger?: Pick<Logger, "info" | "warn">;

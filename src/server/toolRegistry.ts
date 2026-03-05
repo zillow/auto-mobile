@@ -24,16 +24,16 @@ export interface ProgressCallback {
 }
 
 // Interface for tool handlers
-export interface ToolHandler<T = any> {
+interface ToolHandler<T = any> {
   (args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>; // Using any since the actual type varies between text and image responses
 }
 
 // Interface for device-aware tool handlers
-export interface DeviceAwareToolHandler<T = any> {
+interface DeviceAwareToolHandler<T = any> {
   (device: BootedDevice, args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>;
 }
 
-export interface DeviceAwareToolOptions<T = any> {
+interface DeviceAwareToolOptions<T = any> {
   shouldEnsureDevice?: (args: T) => boolean;
   nonDeviceHandler?: ToolHandler<T>;
   outputSchema?: any;

@@ -14,7 +14,7 @@ import { getMcpServerVersion } from "../utils/mcpVersion";
 /**
  * Options for creating a proxy MCP server
  */
-export interface ProxyMcpServerOptions {
+interface ProxyMcpServerOptions {
   /** Configuration for the daemon proxy */
   proxyConfig?: DaemonMcpProxyConfig;
   /** Session context for tracking */

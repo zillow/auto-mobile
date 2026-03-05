@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { logger } from "../utils/logger";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 
-export interface ActiveExecution {
+interface ActiveExecution {
   id: string;
   toolName: string;
   sessionId?: string;
@@ -11,9 +11,9 @@ export interface ActiveExecution {
   abortController: AbortController;
 }
 
-export type ExecutionScope = "session" | "global";
+type ExecutionScope = "session" | "global";
 
-export interface ExecutionScopeOptions {
+interface ExecutionScopeOptions {
   scope: ExecutionScope;
   sessionId?: string;
   sessionUuid?: string;

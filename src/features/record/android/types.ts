@@ -30,7 +30,7 @@ export interface RawTouchFrame {
 // Gesture types (output of GestureClassifier / GetEventReader)
 // ---------------------------------------------------------------------------
 
-export type GestureEventType =
+type GestureEventType =
   | "tap"
   | "doubleTap"
   | "longPress"

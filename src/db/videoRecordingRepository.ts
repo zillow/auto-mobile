@@ -10,7 +10,7 @@ import { parseVideoRecordingConfig } from "../features/video";
 import type { Database, NewVideoRecording, VideoRecordingUpdate, VideoRecording as DbVideoRecording } from "./types";
 import { logger } from "../utils/logger";
 
-export type VideoRecordingStatus = "recording" | "completed" | "interrupted";
+type VideoRecordingStatus = "recording" | "completed" | "interrupted";
 
 export interface VideoRecordingRecord extends VideoRecordingMetadata {
   deviceId: string;

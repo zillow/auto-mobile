@@ -12,11 +12,11 @@ import { FileSystem, DefaultFileSystem as CanonicalDefaultFileSystem } from "../
 /**
  * Screenshot capture interface for dependency injection.
  */
-export interface ScreenshotCapture {
+interface ScreenshotCapture {
   execute(): Promise<{ success: boolean; path?: string; error?: string }>;
 }
 
-export interface NavigationScreenshotManagerOptions {
+interface NavigationScreenshotManagerOptions {
   screenshotDir?: string;
   maxCacheSizeBytes?: number;
   targetWidth?: number;

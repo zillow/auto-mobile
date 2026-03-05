@@ -12,7 +12,7 @@ export const SCROLL_TO_FINGER_DIRECTION: Record<SwipeDirection, SwipeDirection> 
   right: "left"  // content scrolls right → finger swipes left
 };
 
-export interface ResolvedSwipeDirection {
+interface ResolvedSwipeDirection {
   /** The resolved finger movement direction */
   direction?: SwipeDirection;
   /** Descriptive message for the tool response */

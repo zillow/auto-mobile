@@ -54,7 +54,7 @@ export interface ScreenshotResult extends DeviceOperationResult {
 /**
  * Result for IME (Input Method Editor) actions.
  */
-export interface ImeActionResult extends DeviceOperationResult {
+interface ImeActionResult extends DeviceOperationResult {
   totalTimeMs: number;
   /** The action that was performed */
   action?: string;
@@ -311,7 +311,7 @@ interface ClipboardResult extends DeviceOperationResult {
 /**
  * Result for node action operations (Android).
  */
-export interface ActionResult extends DeviceOperationResult {
+interface ActionResult extends DeviceOperationResult {
   totalTimeMs: number;
   /** The action that was performed */
   action?: string;

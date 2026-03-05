@@ -59,18 +59,6 @@ export interface SQLResult {
   rowsAffected?: number;
 }
 
-/**
- * Error types from the Android ContentProvider
- */
-export type DatabaseErrorType =
-  | "DISABLED"
-  | "NOT_FOUND"
-  | "TABLE_NOT_FOUND"
-  | "SQL_ERROR"
-  | "NOT_INITIALIZED"
-  | "INVALID_PATH"
-  | "INVALID_ARGUMENT"
-  | "UNKNOWN";
 
 /**
  * Database inspection action for Android apps.

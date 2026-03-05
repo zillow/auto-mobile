@@ -13,7 +13,7 @@ export interface TrackedStep {
 /**
  * Represents a critical section barrier in the execution timeline.
  */
-export interface CriticalSectionBarrier {
+interface CriticalSectionBarrier {
   type: "barrier";
   step: PlanStep;
   planIndex: number;
@@ -22,7 +22,7 @@ export interface CriticalSectionBarrier {
 /**
  * Represents a regular device step in the execution timeline.
  */
-export interface DeviceStepEntry {
+interface DeviceStepEntry {
   type: "step";
   device: string;
   trackedStep: TrackedStep;
@@ -31,12 +31,12 @@ export interface DeviceStepEntry {
 /**
  * Union type for timeline entries.
  */
-export type TimelineEntry = CriticalSectionBarrier | DeviceStepEntry;
+type TimelineEntry = CriticalSectionBarrier | DeviceStepEntry;
 
 /**
  * Result of partitioning a plan into device tracks.
  */
-export interface PartitionedPlan {
+interface PartitionedPlan {
   devices: string[];
   deviceTracks: Map<string, TrackedStep[]>; // device -> ordered steps for that device
   timeline: TimelineEntry[]; // Ordered list of all steps and barriers

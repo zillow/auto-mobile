@@ -583,7 +583,7 @@ export class FailureRecorder implements FailureRecorderService {
  * Default singleton instance of FailureRecorder.
  * Use this for production code. For testing, use FailureRecorder.createForTesting().
  */
-export const defaultFailureRecorder: FailureRecorderService = FailureRecorder.getInstance();
+const defaultFailureRecorder: FailureRecorderService = FailureRecorder.getInstance();
 
 // Export singleton instance getter (uses defaultFailureRecorder)
 export const getFailureRecorder = (): FailureRecorderService => defaultFailureRecorder;

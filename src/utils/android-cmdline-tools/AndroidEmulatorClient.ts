@@ -11,7 +11,7 @@ import { defaultTimer, Timer } from "../SystemTimer";
  * Interface for Android Emulator (AVD) management
  * Provides emulator lifecycle and control capabilities
  */
-export interface AndroidEmulator {
+interface AndroidEmulator {
   /**
    * Execute an emulator command
    * @param command - The command to execute

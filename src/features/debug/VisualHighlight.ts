@@ -24,7 +24,7 @@ const normalizeNullableString = (value: string | null | undefined): string | und
   value === null ? undefined : value
 );
 
-export const highlightBoundsSchema: z.ZodType<HighlightBounds> = z.object({
+const highlightBoundsSchema: z.ZodType<HighlightBounds> = z.object({
   x: z.number().int(),
   y: z.number().int(),
   width: z.number().int().positive(),
@@ -123,7 +123,7 @@ export interface HighlightOptions {
   timeoutMs?: number;
 }
 
-export interface HighlightOperationOptions {
+interface HighlightOperationOptions {
   timeoutMs?: number;
 }
 

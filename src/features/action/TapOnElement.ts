@@ -50,7 +50,7 @@ type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
 /**
  * Dependencies for TapOnElement that can be injected for testing.
  */
-export interface TapOnElementDependencies {
+interface TapOnElementDependencies {
   visionConfig?: VisionFallbackConfig;
   screenshotCapturer?: ScreenshotCapturer;
   visionAnalyzer?: VisionAnalyzer;

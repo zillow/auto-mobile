@@ -11,7 +11,7 @@ import { GetScreenSize } from "../observe/GetScreenSize";
 import { FocusElementMatcher } from "./FocusElementMatcher";
 import { FocusPathCalculator, type FocusNavigationPath } from "./FocusPathCalculator";
 
-export interface NavigationOptions {
+interface NavigationOptions {
   maxSwipes?: number;
   verificationInterval?: number;
   swipeDelay?: number;

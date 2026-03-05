@@ -6,7 +6,7 @@ import { DefaultElementParser } from "../utility/ElementParser";
 import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { NavigationEdge } from "../../utils/interfaces/NavigationGraph";
 
-export type InteractionType = "navigation" | "input" | "action" | "scroll" | "toggle";
+type InteractionType = "navigation" | "input" | "action" | "scroll" | "toggle";
 
 export interface IdentifyInteractionsOptions {
   platform: "android" | "ios";
@@ -22,7 +22,7 @@ export interface IdentifyInteractionsOptions {
   };
 }
 
-export interface IdentifyInteractionsResult {
+interface IdentifyInteractionsResult {
   success: boolean;
   screenName: string;
   interactions: IdentifiedInteraction[];
@@ -35,7 +35,7 @@ export interface IdentifyInteractionsResult {
   error?: string;
 }
 
-export interface IdentifiedInteraction {
+interface IdentifiedInteraction {
   id: string;
   type: InteractionType;
   description: string;

@@ -58,7 +58,7 @@ interface VideoArchiveEvictionResult {
   maxSizeBytes: number;
 }
 
-export interface VideoRecordingManagerDependencies {
+interface VideoRecordingManagerDependencies {
   videoRecorderService: VideoRecorderService;
   recordingRepository: VideoRecordingRepository;
   configRepository: VideoRecordingConfigRepository;

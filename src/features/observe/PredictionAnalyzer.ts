@@ -14,11 +14,11 @@ export interface PredictionActionContext {
   toolArgs: Record<string, any>;
 }
 
-export interface PredictionHistoryStore {
+interface PredictionHistoryStore {
   recordOutcome: PredictionHistoryRepository["recordOutcome"];
 }
 
-export interface NavigationGraphLike {
+interface NavigationGraphLike {
   getCurrentScreen(): string | null;
 }
 

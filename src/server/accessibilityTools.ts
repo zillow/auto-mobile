@@ -31,7 +31,7 @@ export const accessibilitySchema = addDeviceTargetingToSchema(
   })
 );
 
-export interface AccessibilityArgs {
+interface AccessibilityArgs {
   talkback?: boolean;
   voiceover?: boolean;
 }

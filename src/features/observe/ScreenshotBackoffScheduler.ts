@@ -15,12 +15,12 @@ export interface ScreenshotCaptureResult {
 /**
  * Callback to capture a screenshot
  */
-export type ScreenshotCaptureCallback = () => Promise<ScreenshotCaptureResult>;
+type ScreenshotCaptureCallback = () => Promise<ScreenshotCaptureResult>;
 
 /**
  * Callback to emit a screenshot to the stream
  */
-export type ScreenshotEmitCallback = (data: string) => void;
+type ScreenshotEmitCallback = (data: string) => void;
 
 /**
  * Interface for screenshot backoff scheduling.
@@ -57,7 +57,7 @@ export interface ScreenshotBackoffScheduler {
 /**
  * Configuration for the backoff scheduler
  */
-export interface ScreenshotBackoffConfig {
+interface ScreenshotBackoffConfig {
   /**
    * Backoff intervals in milliseconds from the start of the sequence.
    * Default: [0, 100, 300, 500, 800, 1300]

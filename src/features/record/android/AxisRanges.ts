@@ -1,7 +1,7 @@
 import type { AdbExecutor } from "../../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import type { TouchInputNode } from "./TouchNodeDiscovery";
 
-export interface AxisRanges {
+interface AxisRanges {
   xMin: number;
   xMax: number;
   yMin: number;
@@ -41,7 +41,7 @@ export function buildScaler(ranges: AxisRanges): CoordScaler {
  * Parse the physical display size from `adb shell wm size` output.
  * Returns { width, height } in physical pixels (before rotation).
  */
-export async function queryDisplaySize(
+async function queryDisplaySize(
   adb: AdbExecutor
 ): Promise<{ width: number; height: number }> {
   const { stdout } = await adb.executeCommand("shell wm size");

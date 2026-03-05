@@ -19,7 +19,7 @@ export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
 }
 
-export interface ObservedChangeOptions {
+interface ObservedChangeOptions {
   changeExpected: boolean;
   timeoutMs?: number;
   packageName?: string;

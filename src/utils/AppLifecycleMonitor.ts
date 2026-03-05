@@ -48,7 +48,7 @@ export interface AppLifecycleEvent {
     metadata?: Record<string, any>;
 }
 
-export interface AppLifecycleEventListener {
+interface AppLifecycleEventListener {
     (event: AppLifecycleEvent): Promise<void>;
 }
 

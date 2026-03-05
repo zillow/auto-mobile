@@ -29,7 +29,7 @@ export interface TalkBackNavigationDriver extends FocusNavigationDriver {
 /**
  * Default implementation of TalkBackNavigationDriver using CtrlProxyClient.
  */
-export class DefaultTalkBackNavigationDriver implements TalkBackNavigationDriver {
+class DefaultTalkBackNavigationDriver implements TalkBackNavigationDriver {
   private accessibilityService: CtrlProxyClient;
   private screenSizeProvider: GetScreenSize;
 

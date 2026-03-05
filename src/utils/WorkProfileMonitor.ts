@@ -11,7 +11,7 @@ const DEFAULT_POLL_INTERVAL_MS = 5000;
 /**
  * State tracking for a single work profile
  */
-export interface ProfileState {
+interface ProfileState {
   userId: number;
   hasAccessibilityService: boolean;
   lastRefreshMs: number;
@@ -59,7 +59,7 @@ export interface WorkProfileMonitor {
 /**
  * Options for creating a WorkProfileMonitor
  */
-export interface WorkProfileMonitorOptions {
+interface WorkProfileMonitorOptions {
   deviceId: string;
   adb: AdbExecutor;
   installedAppsStore: InstalledAppsStore;

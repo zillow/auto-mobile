@@ -121,5 +121,3 @@ class StartupBenchmark {
 }
 
 export const startupBenchmark = new StartupBenchmark(enabled);
-
-export const isStartupBenchmarkEnabled = (): boolean => startupBenchmark.isEnabled();

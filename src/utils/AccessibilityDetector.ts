@@ -5,7 +5,6 @@ import { SystemTimer, type Timer } from "./SystemTimer";
 import type { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { TTLCache } from "./cache/Cache";
 
-export type { AccessibilityService };
 
 /**
  * Cached accessibility state value

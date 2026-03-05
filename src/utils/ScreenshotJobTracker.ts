@@ -8,7 +8,7 @@ export interface ScreenshotJobHandle {
   signal: AbortSignal;
 }
 
-export interface ScreenshotJobCompletion {
+interface ScreenshotJobCompletion {
   deviceId: string;
   jobId: string;
   result: ScreenshotResult;

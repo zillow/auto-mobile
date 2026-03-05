@@ -9,7 +9,7 @@ import { logger } from "../logger";
 /**
  * Result of plan validation
  */
-export interface PlanValidationResult {
+interface PlanValidationResult {
   valid: boolean;
   errors?: ValidationError[];
   warnings?: string[];
@@ -18,7 +18,7 @@ export interface PlanValidationResult {
 /**
  * Structured validation error
  */
-export interface ValidationError {
+interface ValidationError {
   field: string;
   message: string;
   line?: number;

@@ -5,8 +5,6 @@ import { PerceptualHasher } from "./PerceptualHasher";
 import { ScreenshotCache } from "./ScreenshotCache";
 import { ScreenshotMatcher, SimilarScreenshotResult } from "./ScreenshotMatcher";
 
-// Re-export interfaces for backward compatibility
-export type { ScreenshotComparisonResult, SimilarScreenshotResult };
 
 /**
  * Facade class that maintains backward compatibility with the original ScreenshotUtils API

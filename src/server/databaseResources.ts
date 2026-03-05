@@ -6,7 +6,7 @@ import { BootedDevice } from "../models";
 import { logger } from "../utils/logger";
 
 // Resource URI templates
-export const DATABASE_RESOURCE_TEMPLATES = {
+const DATABASE_RESOURCE_TEMPLATES = {
   DATABASES: "automobile:devices/{deviceId}/databases?appId={appId}",
   TABLES: "automobile:devices/{deviceId}/databases/{databasePath}/tables?appId={appId}",
   TABLE_DATA: "automobile:devices/{deviceId}/databases/{databasePath}/tables/{table}/data?appId={appId}",

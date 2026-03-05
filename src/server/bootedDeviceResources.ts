@@ -18,7 +18,7 @@ export const BOOTED_DEVICE_RESOURCE_URIS = {
 } as const;
 
 // Service status for a booted device
-export interface DeviceServiceStatus {
+interface DeviceServiceStatus {
   installed: boolean;
   enabled: boolean;
   running: boolean;
@@ -28,7 +28,7 @@ export interface DeviceServiceStatus {
 }
 
 // Booted device info for resource response
-export interface BootedDeviceInfo {
+interface BootedDeviceInfo {
   name: string;
   platform: Platform;
   deviceId: string;
@@ -53,9 +53,9 @@ export interface BootedDevicesResourceContent {
   devices: BootedDeviceInfo[];
 }
 
-export type PoolDeviceStatus = "idle" | "assigned" | "error";
+type PoolDeviceStatus = "idle" | "assigned" | "error";
 
-export interface PoolStatusSummary {
+interface PoolStatusSummary {
   enabled: boolean;
   idle: number;
   assigned: number;
@@ -63,7 +63,7 @@ export interface PoolStatusSummary {
   total: number;
 }
 
-export interface DeviceSessionInfo {
+interface DeviceSessionInfo {
   sessionId: string;
   createdAt: string;
   lastUsedAt: string;

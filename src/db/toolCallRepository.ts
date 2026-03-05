@@ -3,7 +3,7 @@ import { getDatabase } from "./database";
 import type { Database, NewToolCall } from "./types";
 import { logger } from "../utils/logger";
 
-export interface ToolCallRecord {
+interface ToolCallRecord {
   toolName: string;
   timestamp: string;
   sessionUuid?: string | null;

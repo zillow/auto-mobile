@@ -20,7 +20,7 @@ export function addSessionUuidToSchema<T extends z.ZodObject<any>>(schema: T): z
 /**
  * Helper to add device label field to tool schemas.
  */
-export function addDeviceLabelToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObject<any> {
+function addDeviceLabelToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObject<any> {
   return schema.extend({
     device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION),
   }) as z.ZodObject<any>;

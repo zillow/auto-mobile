@@ -8,7 +8,7 @@ import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClien
 import { notifyDatabaseChanged } from "./databaseResources";
 
 // Schema for sqlQuery tool
-export const sqlQuerySchema = addDeviceTargetingToSchema(
+const sqlQuerySchema = addDeviceTargetingToSchema(
   z.object({
     appId: z.string().describe("App package ID"),
     databasePath: z.string().describe("Absolute path to the database file"),
@@ -17,7 +17,7 @@ export const sqlQuerySchema = addDeviceTargetingToSchema(
 );
 
 // Type interface for tool arguments
-export interface SqlQueryArgs {
+interface SqlQueryArgs {
   appId: string;
   databasePath: string;
   query: string;

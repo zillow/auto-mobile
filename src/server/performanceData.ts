@@ -2,8 +2,8 @@ import { PerformanceAuditRepository } from "../db/performanceAuditRepository";
 import { ToolCallRepository } from "../db/toolCallRepository";
 import type { PerformanceAuditHistoryEntry } from "../db/performanceAuditRepository";
 
-export const DEFAULT_PERFORMANCE_RESULTS_LIMIT = 50;
-export const DEFAULT_PERFORMANCE_RESULTS_OFFSET = 0;
+const DEFAULT_PERFORMANCE_RESULTS_LIMIT = 50;
+const DEFAULT_PERFORMANCE_RESULTS_OFFSET = 0;
 export const PERFORMANCE_RESULTS_LIMIT_MAX = 500;
 
 export interface PerformanceAuditQueryArgs {
@@ -14,7 +14,7 @@ export interface PerformanceAuditQueryArgs {
   deviceId?: string;
 }
 
-export interface PerformanceAuditResponse {
+interface PerformanceAuditResponse {
   results: PerformanceAuditHistoryEntry[];
   toolCalls: string[];
   hasMore: boolean;

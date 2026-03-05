@@ -8,7 +8,7 @@ import {
   getToolPathFromPath
 } from "./detection";
 
-export type AaptToolName = "aapt2" | "aapt";
+type AaptToolName = "aapt2" | "aapt";
 
 export interface AaptToolLocation {
   tool: AaptToolName;

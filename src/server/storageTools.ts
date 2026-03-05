@@ -12,7 +12,7 @@ import type { KeyValueType } from "../features/storage/storageTypes";
 const KEY_VALUE_TYPES = ["STRING", "INT", "LONG", "FLOAT", "BOOLEAN", "STRING_SET"] as const;
 
 // Schema for setKeyValue tool
-export const setKeyValueSchema = addDeviceTargetingToSchema(
+const setKeyValueSchema = addDeviceTargetingToSchema(
   z.object({
     appId: z.string().describe("App package ID"),
     fileName: z.string().describe("SharedPreferences file name (without .xml extension)"),
@@ -23,7 +23,7 @@ export const setKeyValueSchema = addDeviceTargetingToSchema(
 );
 
 // Schema for removeKeyValue tool
-export const removeKeyValueSchema = addDeviceTargetingToSchema(
+const removeKeyValueSchema = addDeviceTargetingToSchema(
   z.object({
     appId: z.string().describe("App package ID"),
     fileName: z.string().describe("SharedPreferences file name (without .xml extension)"),
@@ -32,14 +32,14 @@ export const removeKeyValueSchema = addDeviceTargetingToSchema(
 );
 
 // Schema for clearKeyValueFile tool
-export const clearKeyValueFileSchema = addDeviceTargetingToSchema(
+const clearKeyValueFileSchema = addDeviceTargetingToSchema(
   z.object({
     appId: z.string().describe("App package ID"),
     fileName: z.string().describe("SharedPreferences file name to clear entirely (without .xml extension)"),
   })
 );
 
-export interface SetKeyValueArgs {
+interface SetKeyValueArgs {
   appId: string;
   fileName: string;
   key: string;
@@ -47,13 +47,13 @@ export interface SetKeyValueArgs {
   type: KeyValueType;
 }
 
-export interface RemoveKeyValueArgs {
+interface RemoveKeyValueArgs {
   appId: string;
   fileName: string;
   key: string;
 }
 
-export interface ClearKeyValueFileArgs {
+interface ClearKeyValueFileArgs {
   appId: string;
   fileName: string;
 }

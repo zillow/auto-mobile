@@ -18,7 +18,7 @@ import {
  * Interface for AVD Manager operations
  * Enables dependency injection and testing with fakes
  */
-export interface AvdManager {
+interface AvdManager {
   acceptLicenses(): Promise<{ success: boolean; message: string }>;
   listSystemImages(filter?: SystemImageFilter): Promise<SystemImage[]>;
   installSystemImage(packageName: string, acceptLicense?: boolean): Promise<{ success: boolean; message: string }>;

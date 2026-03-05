@@ -23,7 +23,7 @@ export interface PlanExecutionLockScopeProvider {
   getScope(): PlanExecutionLockScope;
 }
 
-export class ServerConfigPlanExecutionLockScopeProvider implements PlanExecutionLockScopeProvider {
+class ServerConfigPlanExecutionLockScopeProvider implements PlanExecutionLockScopeProvider {
   getScope(): PlanExecutionLockScope {
     return serverConfig.getPlanExecutionLockScope();
   }

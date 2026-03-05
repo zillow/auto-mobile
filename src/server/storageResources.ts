@@ -6,7 +6,7 @@ import { logger } from "../utils/logger";
 import type { PreferenceFile, KeyValueEntry } from "../features/storage/storageTypes";
 
 // Resource URI templates
-export const STORAGE_RESOURCE_TEMPLATES = {
+const STORAGE_RESOURCE_TEMPLATES = {
   FILES: "automobile:devices/{deviceId}/storage/{packageName}/files",
   ENTRIES: "automobile:devices/{deviceId}/storage/{packageName}/{fileName}/entries",
 } as const;

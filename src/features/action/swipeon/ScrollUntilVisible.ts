@@ -31,7 +31,7 @@ function oppositeDirection(dir: SwipeDirection): SwipeDirection {
   }
 }
 
-export interface ScrollUntilVisibleDependencies {
+interface ScrollUntilVisibleDependencies {
   device: BootedDevice;
   finder: ElementFinder;
   geometry: ElementGeometry;

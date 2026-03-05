@@ -53,7 +53,7 @@ interface SnapshotRestoreAction {
   execute(args: RestoreSnapshotArgs): Promise<RestoreSnapshotResult>;
 }
 
-export interface DeviceSnapshotManagerDependencies {
+interface DeviceSnapshotManagerDependencies {
   snapshotRepository: DeviceSnapshotRepository;
   configRepository: DeviceSnapshotConfigRepository;
   snapshotStore: DeviceSnapshotStore;

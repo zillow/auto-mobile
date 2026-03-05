@@ -16,7 +16,6 @@ import type {
 
 // Re-export shared types so existing imports from "./types" continue to work
 export type { DelegateContext } from "../shared/types";
-export type { PerfTiming, BaseResult, GestureTimingResult, ActionTimingResult } from "../shared/types";
 
 /**
  * Interface for iOS accessibility node format (matching Android format)

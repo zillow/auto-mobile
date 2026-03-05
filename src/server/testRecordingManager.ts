@@ -7,14 +7,14 @@ import { PlanValidator } from "../utils/plan/PlanValidator";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import { DualTrackRecorder } from "../features/record/android";
 
-export interface TestRecordingStartResult {
+interface TestRecordingStartResult {
   recordingId: string;
   startedAt: string;
   deviceId: string;
   platform: string;
 }
 
-export interface TestRecordingStopResult {
+interface TestRecordingStopResult {
   recordingId: string;
   startedAt: string;
   stoppedAt: string;

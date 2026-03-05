@@ -39,7 +39,7 @@ export interface PerformanceAuditRecord {
   nodeId?: number | null;
 }
 
-export interface PerformanceAuditQuery {
+interface PerformanceAuditQuery {
   startTime?: string;
   endTime?: string;
   limit?: number;
@@ -59,13 +59,13 @@ export interface PerformanceAuditHistoryEntry {
   nodeId: number | null;
 }
 
-export interface PerformanceAuditHistoryPage {
+interface PerformanceAuditHistoryPage {
   results: PerformanceAuditHistoryEntry[];
   hasMore: boolean;
   nextOffset: number | null;
 }
 
-export interface PerformanceAuditStreamQuery {
+interface PerformanceAuditStreamQuery {
   startTime?: string;
   endTime?: string;
   limit?: number;

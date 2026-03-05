@@ -7,7 +7,7 @@ import { logger } from "../logger";
 import { isRunningInDocker } from "../dockerEnv";
 import { getDeviceAppBundleHash, isHostControlAvailable, shouldUseHostControl, uninstallDeviceApp } from "../hostControlClient";
 
-export interface DeviceAppInspectorDependencies {
+interface DeviceAppInspectorDependencies {
   platform: () => NodeJS.Platform;
   exec: (command: string) => Promise<ExecResult>;
   readFile: (path: string) => Promise<string>;
@@ -265,4 +265,3 @@ export class DeviceAppInspector {
 }
 
 export const parseDevicectlJsonOutputPath = parseJsonOutputPath;
-export const extractDevicectlBundlePath = extractBundlePath;

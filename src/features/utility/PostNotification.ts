@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import fs from "fs/promises";
 import path from "path";
 
-export interface PostNotificationAction {
+interface PostNotificationAction {
   label: string;
   actionId: string;
 }

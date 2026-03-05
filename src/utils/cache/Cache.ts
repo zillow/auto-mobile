@@ -3,7 +3,7 @@ import { Timer, defaultTimer } from "../SystemTimer";
 /**
  * Configuration for cache behavior.
  */
-export interface CacheOptions {
+interface CacheOptions {
   /**
    * Time-to-live in milliseconds.
    * Entries older than this will be considered expired.
@@ -28,7 +28,7 @@ export interface CacheOptions {
 /**
  * Entry stored in the cache with metadata.
  */
-export interface CacheEntry<T> {
+interface CacheEntry<T> {
   /** The cached value */
   value: T;
   /** Timestamp when the entry was created */
@@ -42,7 +42,7 @@ export interface CacheEntry<T> {
 /**
  * Statistics about cache performance.
  */
-export interface CacheStats {
+interface CacheStats {
   /** Number of cache hits */
   hits: number;
   /** Number of cache misses */
@@ -58,7 +58,7 @@ export interface CacheStats {
 /**
  * Generic cache interface.
  */
-export interface Cache<K, V> {
+interface Cache<K, V> {
   /**
    * Get a value from the cache.
    * Returns undefined if not found or expired.
@@ -312,6 +312,3 @@ export class TTLCache<K, V> implements Cache<K, V> {
 /**
  * Create a TTL cache with the default timer.
  */
-export function createCache<K, V>(options?: CacheOptions): Cache<K, V> {
-  return new TTLCache<K, V>(defaultTimer, options);
-}
