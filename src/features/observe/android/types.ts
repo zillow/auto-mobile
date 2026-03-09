@@ -98,8 +98,6 @@ export interface AccessibilityHierarchy {
   wakefulness?: "Awake" | "Asleep" | "Dozing";
   /** Foreground activity component name, e.g. "com.example.app/.MainActivity" */
   foregroundActivity?: string;
-  /** Task ID of the foreground activity */
-  foregroundTaskId?: number;
   /** Display density in DPI */
   density?: number;
   /** Android API level (e.g. 34) */

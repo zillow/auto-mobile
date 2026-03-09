@@ -888,9 +888,10 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
   ): Promise<{ success: boolean; action: string; totalTimeMs: number; error?: string }> {
     const startTime = this.timer.now();
     try {
-      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
-      if (!connected) {
-        return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: "Failed to connect to accessibility service" };
+      // Fast-fail if not already connected to avoid stalling callers
+      // (all callers fall back to ADB keyevent on failure)
+      if (!this.isConnected()) {
+        return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: "WebSocket not connected" };
       }
 
       const requestId = this.requestManager.generateId("global_action");
@@ -920,7 +921,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
   ): Promise<{
     success: boolean; screenWidth?: number; screenHeight?: number; density?: number;
     rotation?: number; sdkInt?: number; deviceModel?: string; isEmulator?: boolean;
-    wakefulness?: string; foregroundActivity?: string; foregroundTaskId?: number;
+    wakefulness?: string; foregroundActivity?: string;
     totalTimeMs: number; error?: string;
   }> {
     const startTime = this.timer.now();
@@ -1398,7 +1399,6 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           sdkInt: infoMessage.sdkInt, deviceModel: infoMessage.deviceModel,
           isEmulator: infoMessage.isEmulator, wakefulness: infoMessage.wakefulness,
           foregroundActivity: infoMessage.foregroundActivity,
-          foregroundTaskId: infoMessage.foregroundTaskId,
           totalTimeMs: infoMessage.totalTimeMs ?? 0, error: infoMessage.error
         });
       }

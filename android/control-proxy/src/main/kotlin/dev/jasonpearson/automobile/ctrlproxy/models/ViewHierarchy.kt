@@ -26,7 +26,6 @@ data class ViewHierarchy(
     val systemInsets: SystemInsetsInfo? = null,
     val wakefulness: String? = null, // "Awake", "Asleep", or "Dozing"
     val foregroundActivity: String? = null, // e.g. "com.example.app/.MainActivity"
-    val foregroundTaskId: Int? = null,
     val density: Int? = null, // Display density in DPI
     val sdkInt: Int? = null, // Android API level (e.g. 34)
     val deviceModel: String? = null, // e.g. "Pixel 8"

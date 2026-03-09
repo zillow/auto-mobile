@@ -50,7 +50,7 @@ export class HomeScreen extends BaseVisualChange {
 
   private async executeAndroidHome(): Promise<void> {
     try {
-      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
       const result = await client.requestGlobalAction("home", 3000);
       if (result.success) {
         logger.debug("[HOME] Used accessibility service global action");

@@ -405,7 +405,6 @@ export class CtrlProxyHierarchy {
         "systemInsets": accessibilityHierarchy.systemInsets,
         "wakefulness": accessibilityHierarchy.wakefulness,
         "foregroundActivity": accessibilityHierarchy.foregroundActivity,
-        "foregroundTaskId": accessibilityHierarchy.foregroundTaskId,
         "density": accessibilityHierarchy.density,
         "sdkInt": accessibilityHierarchy.sdkInt,
         "deviceModel": accessibilityHierarchy.deviceModel,

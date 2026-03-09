@@ -13,7 +13,6 @@ describe("FakeDeviceMetadataSource", () => {
     isEmulator: false,
     wakefulness: "Awake",
     foregroundActivity: "com.example.app/.MainActivity",
-    foregroundTaskId: 42,
   };
 
   it("returns null by default", async () => {

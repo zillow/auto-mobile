@@ -12,7 +12,6 @@ export interface DeviceMetadata {
   isEmulator: boolean;
   wakefulness: "Awake" | "Asleep" | "Dozing";
   foregroundActivity?: string;
-  foregroundTaskId?: number;
 }
 
 /**

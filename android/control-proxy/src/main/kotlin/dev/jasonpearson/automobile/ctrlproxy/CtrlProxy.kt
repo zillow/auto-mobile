@@ -1207,23 +1207,25 @@ class CtrlProxy : AccessibilityService() {
   }
 
   /**
-   * Get the foreground activity component name and task ID. Returns a pair of (componentName,
-   * taskId) or null if unavailable.
+   * Get the foreground activity component name using accessibility service state.
+   * Uses rootInActiveWindow (reliable on all API levels) + lastWindowClassName
+   * from TYPE_WINDOW_STATE_CHANGED events, avoiding the restricted
+   * ActivityManager.getRunningTasks() API.
    */
-  @Suppress("DEPRECATION")
-  private fun getForegroundActivity(): Pair<String, Int>? {
+  private fun getForegroundActivity(): String? {
     return try {
-      val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-      val tasks = activityManager?.getRunningTasks(1)
-      if (!tasks.isNullOrEmpty()) {
-        val topTask = tasks[0]
-        val component = topTask.topActivity
-        if (component != null) {
-          val name = component.packageName + "/" + component.shortClassName
-          Pair(name, topTask.id)
+      val rootPackage = rootInActiveWindow?.packageName?.toString()
+      val className = lastWindowClassName
+      if (rootPackage != null && className != null) {
+        // Use short class name format if it starts with the package
+        val shortName = if (className.startsWith(rootPackage)) {
+          className.removePrefix(rootPackage)
         } else {
-          null
+          className
         }
+        "$rootPackage/$shortName"
+      } else if (rootPackage != null) {
+        rootPackage
       } else {
         null
       }
@@ -1322,8 +1324,7 @@ class CtrlProxy : AccessibilityService() {
               deviceModel = Build.MODEL,
               isEmulator = getIsEmulator(),
               wakefulness = getWakefulness(),
-              foregroundActivity = foreground?.first,
-              foregroundTaskId = foreground?.second,
+              foregroundActivity = foreground,
               totalTimeMs = totalTimeMs,
           ),
       )
@@ -1381,8 +1382,7 @@ class CtrlProxy : AccessibilityService() {
         rotation = rotation,
         systemInsets = systemInsets,
         wakefulness = wakefulness,
-        foregroundActivity = foreground?.first,
-        foregroundTaskId = foreground?.second,
+        foregroundActivity = foreground,
         density = density,
         sdkInt = Build.VERSION.SDK_INT,
         deviceModel = Build.MODEL,

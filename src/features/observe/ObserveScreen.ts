@@ -540,7 +540,7 @@ export class RealObserveScreen implements ObserveScreen {
           } else {
             await perf.track("wakefulness", () => this.collectWakefulness(result, signal));
           }
-          // Use foreground activity from accessibility service for activeWindow + backStack
+          // Use foreground activity from accessibility service for activeWindow
           if (hierarchy.foregroundActivity) {
             const parts = hierarchy.foregroundActivity.split("/");
             const packageName = parts[0];
@@ -552,28 +552,9 @@ export class RealObserveScreen implements ObserveScreen {
               activityName,
               layoutSeqSum: 0
             };
-            result.backStack = {
-              depth: 0,
-              activities: [{
-                name: activityName,
-                taskId: hierarchy.foregroundTaskId ?? -1,
-              }],
-              tasks: hierarchy.foregroundTaskId !== undefined && hierarchy.foregroundTaskId !== null ? [{
-                id: hierarchy.foregroundTaskId,
-                packageName,
-              }] : [],
-              currentActivity: {
-                name: activityName,
-                taskId: hierarchy.foregroundTaskId ?? -1,
-              },
-              currentTaskId: hierarchy.foregroundTaskId ?? -1,
-              capturedAt: Date.now(),
-              source: "control-proxy"
-            };
-          } else {
-            // Fall back to ADB for back stack + active window
-            await perf.track("backStack", () => this.collectBackStack(result, perf, signal));
           }
+          // Always use ADB for back stack (accessibility service cannot determine stack depth)
+          await perf.track("backStack", () => this.collectBackStack(result, perf, signal));
           logger.debug("[OBSERVE] Using device metadata from accessibility service");
         } else {
           logger.warn("[OBSERVE] No screen info from accessibility service - check if APK is updated");

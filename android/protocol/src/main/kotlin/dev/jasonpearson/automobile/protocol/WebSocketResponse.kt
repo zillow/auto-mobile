@@ -397,7 +397,6 @@ data class DeviceInfoResult(
   val isEmulator: Boolean? = null,
   val wakefulness: String? = null,
   val foregroundActivity: String? = null,
-  val foregroundTaskId: Int? = null,
   val totalTimeMs: Long,
   val error: String? = null,
 ) : WebSocketResponse()

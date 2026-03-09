@@ -47,8 +47,6 @@ export interface ViewHierarchyResult {
   wakefulness?: "Awake" | "Asleep" | "Dozing";
   /** Foreground activity component name, e.g. "com.example.app/.MainActivity" (Android only) */
   foregroundActivity?: string;
-  /** Task ID of the foreground activity (Android only) */
-  foregroundTaskId?: number;
   /** Display density in DPI (Android only, from accessibility service) */
   density?: number;
   /** Android API level (Android only, from accessibility service) */

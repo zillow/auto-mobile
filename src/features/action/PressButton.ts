@@ -98,7 +98,7 @@ export class PressButton extends BaseVisualChange {
     // Try accessibility service global action for supported buttons
     if (PressButton.GLOBAL_ACTION_BUTTONS.has(normalized)) {
       try {
-        const client = AndroidCtrlProxyClient.getInstance(this.device);
+        const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
         const result = await client.requestGlobalAction(normalized, 3000);
         if (result.success) {
           logger.debug(`[PRESS_BUTTON] Used accessibility service for ${button}`);

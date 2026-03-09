@@ -243,7 +243,7 @@ export class RecentApps extends BaseVisualChange {
   private async executeHardwareNavigation(): Promise<RecentAppsResult> {
     // Try accessibility service global action first
     try {
-      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
       const result = await client.requestGlobalAction("recent", 3000);
       if (result.success) {
         logger.debug("[RECENT_APPS] Used accessibility service global action");

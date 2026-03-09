@@ -770,7 +770,7 @@ export class Explore extends BaseVisualChange {
       // Press back button via accessibility service, fall back to ADB
       let backSuccess = false;
       try {
-        const client = AndroidCtrlProxyClient.getInstance(this.device);
+        const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
         const result = await client.requestGlobalAction("back", 3000);
         backSuccess = result.success;
       } catch {
@@ -804,7 +804,7 @@ export class Explore extends BaseVisualChange {
       // Press home button via accessibility service, fall back to ADB
       let homeSuccess = false;
       try {
-        const client = AndroidCtrlProxyClient.getInstance(this.device);
+        const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
         const result = await client.requestGlobalAction("home", 3000);
         homeSuccess = result.success;
       } catch {

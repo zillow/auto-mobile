@@ -35,6 +35,7 @@ export interface NavigateToOptions {
 export class NavigateTo {
   private device: BootedDevice;
   private adb: AdbExecutor;
+  private adbFactory: AdbClientFactory;
   private navigationManager: NavigationGraphService;
   private uiStateSetup: UIStateSetup;
   private screenWaiter: ScreenTransitionWaiter;
@@ -53,6 +54,7 @@ export class NavigateTo {
     timer: Timer = defaultTimer
   ) {
     this.device = device;
+    this.adbFactory = adbFactory;
     this.adb = adbFactory.create(device);
     this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
     this.timer = timer;
@@ -321,7 +323,7 @@ export class NavigateTo {
   private async pressBack(): Promise<void> {
     // Try accessibility service global action first, fall back to ADB
     try {
-      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const client = AndroidCtrlProxyClient.getInstance(this.device, this.adbFactory);
       const result = await client.requestGlobalAction("back", 3000);
       if (result.success) {
         logger.debug("[NAVIGATE_TO] Pressed back via accessibility service");

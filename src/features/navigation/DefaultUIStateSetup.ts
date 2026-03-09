@@ -451,7 +451,7 @@ export class DefaultUIStateSetup implements UIStateSetup {
    */
   private async pressBack(): Promise<void> {
     try {
-      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const client = AndroidCtrlProxyClient.getInstance(this.device, { create: () => this.adb });
       const result = await client.requestGlobalAction("back", 3000);
       if (result.success) {
         logger.debug("[UI_STATE_SETUP] Pressed back via accessibility service");
