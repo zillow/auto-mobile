@@ -109,9 +109,9 @@ export interface BugReportResult {
   };
 
   /**
-   * Screenshot as base64 encoded image
+   * File path to saved screenshot image
    */
-  screenshot?: string;
+  screenshotPath?: string;
 
   /**
    * System window state from dumpsys

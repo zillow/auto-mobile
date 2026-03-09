@@ -336,9 +336,7 @@ export class BugReport {
     try {
       const screenshot = await this.takeScreenshot.execute();
       if (screenshot && screenshot.success && screenshot.path) {
-        // Read the screenshot file and convert to base64
-        const imageBuffer = await fsPromises.readFile(screenshot.path);
-        result.screenshot = imageBuffer.toString("base64");
+        result.screenshotPath = screenshot.path;
       }
     } catch (error) {
       result.errors?.push(`Failed to get screenshot: ${error}`);
