@@ -1224,9 +1224,9 @@ class CtrlProxy : AccessibilityService() {
           className
         }
         "$rootPackage/$shortName"
-      } else if (rootPackage != null) {
-        rootPackage
       } else {
+        // Don't return package-only value — it produces an empty activityName
+        // in ObserveScreen and prevents the ADB fallback from filling the real one
         null
       }
     } catch (e: Exception) {
