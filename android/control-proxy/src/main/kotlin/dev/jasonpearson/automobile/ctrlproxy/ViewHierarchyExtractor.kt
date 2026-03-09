@@ -198,10 +198,15 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     var activeWindowHasNullRoot = false
     var hasApplicationWindow = false
 
-    // Detect if an IME (keyboard) window is present
+    // Detect if an IME (keyboard) window with an extractable root is present.
     // When IME is visible, Android may mark app window nodes as isVisibleToUser=false
-    // even though they are physically visible above the keyboard
-    val hasImeWindow = windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+    // even though they are physically visible above the keyboard.
+    // Only bypass visibility filtering when the IME window has a root node, because that
+    // root contributes occlusion nodes that will properly hide elements behind the keyboard.
+    // If the IME window has a null root, it cannot participate in occlusion and we must keep
+    // the isVisibleToUser filter to avoid exposing non-interactable elements under the keyboard.
+    val hasImeWindow =
+        windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD && it.root != null }
 
     // Extract from each window
     for (window in windows) {
