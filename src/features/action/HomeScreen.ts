@@ -3,10 +3,12 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, HomeScreenResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { CtrlProxyClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { logger } from "../../utils/logger";
 
 /**
- * Navigates to the home screen using the hardware home button (keyevent 3).
- * This works universally on all Android devices regardless of navigation mode.
+ * Navigates to the home screen using the accessibility service global action
+ * (preferred) or hardware home button keyevent (fallback).
  */
 export class HomeScreen extends BaseVisualChange {
 
@@ -23,10 +25,7 @@ export class HomeScreen extends BaseVisualChange {
       async () => {
         switch (this.device.platform) {
           case "android":
-            // Press hardware home button (keycode 3) - works on all Android devices
-            await perf.track("hardwareNavigation", () =>
-              this.adb.executeCommand("shell input keyevent 3")
-            );
+            await perf.track("homeNavigation", () => this.executeAndroidHome());
             break;
           case "ios":
             await perf.track("iOSHomeNavigation", () => this.executeIosHomeNavigation());
@@ -47,6 +46,21 @@ export class HomeScreen extends BaseVisualChange {
         perf
       }
     );
+  }
+
+  private async executeAndroidHome(): Promise<void> {
+    try {
+      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const result = await client.requestGlobalAction("home", 3000);
+      if (result.success) {
+        logger.debug("[HOME] Used accessibility service global action");
+        return;
+      }
+      logger.debug(`[HOME] Global action failed (${result.error}), falling back to ADB keyevent`);
+    } catch {
+      // Fall through to ADB
+    }
+    await this.adb.executeCommand("shell input keyevent 3");
   }
 
   private async executeIosHomeNavigation(): Promise<void> {

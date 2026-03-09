@@ -3,6 +3,7 @@ package dev.jasonpearson.automobile.ctrlproxy
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
@@ -16,6 +17,7 @@ import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
+import android.os.PowerManager
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
@@ -759,6 +761,10 @@ class CtrlProxy : AccessibilityService() {
               onGetPermission = { requestId, permission, requestPermission ->
                 handleGetPermission(requestId, permission, requestPermission)
               },
+              onRequestGlobalAction = { requestId, action ->
+                performGlobalActionRequest(requestId, action)
+              },
+              onRequestDeviceInfo = { requestId -> performDeviceInfoRequest(requestId) },
               onSetRecompositionTracking = { enabled -> setRecompositionTrackingEnabled(enabled) },
               onGetCurrentFocus = { requestId -> handleGetCurrentFocus(requestId) },
               onGetTraversalOrder = { requestId -> handleGetTraversalOrder(requestId) },
@@ -1181,6 +1187,149 @@ class CtrlProxy : AccessibilityService() {
     }
   }
 
+  /** Get device wakefulness state: "Awake", "Asleep", or "Dozing". */
+  private fun getWakefulness(): String {
+    return try {
+      val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+      if (powerManager == null) {
+        "Awake"
+      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && powerManager.isDeviceIdleMode) {
+        "Dozing"
+      } else if (powerManager.isInteractive) {
+        "Awake"
+      } else {
+        "Asleep"
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get wakefulness", e)
+      "Awake"
+    }
+  }
+
+  /**
+   * Get the foreground activity component name and task ID. Returns a pair of (componentName,
+   * taskId) or null if unavailable.
+   */
+  @Suppress("DEPRECATION")
+  private fun getForegroundActivity(): Pair<String, Int>? {
+    return try {
+      val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+      val tasks = activityManager?.getRunningTasks(1)
+      if (!tasks.isNullOrEmpty()) {
+        val topTask = tasks[0]
+        val component = topTask.topActivity
+        if (component != null) {
+          val name = component.packageName + "/" + component.shortClassName
+          Pair(name, topTask.id)
+        } else {
+          null
+        }
+      } else {
+        null
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get foreground activity", e)
+      null
+    }
+  }
+
+  /** Get display density in DPI. */
+  private fun getDensity(): Int {
+    return try {
+      resources.displayMetrics.densityDpi
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get density", e)
+      0
+    }
+  }
+
+  /** Check if running on an emulator. */
+  private fun getIsEmulator(): Boolean {
+    return (Build.FINGERPRINT.startsWith("generic") ||
+        Build.FINGERPRINT.startsWith("unknown") ||
+        Build.MODEL.contains("google_sdk") ||
+        Build.MODEL.contains("Emulator") ||
+        Build.MODEL.contains("Android SDK built for x86") ||
+        Build.MANUFACTURER.contains("Genymotion") ||
+        Build.HARDWARE.contains("goldfish") ||
+        Build.HARDWARE.contains("ranchu") ||
+        Build.PRODUCT.contains("sdk_gphone") ||
+        Build.PRODUCT.contains("emulator") ||
+        Build.PRODUCT.contains("simulator"))
+  }
+
+  /**
+   * Execute a global action (back, home, recents, etc.) via the accessibility service.
+   * Returns true if the action was dispatched successfully.
+   */
+  private fun executeGlobalAction(action: String): Boolean {
+    val actionId = when (action.lowercase()) {
+      "back" -> GLOBAL_ACTION_BACK
+      "home" -> GLOBAL_ACTION_HOME
+      "recent", "recents" -> GLOBAL_ACTION_RECENTS
+      "notifications" -> GLOBAL_ACTION_NOTIFICATIONS
+      "power_dialog" -> GLOBAL_ACTION_POWER_DIALOG
+      "lock_screen" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        GLOBAL_ACTION_LOCK_SCREEN
+      } else {
+        return false
+      }
+      else -> return false
+    }
+    return performGlobalAction(actionId)
+  }
+
+  /**
+   * Handle a request_global_action WebSocket message.
+   */
+  private fun performGlobalActionRequest(requestId: String?, action: String) {
+    val startTime = System.currentTimeMillis()
+    val success = executeGlobalAction(action)
+    val totalTimeMs = System.currentTimeMillis() - startTime
+    serviceScope.launch {
+      webSocketServer?.broadcast(
+          dev.jasonpearson.automobile.protocol.GlobalActionResult(
+              timestamp = System.currentTimeMillis(),
+              requestId = requestId,
+              success = success,
+              action = action,
+              totalTimeMs = totalTimeMs,
+              error = if (!success) "Unsupported or failed action: $action" else null,
+          ),
+      )
+    }
+  }
+
+  /**
+   * Handle a request_device_info WebSocket message.
+   */
+  private fun performDeviceInfoRequest(requestId: String?) {
+    val startTime = System.currentTimeMillis()
+    val screenDimensions = getScreenDimensions()
+    val foreground = getForegroundActivity()
+    val totalTimeMs = System.currentTimeMillis() - startTime
+    serviceScope.launch {
+      webSocketServer?.broadcast(
+          dev.jasonpearson.automobile.protocol.DeviceInfoResult(
+              timestamp = System.currentTimeMillis(),
+              requestId = requestId,
+              success = true,
+              screenWidth = screenDimensions?.width,
+              screenHeight = screenDimensions?.height,
+              density = getDensity(),
+              rotation = getRotation(),
+              sdkInt = Build.VERSION.SDK_INT,
+              deviceModel = Build.MODEL,
+              isEmulator = getIsEmulator(),
+              wakefulness = getWakefulness(),
+              foregroundActivity = foreground?.first,
+              foregroundTaskId = foreground?.second,
+              totalTimeMs = totalTimeMs,
+          ),
+      )
+    }
+  }
+
   /**
    * Direct hierarchy extraction without debouncing. Used by the HierarchyDebouncer. Extracts from
    * all visible windows to capture popups, toolbars, etc.
@@ -1222,12 +1371,22 @@ class CtrlProxy : AccessibilityService() {
       )
     }
 
-    // Add screen info to the hierarchy (eliminates need for dumpsys window call on client)
+    // Add device metadata to the hierarchy (eliminates need for dumpsys calls on client)
+    val wakefulness = getWakefulness()
+    val foreground = getForegroundActivity()
+    val density = getDensity()
     return hierarchy?.copy(
         screenWidth = screenDimensions?.width,
         screenHeight = screenDimensions?.height,
         rotation = rotation,
         systemInsets = systemInsets,
+        wakefulness = wakefulness,
+        foregroundActivity = foreground?.first,
+        foregroundTaskId = foreground?.second,
+        density = density,
+        sdkInt = Build.VERSION.SDK_INT,
+        deviceModel = Build.MODEL,
+        isEmulator = getIsEmulator(),
     )
   }
 

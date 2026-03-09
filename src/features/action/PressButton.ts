@@ -3,6 +3,8 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { CtrlProxyClient } from "../observe/ios";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { logger } from "../../utils/logger";
 
 export class PressButton extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
@@ -63,10 +65,13 @@ export class PressButton extends BaseVisualChange {
     );
   }
 
+  // Buttons that can be handled via accessibility service global actions
+  private static readonly GLOBAL_ACTION_BUTTONS = new Set(["back", "home", "recent"]);
+
   /**
-   * Execute Android-specific button press
-   * @param button - Button name to press
-   * @returns Result of the button press operation
+   * Execute Android-specific button press.
+   * Uses accessibility service global actions for back/home/recent (faster),
+   * falls back to ADB keyevent for all buttons.
    */
   private async executeAndroidButtonPress(button: string): Promise<PressButtonResult> {
     const keyCodeMap: Record<string, number> = {
@@ -79,7 +84,8 @@ export class PressButton extends BaseVisualChange {
       "recent": 187,
     };
 
-    const keyCode = keyCodeMap[button.toLowerCase()];
+    const normalized = button.toLowerCase();
+    const keyCode = keyCodeMap[normalized];
     if (!keyCode) {
       return {
         success: false,
@@ -89,13 +95,23 @@ export class PressButton extends BaseVisualChange {
       };
     }
 
-    await this.adb.executeCommand(`shell input keyevent ${keyCode}`);
+    // Try accessibility service global action for supported buttons
+    if (PressButton.GLOBAL_ACTION_BUTTONS.has(normalized)) {
+      try {
+        const client = AndroidCtrlProxyClient.getInstance(this.device);
+        const result = await client.requestGlobalAction(normalized, 3000);
+        if (result.success) {
+          logger.debug(`[PRESS_BUTTON] Used accessibility service for ${button}`);
+          return { success: true, button, keyCode };
+        }
+        logger.debug(`[PRESS_BUTTON] Global action failed (${result.error}), falling back to ADB`);
+      } catch {
+        // Fall through to ADB
+      }
+    }
 
-    return {
-      success: true,
-      button,
-      keyCode
-    };
+    await this.adb.executeCommand(`shell input keyevent ${keyCode}`);
+    return { success: true, button, keyCode };
   }
 
   /**

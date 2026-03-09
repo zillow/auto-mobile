@@ -12,3 +12,5 @@ export type { BackStack } from "./BackStack";
 export type { PredictiveUIState } from "./PredictiveUIState";
 export type { AwaitIdle, UiStabilityState } from "./AwaitIdle";
 export type { ScreenshotService } from "./ScreenshotService";
+export type { DeviceMetadataSource, DeviceMetadata } from "./DeviceMetadataSource";
+export type { GlobalActionSource, GlobalActionResult } from "./GlobalActionSource";

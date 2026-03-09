@@ -878,6 +878,76 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
     }
   }
 
+  /**
+   * Execute a global action (back, home, recents, etc.) via the accessibility service.
+   */
+  async requestGlobalAction(
+    action: string,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<{ success: boolean; action: string; totalTimeMs: number; error?: string }> {
+    const startTime = this.timer.now();
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: "Failed to connect to accessibility service" };
+      }
+
+      const requestId = this.requestManager.generateId("global_action");
+      const promise = this.requestManager.register<{ success: boolean; action: string; totalTimeMs: number; error?: string }>(
+        requestId, "global_action", timeoutMs,
+        (_id, _type, timeout) => ({ success: false, action, totalTimeMs: this.timer.now() - startTime, error: `Global action timeout after ${timeout}ms` })
+      );
+
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      this.ws.send(JSON.stringify({ type: "request_global_action", requestId, action }));
+      logger.debug(`[CTRL_PROXY] Sent global action request (requestId: ${requestId}, action: ${action})`);
+
+      return await promise;
+    } catch (error) {
+      return { success: false, action, totalTimeMs: this.timer.now() - startTime, error: `${error}` };
+    }
+  }
+
+  /**
+   * Request device metadata from the accessibility service.
+   */
+  async requestDeviceInfo(
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<{
+    success: boolean; screenWidth?: number; screenHeight?: number; density?: number;
+    rotation?: number; sdkInt?: number; deviceModel?: string; isEmulator?: boolean;
+    wakefulness?: string; foregroundActivity?: string; foregroundTaskId?: number;
+    totalTimeMs: number; error?: string;
+  }> {
+    const startTime = this.timer.now();
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        return { success: false, totalTimeMs: this.timer.now() - startTime, error: "Failed to connect to accessibility service" };
+      }
+
+      const requestId = this.requestManager.generateId("device_info");
+      const promise = this.requestManager.register<any>(
+        requestId, "device_info", timeoutMs,
+        (_id, _type, timeout) => ({ success: false, totalTimeMs: this.timer.now() - startTime, error: `Device info timeout after ${timeout}ms` })
+      );
+
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      this.ws.send(JSON.stringify({ type: "request_device_info", requestId }));
+      logger.debug(`[CTRL_PROXY] Sent device info request (requestId: ${requestId})`);
+
+      return await promise;
+    } catch (error) {
+      return { success: false, totalTimeMs: this.timer.now() - startTime, error: `${error}` };
+    }
+  }
+
   async requestScreenshot(timeoutMs: number = 5000, perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<ScreenshotResult> {
     const startTime = this.timer.now();
 
@@ -1306,6 +1376,30 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         this.requestManager.resolve<HighlightOperationResult>(highlightMessage.requestId, {
           success: highlightMessage.success ?? false, error: highlightMessage.error,
           requestId: highlightMessage.requestId, timestamp: highlightMessage.timestamp
+        });
+      }
+
+      // Handle global action result
+      if (message.type === "global_action_result" && message.requestId) {
+        const actionMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: actionMessage.success ?? false, action: actionMessage.action,
+          totalTimeMs: actionMessage.totalTimeMs ?? 0, error: actionMessage.error
+        });
+      }
+
+      // Handle device info result
+      if (message.type === "device_info_result" && message.requestId) {
+        const infoMessage = message as any;
+        this.requestManager.resolve(message.requestId, {
+          success: infoMessage.success ?? false,
+          screenWidth: infoMessage.screenWidth, screenHeight: infoMessage.screenHeight,
+          density: infoMessage.density, rotation: infoMessage.rotation,
+          sdkInt: infoMessage.sdkInt, deviceModel: infoMessage.deviceModel,
+          isEmulator: infoMessage.isEmulator, wakefulness: infoMessage.wakefulness,
+          foregroundActivity: infoMessage.foregroundActivity,
+          foregroundTaskId: infoMessage.foregroundTaskId,
+          totalTimeMs: infoMessage.totalTimeMs ?? 0, error: infoMessage.error
         });
       }
 

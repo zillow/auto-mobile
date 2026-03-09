@@ -309,6 +309,27 @@ data class ClearPreferences(
 ) : WebSocketRequest()
 
 // =============================================================================
+// Global Action Request
+// =============================================================================
+
+@Serializable
+@SerialName("request_global_action")
+data class RequestGlobalAction(
+  override val requestId: String? = null,
+  val action: String, // back, home, recent, notifications, power_dialog, lock_screen
+) : WebSocketRequest()
+
+// =============================================================================
+// Device Info Request
+// =============================================================================
+
+@Serializable
+@SerialName("request_device_info")
+data class RequestDeviceInfo(
+  override val requestId: String? = null,
+) : WebSocketRequest()
+
+// =============================================================================
 // Configuration Requests
 // =============================================================================
 

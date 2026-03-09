@@ -1,6 +1,7 @@
 import { BootedDevice } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
 import { ToolRegistry } from "../../server/toolRegistry";
 import { NavigationEdge, UIState } from "./NavigationGraphManager";
 import { ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
@@ -449,8 +450,18 @@ export class DefaultUIStateSetup implements UIStateSetup {
    * Press the back button.
    */
   private async pressBack(): Promise<void> {
+    try {
+      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const result = await client.requestGlobalAction("back", 3000);
+      if (result.success) {
+        logger.debug("[UI_STATE_SETUP] Pressed back via accessibility service");
+        return;
+      }
+    } catch {
+      // Fall through to ADB
+    }
     await this.adb.executeCommand("shell input keyevent 4");
-    logger.debug(`[UI_STATE_SETUP] Pressed back button`);
+    logger.debug("[UI_STATE_SETUP] Pressed back via ADB keyevent");
   }
 
   /**

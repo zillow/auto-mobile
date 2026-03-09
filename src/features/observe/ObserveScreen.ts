@@ -519,16 +519,12 @@ export class RealObserveScreen implements ObserveScreen {
         // Phase 1: Get view hierarchy first (includes screen info from accessibility service)
         perf.serial("phase1_hierarchy");
 
-        // Run view hierarchy and non-dumpsys operations in parallel
-        await Promise.all([
-          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal),
-          perf.track("wakefulness", () => this.collectWakefulness(result, signal)),
-          perf.track("backStack", () => this.collectBackStack(result, perf, signal)),
-        ]);
+        // Get view hierarchy (includes all device metadata from accessibility service)
+        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
 
         perf.end();
 
-        // Use screen info from accessibility service (no dumpsys fallback)
+        // Use device metadata from accessibility service (no dumpsys fallback)
         const hierarchy = result.viewHierarchy;
         if (hierarchy?.screenWidth && hierarchy?.screenHeight) {
           result.screenSize = { width: hierarchy.screenWidth, height: hierarchy.screenHeight };
@@ -538,15 +534,60 @@ export class RealObserveScreen implements ObserveScreen {
           if (hierarchy.systemInsets) {
             result.systemInsets = hierarchy.systemInsets;
           }
-          logger.debug("[OBSERVE] Using screen info from accessibility service");
+          // Use wakefulness from accessibility service, fall back to ADB
+          if (hierarchy.wakefulness) {
+            result.wakefulness = hierarchy.wakefulness;
+          } else {
+            await perf.track("wakefulness", () => this.collectWakefulness(result, signal));
+          }
+          // Use foreground activity from accessibility service for activeWindow + backStack
+          if (hierarchy.foregroundActivity) {
+            const parts = hierarchy.foregroundActivity.split("/");
+            const packageName = parts[0];
+            const activityName = parts[1]?.startsWith(".")
+              ? packageName + parts[1]
+              : parts[1] || "";
+            result.activeWindow = {
+              appId: packageName,
+              activityName,
+              layoutSeqSum: 0
+            };
+            result.backStack = {
+              depth: 0,
+              activities: [{
+                name: activityName,
+                taskId: hierarchy.foregroundTaskId ?? -1,
+              }],
+              tasks: hierarchy.foregroundTaskId !== undefined && hierarchy.foregroundTaskId !== null ? [{
+                id: hierarchy.foregroundTaskId,
+                packageName,
+              }] : [],
+              currentActivity: {
+                name: activityName,
+                taskId: hierarchy.foregroundTaskId ?? -1,
+              },
+              currentTaskId: hierarchy.foregroundTaskId ?? -1,
+              capturedAt: Date.now(),
+              source: "control-proxy"
+            };
+          } else {
+            // Fall back to ADB for back stack + active window
+            await perf.track("backStack", () => this.collectBackStack(result, perf, signal));
+          }
+          logger.debug("[OBSERVE] Using device metadata from accessibility service");
         } else {
           logger.warn("[OBSERVE] No screen info from accessibility service - check if APK is updated");
+          // Fall back to ADB for all metadata
+          await Promise.all([
+            perf.track("wakefulness", () => this.collectWakefulness(result, signal)),
+            perf.track("backStack", () => this.collectBackStack(result, perf, signal)),
+          ]);
         }
 
         // Note: Offscreen filtering is now done in the Android accessibility service (Kotlin)
         // for better performance (avoids serializing/transferring filtered data)
 
-        // Populate activeWindow from view hierarchy packageName if available
+        // Populate activeWindow from view hierarchy packageName if not already set
         if (result.viewHierarchy?.packageName && !result.activeWindow) {
           result.activeWindow = {
             appId: result.viewHierarchy.packageName,

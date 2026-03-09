@@ -94,6 +94,20 @@ export interface AccessibilityHierarchy {
   rotation?: number;
   /** System insets (status bar, nav bar, gesture insets) */
   systemInsets?: { top: number; bottom: number; left: number; right: number };
+  /** Device wakefulness: "Awake", "Asleep", or "Dozing" */
+  wakefulness?: "Awake" | "Asleep" | "Dozing";
+  /** Foreground activity component name, e.g. "com.example.app/.MainActivity" */
+  foregroundActivity?: string;
+  /** Task ID of the foreground activity */
+  foregroundTaskId?: number;
+  /** Display density in DPI */
+  density?: number;
+  /** Android API level (e.g. 34) */
+  sdkInt?: number;
+  /** Device model (e.g. "Pixel 8") */
+  deviceModel?: string;
+  /** Whether running on an emulator */
+  isEmulator?: boolean;
 }
 
 /**

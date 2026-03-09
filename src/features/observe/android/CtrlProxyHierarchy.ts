@@ -402,7 +402,14 @@ export class CtrlProxyHierarchy {
         "screenWidth": accessibilityHierarchy.screenWidth,
         "screenHeight": accessibilityHierarchy.screenHeight,
         "rotation": accessibilityHierarchy.rotation,
-        "systemInsets": accessibilityHierarchy.systemInsets
+        "systemInsets": accessibilityHierarchy.systemInsets,
+        "wakefulness": accessibilityHierarchy.wakefulness,
+        "foregroundActivity": accessibilityHierarchy.foregroundActivity,
+        "foregroundTaskId": accessibilityHierarchy.foregroundTaskId,
+        "density": accessibilityHierarchy.density,
+        "sdkInt": accessibilityHierarchy.sdkInt,
+        "deviceModel": accessibilityHierarchy.deviceModel,
+        "isEmulator": accessibilityHierarchy.isEmulator
       };
 
       const duration = this.context.timer.now() - startTime;

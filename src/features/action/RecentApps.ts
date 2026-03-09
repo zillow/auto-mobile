@@ -9,6 +9,8 @@ import { DefaultElementGeometry } from "../utility/ElementGeometry";
 import { ObserveResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
+import { logger } from "../../utils/logger";
 
 /**
  * Opens the recent apps screen using intelligent navigation detection
@@ -239,12 +241,20 @@ export class RecentApps extends BaseVisualChange {
    * @returns Recent apps result
    */
   private async executeHardwareNavigation(): Promise<RecentAppsResult> {
-    // Use hardware recent apps key (keycode 187)
-    await this.adb.executeCommand("shell input keyevent 187");
+    // Try accessibility service global action first
+    try {
+      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const result = await client.requestGlobalAction("recent", 3000);
+      if (result.success) {
+        logger.debug("[RECENT_APPS] Used accessibility service global action");
+        return { success: true, method: "hardware" };
+      }
+      logger.debug(`[RECENT_APPS] Global action failed (${result.error}), falling back to ADB`);
+    } catch {
+      // Fall through to ADB
+    }
 
-    return {
-      success: true,
-      method: "hardware"
-    };
+    await this.adb.executeCommand("shell input keyevent 187");
+    return { success: true, method: "hardware" };
   }
 }

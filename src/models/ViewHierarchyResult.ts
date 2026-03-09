@@ -43,6 +43,20 @@ export interface ViewHierarchyResult {
   rotation?: number;
   /** System insets (status bar, nav bar, gesture insets) */
   systemInsets?: { top: number; bottom: number; left: number; right: number };
+  /** Device wakefulness: "Awake", "Asleep", or "Dozing" (Android only, from accessibility service) */
+  wakefulness?: "Awake" | "Asleep" | "Dozing";
+  /** Foreground activity component name, e.g. "com.example.app/.MainActivity" (Android only) */
+  foregroundActivity?: string;
+  /** Task ID of the foreground activity (Android only) */
+  foregroundTaskId?: number;
+  /** Display density in DPI (Android only, from accessibility service) */
+  density?: number;
+  /** Android API level (Android only, from accessibility service) */
+  sdkInt?: number;
+  /** Device model (Android only, from accessibility service) */
+  deviceModel?: string;
+  /** Whether running on an emulator (Android only, from accessibility service) */
+  isEmulator?: boolean;
 }
 
 export interface Hierarchy {

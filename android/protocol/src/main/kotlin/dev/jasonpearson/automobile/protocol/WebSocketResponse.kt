@@ -364,6 +364,45 @@ data class PermissionResult(
 ) : WebSocketResponse()
 
 // =============================================================================
+// Global Action Result
+// =============================================================================
+
+@Serializable
+@SerialName("global_action_result")
+data class GlobalActionResult(
+  override val timestamp: Long,
+  val requestId: String? = null,
+  val success: Boolean,
+  val action: String,
+  val totalTimeMs: Long,
+  val error: String? = null,
+) : WebSocketResponse()
+
+// =============================================================================
+// Device Info Result
+// =============================================================================
+
+@Serializable
+@SerialName("device_info_result")
+data class DeviceInfoResult(
+  override val timestamp: Long,
+  val requestId: String? = null,
+  val success: Boolean,
+  val screenWidth: Int? = null,
+  val screenHeight: Int? = null,
+  val density: Int? = null,
+  val rotation: Int? = null,
+  val sdkInt: Int? = null,
+  val deviceModel: String? = null,
+  val isEmulator: Boolean? = null,
+  val wakefulness: String? = null,
+  val foregroundActivity: String? = null,
+  val foregroundTaskId: Int? = null,
+  val totalTimeMs: Long,
+  val error: String? = null,
+) : WebSocketResponse()
+
+// =============================================================================
 // Accessibility Focus Results
 // =============================================================================
 

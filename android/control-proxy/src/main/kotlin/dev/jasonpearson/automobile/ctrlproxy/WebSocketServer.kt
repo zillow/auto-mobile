@@ -164,6 +164,8 @@ class WebSocketServer(
     private val onRequestInstallCaCertFromPath:
         ((requestId: String?, devicePath: String) -> Unit)? =
         null,
+    private val onRequestGlobalAction: ((requestId: String?, action: String) -> Unit)? = null,
+    private val onRequestDeviceInfo: ((requestId: String?) -> Unit)? = null,
     private val onGetDeviceOwnerStatus: ((requestId: String?) -> Unit)? = null,
     private val onGetPermission:
         ((requestId: String?, permission: String?, requestPermission: Boolean?) -> Unit)? =
@@ -664,6 +666,19 @@ class WebSocketServer(
           } else {
             Log.w(TAG, "remove_ca_cert request missing alias and certificate")
           }
+        }
+        "request_global_action" -> {
+          Log.d(TAG, "Received global_action request (requestId: ${request.requestId}, action: ${request.action})")
+          val action = request.action
+          if (action != null) {
+            onRequestGlobalAction?.invoke(request.requestId, action)
+          } else {
+            Log.w(TAG, "Global action request missing required action")
+          }
+        }
+        "request_device_info" -> {
+          Log.d(TAG, "Received device_info request (requestId: ${request.requestId})")
+          onRequestDeviceInfo?.invoke(request.requestId)
         }
         "get_device_owner_status" -> {
           Log.d(TAG, "Received get_device_owner_status request (requestId: ${request.requestId})")

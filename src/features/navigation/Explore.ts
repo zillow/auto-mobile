@@ -3,6 +3,7 @@ import { BaseVisualChange, ProgressCallback } from "../action/BaseVisualChange";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
 import { defaultNavigationGraphManager, type NavigationEdge, type NavigationGraphService } from "./NavigationGraphManager";
 import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
@@ -766,8 +767,18 @@ export class Explore extends BaseVisualChange {
         );
       }
 
-      // Press back button
-      await this.adb.executeCommand("shell input keyevent KEYCODE_BACK");
+      // Press back button via accessibility service, fall back to ADB
+      let backSuccess = false;
+      try {
+        const client = AndroidCtrlProxyClient.getInstance(this.device);
+        const result = await client.requestGlobalAction("back", 3000);
+        backSuccess = result.success;
+      } catch {
+        // Fall through to ADB
+      }
+      if (!backSuccess) {
+        await this.adb.executeCommand("shell input keyevent KEYCODE_BACK");
+      }
       this.consecutiveBackCount++;
 
       // Wait briefly for navigation
@@ -790,8 +801,18 @@ export class Explore extends BaseVisualChange {
         );
       }
 
-      // Press home button
-      await this.adb.executeCommand("shell input keyevent KEYCODE_HOME");
+      // Press home button via accessibility service, fall back to ADB
+      let homeSuccess = false;
+      try {
+        const client = AndroidCtrlProxyClient.getInstance(this.device);
+        const result = await client.requestGlobalAction("home", 3000);
+        homeSuccess = result.success;
+      } catch {
+        // Fall through to ADB
+      }
+      if (!homeSuccess) {
+        await this.adb.executeCommand("shell input keyevent KEYCODE_HOME");
+      }
 
       // Wait for home screen
       await this.timer.sleep(2000);

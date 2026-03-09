@@ -2,6 +2,7 @@ import { BootedDevice, NavigateToResult } from "../../models";
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../../utils/logger";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { ToolRegistry } from "../../server/toolRegistry";
 import {
@@ -318,9 +319,19 @@ export class NavigateTo {
    * Press the back button as a fallback navigation action.
    */
   private async pressBack(): Promise<void> {
-    // Use ADB directly for back button
+    // Try accessibility service global action first, fall back to ADB
+    try {
+      const client = AndroidCtrlProxyClient.getInstance(this.device);
+      const result = await client.requestGlobalAction("back", 3000);
+      if (result.success) {
+        logger.debug("[NAVIGATE_TO] Pressed back via accessibility service");
+        return;
+      }
+    } catch {
+      // Fall through to ADB
+    }
     await this.adb.executeCommand("shell input keyevent 4");
-    logger.debug(`[NAVIGATE_TO] Pressed back button`);
+    logger.debug("[NAVIGATE_TO] Pressed back via ADB keyevent");
   }
 
   /**
