@@ -198,6 +198,11 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     var activeWindowHasNullRoot = false
     var hasApplicationWindow = false
 
+    // Detect if an IME (keyboard) window is present
+    // When IME is visible, Android may mark app window nodes as isVisibleToUser=false
+    // even though they are physically visible above the keyboard
+    val hasImeWindow = windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+
     // Extract from each window
     for (window in windows) {
       try {
@@ -250,6 +255,13 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             )
         )
 
+        // When IME is present and this is the active app window, skip isVisibleToUser
+        // filtering. Android marks app nodes as not visible when an IME window overlays them,
+        // but they are still physically on screen above the keyboard.
+        val skipVisibilityFilter =
+            hasImeWindow &&
+                window.isActive &&
+                window.type == AccessibilityWindowInfo.TYPE_APPLICATION
         val element =
             extractNodeInfo(
                 rootNode,
@@ -258,6 +270,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
                 screenDimensions,
                 dedupeTextContentDesc,
                 accessibilityFocusedNode,
+                skipVisibilityFilter,
             )
         // Skip optimization if disableAllFiltering is true
         val processedElement =
@@ -318,6 +331,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               screenDimensions,
               dedupeTextContentDesc,
               accessibilityFocusedNode,
+              skipVisibilityFilter = hasImeWindow,
           )
       // Skip optimization if disableAllFiltering is true
       mainHierarchy =
@@ -361,7 +375,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
                     occlusionInfo,
                     windowEntry.windowId,
                     path = "",
-                    isRoot = false,
+                    isRoot = true,
                 )
             hierarchy?.let { windowEntry.copy(hierarchy = it) }
           }
@@ -534,6 +548,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       screenDimensions: ScreenDimensions? = null,
       dedupeTextContentDesc: Boolean = true,
       accessibilityFocusedNode: AccessibilityNodeInfo? = null,
+      skipVisibilityFilter: Boolean = false,
   ): UIElementInfo? {
     if (depth > MAX_DEPTH) {
       return null
@@ -557,7 +572,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       }
 
       // Filter nodes not actually visible to the user
-      if (!node.isVisibleToUser) {
+      // Skip this filter when IME is present for the active app window — Android incorrectly
+      // marks app nodes as not visible when an IME window overlays them
+      if (!skipVisibilityFilter && !node.isVisibleToUser) {
         return null
       }
 
@@ -575,6 +592,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
                   screenDimensions,
                   dedupeTextContentDesc,
                   accessibilityFocusedNode,
+                  skipVisibilityFilter,
               )
           if (childInfo != null) {
             children.add(childInfo)

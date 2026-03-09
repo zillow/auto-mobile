@@ -462,6 +462,112 @@ class ViewHierarchyExtractorTest {
     assertNotNull(findElementByResourceId(filtered, "root-child"))
   }
 
+  @Test
+  fun `keyboard window does not remove app window hierarchy via occlusion`() {
+    // Simulate the keyboard-open scenario from issue #1488:
+    // App window covers full screen [0,0][1280,2856]
+    // Keyboard (IME) window covers bottom half [0,1395][1280,2856]
+    // App elements above the keyboard should NOT be removed
+    val toolbar =
+        elementWithBounds(resourceId = "toolbar", bounds = bounds(0, 156, 1280, 400))
+    val editText =
+        elementWithBounds(resourceId = "edit-text", bounds = bounds(0, 400, 1280, 500))
+    val appRoot =
+        elementWithBounds(
+            resourceId = "app-root",
+            bounds = bounds(0, 0, 1280, 2856),
+            children = listOf(toolbar, editText),
+        )
+    val keyboardRoot =
+        elementWithBounds(resourceId = "keyboard", bounds = bounds(0, 1395, 1280, 2856))
+
+    val appEntry =
+        extractor.createWindowEntry(
+            windowId = 46,
+            windowLayer = 0,
+            hierarchy = appRoot,
+            windowType = "application",
+            isActive = true,
+            isFocused = true,
+        )
+    val imeEntry =
+        extractor.createWindowEntry(
+            windowId = 31,
+            windowLayer = 1,
+            hierarchy = keyboardRoot,
+            windowType = "input_method",
+            isActive = false,
+            isFocused = false,
+        )
+    val occlusionInfo = extractor.buildOcclusionInfoForTest(listOf(appEntry, imeEntry))
+    val filtered =
+        extractor.filterOccludedHierarchyForTest(
+            element = appRoot,
+            occlusionInfo = occlusionInfo,
+            windowKey = 46,
+            path = "",
+            isRoot = true,
+        )
+
+    assertNotNull("App root should not be removed by keyboard occlusion", filtered)
+    assertNotNull(
+        "Toolbar above keyboard should be preserved",
+        findElementByResourceId(filtered!!, "toolbar"),
+    )
+    assertNotNull(
+        "Edit text above keyboard should be preserved",
+        findElementByResourceId(filtered, "edit-text"),
+    )
+  }
+
+  @Test
+  fun `keyboard window occlusion marks elements behind keyboard as hidden`() {
+    // Element fully behind the keyboard should be marked hidden
+    val bottomElement =
+        elementWithBounds(resourceId = "bottom-item", bounds = bounds(0, 1400, 1280, 2800))
+    val appRoot =
+        elementWithBounds(
+            resourceId = "app-root",
+            bounds = bounds(0, 0, 1280, 2856),
+            children = listOf(bottomElement),
+        )
+    val keyboardRoot =
+        elementWithBounds(resourceId = "keyboard", bounds = bounds(0, 1395, 1280, 2856))
+
+    val appEntry =
+        extractor.createWindowEntry(
+            windowId = 46,
+            windowLayer = 0,
+            hierarchy = appRoot,
+            isActive = true,
+            isFocused = true,
+        )
+    val imeEntry =
+        extractor.createWindowEntry(
+            windowId = 31,
+            windowLayer = 1,
+            hierarchy = keyboardRoot,
+            isActive = false,
+            isFocused = false,
+        )
+    val occlusionInfo = extractor.buildOcclusionInfoForTest(listOf(appEntry, imeEntry))
+    val filtered =
+        extractor.filterOccludedHierarchyForTest(
+            element = appRoot,
+            occlusionInfo = occlusionInfo,
+            windowKey = 46,
+            path = "",
+            isRoot = true,
+        )
+
+    assertNotNull("App root should survive as isRoot=true", filtered)
+    // The bottom element is fully behind the keyboard, so it should be removed
+    assertNull(
+        "Element fully behind keyboard should be removed",
+        findElementByResourceId(filtered!!, "bottom-item"),
+    )
+  }
+
   // MARK: - Node Relationship Tests
 
   @Test
