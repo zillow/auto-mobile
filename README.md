@@ -1,5 +1,7 @@
 # AutoMobile
 
+> **This repository is no longer maintained.** All future development is happening at [github.com/kaeawc/auto-mobile](https://github.com/kaeawc/auto-mobile).
+
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
 <a href="https://glama.ai/mcp/servers/@zillow/auto-mobile">

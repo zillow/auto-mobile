@@ -1,5 +1,7 @@
 # AutoMobile
 
+> **This repository is no longer maintained.** All future development is happening at [github.com/kaeawc/auto-mobile](https://github.com/kaeawc/auto-mobile).
+
 AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
 assistant.
 
