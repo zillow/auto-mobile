@@ -14,6 +14,7 @@ import { setLastTtiMs } from "../performance/PerformanceMonitor";
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { CtrlProxyClient } from "../observe/ios";
+import { IOSCtrlProxyManager } from "../../utils/IOSCtrlProxyManager";
 
 export interface TargetUserDetector {
   detectTargetUserId(packageName: string, userId?: number): Promise<number>;
@@ -214,6 +215,11 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean
   ): Promise<LaunchAppResult> {
     logger.info(`executeiOS bundleId ${bundleId}`);
+
+    // Notify CtrlProxy manager of target bundle ID for auto-restart scenarios
+    if (!bundleId.startsWith("com.apple.")) {
+      IOSCtrlProxyManager.getInstance(this.device).setTargetBundleId(bundleId);
+    }
 
     let observationTimestampMs: number | undefined;
     const isSystemBundleId = bundleId.startsWith("com.apple.");

@@ -83,7 +83,8 @@ echo -e "${BLUE}Starting CtrlProxy iOS...${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
 echo ""
 
+# simctl spawn requires SIMCTL_CHILD_ prefixed env vars (--setenv is not supported)
+SIMCTL_CHILD_CTRL_PROXY_IOS_PORT="${PORT}" \
+SIMCTL_CHILD_CTRL_PROXY_IOS_TIMEOUT="${TIMEOUT}" \
 xcrun simctl spawn "${SIMULATOR_ID}" \
-    --setenv CTRL_PROXY_IOS_PORT="${PORT}" \
-    --setenv CTRL_PROXY_IOS_TIMEOUT="${TIMEOUT}" \
     "${RUNNER_BINARY}"
