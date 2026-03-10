@@ -1,5 +1,10 @@
 # AutoMobile
 
+!!! warning "Project Archived"
+    **AutoMobile is no longer maintained or supported by Zillow. Zillow does not provide warranties or support for this project.**
+    
+    This repository has been archived and is read-only. For continued development and support, please see the community-maintained fork by Jason Pearson at [https://github.com/kaeawc/auto-mobile](https://github.com/kaeawc/auto-mobile).
+
 AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
 assistant.
 

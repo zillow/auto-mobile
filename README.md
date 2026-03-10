@@ -1,5 +1,15 @@
 # AutoMobile
 
+> **⚠️ PROJECT ARCHIVED**
+>
+> **AutoMobile is no longer maintained or supported by Zillow. Zillow does not provide warranties or support for this project.**
+>
+> This repository has been archived and is read-only. For continued development and support, please see the community-maintained fork by Jason Pearson:
+>
+> **🔗 [https://github.com/kaeawc/auto-mobile](https://github.com/kaeawc/auto-mobile)**
+
+---
+
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
 <a href="https://glama.ai/mcp/servers/@zillow/auto-mobile">
