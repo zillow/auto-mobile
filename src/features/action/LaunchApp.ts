@@ -216,11 +216,6 @@ export class LaunchApp extends BaseVisualChange {
   ): Promise<LaunchAppResult> {
     logger.info(`executeiOS bundleId ${bundleId}`);
 
-    // Notify CtrlProxy manager of target bundle ID for auto-restart scenarios
-    if (!bundleId.startsWith("com.apple.")) {
-      IOSCtrlProxyManager.getInstance(this.device).setTargetBundleId(bundleId);
-    }
-
     let observationTimestampMs: number | undefined;
     const isSystemBundleId = bundleId.startsWith("com.apple.");
 
@@ -271,6 +266,10 @@ export class LaunchApp extends BaseVisualChange {
             packageName: bundleId,
             error: launchResult.error
           };
+        }
+
+        if (!isSystemBundleId) {
+          IOSCtrlProxyManager.getInstance(this.device).setTargetBundleId(bundleId);
         }
 
         await this.waitForIosHierarchyReady();
