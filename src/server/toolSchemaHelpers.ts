@@ -29,14 +29,6 @@ function addDeviceLabelToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObj
 /**
  * Helper to add deviceId field to tool schemas.
  *
- * The plan executor injects deviceId into steps with requiresDevice=true.
- * Tools with strict schemas must explicitly declare deviceId to avoid
- * validation failures when the plan executor injects it.
- */
-function addDeviceIdToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObject<any> {
-/**
- * Helper to add deviceId field to tool schemas.
- *
  * Authored plans should prefer device labels (`device`) rather than concrete
  * device IDs, because runtime device IDs are not known ahead of execution.
  *
@@ -45,6 +37,7 @@ function addDeviceIdToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObject
  * declare deviceId to avoid validation failures for that internal injection.
  */
 function addDeviceIdToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObject<any> {
+  return schema.extend({
     deviceId: z.string().optional().describe("Device identifier for targeting a specific device"),
   }) as z.ZodObject<any>;
 }
