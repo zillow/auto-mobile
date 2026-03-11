@@ -17,7 +17,7 @@ It uses standard platform tools like `adb` & `simctl` paired with its own additi
 | Task | What it does |
 |------|-------------|
 | **[Explore app UX](using/ux-exploration.md)** | Navigate your app, discover screens, map user flows, identify confusing interactions |
-| **[Reproduce bugs](using/reproducting-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
+| **[Reproduce bugs](using/reproducing-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
 | **[Create UI tests](using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
 | **[Measure startup time](using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
 | **[Check scroll performance](using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |

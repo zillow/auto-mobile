@@ -76,7 +76,7 @@ nav:
   - 'Install': install.md
   - 'Using AutoMobile':
       - 'UX Exploration': using/ux-exploration.md
-      - 'Reproducing Bugs': using/reproducting-bugs.md
+      - 'Reproducing Bugs': using/reproducing-bugs.md
       - 'UI Tests': using/ui-tests.md
       - 'Performance Analysis':
           - 'Overview': using/perf-analysis/index.md
