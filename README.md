@@ -32,7 +32,7 @@ It can do all this by being an MCP server that uses standard platform tools like
 | Task | What it does |
 |------|-------------|
 | **[Explore app UX](docs/using/ux-exploration.md)** | Navigate your app, discover screens, map user flows, identify confusing interactions |
-| **[Reproduce bugs](docs/using/reproducting-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
+| **[Reproduce bugs](docs/using/reproducing-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
 | **[Create UI tests](docs/using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
 | **[Measure startup time](docs/using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
 | **[Check scroll performance](docs/using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |

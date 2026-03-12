@@ -4,7 +4,7 @@ import dev.jasonpearson.automobile.junit.AutoMobileTest
 import org.junit.Test
 
 /**
- * Tests for bug reproduction workflows documented in docs/using/reproducting-bugs.md
+ * Tests for bug reproduction workflows documented in docs/using/reproducing-bugs.md
  *
  * These tests verify:
  * - Systematic bug reproduction with exact steps
