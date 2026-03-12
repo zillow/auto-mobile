@@ -178,6 +178,8 @@ export class BaseVisualChange {
 
     if (options.skipUiStability) {
       logger.info("[BaseVisualChange] Skipping UI stability tracking (skipUiStability=true)");
+    } else if (this.device.platform !== "android") {
+      logger.debug("[BaseVisualChange] Skipping UI stability tracking (gfxinfo is Android-only)");
     } else if (packageName) {
       logger.info(`[BaseVisualChange] Starting UI stability initialization with package: ${packageName}`);
       initState = await perf.track("initUiStability", async () => {
