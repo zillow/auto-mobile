@@ -14,6 +14,7 @@ import { setLastTtiMs } from "../performance/PerformanceMonitor";
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { CtrlProxyClient } from "../observe/ios";
+import { IOSCtrlProxyManager } from "../../utils/IOSCtrlProxyManager";
 
 export interface TargetUserDetector {
   detectTargetUserId(packageName: string, userId?: number): Promise<number>;
@@ -265,6 +266,10 @@ export class LaunchApp extends BaseVisualChange {
             packageName: bundleId,
             error: launchResult.error
           };
+        }
+
+        if (!isSystemBundleId) {
+          IOSCtrlProxyManager.getInstance(this.device).setTargetBundleId(bundleId);
         }
 
         await this.waitForIosHierarchyReady();

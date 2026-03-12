@@ -154,6 +154,9 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
   // Mutex to prevent concurrent start() calls from spawning multiple processes
   private startPromise: Promise<void> | null = null;
 
+  // Target app bundle ID for CtrlProxy to observe (instead of SpringBoard)
+  private targetBundleId: string | null = null;
+
   public static readonly DEFAULT_PORT = 8765;
   public static readonly BUNDLE_ID = "dev.jasonpearson.automobile.ctrlproxy";
   public static readonly APP_BUNDLE_ID = "dev.jasonpearson.automobile.ctrlproxy";
@@ -261,6 +264,24 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
    */
   public getServicePort(): number {
     return this.servicePort;
+  }
+
+  /**
+   * Set the target app bundle ID for CtrlProxy to observe.
+   * Must be called before start() — CtrlProxy reads the bundle ID from
+   * the CTRL_PROXY_IOS_BUNDLE_ID env var at XCUITest initialization time.
+   * Falls back to process.env.CTRL_PROXY_IOS_BUNDLE_ID if not set explicitly.
+   */
+  public setTargetBundleId(bundleId: string): void {
+    this.targetBundleId = bundleId;
+    logger.info(`[IOSCtrlProxy] Target bundle ID set to ${bundleId}`);
+  }
+
+  /**
+   * Resolve the target bundle ID: explicit property > env var > undefined.
+   */
+  private resolveTargetBundleId(): string | undefined {
+    return this.targetBundleId ?? process.env.CTRL_PROXY_IOS_BUNDLE_ID ?? undefined;
   }
 
   /**
@@ -686,10 +707,12 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
       }
 
       const xctestrunPath = await this.builder.getXctestrunPath("simulator");
+      const bundleId = this.resolveTargetBundleId();
       const result = await this.hostControl.start({
         deviceId: this.device.deviceId,
         port: this.servicePort,
-        xctestrunPath: xctestrunPath || undefined
+        xctestrunPath: xctestrunPath || undefined,
+        bundleId
       });
 
       if (!result.success || !result.data) {
@@ -708,19 +731,30 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
     }
 
     const timeout = process.env.CTRL_PROXY_IOS_TIMEOUT || "86400";
+    const bundleId = this.resolveTargetBundleId();
+
+    // simctl spawn requires SIMCTL_CHILD_ prefixed env vars (--setenv is not supported)
+    const childEnv: Record<string, string> = {
+      SIMCTL_CHILD_CTRL_PROXY_IOS_PORT: String(this.servicePort),
+      SIMCTL_CHILD_CTRL_PROXY_IOS_TIMEOUT: timeout,
+    };
+    if (bundleId) {
+      childEnv.SIMCTL_CHILD_CTRL_PROXY_IOS_BUNDLE_ID = bundleId;
+      logger.info(`[IOSCtrlProxy] Passing CTRL_PROXY_IOS_BUNDLE_ID=${bundleId} via SIMCTL_CHILD_ env`);
+    }
     const command = [
       "xcrun simctl spawn",
       `"${this.device.deviceId}"`,
-      `--setenv CTRL_PROXY_IOS_PORT=${this.servicePort}`,
-      `--setenv CTRL_PROXY_IOS_TIMEOUT=${timeout}`,
       `"${runnerBinaryPath}"`,
       "2>&1"
     ].join(" ");
 
     logger.info("[IOSCtrlProxy] Using simctl spawn to start runner binary");
 
-    // Start in background
-    const child = exec(command, error => {
+    // Start in background with SIMCTL_CHILD_ env vars
+    // Note: exec() is used here intentionally — the command is built from internal constants,
+    // not user input, and we need shell features (2>&1 redirection, quoted paths).
+    const child = exec(command, { env: { ...process.env, ...childEnv } }, error => {
       if (error) {
         logger.warn(`[IOSCtrlProxy] simctl spawn exited: ${error.message}`);
         this.handleProcessExit();
@@ -972,10 +1006,12 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
       await this.startIproxyTunnel();
       await this.verifyInstalledAppBundle();
 
+      const bundleId = this.resolveTargetBundleId();
       const result = await this.hostControl.start({
         deviceId: this.device.deviceId,
         port: this.servicePort,
-        xctestrunPath: xctestrunPath || undefined
+        xctestrunPath: xctestrunPath || undefined,
+        bundleId
       });
 
       if (!result.success || !result.data) {
@@ -1005,13 +1041,21 @@ export class IOSCtrlProxyManager implements CtrlProxyIosManager {
       signingArgs.unshift("-allowProvisioningUpdates");
     }
 
+    const bundleId = this.resolveTargetBundleId();
+    const envSettings = [
+      `CTRL_PROXY_IOS_PORT=${this.servicePort}`,
+    ];
+    if (bundleId) {
+      envSettings.push(`CTRL_PROXY_IOS_BUNDLE_ID=${bundleId}`);
+      logger.info(`[IOSCtrlProxy] Passing CTRL_PROXY_IOS_BUNDLE_ID=${bundleId} to xcodebuild`);
+    }
     const command = [
       "xcodebuild",
       "test-without-building",
       `-xctestrun "${xctestrunPath}"`,
       "-destination", `id=${this.device.deviceId}`,
       "-only-testing:CtrlProxyUITests/CtrlProxyUITests/testRunService",
-      `CTRL_PROXY_IOS_PORT=${this.servicePort}`,
+      ...envSettings,
       ...signingArgs,
       "2>&1"
     ].join(" ");

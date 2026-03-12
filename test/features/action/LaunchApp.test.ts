@@ -11,6 +11,7 @@ import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeIOSCtrlProxy } from "../../fakes/FakeIOSCtrlProxy";
 import { CtrlProxyClient } from "../../../src/features/observe/ios";
+import { IOSCtrlProxyManager } from "../../../src/utils/IOSCtrlProxyManager";
 
 describe("LaunchApp", () => {
   let device: BootedDevice;
@@ -247,5 +248,111 @@ describe("LaunchApp", () => {
     } finally {
       getInstanceSpy.mockRestore();
     }
+  });
+
+  describe("iOS setTargetBundleId timing", () => {
+    const userBundleId = "com.example.myapp";
+    const systemBundleId = "com.apple.Preferences";
+
+    function createIOSTestHarness(opts: {
+      bundleId: string;
+      launchSuccess?: boolean;
+    }) {
+      const iosDevice: BootedDevice = { name: "test-ios", platform: "ios", deviceId: "ios-target" };
+      const fakeCtrlProxy = new FakeIOSCtrlProxy();
+
+      const ctrlProxySpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(
+        fakeCtrlProxy as unknown as CtrlProxyClient
+      );
+
+      const targetBundleIdCalls: string[] = [];
+      const managerSpy = spyOn(IOSCtrlProxyManager, "getInstance").mockReturnValue({
+        setTargetBundleId: (id: string) => targetBundleIdCalls.push(id),
+      } as unknown as IOSCtrlProxyManager);
+
+      const iosObserveScreen = new FakeObserveScreen();
+      iosObserveScreen.setObserveResult({
+        updatedAt: Date.now(),
+        screenSize: { width: 1080, height: 1920 },
+        systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+        viewHierarchy: { hierarchy: { node: {} }, packageName: opts.bundleId } as any
+      });
+
+      const iosWindow = new FakeWindow();
+      iosWindow.configureCachedActiveWindow({ appId: opts.bundleId, activityName: "Main", layoutSeqSum: 1 });
+
+      const installedApps = new FakeInstalledAppsProvider(fakeTimer, {
+        installedApps: [opts.bundleId]
+      });
+
+      const iosLaunchApp = new LaunchApp(iosDevice, fakeAdb as unknown as any, null, fakeTimer, { installedAppsProvider: installedApps });
+      (iosLaunchApp as any).awaitIdle = new FakeAwaitIdle();
+      (iosLaunchApp as any).observeScreen = iosObserveScreen;
+      (iosLaunchApp as any).window = iosWindow;
+      (iosLaunchApp as any).waitForIosHierarchyReady = async () => {};
+
+      if (opts.launchSuccess === false) {
+        // CtrlProxy returns success:false → falls back to simctl which also fails
+        spyOn(fakeCtrlProxy, "requestLaunchApp").mockResolvedValue({
+          success: false,
+          error: "ctrlproxy unavailable",
+          totalTimeMs: 10,
+        });
+        (iosLaunchApp as any).simctl = {
+          launchApp: async () => ({ success: false, error: "simctl launch failed" }),
+          terminateApp: async () => {},
+        };
+      }
+
+      return { iosLaunchApp, targetBundleIdCalls, cleanup: () => { ctrlProxySpy.mockRestore(); managerSpy.mockRestore(); } };
+    }
+
+    test("sets targetBundleId after successful non-system app launch", async () => {
+      fakeTimer.enableAutoAdvance();
+      const { iosLaunchApp, targetBundleIdCalls, cleanup } = createIOSTestHarness({
+        bundleId: userBundleId,
+        launchSuccess: true,
+      });
+
+      try {
+        const result = await iosLaunchApp.execute(userBundleId, false, false);
+        expect(result.success).toBe(true);
+        expect(targetBundleIdCalls).toEqual([userBundleId]);
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("does not set targetBundleId when launch fails", async () => {
+      fakeTimer.enableAutoAdvance();
+      const { iosLaunchApp, targetBundleIdCalls, cleanup } = createIOSTestHarness({
+        bundleId: userBundleId,
+        launchSuccess: false,
+      });
+
+      try {
+        const result = await iosLaunchApp.execute(userBundleId, false, false);
+        expect(result.success).toBe(false);
+        expect(targetBundleIdCalls).toEqual([]);
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("does not set targetBundleId for system app launch", async () => {
+      fakeTimer.enableAutoAdvance();
+      const { iosLaunchApp, targetBundleIdCalls, cleanup } = createIOSTestHarness({
+        bundleId: systemBundleId,
+        launchSuccess: true,
+      });
+
+      try {
+        const result = await iosLaunchApp.execute(systemBundleId, false, false);
+        expect(result.success).toBe(true);
+        expect(targetBundleIdCalls).toEqual([]);
+      } finally {
+        cleanup();
+      }
+    });
   });
 });
