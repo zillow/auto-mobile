@@ -307,6 +307,53 @@ describe("LaunchApp", () => {
       return { iosLaunchApp, targetBundleIdCalls, cleanup: () => { ctrlProxySpy.mockRestore(); managerSpy.mockRestore(); } };
     }
 
+    test("sets targetBundleId BEFORE requestLaunchApp so CtrlProxy targets the app, not SpringBoard", async () => {
+      fakeTimer.enableAutoAdvance();
+      const iosDevice: BootedDevice = { name: "test-ios", platform: "ios", deviceId: "ios-order" };
+      const fakeCtrlProxy = new FakeIOSCtrlProxy();
+      const callOrder: string[] = [];
+
+      const ctrlProxySpy = spyOn(CtrlProxyClient, "getInstance").mockReturnValue(
+        fakeCtrlProxy as unknown as CtrlProxyClient
+      );
+      const managerSpy = spyOn(IOSCtrlProxyManager, "getInstance").mockReturnValue({
+        setTargetBundleId: (id: string) => callOrder.push(`setTargetBundleId:${id}`),
+      } as unknown as IOSCtrlProxyManager);
+      spyOn(fakeCtrlProxy, "requestLaunchApp").mockImplementation(async (id) => {
+        callOrder.push(`requestLaunchApp:${id}`);
+        return { success: true, totalTimeMs: 10 };
+      });
+
+      const iosObserveScreen = new FakeObserveScreen();
+      iosObserveScreen.setObserveResult({
+        updatedAt: Date.now(),
+        screenSize: { width: 1080, height: 1920 },
+        systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+        viewHierarchy: { hierarchy: { node: {} }, packageName: userBundleId } as any,
+      });
+      const iosWindow = new FakeWindow();
+      iosWindow.configureCachedActiveWindow({ appId: userBundleId, activityName: "Main", layoutSeqSum: 1 });
+      const installedApps = new FakeInstalledAppsProvider(fakeTimer, { installedApps: [userBundleId] });
+
+      const iosLaunchApp = new LaunchApp(iosDevice, fakeAdb as unknown as any, null, fakeTimer, { installedAppsProvider: installedApps });
+      (iosLaunchApp as any).awaitIdle = new FakeAwaitIdle();
+      (iosLaunchApp as any).observeScreen = iosObserveScreen;
+      (iosLaunchApp as any).window = iosWindow;
+      (iosLaunchApp as any).waitForIosHierarchyReady = async () => {};
+
+      try {
+        await iosLaunchApp.execute(userBundleId, false, false);
+        // setTargetBundleId must fire before requestLaunchApp so CtrlProxy receives the
+        // bundle ID via SIMCTL_CHILD_CTRL_PROXY_IOS_BUNDLE_ID when it starts.
+        // If reversed, CtrlProxy defaults to observing SpringBoard instead of the app.
+        expect(callOrder.indexOf(`setTargetBundleId:${userBundleId}`))
+          .toBeLessThan(callOrder.indexOf(`requestLaunchApp:${userBundleId}`));
+      } finally {
+        ctrlProxySpy.mockRestore();
+        managerSpy.mockRestore();
+      }
+    });
+
     test("sets targetBundleId after successful non-system app launch", async () => {
       fakeTimer.enableAutoAdvance();
       const { iosLaunchApp, targetBundleIdCalls, cleanup } = createIOSTestHarness({
@@ -323,7 +370,7 @@ describe("LaunchApp", () => {
       }
     });
 
-    test("does not set targetBundleId when launch fails", async () => {
+    test("still sets targetBundleId even when launch fails (must be set before CtrlProxy starts)", async () => {
       fakeTimer.enableAutoAdvance();
       const { iosLaunchApp, targetBundleIdCalls, cleanup } = createIOSTestHarness({
         bundleId: userBundleId,
@@ -333,7 +380,9 @@ describe("LaunchApp", () => {
       try {
         const result = await iosLaunchApp.execute(userBundleId, false, false);
         expect(result.success).toBe(false);
-        expect(targetBundleIdCalls).toEqual([]);
+        // setTargetBundleId is called before requestLaunchApp (which triggers CtrlProxy setup),
+        // so it fires regardless of whether the launch ultimately succeeds.
+        expect(targetBundleIdCalls).toEqual([userBundleId]);
       } finally {
         cleanup();
       }
