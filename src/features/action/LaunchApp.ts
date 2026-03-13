@@ -246,6 +246,11 @@ export class LaunchApp extends BaseVisualChange {
           }
         }
 
+        // Set bundle ID before starting CtrlProxy so it targets the app, not SpringBoard
+        if (!isSystemBundleId) {
+          IOSCtrlProxyManager.getInstance(this.device).setTargetBundleId(bundleId);
+        }
+
         const xcTestClient = CtrlProxyClient.getInstance(this.device);
         const xcTestLaunchResult = await xcTestClient.requestLaunchApp(bundleId);
         let launchResult: { success: boolean; pid?: number; error?: string } = {
@@ -266,10 +271,6 @@ export class LaunchApp extends BaseVisualChange {
             packageName: bundleId,
             error: launchResult.error
           };
-        }
-
-        if (!isSystemBundleId) {
-          IOSCtrlProxyManager.getInstance(this.device).setTargetBundleId(bundleId);
         }
 
         await this.waitForIosHierarchyReady();
