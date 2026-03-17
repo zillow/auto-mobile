@@ -16,6 +16,7 @@ data class TelemetryPushRequest(
     val id: String,
     val command: String,
     val category: String? = null,
+    val deviceId: String? = null,
 )
 
 /**

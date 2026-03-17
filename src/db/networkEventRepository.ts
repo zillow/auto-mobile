@@ -88,7 +88,7 @@ export async function getNetworkEvents(
 }
 
 async function cleanupIfNeeded(db?: Kysely<Database>): Promise<void> {
-  if (cleanupInProgress) return;
+  if (cleanupInProgress) {return;}
   cleanupInProgress = true;
   try {
     const d = getDb(db);

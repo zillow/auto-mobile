@@ -19,7 +19,7 @@ class FakeTelemetryPushClientTest {
         val client = FakeTelemetryPushClient()
         assertFalse(client.isConnected())
 
-        client.connect()
+        client.connect(null)
         assertTrue(client.isConnected())
         assertEquals(TelemetryConnectionState.Connected, client.connectionState.first())
     }
@@ -27,7 +27,7 @@ class FakeTelemetryPushClientTest {
     @Test
     fun `disconnect sets disconnected state`() = runBlocking {
         val client = FakeTelemetryPushClient()
-        client.connect()
+        client.connect(null)
         assertTrue(client.isConnected())
 
         client.disconnect()
@@ -41,7 +41,7 @@ class FakeTelemetryPushClientTest {
     @Test
     fun `dispose disconnects`() {
         val client = FakeTelemetryPushClient()
-        client.connect()
+        client.connect(null)
         client.dispose()
         assertFalse(client.isConnected())
     }
@@ -52,8 +52,8 @@ class FakeTelemetryPushClientTest {
         assertEquals(0, client.getConnectCallCount())
         assertEquals(0, client.getDisconnectCallCount())
 
-        client.connect()
-        client.connect()
+        client.connect(null)
+        client.connect(null)
         assertEquals(2, client.getConnectCallCount())
 
         client.disconnect()
@@ -127,5 +127,19 @@ class FakeTelemetryPushClientTest {
 
         client.setConnectionState(TelemetryConnectionState.Connected)
         assertTrue(client.isConnected())
+    }
+
+    @Test
+    fun `connect stores deviceId`() {
+        val client = FakeTelemetryPushClient()
+        client.connect("emulator-5554")
+        assertEquals("emulator-5554", client.getLastDeviceId())
+    }
+
+    @Test
+    fun `connect with null deviceId`() {
+        val client = FakeTelemetryPushClient()
+        client.connect(null)
+        assertEquals(null, client.getLastDeviceId())
     }
 }

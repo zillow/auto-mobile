@@ -24,9 +24,11 @@ class FakeTelemetryPushClient : TelemetryPushClient {
     private var connected = false
     private var connectCallCount = 0
     private var disconnectCallCount = 0
+    private var lastDeviceId: String? = null
 
-    override fun connect() {
+    override fun connect(deviceId: String?) {
         connectCallCount++
+        lastDeviceId = deviceId
         connected = true
         _connectionState.tryEmit(TelemetryConnectionState.Connected)
     }
@@ -59,4 +61,7 @@ class FakeTelemetryPushClient : TelemetryPushClient {
 
     /** Get the number of times [disconnect] was called. */
     fun getDisconnectCallCount(): Int = disconnectCallCount
+
+    /** Get the deviceId from the last [connect] call. */
+    fun getLastDeviceId(): String? = lastDeviceId
 }

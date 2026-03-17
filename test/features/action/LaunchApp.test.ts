@@ -319,7 +319,7 @@ describe("LaunchApp", () => {
       const managerSpy = spyOn(IOSCtrlProxyManager, "getInstance").mockReturnValue({
         setTargetBundleId: (id: string) => callOrder.push(`setTargetBundleId:${id}`),
       } as unknown as IOSCtrlProxyManager);
-      spyOn(fakeCtrlProxy, "requestLaunchApp").mockImplementation(async (id) => {
+      spyOn(fakeCtrlProxy, "requestLaunchApp").mockImplementation(async id => {
         callOrder.push(`requestLaunchApp:${id}`);
         return { success: true, totalTimeMs: 10 };
       });

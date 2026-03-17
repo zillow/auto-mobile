@@ -13,8 +13,11 @@ interface TelemetryPushClient {
     /** Flow of connection state changes. */
     val connectionState: SharedFlow<TelemetryConnectionState>
 
-    /** Connect to the telemetry push socket and subscribe to events. */
-    fun connect()
+    /**
+     * Connect to the telemetry push socket and subscribe to events.
+     * @param deviceId Optional device ID to filter server-side. Null receives all devices.
+     */
+    fun connect(deviceId: String? = null)
 
     /** Disconnect from the telemetry push socket. */
     fun disconnect()

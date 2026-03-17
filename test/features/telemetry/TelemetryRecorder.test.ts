@@ -233,4 +233,39 @@ describe("TelemetryRecorder", () => {
     const b = TelemetryRecorder.getInstance();
     expect(a).not.toBe(b);
   });
+
+  it("snapshots context before async write to avoid race", async () => {
+    // Simulate: start recording with device-A, then setContext to device-B
+    // before the repo write completes. Both DB write and push should use device-A.
+    let resolveWrite: (() => void) | null = null;
+    const slowRepo: TelemetryRepository = {
+      ...repo,
+      recordNetworkEvent: async input => {
+        repo.networkEvents.push(input);
+        // Block until test resolves
+        await new Promise<void>(r => { resolveWrite = r; });
+      },
+    };
+    const slowRecorder = new TelemetryRecorder(slowRepo, () => pushTarget);
+    slowRecorder.setContext("device-A", "session-A");
+
+    const promise = slowRecorder.recordNetworkEvent({
+      timestamp: 1000, applicationId: null, url: "u", method: "GET",
+      statusCode: 200, durationMs: 0, requestBodySize: 0, responseBodySize: 0,
+      protocol: null, host: null, path: null, error: null,
+    });
+
+    // Context changes while the write is in flight
+    slowRecorder.setContext("device-B", "session-B");
+
+    // Let the write complete
+    resolveWrite!();
+    await promise;
+
+    // DB should have device-A (snapshotted before await)
+    expect(repo.networkEvents[0].deviceId).toBe("device-A");
+    expect(repo.networkEvents[0].sessionId).toBe("session-A");
+    // Push should also have device-A
+    expect(pushTarget.pushedEvents[0].deviceId).toBe("device-A");
+  });
 });

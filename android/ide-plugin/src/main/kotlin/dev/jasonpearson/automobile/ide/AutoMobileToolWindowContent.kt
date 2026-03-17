@@ -400,8 +400,8 @@ fun AutoMobileToolWindowContent() {
               failuresPushClient = failClient
 
               telClient = TelemetryPushSocketClient()
-              LOG.info("Connecting telemetry push client")
-              telClient.connect()
+              LOG.info("Connecting telemetry push client for device: $deviceId")
+              telClient.connect(deviceId = deviceId)
               telemetryPushClient = telClient
           }
       }

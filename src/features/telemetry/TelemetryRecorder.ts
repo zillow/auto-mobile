@@ -80,11 +80,9 @@ export class TelemetryRecorder {
     path: string | null;
     error: string | null;
   }): Promise<void> {
-    const input: RecordNetworkEventInput = {
-      deviceId: this.deviceId,
-      sessionId: this.sessionId,
-      ...event,
-    };
+    // Snapshot context before async work to avoid race with concurrent setContext() calls
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordNetworkEventInput = { deviceId, sessionId, ...event };
 
     try {
       await this.repository.recordNetworkEvent(input);
@@ -92,7 +90,7 @@ export class TelemetryRecorder {
       logger.error(`[TelemetryRecorder] Failed to record network event: ${e}`);
     }
 
-    this.pushToSocket({ category: "network", timestamp: event.timestamp, deviceId: this.deviceId, data: event });
+    this.pushToSocket({ category: "network", timestamp: event.timestamp, deviceId, data: event });
   }
 
   async recordLogEvent(event: {
@@ -103,11 +101,8 @@ export class TelemetryRecorder {
     message: string;
     filterName: string;
   }): Promise<void> {
-    const input: RecordLogEventInput = {
-      deviceId: this.deviceId,
-      sessionId: this.sessionId,
-      ...event,
-    };
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordLogEventInput = { deviceId, sessionId, ...event };
 
     try {
       await this.repository.recordLogEvent(input);
@@ -115,7 +110,7 @@ export class TelemetryRecorder {
       logger.error(`[TelemetryRecorder] Failed to record log event: ${e}`);
     }
 
-    this.pushToSocket({ category: "log", timestamp: event.timestamp, deviceId: this.deviceId, data: event });
+    this.pushToSocket({ category: "log", timestamp: event.timestamp, deviceId, data: event });
   }
 
   async recordCustomEvent(event: {
@@ -124,11 +119,8 @@ export class TelemetryRecorder {
     name: string;
     properties: Record<string, string>;
   }): Promise<void> {
-    const input: RecordCustomEventInput = {
-      deviceId: this.deviceId,
-      sessionId: this.sessionId,
-      ...event,
-    };
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordCustomEventInput = { deviceId, sessionId, ...event };
 
     try {
       await this.repository.recordCustomEvent(input);
@@ -136,7 +128,7 @@ export class TelemetryRecorder {
       logger.error(`[TelemetryRecorder] Failed to record custom event: ${e}`);
     }
 
-    this.pushToSocket({ category: "custom", timestamp: event.timestamp, deviceId: this.deviceId, data: event });
+    this.pushToSocket({ category: "custom", timestamp: event.timestamp, deviceId, data: event });
   }
 
   async recordOsEvent(event: {
@@ -146,11 +138,8 @@ export class TelemetryRecorder {
     kind: string;
     details: Record<string, string> | null;
   }): Promise<void> {
-    const input: RecordOsEventInput = {
-      deviceId: this.deviceId,
-      sessionId: this.sessionId,
-      ...event,
-    };
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordOsEventInput = { deviceId, sessionId, ...event };
 
     try {
       await this.repository.recordOsEvent(input);
@@ -158,7 +147,11 @@ export class TelemetryRecorder {
       logger.error(`[TelemetryRecorder] Failed to record OS event: ${e}`);
     }
 
-    this.pushToSocket({ category: "os", timestamp: event.timestamp, deviceId: this.deviceId, data: event });
+    this.pushToSocket({ category: "os", timestamp: event.timestamp, deviceId, data: event });
+  }
+
+  private snapshotContext(): { deviceId: string | null; sessionId: string | null } {
+    return { deviceId: this.deviceId, sessionId: this.sessionId };
   }
 
   private pushToSocket(event: TelemetryEvent): void {

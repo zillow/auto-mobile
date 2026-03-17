@@ -82,16 +82,19 @@ class TelemetryPushSocketClient : TelemetryPushClient {
     private val _connectionState = MutableSharedFlow<TelemetryConnectionState>(replay = 1)
     override val connectionState: SharedFlow<TelemetryConnectionState> = _connectionState.asSharedFlow()
 
+    private var subscribedDeviceId: String? = null
+
     /**
-     * Connect to the telemetry push socket and subscribe to all events.
-     * Will retry with exponential backoff if the socket is not available.
+     * Connect to the telemetry push socket and subscribe to events.
+     * @param deviceId Optional device ID for server-side filtering. Null subscribes to all devices.
      */
-    override fun connect() {
+    override fun connect(deviceId: String?) {
         if (connected.get()) {
             log.info("Already connected to telemetry push")
             return
         }
 
+        subscribedDeviceId = deviceId
         connectionJob?.cancel()
         shouldReconnect.set(true)
         reconnectAttempt.set(0)
@@ -232,12 +235,13 @@ class TelemetryPushSocketClient : TelemetryPushClient {
         val request = TelemetryPushRequest(
             id = UUID.randomUUID().toString(),
             command = "subscribe",
-            category = null, // subscribe to all, filter client-side
+            category = null, // subscribe to all categories, filter client-side
+            deviceId = subscribedDeviceId,
         )
 
         if (sendRequest(request)) {
             subscribed.set(true)
-            log.info("Subscribed to telemetry push (all categories)")
+            log.info("Subscribed to telemetry push (device: ${subscribedDeviceId ?: "all"})")
         }
     }
 
