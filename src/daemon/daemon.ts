@@ -31,6 +31,7 @@ import { startPerformancePushSocketServer, stopPerformancePushSocketServer } fro
 import { startDeviceDataStreamSocketServer, stopDeviceDataStreamSocketServer, getDeviceDataStreamServer, type NavigationGraphStreamData } from "./deviceDataStreamSocketServer";
 import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
 import { startFailuresPushSocketServer, stopFailuresPushSocketServer } from "./failuresPushSocketServer";
+import { startTelemetryPushSocketServer, stopTelemetryPushSocketServer } from "./telemetryPushSocketServer";
 import { CtrlProxyClient } from "../features/observe/android";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
@@ -149,6 +150,7 @@ export class Daemon {
     await startDeviceDataStreamSocketServer();
     await startFailuresStreamSocketServer();
     await startFailuresPushSocketServer();
+    await startTelemetryPushSocketServer();
 
     // Wire up callback to establish WebSocket connections when IDE plugins subscribe
     this.setupDeviceDataStreamCallback();
@@ -944,6 +946,7 @@ export class Daemon {
     await stopDeviceDataStreamSocketServer();
     await stopFailuresStreamSocketServer();
     await stopFailuresPushSocketServer();
+    await stopTelemetryPushSocketServer();
     stopAppearanceSyncScheduler();
     stopPerformanceMonitor();
 

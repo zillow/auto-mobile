@@ -189,3 +189,173 @@ data class SdkAnrEvent(
   /** Device information */
   val deviceInfo: SdkDeviceInfo? = null,
 ) : SdkEvent()
+
+// =============================================================================
+// Network Events
+// =============================================================================
+
+/**
+ * Represents an HTTP request/response captured by the network interceptor.
+ */
+@Serializable
+@SerialName("network_request")
+data class SdkNetworkRequestEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Request URL */
+  val url: String,
+  /** HTTP method (GET, POST, etc.) */
+  val method: String,
+  /** HTTP status code (0 if no response) */
+  val statusCode: Int = 0,
+  /** Request duration in milliseconds */
+  val durationMs: Long = 0,
+  /** Request body size in bytes (-1 if unknown) */
+  val requestBodySize: Long = -1,
+  /** Response body size in bytes (-1 if unknown) */
+  val responseBodySize: Long = -1,
+  /** HTTP protocol (e.g., "h2", "http/1.1") */
+  val protocol: String? = null,
+  /** Request host extracted from URL */
+  val host: String? = null,
+  /** Request path extracted from URL */
+  val path: String? = null,
+  /** Error message if the request failed */
+  val error: String? = null,
+) : SdkEvent()
+
+/**
+ * Direction of a WebSocket frame.
+ */
+@Serializable
+enum class WebSocketFrameDirection {
+  @SerialName("sent") SENT,
+  @SerialName("received") RECEIVED,
+}
+
+/**
+ * Type of a WebSocket frame.
+ */
+@Serializable
+enum class WebSocketFrameType {
+  @SerialName("text") TEXT,
+  @SerialName("binary") BINARY,
+  @SerialName("ping") PING,
+  @SerialName("pong") PONG,
+  @SerialName("close") CLOSE,
+}
+
+/**
+ * Represents a WebSocket frame sent or received.
+ */
+@Serializable
+@SerialName("websocket_frame")
+data class SdkWebSocketFrameEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Connection identifier to group frames by WebSocket connection */
+  val connectionId: String,
+  /** WebSocket URL */
+  val url: String,
+  /** Frame direction (sent or received) */
+  val direction: WebSocketFrameDirection,
+  /** Frame type */
+  val frameType: WebSocketFrameType,
+  /** Frame payload size in bytes */
+  val payloadSize: Long = 0,
+) : SdkEvent()
+
+// =============================================================================
+// Log Events
+// =============================================================================
+
+/**
+ * Represents a log entry that matched a registered filter.
+ */
+@Serializable
+@SerialName("log")
+data class SdkLogEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Log level (VERBOSE=2, DEBUG=3, INFO=4, WARN=5, ERROR=6, ASSERT=7) */
+  val level: Int,
+  /** Log tag */
+  val tag: String,
+  /** Log message */
+  val message: String,
+  /** Name of the filter that matched this log entry */
+  val filterName: String,
+) : SdkEvent()
+
+// =============================================================================
+// Broadcast Events
+// =============================================================================
+
+/**
+ * Represents a system or app broadcast that was intercepted.
+ */
+@Serializable
+@SerialName("broadcast")
+data class SdkBroadcastEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Broadcast action string */
+  val action: String,
+  /** Broadcast categories, if any */
+  val categories: List<String>? = null,
+  /** Extra keys and their type names (not values, to avoid leaking data) */
+  val extraKeys: Map<String, String>? = null,
+) : SdkEvent()
+
+// =============================================================================
+// Lifecycle Events
+// =============================================================================
+
+/**
+ * Represents an OS lifecycle event (foreground/background, connectivity, battery, screen).
+ */
+@Serializable
+@SerialName("lifecycle")
+data class SdkLifecycleEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Event kind: foreground, background, connectivity_change, battery_change, screen_on, screen_off */
+  val kind: String,
+  /** Additional details about the event */
+  val details: Map<String, String>? = null,
+) : SdkEvent()
+
+// =============================================================================
+// Custom Events
+// =============================================================================
+
+/**
+ * Represents an app-defined custom event.
+ */
+@Serializable
+@SerialName("custom")
+data class SdkCustomEvent(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** Event name defined by the app */
+  val name: String,
+  /** App-defined properties */
+  val properties: Map<String, String> = emptyMap(),
+) : SdkEvent()
+
+// =============================================================================
+// Event Batch (transport wrapper)
+// =============================================================================
+
+/**
+ * Batched transport wrapper containing multiple SDK events.
+ * Used to reduce Intent broadcast frequency for high-volume events.
+ */
+@Serializable
+@SerialName("event_batch")
+data class SdkEventBatch(
+  override val timestamp: Long,
+  override val applicationId: String? = null,
+  /** The batched events */
+  val events: List<SdkEvent>,
+) : SdkEvent()

@@ -514,6 +514,62 @@ export interface AppearanceConfigsTable {
   created_at: Generated<string>;
 }
 
+// Telemetry tables
+export interface NetworkEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  url: string;
+  method: string;
+  status_code: number;
+  duration_ms: number;
+  request_body_size: number | null;
+  response_body_size: number | null;
+  protocol: string | null;
+  host: string | null;
+  path: string | null;
+  error: string | null;
+  created_at: Generated<string>;
+}
+
+export interface LogEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  level: number;
+  tag: string;
+  message: string;
+  filter_name: string;
+  created_at: Generated<string>;
+}
+
+export interface CustomEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  name: string;
+  properties_json: string | null;
+  created_at: Generated<string>;
+}
+
+export interface OsEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  category: string;
+  kind: string;
+  details_json: string | null;
+  created_at: Generated<string>;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -557,6 +613,10 @@ export interface Database {
   anrs: AnrsTable;
   navigation_node_fingerprints: NavigationNodeFingerprintsTable;
   navigation_suggestions: NavigationSuggestionsTable;
+  network_events: NetworkEventsTable;
+  log_events: LogEventsTable;
+  custom_events: CustomEventsTable;
+  os_events: OsEventsTable;
 }
 
 // Convenience types for each table

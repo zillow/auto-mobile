@@ -46,6 +46,7 @@ import {
   computeChecksum,
 } from "../ScreenshotBackoffScheduler";
 import { getFailureRecorder } from "../../failures/FailureRecorder";
+import { TelemetryRecorder } from "../../telemetry/TelemetryRecorder";
 import { getPerformanceMonitor } from "../../performance/PerformanceMonitor";
 import type { StackTraceElement } from "../../../server/failuresResources";
 import type {
@@ -1540,6 +1541,115 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         const event = anrMessage.event as AnrEvent | undefined;
         if (event) {
           await this.handleAnrEvent(event);
+        }
+      }
+
+      // Handle telemetry events from SDK event batch
+      if (message.type === "network_event") {
+        const msg = message as any;
+        const event = msg.event;
+        if (event) {
+          const recorder = TelemetryRecorder.getInstance();
+          recorder.setContext(this.device.deviceId, null);
+          await recorder.recordNetworkEvent({
+            timestamp: msg.timestamp,
+            applicationId: event.applicationId ?? null,
+            url: event.url,
+            method: event.method,
+            statusCode: event.statusCode ?? 0,
+            durationMs: event.durationMs ?? 0,
+            requestBodySize: event.requestBodySize ?? -1,
+            responseBodySize: event.responseBodySize ?? -1,
+            protocol: event.protocol ?? null,
+            host: event.host ?? null,
+            path: event.path ?? null,
+            error: event.error ?? null,
+          });
+        }
+      }
+
+      if (message.type === "websocket_frame_event") {
+        const msg = message as any;
+        const event = msg.event;
+        if (event) {
+          const recorder = TelemetryRecorder.getInstance();
+          recorder.setContext(this.device.deviceId, null);
+          await recorder.recordOsEvent({
+            timestamp: msg.timestamp,
+            applicationId: event.applicationId ?? null,
+            category: "websocket_frame",
+            kind: event.frameType ?? "unknown",
+            details: {
+              connectionId: event.connectionId ?? "",
+              url: event.url ?? "",
+              direction: event.direction ?? "",
+              payloadSize: String(event.payloadSize ?? 0),
+            },
+          });
+        }
+      }
+
+      if (message.type === "log_event") {
+        const msg = message as any;
+        const event = msg.event;
+        if (event) {
+          const recorder = TelemetryRecorder.getInstance();
+          recorder.setContext(this.device.deviceId, null);
+          await recorder.recordLogEvent({
+            timestamp: msg.timestamp,
+            applicationId: event.applicationId ?? null,
+            level: event.level ?? 0,
+            tag: event.tag ?? "",
+            message: event.message ?? "",
+            filterName: event.filterName ?? "",
+          });
+        }
+      }
+
+      if (message.type === "broadcast_event") {
+        const msg = message as any;
+        const event = msg.event;
+        if (event) {
+          const recorder = TelemetryRecorder.getInstance();
+          recorder.setContext(this.device.deviceId, null);
+          await recorder.recordOsEvent({
+            timestamp: msg.timestamp,
+            applicationId: event.applicationId ?? null,
+            category: "broadcast",
+            kind: event.action ?? "unknown",
+            details: event.extraKeys ?? null,
+          });
+        }
+      }
+
+      if (message.type === "lifecycle_event") {
+        const msg = message as any;
+        const event = msg.event;
+        if (event) {
+          const recorder = TelemetryRecorder.getInstance();
+          recorder.setContext(this.device.deviceId, null);
+          await recorder.recordOsEvent({
+            timestamp: msg.timestamp,
+            applicationId: event.applicationId ?? null,
+            category: "lifecycle",
+            kind: event.kind ?? "unknown",
+            details: event.details ?? null,
+          });
+        }
+      }
+
+      if (message.type === "custom_event") {
+        const msg = message as any;
+        const event = msg.event;
+        if (event) {
+          const recorder = TelemetryRecorder.getInstance();
+          recorder.setContext(this.device.deviceId, null);
+          await recorder.recordCustomEvent({
+            timestamp: msg.timestamp,
+            applicationId: event.applicationId ?? null,
+            name: event.name ?? "",
+            properties: event.properties ?? {},
+          });
         }
       }
 

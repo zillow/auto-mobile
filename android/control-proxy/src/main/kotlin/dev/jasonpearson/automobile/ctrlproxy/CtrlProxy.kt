@@ -47,13 +47,36 @@ import dev.jasonpearson.automobile.protocol.HandledExceptionData
 import dev.jasonpearson.automobile.protocol.HandledExceptionEvent
 import dev.jasonpearson.automobile.protocol.NavigationEventData
 import dev.jasonpearson.automobile.protocol.NavigationEventResponse
+import dev.jasonpearson.automobile.protocol.BroadcastEventData
+import dev.jasonpearson.automobile.protocol.BroadcastEventResponse
+import dev.jasonpearson.automobile.protocol.CustomEventData
+import dev.jasonpearson.automobile.protocol.CustomEventResponse
+import dev.jasonpearson.automobile.protocol.LifecycleEventData
+import dev.jasonpearson.automobile.protocol.LifecycleEventResponse
+import dev.jasonpearson.automobile.protocol.LogEventData
+import dev.jasonpearson.automobile.protocol.LogEventResponse
+import dev.jasonpearson.automobile.protocol.NetworkEventData
+import dev.jasonpearson.automobile.protocol.NetworkEventResponse
 import dev.jasonpearson.automobile.protocol.SdkAnrEvent
+import dev.jasonpearson.automobile.protocol.SdkBroadcastEvent
 import dev.jasonpearson.automobile.protocol.SdkCrashEvent
+import dev.jasonpearson.automobile.protocol.SdkCustomEvent
+import dev.jasonpearson.automobile.protocol.SdkEvent
+import dev.jasonpearson.automobile.protocol.SdkEventBatch
 import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkHandledExceptionEvent
+import dev.jasonpearson.automobile.protocol.SdkLifecycleEvent
+import dev.jasonpearson.automobile.protocol.SdkLogEvent
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
+import dev.jasonpearson.automobile.protocol.SdkNetworkRequestEvent
+import dev.jasonpearson.automobile.protocol.SdkNotificationActionEvent
+import dev.jasonpearson.automobile.protocol.SdkRecompositionSnapshotEvent
+import dev.jasonpearson.automobile.protocol.SdkWebSocketFrameEvent
+import dev.jasonpearson.automobile.protocol.WebSocketFrameData
+import dev.jasonpearson.automobile.protocol.WebSocketFrameResponse
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.anr.AutoMobileAnr
+import dev.jasonpearson.automobile.sdk.events.SdkEventBroadcaster
 import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import java.io.ByteArrayOutputStream
@@ -503,6 +526,31 @@ class CtrlProxy : AccessibilityService() {
         }
       }
 
+  private val eventBatchReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          if (intent == null || intent.action != SdkEventBroadcaster.ACTION_SDK_EVENT_BATCH) {
+            return
+          }
+
+          try {
+            val eventJson = intent.getStringExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON)
+                ?: return
+            val batch = SdkEventSerializer.eventBatchFromJson(eventJson) ?: return
+
+            Log.d(TAG, "Received event batch with ${batch.events.size} events")
+
+            serviceScope.launch {
+              for (event in batch.events) {
+                broadcastSdkEvent(event)
+              }
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Error handling event batch broadcast", e)
+          }
+        }
+      }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
@@ -599,6 +647,18 @@ class CtrlProxy : AccessibilityService() {
         registerReceiver(anrReceiver, anrFilter)
       }
       Log.d(TAG, "ANR receiver registered")
+
+      // Register broadcast receiver for SDK event batches
+      val eventBatchFilter =
+          IntentFilter().apply { addAction(SdkEventBroadcaster.ACTION_SDK_EVENT_BATCH) }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(eventBatchReceiver, eventBatchFilter, RECEIVER_EXPORTED)
+      } else {
+        @SuppressLint("UnspecifiedRegisterReceiverFlag")
+        registerReceiver(eventBatchReceiver, eventBatchFilter)
+      }
+      Log.d(TAG, "Event batch receiver registered")
 
       val screenStateFilter =
           IntentFilter().apply {
@@ -857,6 +917,12 @@ class CtrlProxy : AccessibilityService() {
       unregisterReceiver(anrReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering ANR receiver", e)
+    }
+
+    try {
+      unregisterReceiver(eventBatchReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering event batch receiver", e)
     }
 
     try {
@@ -4077,6 +4143,90 @@ class CtrlProxy : AccessibilityService() {
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting ANR event", e)
+    }
+  }
+
+  /** Broadcast an individual SDK event from a batch to WebSocket clients. */
+  private suspend fun broadcastSdkEvent(event: SdkEvent) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) return
+
+    try {
+      val response = when (event) {
+        is SdkNetworkRequestEvent -> NetworkEventResponse(
+          timestamp = event.timestamp,
+          event = NetworkEventData(
+            url = event.url,
+            method = event.method,
+            statusCode = event.statusCode,
+            durationMs = event.durationMs,
+            requestBodySize = event.requestBodySize,
+            responseBodySize = event.responseBodySize,
+            protocol = event.protocol,
+            host = event.host,
+            path = event.path,
+            error = event.error,
+            applicationId = event.applicationId,
+          ),
+        )
+        is SdkWebSocketFrameEvent -> WebSocketFrameResponse(
+          timestamp = event.timestamp,
+          event = WebSocketFrameData(
+            connectionId = event.connectionId,
+            url = event.url,
+            direction = event.direction.name.lowercase(),
+            frameType = event.frameType.name.lowercase(),
+            payloadSize = event.payloadSize,
+            applicationId = event.applicationId,
+          ),
+        )
+        is SdkLogEvent -> LogEventResponse(
+          timestamp = event.timestamp,
+          event = LogEventData(
+            level = event.level,
+            tag = event.tag,
+            message = event.message,
+            filterName = event.filterName,
+            applicationId = event.applicationId,
+          ),
+        )
+        is SdkBroadcastEvent -> BroadcastEventResponse(
+          timestamp = event.timestamp,
+          event = BroadcastEventData(
+            action = event.action,
+            categories = event.categories,
+            extraKeys = event.extraKeys,
+            applicationId = event.applicationId,
+          ),
+        )
+        is SdkLifecycleEvent -> LifecycleEventResponse(
+          timestamp = event.timestamp,
+          event = LifecycleEventData(
+            kind = event.kind,
+            details = event.details,
+            applicationId = event.applicationId,
+          ),
+        )
+        is SdkCustomEvent -> CustomEventResponse(
+          timestamp = event.timestamp,
+          event = CustomEventData(
+            name = event.name,
+            properties = event.properties,
+            applicationId = event.applicationId,
+          ),
+        )
+        // Existing event types handled by their own receivers — skip here
+        is SdkNavigationEvent,
+        is SdkHandledExceptionEvent,
+        is SdkCrashEvent,
+        is SdkAnrEvent,
+        is SdkNotificationActionEvent,
+        is SdkRecompositionSnapshotEvent,
+        is SdkEventBatch -> null
+      }
+
+      response?.let { webSocketServer.broadcast(it) }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting SDK event", e)
     }
   }
 

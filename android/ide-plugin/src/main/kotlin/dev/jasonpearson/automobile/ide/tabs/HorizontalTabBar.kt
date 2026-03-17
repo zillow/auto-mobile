@@ -53,10 +53,10 @@ fun HorizontalTabBar(
         // Progressively hide text from rightmost tab first
         val availableWidth = maxWidth
         val tabsWithText = when {
-            availableWidth >= 450.dp -> tabs.size      // All tabs show text
-            availableWidth >= 360.dp -> tabs.size - 1  // Hide rightmost (Diagnostics)
-            availableWidth >= 280.dp -> tabs.size - 2  // Hide 2 rightmost (Storage, Diagnostics)
-            availableWidth >= 200.dp -> tabs.size - 3  // Hide 3 rightmost (Test Runs, Storage, Diagnostics)
+            availableWidth >= 550.dp -> tabs.size      // All tabs show text
+            availableWidth >= 450.dp -> tabs.size - 1  // Hide rightmost (Telemetry)
+            availableWidth >= 360.dp -> tabs.size - 2  // Hide 2 rightmost (Diagnostics, Telemetry)
+            availableWidth >= 280.dp -> tabs.size - 3  // Hide 3 rightmost (Storage, Diagnostics, Telemetry)
             else -> 0                                   // All icon-only
         }
 

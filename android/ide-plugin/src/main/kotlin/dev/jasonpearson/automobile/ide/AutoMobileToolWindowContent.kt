@@ -90,6 +90,8 @@ import dev.jasonpearson.automobile.ide.daemon.DaemonSocketPaths
 import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
 import dev.jasonpearson.automobile.ide.daemon.StreamConnectionState
 import dev.jasonpearson.automobile.ide.daemon.FailuresPushSocketClient
+import dev.jasonpearson.automobile.ide.daemon.TelemetryPushClient
+import dev.jasonpearson.automobile.ide.daemon.TelemetryPushSocketClient
 import dev.jasonpearson.automobile.ide.failures.FailuresVerticalPanel
 import dev.jasonpearson.automobile.ide.failures.DateRange
 import dev.jasonpearson.automobile.ide.layout.LayoutInspectorDashboard
@@ -97,6 +99,7 @@ import dev.jasonpearson.automobile.ide.performance.PerformanceVerticalPanel
 import dev.jasonpearson.automobile.ide.settings.AutoMobileSettings
 import dev.jasonpearson.automobile.ide.tabs.HorizontalTab
 import dev.jasonpearson.automobile.ide.tabs.HorizontalTabBar
+import dev.jasonpearson.automobile.ide.telemetry.TelemetryDashboard
 import dev.jasonpearson.automobile.ide.navigation.NavigationDashboard
 import dev.jasonpearson.automobile.ide.navigation.NavigationScreenshotLoader
 import dev.jasonpearson.automobile.ide.performance.PerformanceDashboard
@@ -220,6 +223,7 @@ fun AutoMobileToolWindowContent() {
           HorizontalTab("test_runs", "Test Runs", "🧪"),
           HorizontalTab("storage", "Storage", "💾"),
           HorizontalTab("diagnostics", "Diagnostics", "🩺"),
+          HorizontalTab("telemetry", "Telemetry", "📡"),
       )
   }
   var selectedHorizontalTabId by remember { mutableStateOf<String?>(null) }
@@ -326,6 +330,10 @@ fun AutoMobileToolWindowContent() {
   // Only created when a device is connected in Real mode; disposed when device disconnects
   var failuresPushClient by remember { mutableStateOf<FailuresPushSocketClient?>(null) }
 
+  // Push socket client for real-time telemetry events
+  // Only created when a device is connected in Real mode; disposed when device disconnects
+  var telemetryPushClient by remember { mutableStateOf<TelemetryPushClient?>(null) }
+
   // Streaming failures data source for real-time failure notifications
   // Only created in Real mode when the Failures panel is expanded
   val streamingFailuresDataSource = remember(dataSourceMode, isFailuresPanelCollapsed) {
@@ -377,6 +385,7 @@ fun AutoMobileToolWindowContent() {
       val deviceId = activeDeviceId
       var obsClient: ObservationStreamClient? = null
       var failClient: FailuresPushSocketClient? = null
+      var telClient: TelemetryPushSocketClient? = null
 
       if (deviceId != null) {
           obsClient = ObservationStreamClient()
@@ -389,6 +398,11 @@ fun AutoMobileToolWindowContent() {
               LOG.info("Connecting failures push client")
               failClient.connect()
               failuresPushClient = failClient
+
+              telClient = TelemetryPushSocketClient()
+              LOG.info("Connecting telemetry push client")
+              telClient.connect()
+              telemetryPushClient = telClient
           }
       }
 
@@ -402,6 +416,11 @@ fun AutoMobileToolWindowContent() {
               LOG.info("Disposing failures push client")
               failuresPushClient = null
               failClient.dispose()
+          }
+          if (telClient != null) {
+              LOG.info("Disposing telemetry push client")
+              telemetryPushClient = null
+              telClient.dispose()
           }
       }
   }
@@ -431,6 +450,22 @@ fun AutoMobileToolWindowContent() {
           if (!client.isConnected()) {
               LOG.info("Failures push disconnected, attempting reconnect")
               client.connect()
+          }
+      }
+  }
+
+  // Periodic connection health check for telemetry push - reconnect if dropped
+  LaunchedEffect(telemetryPushClient) {
+      val client = telemetryPushClient ?: return@LaunchedEffect
+      while (true) {
+          kotlinx.coroutines.delay(5000)
+          if (!client.isConnected()) {
+              if (!TelemetryPushSocketClient.socketExists()) {
+                  LOG.info("Telemetry push socket missing, daemon appears down - skipping reconnect")
+              } else {
+                  LOG.info("Telemetry push disconnected, attempting reconnect")
+                  client.connect()
+              }
           }
       }
   }
@@ -941,6 +976,10 @@ fun AutoMobileToolWindowContent() {
                 )
                 "diagnostics" -> DiagnosticsDashboard(
                     connectedMcpProcess = connectedMcpProcess,
+                    dataSourceMode = dataSourceMode,
+                )
+                "telemetry" -> TelemetryDashboard(
+                    telemetryPushClient = telemetryPushClient,
                     dataSourceMode = dataSourceMode,
                 )
               }

@@ -125,6 +125,9 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.coil.network.okhttp)
 
+  // OkHttp for network interceptor
+  implementation(libs.okhttp)
+
   // Splash Screen API support for Android 12+ backported to API 23+
   implementation(libs.androidx.core.splashscreen)
 

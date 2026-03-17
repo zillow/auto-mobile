@@ -54,6 +54,13 @@ object SdkEventSerializer {
     const val RECOMPOSITION_SNAPSHOT = "recomposition_snapshot"
     const val CRASH = "crash"
     const val ANR = "anr"
+    const val NETWORK_REQUEST = "network_request"
+    const val WEBSOCKET_FRAME = "websocket_frame"
+    const val LOG = "log"
+    const val BROADCAST = "broadcast"
+    const val LIFECYCLE = "lifecycle"
+    const val CUSTOM = "custom"
+    const val EVENT_BATCH = "event_batch"
   }
 
   /**
@@ -114,6 +121,13 @@ object SdkEventSerializer {
       is SdkRecompositionSnapshotEvent -> EventTypes.RECOMPOSITION_SNAPSHOT
       is SdkCrashEvent -> EventTypes.CRASH
       is SdkAnrEvent -> EventTypes.ANR
+      is SdkNetworkRequestEvent -> EventTypes.NETWORK_REQUEST
+      is SdkWebSocketFrameEvent -> EventTypes.WEBSOCKET_FRAME
+      is SdkLogEvent -> EventTypes.LOG
+      is SdkBroadcastEvent -> EventTypes.BROADCAST
+      is SdkLifecycleEvent -> EventTypes.LIFECYCLE
+      is SdkCustomEvent -> EventTypes.CUSTOM
+      is SdkEventBatch -> EventTypes.EVENT_BATCH
     }
   }
 
@@ -179,5 +193,33 @@ object SdkEventSerializer {
    */
   fun anrEventFromJson(jsonString: String): SdkAnrEvent? {
     return fromJson(jsonString) as? SdkAnrEvent
+  }
+
+  fun networkRequestEventFromJson(jsonString: String): SdkNetworkRequestEvent? {
+    return fromJson(jsonString) as? SdkNetworkRequestEvent
+  }
+
+  fun webSocketFrameEventFromJson(jsonString: String): SdkWebSocketFrameEvent? {
+    return fromJson(jsonString) as? SdkWebSocketFrameEvent
+  }
+
+  fun logEventFromJson(jsonString: String): SdkLogEvent? {
+    return fromJson(jsonString) as? SdkLogEvent
+  }
+
+  fun broadcastEventFromJson(jsonString: String): SdkBroadcastEvent? {
+    return fromJson(jsonString) as? SdkBroadcastEvent
+  }
+
+  fun lifecycleEventFromJson(jsonString: String): SdkLifecycleEvent? {
+    return fromJson(jsonString) as? SdkLifecycleEvent
+  }
+
+  fun customEventFromJson(jsonString: String): SdkCustomEvent? {
+    return fromJson(jsonString) as? SdkCustomEvent
+  }
+
+  fun eventBatchFromJson(jsonString: String): SdkEventBatch? {
+    return fromJson(jsonString) as? SdkEventBatch
   }
 }

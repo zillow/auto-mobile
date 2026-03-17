@@ -109,6 +109,104 @@ data class HandledExceptionData(
 )
 
 @Serializable
+@SerialName("network_event")
+data class NetworkEventResponse(
+  override val timestamp: Long,
+  val event: NetworkEventData,
+) : WebSocketResponse()
+
+@Serializable
+data class NetworkEventData(
+  val url: String,
+  val method: String,
+  val statusCode: Int = 0,
+  val durationMs: Long = 0,
+  val requestBodySize: Long = -1,
+  val responseBodySize: Long = -1,
+  val protocol: String? = null,
+  val host: String? = null,
+  val path: String? = null,
+  val error: String? = null,
+  val applicationId: String? = null,
+)
+
+@Serializable
+@SerialName("websocket_frame_event")
+data class WebSocketFrameResponse(
+  override val timestamp: Long,
+  val event: WebSocketFrameData,
+) : WebSocketResponse()
+
+@Serializable
+data class WebSocketFrameData(
+  val connectionId: String,
+  val url: String,
+  val direction: String,
+  val frameType: String,
+  val payloadSize: Long = 0,
+  val applicationId: String? = null,
+)
+
+@Serializable
+@SerialName("log_event")
+data class LogEventResponse(
+  override val timestamp: Long,
+  val event: LogEventData,
+) : WebSocketResponse()
+
+@Serializable
+data class LogEventData(
+  val level: Int,
+  val tag: String,
+  val message: String,
+  val filterName: String,
+  val applicationId: String? = null,
+)
+
+@Serializable
+@SerialName("broadcast_event")
+data class BroadcastEventResponse(
+  override val timestamp: Long,
+  val event: BroadcastEventData,
+) : WebSocketResponse()
+
+@Serializable
+data class BroadcastEventData(
+  val action: String,
+  val categories: List<String>? = null,
+  val extraKeys: Map<String, String>? = null,
+  val applicationId: String? = null,
+)
+
+@Serializable
+@SerialName("lifecycle_event")
+data class LifecycleEventResponse(
+  override val timestamp: Long,
+  val event: LifecycleEventData,
+) : WebSocketResponse()
+
+@Serializable
+data class LifecycleEventData(
+  val kind: String,
+  val details: Map<String, String>? = null,
+  val applicationId: String? = null,
+)
+
+@Serializable
+@SerialName("custom_event")
+data class CustomEventResponse(
+  override val timestamp: Long,
+  val event: CustomEventData,
+) : WebSocketResponse()
+
+@Serializable
+data class CustomEventData(
+  val name: String,
+  val properties: Map<String, String> = emptyMap(),
+  val applicationId: String? = null,
+)
+
+@Serializable
 @SerialName("storage_changed")
 data class StorageChangedEvent(
   override val timestamp: Long,

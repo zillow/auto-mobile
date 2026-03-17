@@ -14,6 +14,7 @@ import dev.jasonpearson.automobile.playground.navigation.AppNavigation
 import dev.jasonpearson.automobile.playground.navigation.DeepLinkManager
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.EnableComposeObservableApi
+import dev.jasonpearson.automobile.sdk.logging.AutoMobileLog
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
@@ -41,6 +42,12 @@ class MainActivity : ComponentActivity() {
     SharedPreferencesInspector.setEnabled(true)
     DatabaseInspector.setEnabled(true)
     Log.d(TAG, "AutoMobileSDK initialized")
+
+    // Add log filters for network-related libraries
+    AutoMobileLog.addFilter("http", tagPattern = Regex("OkHttp|Coil|ExoPlayer"))
+
+    // Track app launch as a custom event
+    AutoMobileSDK.trackEvent("app_launched", mapOf("screen" to "MainActivity"))
 
     // Record session start in background
     Thread { SessionRepository(applicationContext).recordSessionStart() }.start()

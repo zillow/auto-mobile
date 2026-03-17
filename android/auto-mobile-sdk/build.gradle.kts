@@ -43,9 +43,13 @@ dependencies {
   implementation(libs.androidx.core)
   implementation(libs.androidx.appcompat)
   implementation(libs.androidx.lifecycle.runtime)
+  implementation(libs.androidx.lifecycle.process)
 
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)
+
+  // OkHttp — compileOnly so consumers must bring their own dependency
+  compileOnly(libs.okhttp)
 
   // Compose runtime for @Composable support
   implementation(platform(libs.compose.bom))
@@ -60,6 +64,7 @@ dependencies {
   testImplementation(libs.junit)
   testImplementation(libs.bundles.unit.test)
   testImplementation(libs.robolectric)
+  testImplementation(libs.okhttp)
 }
 
 // Configure Kotlin compilation options

@@ -48,6 +48,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -108,6 +112,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -141,6 +149,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -189,6 +201,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -330,6 +346,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -470,6 +490,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -807,6 +831,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -831,7 +859,7 @@
           "description": "Target platform"
         },
         "deviceId": {
-          "description": "Optional device ID override",
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         },
         "timeoutMs": {
@@ -1506,6 +1534,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -1551,6 +1583,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -1603,6 +1639,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -1633,6 +1673,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -1676,6 +1720,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -1756,6 +1804,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -1884,6 +1936,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -3562,6 +3618,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -3664,6 +3724,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -3749,6 +3813,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -3798,6 +3866,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -3846,6 +3918,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -3880,6 +3956,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -3923,6 +4003,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -3957,6 +4041,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -4034,6 +4122,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -4272,6 +4364,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -5191,6 +5287,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -5299,6 +5399,10 @@
         },
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         }
       },
@@ -6305,6 +6409,10 @@
         "device": {
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
           "type": "string"
+        },
+        "deviceId": {
+          "description": "Device identifier for targeting a specific device",
+          "type": "string"
         }
       },
       "required": [
@@ -6337,7 +6445,7 @@
           "description": "Target platform"
         },
         "deviceId": {
-          "description": "Optional device ID override",
+          "description": "Device identifier for targeting a specific device",
           "type": "string"
         },
         "recordingId": {

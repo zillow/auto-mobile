@@ -3,14 +3,22 @@ package dev.jasonpearson.automobile.sdk
 import android.content.Context
 import android.content.Intent
 import dev.jasonpearson.automobile.protocol.NavigationSourceType
+import dev.jasonpearson.automobile.protocol.SdkCustomEvent
 import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.anr.AutoMobileAnr
 import dev.jasonpearson.automobile.sdk.biometrics.AutoMobileBiometrics
 import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
+import dev.jasonpearson.automobile.sdk.events.SdkEventBroadcaster
+import dev.jasonpearson.automobile.sdk.events.SdkEventBuffer
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
+import dev.jasonpearson.automobile.sdk.logging.AutoMobileLog
+import dev.jasonpearson.automobile.sdk.network.AutoMobileNetwork
+import dev.jasonpearson.automobile.sdk.os.AutoMobileBroadcastInterceptor
+import dev.jasonpearson.automobile.sdk.os.AutoMobileOsEvents
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
+import androidx.annotation.RequiresPermission
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -45,6 +53,7 @@ object AutoMobileSDK {
   private val listeners = CopyOnWriteArrayList<NavigationListener>()
   private var isEnabled = true
   private var context: Context? = null
+  private var eventBuffer: SdkEventBuffer? = null
 
   const val ACTION_NAVIGATION_EVENT = "dev.jasonpearson.automobile.sdk.NAVIGATION_EVENT"
   const val EXTRA_DESTINATION = "destination"
@@ -62,16 +71,33 @@ object AutoMobileSDK {
    *
    * @param context Application context (use applicationContext, not activity context)
    */
+  @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE)
   fun initialize(context: Context) {
     this.context = context.applicationContext
-    RecompositionTracker.initialize(this.context!!)
-    AutoMobileNotifications.initialize(this.context!!)
-    DatabaseInspector.initialize(this.context!!)
-    SharedPreferencesInspector.initialize(this.context!!)
-    AutoMobileFailures.initialize(this.context!!)
-    AutoMobileCrashes.initialize(this.context!!)
-    AutoMobileAnr.initialize(this.context!!)
-    AutoMobileBiometrics.initialize(this.context!!)
+    val appContext = this.context!!
+
+    // Create shared event buffer with broadcast flush callback
+    val buffer = SdkEventBuffer(
+      onFlush = { events -> SdkEventBroadcaster.broadcastBatch(appContext, events) },
+    )
+    buffer.start()
+    eventBuffer = buffer
+
+    // Initialize telemetry subsystems with the shared buffer
+    AutoMobileNetwork.initialize(appContext.packageName, buffer)
+    AutoMobileLog.initialize(appContext.packageName, buffer)
+    AutoMobileOsEvents.initialize(appContext, buffer)
+    AutoMobileBroadcastInterceptor.initialize(appContext, buffer)
+
+    // Initialize existing subsystems
+    RecompositionTracker.initialize(appContext)
+    AutoMobileNotifications.initialize(appContext)
+    DatabaseInspector.initialize(appContext)
+    SharedPreferencesInspector.initialize(appContext)
+    AutoMobileFailures.initialize(appContext)
+    AutoMobileCrashes.initialize(appContext)
+    AutoMobileAnr.initialize(appContext)
+    AutoMobileBiometrics.initialize(appContext)
   }
 
   /**
@@ -184,4 +210,26 @@ object AutoMobileSDK {
 
   /** Returns the current number of registered listeners. */
   fun getListenerCount(): Int = listeners.size
+
+  /**
+   * Track a custom app-defined event.
+   *
+   * @param name The event name
+   * @param properties Optional key-value properties
+   */
+  fun trackEvent(name: String, properties: Map<String, String> = emptyMap()) {
+    if (!isEnabled) return
+    val buf = eventBuffer ?: return
+    buf.add(
+      SdkCustomEvent(
+        timestamp = System.currentTimeMillis(),
+        applicationId = context?.packageName,
+        name = name,
+        properties = properties,
+      )
+    )
+  }
+
+  /** Returns the shared event buffer, or null if not initialized. */
+  fun getEventBuffer(): SdkEventBuffer? = eventBuffer
 }
