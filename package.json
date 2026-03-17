@@ -73,7 +73,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
+    "@anthropic-ai/sdk": "^0.79.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@types/js-yaml": "^4.0.9",
     "@types/ws": "^8.18.1",
