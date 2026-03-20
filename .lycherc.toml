@@ -34,6 +34,7 @@ accept = [
     "200..=299",  # 2xx success
     "403",        # Forbidden (auth-protected URLs like console.anthropic.com)
     "429",        # Too Many Requests (common for rate-limited APIs)
+    "502",        # Bad Gateway (transient GitHub/CDN errors)
     "503",        # Service Unavailable (temporary for Anthropic URLs under load)
 ]
 
