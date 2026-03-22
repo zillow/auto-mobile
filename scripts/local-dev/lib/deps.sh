@@ -252,7 +252,16 @@ ensure_dev_tools() {
   brew_install_if_missing yq        yq           || ((missing++)) || true
   brew_install_if_missing gum       gum          || ((missing++)) || true
   brew_install_if_missing hadolint  hadolint     || ((missing++)) || true
-  brew_install_if_missing vips      vips         || ((missing++)) || true
+  # vips — optional system fallback; sharp's npm prebuilts bundle their own libvips
+  if ! (command -v pkg-config >/dev/null 2>&1 && pkg-config --exists vips 2>/dev/null); then
+    log_info "System libvips not found (optional — sharp uses bundled prebuilts)"
+  fi
+
+  # --- libimobiledevice tools (physical iOS device support) ----------------
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    brew_install_if_missing iproxy          libusbmuxd       || ((missing++)) || true
+    brew_install_if_missing ideviceinstaller ideviceinstaller || ((missing++)) || true
+  fi
 
   # --- Java 21 (needed for Gradle / Android builds) -----------------------
   if ! java -version 2>&1 | grep -q 'version "21'; then

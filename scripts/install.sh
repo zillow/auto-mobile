@@ -2594,38 +2594,58 @@ install_runtime_deps() {
             if [[ "${os}" == "macos" ]]; then
                 log_info "Install with: brew install ffmpeg"
             else
-                log_info "Install with: apt-get install ffmpeg (or your package manager)"
+                _log_linux_install_hint "ffmpeg" "ffmpeg" "ffmpeg" "ffmpeg"
             fi
         fi
     fi
 
-    # vips — required by sharp for screenshot processing
-    if ! command_exists vips; then
-        if [[ "${os}" == "macos" ]] && command_exists brew; then
-            if [[ "${NON_INTERACTIVE}" == "true" ]]; then
-                log_info "Installing vips (required for image processing)..."
-                if run_spinner "Installing vips" brew install vips; then
-                    CHANGES_MADE=true
-                else
-                    log_warn "vips install failed — image processing may fall back to slower paths"
-                fi
-            elif gum confirm "Install vips? (required for image processing)"; then
-                if run_spinner "Installing vips" brew install vips; then
-                    CHANGES_MADE=true
-                else
-                    log_warn "vips install failed — image processing may fall back to slower paths"
-                fi
-            else
-                log_info "Skipped vips — install later with: brew install vips"
-            fi
+    # libvips — optional system fallback for sharp image processing.
+    # Sharp's npm prebuilt binaries bundle their own libvips, so a system
+    # install is only needed when the prebuilts are unavailable (e.g.
+    # unsupported arch or failed download). Never auto-install; just inform.
+    if ! _check_libvips; then
+        log_info "System libvips not found (optional — sharp uses bundled prebuilts)"
+        if [[ "${os}" == "macos" ]]; then
+            log_info "If image processing fails, install with: brew install vips"
         else
-            log_warn "vips not found — image processing may fall back to slower paths"
-            if [[ "${os}" == "macos" ]]; then
-                log_info "Install with: brew install vips"
-            else
-                log_info "Install with: apt-get install libvips42 libvips-dev (or your package manager)"
-            fi
+            _log_linux_install_hint "libvips" "libvips-dev" "vips-devel" "libvips"
         fi
+    fi
+}
+
+# Check if libvips shared library is available (not just the CLI tool).
+# sharp links against libvips at runtime; the vips CLI is not sufficient.
+_check_libvips() {
+    # Prefer pkg-config (works on all distros and Homebrew)
+    if command_exists pkg-config && pkg-config --exists vips 2>/dev/null; then
+        return 0
+    fi
+    # Fallback: check for the shared library directly
+    if [[ "$(detect_os)" == "macos" ]]; then
+        # Homebrew installs to /opt/homebrew (arm64) or /usr/local (x64)
+        local brew_prefix
+        brew_prefix=$(brew --prefix 2>/dev/null || echo "/opt/homebrew")
+        [[ -f "${brew_prefix}/lib/libvips.dylib" ]] && return 0
+    else
+        ldconfig -p 2>/dev/null | grep -q libvips && return 0
+    fi
+    return 1
+}
+
+# Print distro-aware install hints for Linux packages.
+# Usage: _log_linux_install_hint <label> <deb_pkg> <rpm_pkg> <arch_pkg>
+_log_linux_install_hint() {
+    local label="$1" deb_pkg="$2" rpm_pkg="$3" arch_pkg="$4"
+    if command_exists apt-get; then
+        log_info "Install with: sudo apt-get install ${deb_pkg}"
+    elif command_exists dnf; then
+        log_info "Install with: sudo dnf install ${rpm_pkg}"
+    elif command_exists yum; then
+        log_info "Install with: sudo yum install ${rpm_pkg}"
+    elif command_exists pacman; then
+        log_info "Install with: sudo pacman -S ${arch_pkg}"
+    else
+        log_info "Install ${label} using your system package manager"
     fi
 }
 
@@ -2927,7 +2947,56 @@ run_ios_setup() {
 
     ios_check_simulator_runtimes
     ios_check_ctrl_proxy_build
+    ios_check_physical_device_tools
     return 0
+}
+
+# Check and offer to install libimobiledevice tools for physical iOS device support.
+# Requires: libusbmuxd (iproxy), libimobiledevice (idevice_id), ideviceinstaller
+ios_check_physical_device_tools() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 0
+    fi
+
+    local missing_tools=()
+    command_exists iproxy          || missing_tools+=("iproxy (libusbmuxd)")
+    command_exists idevice_id      || missing_tools+=("idevice_id (libimobiledevice)")
+    command_exists ideviceinstaller || missing_tools+=("ideviceinstaller")
+
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        log_info "Physical iOS device tools: all present"
+        return 0
+    fi
+
+    log_warn "Missing physical iOS device tools: ${missing_tools[*]}"
+
+    if ! command_exists brew; then
+        log_info "Install with: brew install libusbmuxd ideviceinstaller"
+        return 0
+    fi
+
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        log_info "Installing libimobiledevice tools (required for physical iOS devices)..."
+        _install_libimobiledevice_tools
+    elif gum confirm "Install libimobiledevice tools? (required for physical iOS devices)"; then
+        _install_libimobiledevice_tools
+    else
+        log_info "Skipped — install later with: brew install libusbmuxd ideviceinstaller"
+    fi
+}
+
+_install_libimobiledevice_tools() {
+    # ideviceinstaller depends on libimobiledevice; libusbmuxd provides iproxy
+    if run_spinner "Installing libusbmuxd" brew install libusbmuxd; then
+        CHANGES_MADE=true
+    else
+        log_warn "libusbmuxd install failed — iproxy will be unavailable"
+    fi
+    if run_spinner "Installing ideviceinstaller" brew install ideviceinstaller; then
+        CHANGES_MADE=true
+    else
+        log_warn "ideviceinstaller install failed — physical device app install will be unavailable"
+    fi
 }
 
 collect_choices() {
@@ -3451,7 +3520,7 @@ main() {
 
     # Check runtime dependencies
     spin_check "Checking ffmpeg" "command -v ffmpeg >/dev/null 2>&1" || true
-    spin_check "Checking vips" "command -v vips >/dev/null 2>&1" || true
+    spin_check "Checking libvips" "command -v pkg-config >/dev/null 2>&1 && pkg-config --exists vips 2>/dev/null" || true
 
     # Check Android SDK
     local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
@@ -3479,8 +3548,15 @@ main() {
                 offer_android_home_shell_setup "${detected_android_home}"
             fi
 
-            # List available AVDs with API levels
+            # Check Android emulator
             local emulator_path="${detected_android_home}/emulator/emulator"
+            if [[ -x "${emulator_path}" ]]; then
+                log_info "Checking Android emulator: ok"
+            else
+                log_warn "Checking Android emulator: missing — install via Android Studio SDK Manager or: sdkmanager 'emulator'"
+            fi
+
+            # List available AVDs with API levels
             if [[ -x "${emulator_path}" ]]; then
                 local avd_list
                 avd_list=$("${emulator_path}" -list-avds 2>/dev/null | head -10 || true)
@@ -3536,9 +3612,17 @@ main() {
                     log_info "iOS runtimes available: ${runtimes}"
                 fi
 
+                # Check devicectl (Xcode 15+ physical device control)
+                spin_check "Checking devicectl" "xcrun devicectl --version >/dev/null 2>&1" || true
+
                 IOS_SETUP_OK=true
             fi
         fi
+
+        # Check libimobiledevice tools (physical iOS device support)
+        spin_check "Checking iproxy" "command -v iproxy >/dev/null 2>&1" || true
+        spin_check "Checking idevice_id" "command -v idevice_id >/dev/null 2>&1" || true
+        spin_check "Checking ideviceinstaller" "command -v ideviceinstaller >/dev/null 2>&1" || true
     fi
 
     # Check AutoMobile CLI
@@ -3724,6 +3808,9 @@ main() {
             # Only run setup if not already detected as ready
             if [[ "${IOS_SETUP_OK}" != "true" ]]; then
                 run_ios_setup
+            else
+                # Xcode already detected — still check physical device tools
+                ios_check_physical_device_tools
             fi
             ;;
         Both)
@@ -3736,6 +3823,9 @@ main() {
             fi
             if [[ "${IOS_SETUP_OK}" != "true" ]]; then
                 run_ios_setup
+            else
+                # Xcode already detected — still check physical device tools
+                ios_check_physical_device_tools
             fi
             ;;
     esac
