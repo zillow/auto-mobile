@@ -2368,14 +2368,14 @@ install_claude_marketplace() {
 
     if [[ "${DRY_RUN}" == "true" ]]; then
         DRY_RUN_LOG+=("[DRY-RUN] Install Claude Marketplace plugin")
-        log_info "[DRY-RUN] Would run: claude plugin marketplace add kaeawc/auto-mobile"
+        log_info "[DRY-RUN] Would run: claude plugin marketplace add https://github.com/kaeawc/auto-mobile"
         return 0
     fi
 
     log_info "Installing Claude Marketplace plugin..."
     local install_output
     local install_status=0
-    install_output=$(claude plugin marketplace add kaeawc/auto-mobile 2>&1) || install_status=$?
+    install_output=$(claude plugin marketplace add https://github.com/kaeawc/auto-mobile 2>&1) || install_status=$?
 
     if [[ ${install_status} -ne 0 ]]; then
         log_error "Failed to install Claude Marketplace plugin:"
