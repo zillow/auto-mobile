@@ -2999,6 +2999,26 @@ _install_libimobiledevice_tools() {
     fi
 }
 
+# Report-only variant: show status of physical device tools without offering to install.
+# Used when iOS is already detected as ready (rerun case) to avoid unexpected brew installs.
+ios_report_physical_device_tools() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 0
+    fi
+
+    local missing_tools=()
+    command_exists iproxy          || missing_tools+=("iproxy")
+    command_exists idevice_id      || missing_tools+=("idevice_id")
+    command_exists ideviceinstaller || missing_tools+=("ideviceinstaller")
+
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        log_info "Physical iOS device tools: all present"
+    else
+        log_warn "Missing physical iOS device tools: ${missing_tools[*]}"
+        log_info "Install with: brew install libusbmuxd ideviceinstaller"
+    fi
+}
+
 collect_choices() {
     if [[ "${BUN_INSTALLED}" == "false" ]]; then
         if gum confirm "Bun is required for AutoMobile. Install Bun now?"; then
@@ -3809,8 +3829,8 @@ main() {
             if [[ "${IOS_SETUP_OK}" != "true" ]]; then
                 run_ios_setup
             else
-                # Xcode already detected — still check physical device tools
-                ios_check_physical_device_tools
+                # Xcode already detected — report physical device tool status (no auto-install)
+                ios_report_physical_device_tools
             fi
             ;;
         Both)
@@ -3824,8 +3844,8 @@ main() {
             if [[ "${IOS_SETUP_OK}" != "true" ]]; then
                 run_ios_setup
             else
-                # Xcode already detected — still check physical device tools
-                ios_check_physical_device_tools
+                # Xcode already detected — report physical device tool status (no auto-install)
+                ios_report_physical_device_tools
             fi
             ;;
     esac
