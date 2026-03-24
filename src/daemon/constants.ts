@@ -1,4 +1,5 @@
 import { platform } from "node:os";
+import { getMcpServerVersion } from "../utils/mcpVersion";
 
 /**
  * Get the user ID for the current process
@@ -88,6 +89,6 @@ export const MCP_STREAMABLE_PATH = "/auto-mobile/streamable";
 
 /**
  * Package version (read from package.json)
- * Used for version compatibility checks
+ * Used for version compatibility checks and PID file metadata
  */
-export const DAEMON_VERSION = "0.0.1"; // TODO: Read from package.json
+export const DAEMON_VERSION = getMcpServerVersion();

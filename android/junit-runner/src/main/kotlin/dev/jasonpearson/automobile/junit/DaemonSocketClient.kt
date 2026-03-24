@@ -282,29 +282,27 @@ internal object DaemonSocketPaths {
   }
 
   private fun buildDaemonCommand(subCommand: String): List<String> {
-    // Prefer npx/bunx to avoid requiring a global npm install of auto-mobile.
-    // Fall back to the global binary if neither package runner is available.
-    val runner = resolvePackageRunner()
-    return if (runner != null) {
-      listOf(runner, "-y", "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
+    // Use bunx to avoid requiring a global install of auto-mobile.
+    // Fall back to the global binary if bunx is not available.
+    val hasBunx = resolvePackageRunner()
+    return if (hasBunx) {
+      listOf("bunx", "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
     } else {
       listOf("auto-mobile", "--daemon", subCommand)
     }
   }
 
-  private fun resolvePackageRunner(): String? {
-    for (cmd in listOf("npx", "bunx")) {
-      try {
-        val process = ProcessBuilder("which", cmd)
-          .redirectErrorStream(true)
-          .start()
-        val exited = process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-        if (exited && process.exitValue() == 0) return cmd
-      } catch (_: Exception) {
-        // ignore
-      }
+  private fun resolvePackageRunner(): Boolean {
+    try {
+      val process = ProcessBuilder("which", "bunx")
+        .redirectErrorStream(true)
+        .start()
+      val exited = process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+      return exited && process.exitValue() == 0
+    } catch (_: Exception) {
+      // ignore
     }
-    return null
+    return false
   }
 
   private fun getUserId(): String {

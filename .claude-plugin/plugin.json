@@ -25,9 +25,8 @@
   "hooks": "./hooks.json",
   "mcpServers": {
     "auto-mobile": {
-      "command": "npx",
+      "command": "bunx",
       "args": [
-        "-y",
         "@kaeawc/auto-mobile@latest"
       ]
     }

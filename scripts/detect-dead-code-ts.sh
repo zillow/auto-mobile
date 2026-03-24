@@ -48,8 +48,9 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-if ! command -v npx &> /dev/null; then
-    echo "❌ Error: npx is required but not installed"
+if ! command -v bunx &> /dev/null; then
+    echo "❌ Error: bunx is required but not installed"
+    echo "Install with: curl -fsSL https://bun.sh/install | bash"
     exit 1
 fi
 
@@ -74,7 +75,7 @@ echo "📦 Running ts-prune..."
 
 # Run ts-prune (it exits with non-zero when issues found, that's okay)
 set +e  # Temporarily disable exit on error
-npx ts-prune --error --project tsconfig.dead-code.json > "$TS_PRUNE_OUTPUT" 2>&1
+bunx ts-prune --error --project tsconfig.dead-code.json > "$TS_PRUNE_OUTPUT" 2>&1
 TS_PRUNE_EXIT=$?
 set -e  # Re-enable exit on error
 
@@ -130,7 +131,7 @@ echo "🔪 Running knip..."
 
 # Run knip with JSON reporter (it exits with non-zero when issues found, that's okay)
 set +e  # Temporarily disable exit on error
-npx knip --reporter json > "$KNIP_OUTPUT" 2>&1
+bunx knip --reporter json > "$KNIP_OUTPUT" 2>&1
 KNIP_EXIT=$?
 set -e  # Re-enable exit on error
 

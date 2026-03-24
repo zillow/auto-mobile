@@ -50,7 +50,7 @@ happens entirely through the daemon.
 - JDK 11+
 - Android SDK with `adb` on `PATH`
 - A connected Android device or running emulator
-- AutoMobile daemon running (`npm install -g @kaeawc/auto-mobile --ignore-scripts` then `auto-mobile --daemon-mode`)
+- AutoMobile daemon running (`bun add -g @kaeawc/auto-mobile` then `auto-mobile --daemon-mode`)
 - CtrlProxy accessibility service installed on the device (see [CtrlProxy](../control-proxy.md))
 
 ## Quick start

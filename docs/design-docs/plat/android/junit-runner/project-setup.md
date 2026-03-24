@@ -136,13 +136,13 @@ adb devices
 
 The JUnitRunner communicates with a locally running AutoMobile daemon over a Unix domain socket at
 `/tmp/auto-mobile-daemon-<uid>.sock`. If no daemon is running when the first test starts, the runner
-bootstraps one automatically using `npx -y @kaeawc/auto-mobile@latest --daemon start`.
+bootstraps one automatically using `bunx @kaeawc/auto-mobile@latest --daemon start`.
 
 For predictable local development, start the daemon yourself so you can control its lifetime and
 configuration:
 
 ```bash
-npm install -g @kaeawc/auto-mobile --ignore-scripts
+bun add -g @kaeawc/auto-mobile
 auto-mobile --daemon-mode &
 ```
 
@@ -257,9 +257,9 @@ across all test workers on the host — you do not need to run multiple daemon i
 | Problem | Likely cause | Fix |
 |---|---|---|
 | `Could not resolve auto-mobile-junit-runner` | Missing `mavenLocal()` or wrong version | Ensure `mavenLocal()` is first in `settings.gradle.kts`; republish both SNAPSHOT modules |
-| `Could not find test-plan.schema.json` | Daemon running old binary with path bug | Restart daemon from the auto-mobile source directory; verify npm cache contains the latest binary |
+| `Could not find test-plan.schema.json` | Daemon running old binary with path bug | Restart daemon from the auto-mobile source directory; verify the latest binary is installed |
 | `Failed to terminate app: Command failed` | App APK not installed on device | Run `adb install -r app-debug.apk` before tests |
-| `Daemon failed to start within Xms` | `npx` or `bunx` unavailable or slow | Install `auto-mobile` globally and start the daemon manually before running tests |
+| `Daemon failed to start within Xms` | `bunx` unavailable or slow | Install `auto-mobile` globally and start the daemon manually before running tests |
 | `No Android devices found — skipping` | `adb devices` shows no device | Start your emulator or connect a device; check `ANDROID_HOME` is set |
 
 ## See also

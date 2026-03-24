@@ -23,19 +23,16 @@ import { DaemonState, type DaemonStateLike } from "./daemonState";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 
 /**
- * Find the first available package runner (npx or bunx) on PATH.
- * Returns the command name, or null if neither is found.
+ * Check that bunx is available on PATH.
+ * Returns "bunx" if found, or null if not.
  */
 function resolvePackageRunner(): string | null {
-  for (const cmd of ["npx", "bunx"]) {
-    try {
-      execSync(`which ${cmd}`, { stdio: "ignore" });
-      return cmd;
-    } catch {
-      // not found, try next
-    }
+  try {
+    execSync("which bunx", { stdio: "ignore" });
+    return "bunx";
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /**
@@ -164,10 +161,9 @@ export class DaemonManager {
 
     console.log("Starting AutoMobile daemon...");
 
-    // Resolve the current binary so the daemon uses the same version,
-    // even when invoked via npx (where "auto-mobile" may not be on PATH).
+    // Resolve the current binary so the daemon uses the same version.
     // process.argv[1] is the entry script (e.g. dist/src/index.js).
-    // Falls back to npx/bunx to avoid requiring a global npm install.
+    // Falls back to bunx to avoid requiring a global install.
     const entryScript = process.argv[1];
     let autoMobileCmd: string;
     let args: string[];
@@ -510,7 +506,7 @@ export async function runDaemonCommand(
               console.log(`  - PID ${pid}`);
             }
             console.log(
-              `\nThese can cause device pool conflicts. Run 'npx -y @kaeawc/auto-mobile@latest --daemon restart' to stop them.`
+              `\nThese can cause device pool conflicts. Run 'bunx @kaeawc/auto-mobile@latest --daemon restart' to stop them.`
             );
           }
         } else {

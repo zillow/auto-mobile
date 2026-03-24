@@ -42,8 +42,6 @@ runs:
       run: |
         if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
           npm install -g .
-          exit 0
+        else
+          bun add -g .
         fi
-
-        bun install -g .
-        npm install -g .

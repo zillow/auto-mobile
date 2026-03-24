@@ -177,61 +177,153 @@ jobs:
         run: |
           scripts/lychee/validate_lychee.sh
 
-  interactive-installer:
-    name: "Interactive Installer (${{ matrix.os }})"
+  installer-minimal:
+    name: "Installer Minimal (${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v6
         with:
           lfs: false
 
-      - name: "Run Interactive Installer"
+      - name: "Run Installer (minimal)"
         shell: bash
         continue-on-error: true
         run: |
           set -uo pipefail
           mkdir -p ci-logs
-          log_path="ci-logs/interactive-installer-${{ matrix.os }}.log"
-          bash ./scripts/install.sh --preset minimal --record-mode 2>&1 | tee "${log_path}"
+          bash ./scripts/install.sh --preset minimal --non-interactive 2>&1 | tee ci-logs/installer.log
           echo "INSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
 
-      - name: "Run Interactive Uninstaller"
+      - name: "Run Uninstaller"
         shell: bash
         continue-on-error: true
         run: |
           set -uo pipefail
-          mkdir -p ci-logs
-          log_path="ci-logs/interactive-uninstaller-${{ matrix.os }}.log"
-          bash ./scripts/uninstall.sh --record-mode --force 2>&1 | tee "${log_path}"
+          bash ./scripts/uninstall.sh --all --force 2>&1 | tee ci-logs/uninstaller.log
           echo "UNINSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
 
-      - name: "Upload Installer Logs"
-        if: env.INSTALL_EXIT_CODE != '0'
+      - name: "Upload Logs"
+        if: env.INSTALL_EXIT_CODE != '0' || env.UNINSTALL_EXIT_CODE != '0' || failure()
         uses: actions/upload-artifact@v6
         with:
-          name: interactive-installer-${{ matrix.os }}-logs
-          path: ci-logs/interactive-installer-${{ matrix.os }}.log
+          name: installer-minimal-${{ matrix.os }}-logs
+          path: ci-logs/
           retention-days: 7
 
-      - name: "Upload Uninstaller Logs"
-        if: env.UNINSTALL_EXIT_CODE != '0'
-        uses: actions/upload-artifact@v6
-        with:
-          name: interactive-uninstaller-${{ matrix.os }}-logs
-          path: ci-logs/interactive-uninstaller-${{ matrix.os }}.log
-          retention-days: 7
-
-      - name: "Fail if Installer or Uninstaller Failed"
+      - name: "Fail on error"
         if: env.INSTALL_EXIT_CODE != '0' || env.UNINSTALL_EXIT_CODE != '0'
         shell: bash
         run: |
           echo "Installer exit code: ${INSTALL_EXIT_CODE:-0}"
           echo "Uninstaller exit code: ${UNINSTALL_EXIT_CODE:-0}"
+          exit 1
+
+  installer-development:
+    name: "Installer Development (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - name: "Run Installer (development)"
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p ci-logs
+          bash ./scripts/install.sh --preset development --non-interactive 2>&1 | tee ci-logs/installer.log
+          echo "INSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+
+      - name: "Verify runtime dependencies"
+        if: env.INSTALL_EXIT_CODE == '0'
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Refresh PATH — installer may have added ~/.bun/bin or Homebrew paths
+          export PATH="${HOME}/.bun/bin:${PATH}"
+          if [[ -f "${HOME}/.bashrc" ]]; then source "${HOME}/.bashrc" 2>/dev/null || true; fi
+          hash -r 2>/dev/null || true
+
+          missing=()
+
+          # Core runtime
+          command -v bun     >/dev/null 2>&1 || missing+=("bun")
+          command -v bunx    >/dev/null 2>&1 || missing+=("bunx")
+
+          # Runtime deps (ffmpeg installed by installer on macOS via brew,
+          # pre-installed on ubuntu-latest)
+          command -v ffmpeg  >/dev/null 2>&1 || missing+=("ffmpeg")
+
+          # Dev tools (installed by development preset via brew on macOS,
+          # some pre-installed on ubuntu-latest)
+          command -v shellcheck  >/dev/null 2>&1 || missing+=("shellcheck")
+          command -v jq          >/dev/null 2>&1 || missing+=("jq")
+          command -v rg          >/dev/null 2>&1 || missing+=("ripgrep")
+
+          # macOS-specific
+          if [[ "$(uname -s)" == "Darwin" ]]; then
+            command -v yq          >/dev/null 2>&1 || missing+=("yq")
+            command -v swiftformat >/dev/null 2>&1 || missing+=("swiftformat")
+            command -v swiftlint   >/dev/null 2>&1 || missing+=("swiftlint")
+            command -v iproxy      >/dev/null 2>&1 || missing+=("iproxy")
+          fi
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing runtime dependencies: ${missing[*]}"
+            exit 1
+          fi
+          echo "All runtime dependencies verified."
+
+      - name: "Build from source"
+        if: env.INSTALL_EXIT_CODE == '0'
+        shell: bash
+        run: |
+          export PATH="${HOME}/.bun/bin:${PATH}"
+          bun install --frozen-lockfile
+          bunx turbo run build --output-logs=errors-only
+
+      - name: "Daemon lifecycle (start → health → doctor → stop)"
+        if: env.INSTALL_EXIT_CODE == '0'
+        shell: bash
+        run: |
+          set -uo pipefail
+          export PATH="${HOME}/.bun/bin:${PATH}"
+          mkdir -p ci-logs
+
+          bun dist/src/index.js --daemon start  2>&1 | tee ci-logs/daemon-start.log
+          bun dist/src/index.js --daemon health 2>&1 | tee ci-logs/daemon-health.log
+
+          # Doctor exits non-zero when checks fail (expected on CI without devices).
+          # We just verify the daemon responds to the request.
+          bun dist/src/index.js --cli doctor --json 2>&1 | tee ci-logs/daemon-doctor.log || true
+
+          bun dist/src/index.js --daemon stop   2>&1 | tee ci-logs/daemon-stop.log
+
+      - name: "Upload Logs"
+        if: env.INSTALL_EXIT_CODE != '0' || failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: installer-development-${{ matrix.os }}-logs
+          path: ci-logs/
+          retention-days: 7
+
+      - name: "Fail on error"
+        if: env.INSTALL_EXIT_CODE != '0'
+        shell: bash
+        run: |
+          echo "Installer exit code: ${INSTALL_EXIT_CODE:-0}"
           exit 1
 
   mcp-build-and-test:

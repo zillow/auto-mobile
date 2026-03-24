@@ -35,7 +35,7 @@ auto-mobile-tests:
 
     - name: "Install auto-mobile"
       shell: bash
-      run: npm install -g @kaeawc/auto-mobile --ignore-scripts
+      run: bun add -g @kaeawc/auto-mobile
 
     - name: "Download app APK"
       uses: actions/download-artifact@v4.1.8
@@ -146,11 +146,10 @@ runner so that `auto-mobile --daemon-mode` works correctly.
 ```yaml
 - uses: oven-sh/setup-bun@v2
 
-- run: npm install -g @kaeawc/auto-mobile --ignore-scripts
+- run: bun add -g @kaeawc/auto-mobile
 ```
 
-`--ignore-scripts` skips the optional native post-install hooks in the npm package, which are not
-needed on CI and can fail on headless runners.
+Bun handles native dependencies automatically during installation.
 
 ### 2. emulator.wtf ADB session
 

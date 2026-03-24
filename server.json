@@ -14,7 +14,7 @@
       "registryType": "npm",
       "identifier": "@kaeawc/auto-mobile",
       "version": "0.0.13",
-      "runtimeHint": "npx",
+      "runtimeHint": "bunx",
       "transport": {
         "type": "stdio"
       }

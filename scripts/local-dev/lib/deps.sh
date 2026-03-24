@@ -3,7 +3,7 @@
 # Dependency detection and installation for local development.
 #
 # Delegates heavy lifting to scripts/install.sh (--preset local-dev),
-# then performs post-install validation and local-only steps (npm link).
+# then performs post-install validation and local-only steps (bun link).
 #
 # Required variables (must be set before sourcing):
 #   PROJECT_ROOT - Path to project root
@@ -13,7 +13,7 @@
 #   version_gte()              - Semver comparison (returns 0 if $1 >= $2)
 #   ensure_gum()               - Check gum availability (installed by install.sh)
 #   ensure_git_lfs()           - Install git-lfs, configure hooks, pull unresolved objects
-#   ensure_auto_mobile()       - Build and npm link auto-mobile CLI
+#   ensure_auto_mobile()       - Build and bun link auto-mobile CLI
 #   ensure_dev_tools()         - Install brew packages, Java, manual tools if missing
 #   ensure_dependencies()      - Run all dependency checks via install.sh
 
@@ -131,8 +131,9 @@ ensure_auto_mobile() {
   fi
 
   # Always reinstall globally to pick up changes
-  log_info "Installing auto-mobile globally via npm link..."
-  if (cd "${PROJECT_ROOT}" && npm link 2>/dev/null); then
+  log_info "Installing auto-mobile globally via bun add -g..."
+  if (cd "${PROJECT_ROOT}" && bun add -g . 2>/dev/null); then
+    hash -r 2>/dev/null || true
     if command -v auto-mobile >/dev/null 2>&1; then
       log_info "auto-mobile CLI installed globally."
       return 0
@@ -140,7 +141,7 @@ ensure_auto_mobile() {
   fi
 
   log_error "Failed to install auto-mobile globally."
-  log_error "Try running manually: cd ${PROJECT_ROOT} && npm link"
+  log_error "Try running manually: cd ${PROJECT_ROOT} && bun add -g ."
   return 1
 }
 
@@ -293,7 +294,7 @@ ensure_dev_tools() {
 ensure_dependencies() {
   log_info "Checking dependencies..."
 
-  # Delegate to install.sh for gum, node, bun, and npm install
+  # Delegate to install.sh for gum, bun, and bun install
   local env_file
   env_file=$(mktemp)
 
@@ -354,7 +355,7 @@ ensure_dependencies() {
     return 1
   fi
 
-  # Build and npm link auto-mobile (local-dev specific)
+  # Build and bun link auto-mobile (local-dev specific)
   if ! ensure_auto_mobile; then
     log_error "auto-mobile global installation failed."
     return 1

@@ -32,7 +32,7 @@ Run the AutoMobile doctor to diagnose setup issues and get actionable recommenda
 - **ANDROID_HOME not set**: Export the environment variable pointing to Android SDK
 - **No AVDs found**: Create an emulator via Android Studio or `avdmanager`
 - **No devices connected**: Connect via USB or start an emulator/simulator
-- **Daemon not running**: Start with `npx -y @kaeawc/auto-mobile@latest --daemon start`
+- **Daemon not running**: Start with `bunx @kaeawc/auto-mobile@latest --daemon start`
 - **Accessibility service not enabled**: Guide user through device Settings > Accessibility
 - **Xcode Command Line Tools missing**: Run `xcode-select --install`
 - **No simulator runtimes**: Install in Xcode Settings > Platforms

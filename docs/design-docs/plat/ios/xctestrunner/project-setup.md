@@ -223,7 +223,7 @@ The XCTestRunner communicates with a locally running AutoMobile daemon over a Un
 local development, start it yourself:
 
 ```bash
-npm install -g @kaeawc/auto-mobile --ignore-scripts
+bun add -g @kaeawc/auto-mobile
 auto-mobile --daemon start &
 ```
 

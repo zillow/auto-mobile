@@ -468,6 +468,18 @@ async function main() {
         startAppearanceSyncScheduler();
       }
 
+      // Detect when the MCP client disconnects (stdin closes / pipe breaks).
+      // Without this, the bun process stays alive indefinitely as an orphan
+      // when the client (Claude Code, Cursor, etc.) exits or crashes.
+      const shutdownOnStdinClose = () => {
+        logger.info("stdin closed — MCP client disconnected, shutting down");
+        logger.close();
+        process.exit(0);
+      };
+      process.stdin.on("end", shutdownOnStdinClose);
+      process.stdin.on("error", shutdownOnStdinClose);
+      process.stdin.on("close", shutdownOnStdinClose);
+
       // Run as MCP server with STDIO transport
       const stdioTransport = new StdioServerTransport();
       let server;

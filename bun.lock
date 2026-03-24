@@ -7,8 +7,6 @@
       "dependencies": {
         "@anthropic-ai/sdk": "^0.80.0",
         "@modelcontextprotocol/sdk": "^1.26.0",
-        "@types/js-yaml": "^4.0.9",
-        "@types/ws": "^8.18.1",
         "adm-zip": "^0.5.16",
         "ajv": "^8.18.0",
         "ajv-formats": "^3.0.1",
@@ -27,9 +25,11 @@
       "devDependencies": {
         "@faker-js/faker": "^10.2.0",
         "@stylistic/eslint-plugin": "^5.7.0",
+        "@types/js-yaml": "^4.0.9",
         "@types/node": "^25.0.9",
         "@types/pixelmatch": "^5.2.6",
         "@types/pngjs": "^6.0.5",
+        "@types/ws": "^8.18.1",
         "@types/xml2js": "^0.4.14",
         "@typescript-eslint/eslint-plugin": "^8.53.0",
         "@typescript-eslint/parser": "^8.53.0",

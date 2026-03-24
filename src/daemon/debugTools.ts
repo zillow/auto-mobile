@@ -107,7 +107,7 @@ export async function getDaemonHealthReport(timer: Timer = defaultTimer): Promis
     if (report.daemonRunning && report.socketConnectable) {
       report.recommendations.push("Daemon is healthy and responsive.");
     } else if (!report.daemonRunning && !report.socketExists && !report.pidFileExists) {
-      report.recommendations.push("Daemon is not running. Start it with: npx -y @kaeawc/auto-mobile@latest --daemon start");
+      report.recommendations.push("Daemon is not running. Start it with: bunx @kaeawc/auto-mobile@latest --daemon start");
     }
   }
 

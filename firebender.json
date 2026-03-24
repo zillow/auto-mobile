@@ -1,13 +1,13 @@
 {
   "backgroundAgent": {
-    "start": "npm run lint; npm run build",
+    "start": "bun run lint; bun run build",
     "copyFiles": [
       "roadmap/README.md",
       "roadmap/bugs/TEMPLATE.md",
       "roadmap/features/TEMPLATE.md",
       "roadmap/features/README.md"
     ],
-    "install": "npm install"
+    "install": "bun install"
   },
   "rules": [
     "This is a Node TypeScript MCP server that uses https://github.com/modelcontextprotocol/typescript-sdk to serve tool calls.",

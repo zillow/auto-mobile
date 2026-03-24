@@ -1,11 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build)",
-      "Bash(npm run lint)",
-      "Bash(npm run test)",
-      "Bash(npm run test -- --grep:*)",
-      "Bash(npm install)",
+      "Bash(bun run build)",
+      "Bash(bun run lint)",
+      "Bash(bun run test)",
+      "Bash(bun run test -- --grep:*)",
+      "Bash(bun install)",
       "mcp__auto-mobile__*"
     ]
   },

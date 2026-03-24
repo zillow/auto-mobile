@@ -1,6 +1,6 @@
 /**
  * Generates test PNG images with known color combinations for contrast testing
- * Run with: npx tsx test/fixtures/generate-test-images.ts
+ * Run with: bunx tsx test/fixtures/generate-test-images.ts
  */
 
 import { Jimp, rgbaToInt } from "jimp";
