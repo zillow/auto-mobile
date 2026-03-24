@@ -72,16 +72,25 @@ const baseContext = {
   sessionId: "session-1",
 };
 
+class FakeTelemetryRecorder {
+  pushed: Array<{ type: string; stackTrace?: unknown }> = [];
+  recordFailureTelemetry(event: Record<string, unknown>): void {
+    this.pushed.push(event as any);
+  }
+}
+
 describe("FailureRecorder", () => {
   let repo: FakeFailureAnalyticsRepository;
   let timer: FakeTimer;
+  let telemetry: FakeTelemetryRecorder;
   let recorder: FailureRecorder;
 
   beforeEach(() => {
     repo = new FakeFailureAnalyticsRepository();
     timer = new FakeTimer();
+    telemetry = new FakeTelemetryRecorder();
     // Use the constructor DI to inject our fakes
-    recorder = new FailureRecorder(repo as any, timer);
+    recorder = new FailureRecorder(repo as any, timer, telemetry);
   });
 
   describe("recordToolFailure", () => {
@@ -708,6 +717,69 @@ describe("FailureRecorder", () => {
     test("createForTesting returns a new instance", () => {
       const instance = FailureRecorder.createForTesting(repo as any);
       expect(instance).toBeInstanceOf(FailureRecorder);
+    });
+  });
+
+  describe("telemetry push", () => {
+    const crashStack: StackTraceElement[] = [
+      { className: "com.example.UserRepo", methodName: "getUser", fileName: "UserRepo.kt", lineNumber: 42, isAppCode: true },
+      { className: "android.os.Handler", methodName: "dispatch", fileName: null, lineNumber: null, isAppCode: false },
+    ];
+
+    test("recordCrash pushes telemetry with stackTrace", async () => {
+      timer.advanceTime(5000);
+      await recorder.recordCrash({
+        exceptionType: "NullPointerException",
+        exceptionMessage: "null",
+        stackTrace: crashStack,
+        ...baseContext,
+      });
+
+      expect(telemetry.pushed).toHaveLength(1);
+      expect(telemetry.pushed[0].type).toBe("crash");
+      expect(telemetry.pushed[0].stackTrace).toEqual(crashStack);
+    });
+
+    test("recordAnr pushes telemetry with stackTrace", async () => {
+      timer.advanceTime(6000);
+      const anrStack: StackTraceElement[] = [
+        { className: "com.example.Main", methodName: "run", fileName: "Main.kt", lineNumber: 10, isAppCode: true },
+      ];
+      await recorder.recordAnr({
+        reason: "main thread blocked",
+        stackTrace: anrStack,
+        ...baseContext,
+      });
+
+      expect(telemetry.pushed).toHaveLength(1);
+      expect(telemetry.pushed[0].type).toBe("anr");
+      expect(telemetry.pushed[0].stackTrace).toEqual(anrStack);
+    });
+
+    test("recordNonFatal pushes telemetry with stackTrace", async () => {
+      timer.advanceTime(7000);
+      await recorder.recordNonFatal({
+        exceptionType: "IOException",
+        exceptionMessage: "timeout",
+        stackTrace: crashStack,
+        ...baseContext,
+      });
+
+      expect(telemetry.pushed).toHaveLength(1);
+      expect(telemetry.pushed[0].type).toBe("nonfatal");
+      expect(telemetry.pushed[0].stackTrace).toEqual(crashStack);
+    });
+
+    test("telemetry event uses timer.now() for timestamp", async () => {
+      timer.advanceTime(9999);
+      await recorder.recordCrash({
+        exceptionType: "NPE",
+        exceptionMessage: "null",
+        stackTrace: crashStack,
+        ...baseContext,
+      });
+
+      expect((telemetry.pushed[0] as any).timestamp).toBe(9999);
     });
   });
 });

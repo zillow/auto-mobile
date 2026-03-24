@@ -205,7 +205,7 @@ private fun selectDefaultApp(apps: List<InstalledApp>, deviceType: DeviceType?):
 }
 
 @Composable
-fun AutoMobileToolWindowContent() {
+fun AutoMobileToolWindowContent(project: com.intellij.openapi.project.Project? = null) {
   var selectedIndex by remember { mutableIntStateOf(0) }
   val dashboardOrder = remember { mutableStateListOf(*Dashboard.entries.toTypedArray()) }
   var draggedIndex by remember { mutableStateOf<Int?>(null) }
@@ -978,10 +978,21 @@ fun AutoMobileToolWindowContent() {
                     connectedMcpProcess = connectedMcpProcess,
                     dataSourceMode = dataSourceMode,
                 )
-                "telemetry" -> TelemetryDashboard(
-                    telemetryPushClient = telemetryPushClient,
-                    dataSourceMode = dataSourceMode,
-                )
+                "telemetry" -> {
+                    val telemetryScreenshotLoader = remember(clientProvider, dataSourceMode) {
+                        if (dataSourceMode == DataSourceMode.Real && clientProvider != null) {
+                            NavigationScreenshotLoader(clientProvider)
+                        } else {
+                            null
+                        }
+                    }
+                    TelemetryDashboard(
+                        telemetryPushClient = telemetryPushClient,
+                        dataSourceMode = dataSourceMode,
+                        project = project,
+                        screenshotLoader = telemetryScreenshotLoader,
+                    )
+                }
               }
             }
           }

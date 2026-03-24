@@ -8,7 +8,7 @@ import org.jetbrains.jewel.bridge.JewelComposePanel
 
 class AutoMobileToolWindowFactory : ToolWindowFactory, DumbAware {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-    val panel = JewelComposePanel { AutoMobileToolWindowContent() }
+    val panel = JewelComposePanel { AutoMobileToolWindowContent(project = project) }
     val content = toolWindow.contentManager.factory.createContent(panel, "", false)
     toolWindow.contentManager.addContent(content)
   }

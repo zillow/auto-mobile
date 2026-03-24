@@ -59,6 +59,46 @@ describe("NetworkEventRepository", () => {
     expect(events).toHaveLength(1);
     expect(events[0].url).toBe("u2");
   });
+
+  test("recordNetworkEvent stores and retrieves request/response headers", async () => {
+    await recordNetworkEvent({
+      deviceId: "d1", timestamp: 1000, applicationId: null, sessionId: null,
+      url: "https://api.test/get", method: "GET", statusCode: 200, durationMs: 50,
+      requestBodySize: 0, responseBodySize: 100, protocol: null, host: "api.test", path: "/get", error: null,
+      requestHeaders: { "Accept": "application/json", "Authorization": "Bearer tok" },
+      responseHeaders: { "Content-Type": "application/json", "X-Request-Id": "abc" },
+    }, db);
+    const events = await getNetworkEvents({}, db);
+    expect(events[0].requestHeaders).toEqual({ "Accept": "application/json", "Authorization": "Bearer tok" });
+    expect(events[0].responseHeaders).toEqual({ "Content-Type": "application/json", "X-Request-Id": "abc" });
+  });
+
+  test("recordNetworkEvent stores and retrieves request/response bodies", async () => {
+    await recordNetworkEvent({
+      deviceId: "d1", timestamp: 1000, applicationId: null, sessionId: null,
+      url: "https://api.test/post", method: "POST", statusCode: 201, durationMs: 100,
+      requestBodySize: 20, responseBodySize: 50, protocol: null, host: "api.test", path: "/post", error: null,
+      requestBody: '{"name":"test"}', responseBody: '{"id":1}', contentType: "application/json",
+    }, db);
+    const events = await getNetworkEvents({}, db);
+    expect(events[0].requestBody).toBe('{"name":"test"}');
+    expect(events[0].responseBody).toBe('{"id":1}');
+    expect(events[0].contentType).toBe("application/json");
+  });
+
+  test("null headers and bodies stored as null not string", async () => {
+    await recordNetworkEvent({
+      deviceId: "d1", timestamp: 1000, applicationId: null, sessionId: null,
+      url: "u", method: "GET", statusCode: 200, durationMs: 10,
+      requestBodySize: -1, responseBodySize: -1, protocol: null, host: null, path: null, error: null,
+    }, db);
+    const events = await getNetworkEvents({}, db);
+    expect(events[0].requestHeaders).toBeNull();
+    expect(events[0].responseHeaders).toBeNull();
+    expect(events[0].requestBody).toBeNull();
+    expect(events[0].responseBody).toBeNull();
+    expect(events[0].contentType).toBeNull();
+  });
 });
 
 describe("LogEventRepository", () => {

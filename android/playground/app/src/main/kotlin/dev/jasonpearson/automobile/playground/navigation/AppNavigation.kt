@@ -21,6 +21,7 @@ import androidx.navigation3.ui.NavDisplay
 import dev.jasonpearson.automobile.demos.BugReproScreen
 import dev.jasonpearson.automobile.demos.ContrastDemoScreen
 import dev.jasonpearson.automobile.demos.HandledExceptionDemoScreen
+import dev.jasonpearson.automobile.demos.NetworkTestScreen
 import dev.jasonpearson.automobile.demos.DemoIndexScreen
 import dev.jasonpearson.automobile.demos.PerformanceDetailScreen
 import dev.jasonpearson.automobile.demos.PerformanceListScreen
@@ -148,7 +149,8 @@ fun determineStartDestinationWithDeepLink(
             is DemoContrastDestination,
             is DemoTapTargetsDestination,
             is DemoBugReproDestination,
-            is DemoHandledExceptionDestination -> {
+            is DemoHandledExceptionDestination,
+            is DemoNetworkTestDestination -> {
               // For protected destinations, ensure user is authenticated
               when {
                 !hasCompletedOnboarding -> {
@@ -239,6 +241,20 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
     }
   }
 
+  // Re-fire current navigation destination on resume (after returning from background)
+  val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+  androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+      if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val current = backStack.lastOrNull() ?: return@LifecycleEventObserver
+        val name = current::class.simpleName ?: return@LifecycleEventObserver
+        Navigation3Adapter.trackManually(name)
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
+
   // Set up the deep link callback for runtime navigation
   LaunchedEffect(Unit) {
     Log.d(TAG, "Setting up deep link callback")
@@ -267,7 +283,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               is DemoContrastDestination,
               is DemoTapTargetsDestination,
               is DemoBugReproDestination,
-              is DemoHandledExceptionDestination -> {
+              is DemoHandledExceptionDestination,
+              is DemoNetworkTestDestination -> {
                 // For protected destinations, ensure user is authenticated
                 when {
                   !userPreferences.hasCompletedOnboarding -> {
@@ -373,10 +390,11 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
             }
 
             entry<HomeDestination> { homeDestination ->
+              val tabNames = listOf("Discover", "Demos", "Slides", "Settings")
               Navigation3Adapter.TrackNavigation(
                   destination = homeDestination,
                   extractArguments = {
-                    mapOf("selectedTab" to it.selectedTab, "selectedSubTab" to it.selectedSubTab)
+                    mapOf("tab" to (tabNames.getOrNull(it.selectedTab) ?: it.selectedTab))
                   },
               )
               LaunchedEffect(Unit) {
@@ -559,6 +577,7 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                     onNavigateToTapTargets = { backStack.add(DemoTapTargetsDestination) },
                     onNavigateToBugRepro = { backStack.add(DemoBugReproDestination) },
                     onNavigateToHandledException = { backStack.add(DemoHandledExceptionDestination) },
+                    onNavigateToNetworkTest = { backStack.add(DemoNetworkTestDestination) },
                     onNavigateBack = { backStack.removeLastOrNull() },
                 )
               }
@@ -703,6 +722,19 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                   modifier = Modifier.destinationSemanticModifier<DemoHandledExceptionDestination>()
               ) {
                 HandledExceptionDemoScreen(onNavigateBack = { backStack.removeLastOrNull() })
+              }
+            }
+
+            entry<DemoNetworkTestDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to NetworkTestScreen")
+                analyticsTracker.trackScreenView("NetworkTestScreen")
+              }
+              Box(
+                  modifier = Modifier.destinationSemanticModifier<DemoNetworkTestDestination>()
+              ) {
+                NetworkTestScreen(onNavigateBack = { backStack.removeLastOrNull() })
               }
             }
           },

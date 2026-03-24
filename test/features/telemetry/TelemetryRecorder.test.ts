@@ -9,12 +9,18 @@ import type { RecordNetworkEventInput } from "../../../src/db/networkEventReposi
 import type { RecordLogEventInput } from "../../../src/db/logEventRepository";
 import type { RecordCustomEventInput } from "../../../src/db/customEventRepository";
 import type { RecordOsEventInput } from "../../../src/db/osEventRepository";
+import type { RecordNavigationEventInput } from "../../../src/db/navigationEventRepository";
+import type { RecordStorageEventInput } from "../../../src/db/storageEventRepository";
+import type { RecordLayoutEventInput } from "../../../src/db/layoutEventRepository";
 
 class FakeRepository implements TelemetryRepository {
   networkEvents: RecordNetworkEventInput[] = [];
   logEvents: RecordLogEventInput[] = [];
   customEvents: RecordCustomEventInput[] = [];
   osEvents: RecordOsEventInput[] = [];
+  navigationEvents: RecordNavigationEventInput[] = [];
+  storageEvents: RecordStorageEventInput[] = [];
+  layoutEvents: RecordLayoutEventInput[] = [];
   shouldThrow = false;
 
   async recordNetworkEvent(input: RecordNetworkEventInput): Promise<void> {
@@ -32,6 +38,18 @@ class FakeRepository implements TelemetryRepository {
   async recordOsEvent(input: RecordOsEventInput): Promise<void> {
     if (this.shouldThrow) {throw new Error("db error");}
     this.osEvents.push(input);
+  }
+  async recordNavigationEvent(input: RecordNavigationEventInput): Promise<void> {
+    if (this.shouldThrow) {throw new Error("db error");}
+    this.navigationEvents.push(input);
+  }
+  async recordStorageEvent(input: RecordStorageEventInput): Promise<void> {
+    if (this.shouldThrow) {throw new Error("db error");}
+    this.storageEvents.push(input);
+  }
+  async recordLayoutEvent(input: RecordLayoutEventInput): Promise<void> {
+    if (this.shouldThrow) {throw new Error("db error");}
+    this.layoutEvents.push(input);
   }
 }
 
@@ -267,5 +285,219 @@ describe("TelemetryRecorder", () => {
     expect(repo.networkEvents[0].sessionId).toBe("session-A");
     // Push should also have device-A
     expect(pushTarget.pushedEvents[0].deviceId).toBe("device-A");
+  });
+
+  it("recordNavigationEvent stores to repository with context", async () => {
+    recorder.setContext("d1", "s1");
+
+    await recorder.recordNavigationEvent({
+      timestamp: 5000,
+      applicationId: "com.example",
+      destination: "HomeScreen",
+      source: "SplashScreen",
+      arguments: { id: "123" },
+      metadata: null,
+    });
+
+    expect(repo.navigationEvents).toHaveLength(1);
+    expect(repo.navigationEvents[0].deviceId).toBe("d1");
+    expect(repo.navigationEvents[0].sessionId).toBe("s1");
+    expect(repo.navigationEvents[0].destination).toBe("HomeScreen");
+    expect(repo.navigationEvents[0].source).toBe("SplashScreen");
+  });
+
+  it("recordNavigationEvent pushes category navigation to socket with triggeringInteraction and screenshotUri", async () => {
+    await recorder.recordNavigationEvent({
+      timestamp: 5000,
+      applicationId: null,
+      destination: "Settings",
+      source: null,
+      arguments: null,
+      metadata: null,
+      triggeringInteraction: { type: "tap", elementText: "Settings" },
+      screenshotUri: "file:///tmp/screenshot.png",
+    });
+
+    expect(pushTarget.pushedEvents).toHaveLength(1);
+    expect(pushTarget.pushedEvents[0].category).toBe("navigation");
+    expect(pushTarget.pushedEvents[0].timestamp).toBe(5000);
+    const data = pushTarget.pushedEvents[0].data as any;
+    expect(data.triggeringInteraction).toEqual({ type: "tap", elementText: "Settings" });
+    expect(data.screenshotUri).toBe("file:///tmp/screenshot.png");
+  });
+
+  it("recordStorageEvent stores to repository with context", async () => {
+    recorder.setContext("d2", "s2");
+
+    await recorder.recordStorageEvent({
+      timestamp: 6000,
+      applicationId: "com.example",
+      fileName: "shared_prefs.xml",
+      key: "theme",
+      value: "dark",
+      valueType: "string",
+      changeType: "put",
+    });
+
+    expect(repo.storageEvents).toHaveLength(1);
+    expect(repo.storageEvents[0].deviceId).toBe("d2");
+    expect(repo.storageEvents[0].sessionId).toBe("s2");
+    expect(repo.storageEvents[0].fileName).toBe("shared_prefs.xml");
+    expect(repo.storageEvents[0].key).toBe("theme");
+  });
+
+  it("recordStorageEvent pushes category storage to socket", async () => {
+    await recorder.recordStorageEvent({
+      timestamp: 6000,
+      applicationId: null,
+      fileName: "prefs.xml",
+      key: "k",
+      value: "v",
+      valueType: null,
+      changeType: "put",
+    });
+
+    expect(pushTarget.pushedEvents).toHaveLength(1);
+    expect(pushTarget.pushedEvents[0].category).toBe("storage");
+    expect(pushTarget.pushedEvents[0].timestamp).toBe(6000);
+  });
+
+  it("recordLayoutEvent stores to repository with context and screenName", async () => {
+    recorder.setContext("d3", "s3");
+
+    await recorder.recordLayoutEvent({
+      timestamp: 7000,
+      applicationId: "com.example",
+      subType: "recomposition",
+      composableName: "UserList",
+      composableId: "user-list-1",
+      recompositionCount: 15,
+      durationMs: 8,
+      likelyCause: "state change",
+      detailsJson: null,
+      screenName: "HomeScreen",
+    });
+
+    expect(repo.layoutEvents).toHaveLength(1);
+    expect(repo.layoutEvents[0].deviceId).toBe("d3");
+    expect(repo.layoutEvents[0].sessionId).toBe("s3");
+    expect(repo.layoutEvents[0].composableName).toBe("UserList");
+    expect(repo.layoutEvents[0].screenName).toBe("HomeScreen");
+  });
+
+  it("recordLayoutEvent pushes category layout to socket", async () => {
+    await recorder.recordLayoutEvent({
+      timestamp: 7000,
+      applicationId: null,
+      subType: "recomposition",
+      composableName: null,
+      composableId: null,
+      recompositionCount: null,
+      durationMs: null,
+      likelyCause: null,
+      detailsJson: null,
+    });
+
+    expect(pushTarget.pushedEvents).toHaveLength(1);
+    expect(pushTarget.pushedEvents[0].category).toBe("layout");
+    expect(pushTarget.pushedEvents[0].timestamp).toBe(7000);
+  });
+
+  it("recordFailureTelemetry pushes crash event with stackTrace to socket", () => {
+    recorder.setContext("d1", "s1");
+
+    recorder.recordFailureTelemetry({
+      type: "crash",
+      occurrenceId: "occ_1",
+      groupId: "crash:NullPointerException",
+      severity: "high",
+      title: "NullPointerException in onClick",
+      exceptionType: "NullPointerException",
+      screen: "HomeScreen",
+      timestamp: 8000,
+      stackTrace: [
+        { className: "com.example.MainActivity", methodName: "onClick", fileName: "MainActivity.kt", lineNumber: 42, isAppCode: true },
+      ],
+    });
+
+    expect(pushTarget.pushedEvents).toHaveLength(1);
+    expect(pushTarget.pushedEvents[0].category).toBe("crash");
+    expect(pushTarget.pushedEvents[0].timestamp).toBe(8000);
+    expect(pushTarget.pushedEvents[0].deviceId).toBe("d1");
+    const data = pushTarget.pushedEvents[0].data as any;
+    expect(data.stackTrace).toHaveLength(1);
+    expect(data.stackTrace[0].className).toBe("com.example.MainActivity");
+  });
+
+  it("recordFailureTelemetry pushes anr event to socket", () => {
+    recorder.recordFailureTelemetry({
+      type: "anr",
+      occurrenceId: "occ_2",
+      groupId: "anr:main",
+      severity: "high",
+      title: "ANR: Main thread blocked",
+      screen: null,
+      timestamp: 9000,
+    });
+
+    expect(pushTarget.pushedEvents).toHaveLength(1);
+    expect(pushTarget.pushedEvents[0].category).toBe("anr");
+    expect(pushTarget.pushedEvents[0].timestamp).toBe(9000);
+  });
+
+  it("recordFailureTelemetry does not write to repository", () => {
+    recorder.recordFailureTelemetry({
+      type: "crash",
+      occurrenceId: "occ_3",
+      groupId: "crash:RuntimeException",
+      severity: "medium",
+      title: "RuntimeException",
+      timestamp: 10000,
+    });
+
+    expect(repo.networkEvents).toHaveLength(0);
+    expect(repo.logEvents).toHaveLength(0);
+    expect(repo.customEvents).toHaveLength(0);
+    expect(repo.osEvents).toHaveLength(0);
+    expect(repo.navigationEvents).toHaveLength(0);
+    expect(repo.storageEvents).toHaveLength(0);
+    expect(repo.layoutEvents).toHaveLength(0);
+  });
+
+  it("recordNetworkEvent with headers and bodies passes through to repository and push", async () => {
+    recorder.setContext("d1", "s1");
+
+    await recorder.recordNetworkEvent({
+      timestamp: 11000,
+      applicationId: "com.example",
+      url: "https://api.example.com/data",
+      method: "POST",
+      statusCode: 201,
+      durationMs: 100,
+      requestBodySize: 50,
+      responseBodySize: 200,
+      protocol: "h2",
+      host: "api.example.com",
+      path: "/data",
+      error: null,
+      requestHeaders: { "Content-Type": "application/json" },
+      responseHeaders: { "X-Request-Id": "abc123" },
+      requestBody: '{"name":"test"}',
+      responseBody: '{"id":1}',
+      contentType: "application/json",
+    });
+
+    expect(repo.networkEvents).toHaveLength(1);
+    expect(repo.networkEvents[0].requestHeaders).toEqual({ "Content-Type": "application/json" });
+    expect(repo.networkEvents[0].responseHeaders).toEqual({ "X-Request-Id": "abc123" });
+    expect(repo.networkEvents[0].requestBody).toBe('{"name":"test"}');
+    expect(repo.networkEvents[0].responseBody).toBe('{"id":1}');
+    expect(repo.networkEvents[0].contentType).toBe("application/json");
+
+    expect(pushTarget.pushedEvents).toHaveLength(1);
+    expect(pushTarget.pushedEvents[0].category).toBe("network");
+    const data = pushTarget.pushedEvents[0].data as any;
+    expect(data.requestHeaders).toEqual({ "Content-Type": "application/json" });
+    expect(data.responseBody).toBe('{"id":1}');
   });
 });

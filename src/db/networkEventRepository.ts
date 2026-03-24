@@ -17,6 +17,11 @@ export interface RecordNetworkEventInput {
   host: string | null;
   path: string | null;
   error: string | null;
+  requestHeaders?: Record<string, string> | null;
+  responseHeaders?: Record<string, string> | null;
+  requestBody?: string | null;
+  responseBody?: string | null;
+  contentType?: string | null;
 }
 
 const RETENTION_MAX_ROWS = 10_000;
@@ -47,6 +52,11 @@ export async function recordNetworkEvent(
       host: input.host,
       path: input.path,
       error: input.error,
+      request_headers_json: input.requestHeaders ? JSON.stringify(input.requestHeaders) : null,
+      response_headers_json: input.responseHeaders ? JSON.stringify(input.responseHeaders) : null,
+      request_body: input.requestBody ?? null,
+      response_body: input.responseBody ?? null,
+      content_type: input.contentType ?? null,
     })
     .execute();
 
@@ -84,6 +94,11 @@ export async function getNetworkEvents(
     host: r.host,
     path: r.path,
     error: r.error,
+    requestHeaders: r.request_headers_json ? JSON.parse(r.request_headers_json) : null,
+    responseHeaders: r.response_headers_json ? JSON.parse(r.response_headers_json) : null,
+    requestBody: r.request_body ?? null,
+    responseBody: r.response_body ?? null,
+    contentType: r.content_type ?? null,
   }));
 }
 

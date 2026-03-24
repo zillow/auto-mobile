@@ -8,12 +8,19 @@ import {
 } from "../../daemon/performancePushSocketServer";
 import { getDeviceDataStreamServer, PerformanceStreamData } from "../../daemon/deviceDataStreamSocketServer";
 import { RecompositionTracker } from "./RecompositionTracker";
+import { TelemetryRecorder } from "../telemetry/TelemetryRecorder";
 import { defaultAdbClientFactory, AdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import { SimCtlClient, SimCtl } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { execFile } from "child_process";
 import { promisify } from "util";
 
 const defaultExecFileAsync = promisify(execFile);
+
+/** Minimal interface for performance telemetry emission. */
+export interface PerformanceTelemetryEmitter {
+  setContext(deviceId: string | null, sessionId: string | null): void;
+  recordPerformanceEvent: TelemetryRecorder["recordPerformanceEvent"];
+}
 
 /**
  * Type for the exec function used to run host commands.
@@ -82,6 +89,8 @@ interface MonitoredDevice {
   prevJankCounters: RawJankCounters | null;
   /** PID of the app process (cached for iOS since it requires a lookup) */
   cachedPid: number | null;
+  /** Previous per-metric health for detecting threshold crossings */
+  previousMetricHealth: Record<string, string>;
 }
 
 /**
@@ -117,6 +126,7 @@ export class PerformanceMonitor {
   private readonly simCtlClientFactory: SimCtlClientFactory;
   private readonly getServer: ServerGetter;
   private readonly execFileAsync: ExecFileAsyncFn;
+  private readonly getTelemetryEmitter: () => PerformanceTelemetryEmitter;
   private monitoredDevices = new Map<string, MonitoredDevice>();
 
   constructor(
@@ -124,13 +134,15 @@ export class PerformanceMonitor {
     adbClientFactory: AdbClientFactory = defaultAdbClientFactory,
     serverGetter: ServerGetter = getPerformancePushServer,
     simCtlClientFactory: SimCtlClientFactory = defaultSimCtlClientFactory,
-    execFileAsync: ExecFileAsyncFn = defaultExecFileAsync
+    execFileAsync: ExecFileAsyncFn = defaultExecFileAsync,
+    getTelemetryEmitter: () => PerformanceTelemetryEmitter = () => TelemetryRecorder.getInstance(),
   ) {
     this.timer = timer;
     this.adbClientFactory = adbClientFactory;
     this.simCtlClientFactory = simCtlClientFactory;
     this.getServer = serverGetter;
     this.execFileAsync = execFileAsync;
+    this.getTelemetryEmitter = getTelemetryEmitter;
   }
 
   /**
@@ -204,6 +216,7 @@ export class PerformanceMonitor {
       cachedTouchLatency: null,
       prevJankCounters: null,
       cachedPid: null,
+      previousMetricHealth: {},
     });
     logger.info(`[PerformanceMonitor] Started monitoring ${packageName} on ${deviceId} (${platform})`);
   }
@@ -485,6 +498,9 @@ export class PerformanceMonitor {
 
     server.pushPerformanceData(data);
 
+    // Emit telemetry events when metric health status changes
+    this.emitPerformanceTelemetry(device, now, metrics, data.health);
+
     // Also push to the observation stream for IDE plugin
     // Skip for iOS - CtrlProxy iOSClient handles observation stream updates via CADisplayLink
     if (device.platform === "ios") {
@@ -509,6 +525,82 @@ export class PerformanceMonitor {
         recompositionRate: recompositionSummary?.averagePerSecond ?? null,
       };
       observationServer.pushPerformanceUpdate(device.deviceId, streamData);
+    }
+  }
+
+  /**
+   * Detect per-metric health changes and emit telemetry events.
+   * Only emits when a metric crosses a threshold boundary (healthy→warning→critical or back).
+   */
+  private emitPerformanceTelemetry(
+    device: MonitoredDevice,
+    now: number,
+    metrics: {
+      fps: number | null;
+      frameTimeMs: number | null;
+      jankFrames: number | null;
+      touchLatencyMs: number | null;
+      memoryUsageMb: number | null;
+      cpuUsagePercent: number | null;
+    },
+    overallHealth: string
+  ): void {
+    const th = DEFAULT_THRESHOLDS;
+    const currentHealth: Record<string, string> = {};
+    const changedMetrics: string[] = [];
+
+    // Classify each metric
+    if (metrics.fps !== null) {
+      currentHealth.fps = metrics.fps < th.fpsCritical ? "critical" : metrics.fps < th.fpsWarning ? "warning" : "healthy";
+    }
+    if (metrics.frameTimeMs !== null) {
+      currentHealth.frameTime = metrics.frameTimeMs > th.frameTimeCritical ? "critical" : metrics.frameTimeMs > th.frameTimeWarning ? "warning" : "healthy";
+    }
+    if (metrics.jankFrames !== null) {
+      currentHealth.jank = metrics.jankFrames > th.jankCritical ? "critical" : metrics.jankFrames > th.jankWarning ? "warning" : "healthy";
+    }
+    if (metrics.touchLatencyMs !== null) {
+      currentHealth.touchLatency = metrics.touchLatencyMs > th.touchLatencyCritical ? "critical" : metrics.touchLatencyMs > th.touchLatencyWarning ? "warning" : "healthy";
+    }
+    if (metrics.memoryUsageMb !== null) {
+      // Classify memory into bands — emit telemetry when band changes.
+      // Thresholds based on typical Android app memory budgets.
+      const mb = metrics.memoryUsageMb;
+      currentHealth.memory = mb > 300 ? "critical" : mb > 200 ? "warning" : "healthy";
+    }
+
+    // Compare against previous health — emit when any metric crosses a threshold
+    const isFirstSample = Object.keys(device.previousMetricHealth).length === 0;
+    for (const [metric, health] of Object.entries(currentHealth)) {
+      const prev = device.previousMetricHealth[metric];
+      if (prev !== undefined && prev !== health) {
+        changedMetrics.push(metric);
+      }
+    }
+
+    // Update stored health
+    device.previousMetricHealth = currentHealth;
+
+    // Emit on first sample (baseline) or when any metric health changed
+    const effectiveChanged = isFirstSample
+      ? Object.keys(currentHealth) // all metrics for baseline
+      : changedMetrics;
+
+    if (effectiveChanged.length > 0) {
+      const emitter = this.getTelemetryEmitter();
+      emitter.setContext(device.deviceId, null);
+      emitter.recordPerformanceEvent({
+        timestamp: now,
+        packageName: device.packageName,
+        fps: metrics.fps,
+        frameTimeMs: metrics.frameTimeMs,
+        jankFrames: metrics.jankFrames,
+        touchLatencyMs: metrics.touchLatencyMs,
+        memoryUsageMb: metrics.memoryUsageMb,
+        cpuUsagePercent: metrics.cpuUsagePercent,
+        health: overallHealth,
+        changedMetrics: effectiveChanged,
+      });
     }
   }
 

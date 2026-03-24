@@ -128,6 +128,11 @@ data class NetworkEventData(
   val path: String? = null,
   val error: String? = null,
   val applicationId: String? = null,
+  val requestHeaders: Map<String, String>? = null,
+  val responseHeaders: Map<String, String>? = null,
+  val requestBody: String? = null,
+  val responseBody: String? = null,
+  val contentType: String? = null,
 )
 
 @Serializable

@@ -1,5 +1,7 @@
 package dev.jasonpearson.automobile.sdk.os
 
+import android.app.Activity
+import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -10,6 +12,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Bundle
 import androidx.annotation.RequiresPermission
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -34,18 +37,23 @@ object AutoMobileOsEvents {
   private var batteryReceiver: BroadcastReceiver? = null
   private var screenReceiver: BroadcastReceiver? = null
   private var lifecycleObserver: DefaultLifecycleObserver? = null
+  private var activityCallbacks: Application.ActivityLifecycleCallbacks? = null
+  @Volatile private var lastBatteryPct: String? = null
+  @Volatile private var lastBatteryCharging: Boolean? = null
 
   @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE)
   fun initialize(context: Context, buffer: SdkEventBuffer) {
     this.buffer = buffer
     this.applicationId = context.packageName
     registerLifecycleObserver()
+    registerActivityCallbacks(context)
     registerConnectivityCallback(context)
     registerBatteryReceiver(context)
     registerScreenReceiver(context)
   }
 
   fun shutdown(context: Context) {
+    unregisterActivityCallbacks(context)
     unregisterConnectivityCallback(context)
     unregisterBatteryReceiver(context)
     unregisterScreenReceiver(context)
@@ -85,6 +93,54 @@ object AutoMobileOsEvents {
       ProcessLifecycleOwner.get().lifecycle.removeObserver(it)
     }
     lifecycleObserver = null
+  }
+
+  // ---- Activity Lifecycle ----
+
+  private fun registerActivityCallbacks(context: Context) {
+    val app = context.applicationContext as? Application ?: return
+    val callbacks = object : Application.ActivityLifecycleCallbacks {
+      private fun activityName(activity: Activity): String =
+        activity.javaClass.simpleName
+
+      override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+        postEvent("activity_created", mapOf("activity" to activityName(activity)))
+      }
+
+      override fun onActivityStarted(activity: Activity) {
+        postEvent("activity_started", mapOf("activity" to activityName(activity)))
+      }
+
+      override fun onActivityResumed(activity: Activity) {
+        postEvent("activity_resumed", mapOf("activity" to activityName(activity)))
+      }
+
+      override fun onActivityPaused(activity: Activity) {
+        postEvent("activity_paused", mapOf("activity" to activityName(activity)))
+      }
+
+      override fun onActivityStopped(activity: Activity) {
+        postEvent("activity_stopped", mapOf("activity" to activityName(activity)))
+      }
+
+      override fun onActivityDestroyed(activity: Activity) {
+        postEvent("activity_destroyed", mapOf("activity" to activityName(activity)))
+      }
+
+      override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
+        // Not tracked — too noisy and low signal
+      }
+    }
+    activityCallbacks = callbacks
+    app.registerActivityLifecycleCallbacks(callbacks)
+  }
+
+  private fun unregisterActivityCallbacks(context: Context) {
+    val app = context.applicationContext as? Application
+    activityCallbacks?.let { cb ->
+      app?.unregisterActivityLifecycleCallbacks(cb)
+    }
+    activityCallbacks = null
   }
 
   // ---- Connectivity ----
@@ -134,6 +190,10 @@ object AutoMobileOsEvents {
         val pct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().toString() else "unknown"
         val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
         val charging = plugged != 0
+        // Only post when level or charging state actually changes
+        if (pct == lastBatteryPct && charging == lastBatteryCharging) return
+        lastBatteryPct = pct
+        lastBatteryCharging = charging
         postEvent("battery_change", mapOf("level" to pct, "charging" to charging.toString()))
       }
     }

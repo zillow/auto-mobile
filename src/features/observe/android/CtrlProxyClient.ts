@@ -101,7 +101,7 @@ import type {
  * Interface for interaction event from accessibility service
  */
 export interface InteractionEvent {
-  type: "tap" | "longPress" | "swipe" | "inputText";
+  type: "tap" | "longPress" | "swipe" | "inputText" | "select" | "navigate" | "scroll" | "touch" | "stateChange";
   timestamp: number;
   packageName?: string;
   screenClassName?: string;
@@ -348,6 +348,8 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
 
   // Interaction listeners
   private interactionListeners: Set<(event: InteractionEvent) => void> = new Set();
+  // Last interaction for correlating with navigation events
+  private lastInteraction: { type: string; elementText?: string; elementResourceId?: string; timestamp: number } | null = null;
   private installedAppsRepository: InstalledAppsStore | null = null;
 
   // Hierarchy navigation detector
@@ -369,6 +371,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
 
   // Track foreground package for crash monitoring
   private lastForegroundPackage: string | null = null;
+  private lastLayoutTelemetryTimestamp = 0;
 
   // Logging tag for base class
   protected readonly logTag = "ACCESSIBILITY_SERVICE";
@@ -1212,6 +1215,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
             gestureTimeMs: swipeMessage.gestureTimeMs, error: swipeMessage.error, perfTiming
           });
         }
+
       }
 
       // Handle tap coordinates result
@@ -1225,6 +1229,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
             success: tapMessage.success, totalTimeMs: tapMessage.totalTimeMs, error: tapMessage.error, perfTiming
           });
         }
+
       }
 
       // Handle drag result
@@ -1235,6 +1240,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           success: dragMessage.success, totalTimeMs: dragMessage.totalTimeMs,
           gestureTimeMs: dragMessage.gestureTimeMs, error: dragMessage.error, perfTiming
         });
+
       }
 
       // Handle pinch result
@@ -1245,6 +1251,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           success: pinchMessage.success, totalTimeMs: pinchMessage.totalTimeMs,
           gestureTimeMs: pinchMessage.gestureTimeMs, error: pinchMessage.error, perfTiming
         });
+
       }
 
       // Handle set text result
@@ -1254,6 +1261,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         this.requestManager.resolve<A11ySetTextResult>(setTextMessage.requestId, {
           success: setTextMessage.success, totalTimeMs: setTextMessage.totalTimeMs, error: setTextMessage.error, perfTiming
         });
+
       }
 
       // Handle IME action result
@@ -1264,6 +1272,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           success: imeActionMessage.success, action: imeActionMessage.action,
           totalTimeMs: imeActionMessage.totalTimeMs, error: imeActionMessage.error, perfTiming
         });
+
       }
 
       // Handle select all result
@@ -1273,6 +1282,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         this.requestManager.resolve<A11ySelectAllResult>(selectAllMessage.requestId, {
           success: selectAllMessage.success, totalTimeMs: selectAllMessage.totalTimeMs, error: selectAllMessage.error, perfTiming
         });
+
       }
 
       // Handle action result
@@ -1293,6 +1303,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           success: clipboardMessage.success, action: clipboardMessage.action, text: clipboardMessage.text,
           totalTimeMs: clipboardMessage.totalTimeMs, error: clipboardMessage.error, perfTiming
         });
+
       }
 
       // Handle CA certificate result
@@ -1486,6 +1497,15 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           if (event.applicationId) {
             this.sdkNavigationAppIds.add(event.applicationId);
           }
+          // Attach last interaction for telemetry correlation
+          if (this.lastInteraction) {
+            event.triggeringInteraction = {
+              type: this.lastInteraction.type,
+              elementText: this.lastInteraction.elementText,
+              elementResourceId: this.lastInteraction.elementResourceId,
+            };
+          }
+
           logger.info(`[CTRL_PROXY] Navigation event: ${event.destination} (app: ${event.applicationId})`);
           await NavigationGraphManager.getInstance().recordNavigationEvent(event);
 
@@ -1516,6 +1536,12 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         const interactionMessage = message as any;
         const interaction = interactionMessage.event as InteractionEvent | undefined;
         if (interaction) {
+          this.lastInteraction = {
+            type: interaction.type,
+            elementText: interaction.element?.text ?? undefined,
+            elementResourceId: interaction.element?.["resource-id"] ?? undefined,
+            timestamp: interaction.timestamp,
+          };
           this.notifyInteractionListeners(interaction);
         }
       }
@@ -1564,6 +1590,11 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
             host: event.host ?? null,
             path: event.path ?? null,
             error: event.error ?? null,
+            requestHeaders: event.requestHeaders ?? null,
+            responseHeaders: event.responseHeaders ?? null,
+            requestBody: event.requestBody ?? null,
+            responseBody: event.responseBody ?? null,
+            contentType: event.contentType ?? null,
           });
         }
       }
@@ -1644,6 +1675,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         if (event) {
           const recorder = TelemetryRecorder.getInstance();
           recorder.setContext(this.device.deviceId, null);
+
           await recorder.recordCustomEvent({
             timestamp: msg.timestamp,
             applicationId: event.applicationId ?? null,
@@ -1670,6 +1702,19 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         if (server) {
           server.pushStorageUpdate(this.device.deviceId, event);
         }
+
+        // Record to telemetry timeline
+        const recorder = TelemetryRecorder.getInstance();
+        recorder.setContext(this.device.deviceId, null);
+        recorder.recordStorageEvent({
+          timestamp: event.timestamp,
+          applicationId: storageMessage.packageName ?? null,
+          fileName: event.fileName,
+          key: event.key,
+          value: event.value,
+          valueType: event.valueType,
+          changeType: storageMessage.changeType ?? "modify",
+        });
       }
     } catch (error) {
       logger.warn(`[CTRL_PROXY] Error handling WebSocket message: ${error}`);
@@ -1708,6 +1753,38 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       // Start performance monitoring for this device/package
       const monitor = getPerformanceMonitor();
       monitor.startMonitoring(this.device.deviceId, data.packageName);
+    }
+
+    // Record layout telemetry (throttled to max 1 per 500ms)
+    if (now - this.lastLayoutTelemetryTimestamp >= 500) {
+      this.lastLayoutTelemetryTimestamp = now;
+      const recorder = TelemetryRecorder.getInstance();
+      recorder.setContext(this.device.deviceId, null);
+      const screenName = data.foregroundActivity ?? data.packageName ?? null;
+      const windowCount = data.windows?.length ?? 0;
+      // Include a compact hierarchy tree (~2-5KB) with just the display properties.
+      // The full hierarchy (~10-50KB with bounds/states/extras) is available via
+      // the observation stream and would cause excessive traffic at 500ms intervals.
+      const compactHierarchy = data.hierarchy
+        ? { node: compactifyNode(data.hierarchy) }
+        : null;
+      recorder.recordLayoutEvent({
+        timestamp: now,
+        applicationId: data.packageName ?? null,
+        subType: "hierarchy_change",
+        composableName: null,
+        composableId: null,
+        recompositionCount: null,
+        durationMs: null,
+        likelyCause: null,
+        detailsJson: JSON.stringify({
+          screenName,
+          windowCount,
+          foregroundActivity: data.foregroundActivity ?? null,
+          hierarchy: compactHierarchy,
+        }),
+        screenName,
+      });
     }
 
     // Notify hierarchy navigation detector
@@ -2119,4 +2196,24 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       logger.warn(`[CTRL_PROXY] Failed to mark installed apps stale: ${error}`);
     }
   }
+}
+
+/**
+ * Create a compact representation of an AccessibilityNode tree for telemetry.
+ * Strips bounds, states, extras — keeps only className, resource-id, text,
+ * content-desc, scrollable, and children. Typically ~2-5KB vs 10-50KB full.
+ */
+function compactifyNode(node: AccessibilityNode): Record<string, unknown> {
+  const compact: Record<string, unknown> = {};
+  if (node.className) {compact.className = node.className;}
+  if (node["resource-id"]) {compact["resource-id"] = node["resource-id"];}
+  if (node.text) {compact.text = node.text;}
+  if (node["content-desc"]) {compact["content-desc"] = node["content-desc"];}
+  if (node.scrollable === "true") {compact.scrollable = "true";}
+
+  if (node.node) {
+    const children = Array.isArray(node.node) ? node.node : [node.node];
+    compact.node = children.map(compactifyNode);
+  }
+  return compact;
 }

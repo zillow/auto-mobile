@@ -43,3 +43,5 @@ data class HomeDestination(
 @Serializable data object DemoBugReproDestination : AppDestination
 
 @Serializable data object DemoHandledExceptionDestination : AppDestination
+
+@Serializable data object DemoNetworkTestDestination : AppDestination

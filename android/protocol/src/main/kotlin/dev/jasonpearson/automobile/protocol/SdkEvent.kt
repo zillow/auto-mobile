@@ -222,6 +222,16 @@ data class SdkNetworkRequestEvent(
   val path: String? = null,
   /** Error message if the request failed */
   val error: String? = null,
+  /** Request headers (opt-in, may contain auth tokens) */
+  val requestHeaders: Map<String, String>? = null,
+  /** Response headers */
+  val responseHeaders: Map<String, String>? = null,
+  /** Request body text (truncated, null for binary or when capture disabled) */
+  val requestBody: String? = null,
+  /** Response body text (truncated, null for binary or when capture disabled) */
+  val responseBody: String? = null,
+  /** Content-Type of the response */
+  val contentType: String? = null,
 ) : SdkEvent()
 
 /**

@@ -70,9 +70,9 @@ class TelemetryPushSocketClient : TelemetryPushClient {
     private val initialRetryDelayMs = 1000L
     private val maxRetryDelayMs = 30000L
 
-    // Flow for live telemetry events
+    // Flow for live telemetry events — replay caches recent events for late collectors (e.g. tab re-open)
     private val _telemetryEvents = MutableSharedFlow<TelemetryDisplayEvent>(
-        replay = 0,
+        replay = 500,
         extraBufferCapacity = 200,
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
     )

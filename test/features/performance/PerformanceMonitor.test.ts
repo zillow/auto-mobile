@@ -3,6 +3,7 @@ import {
   PerformanceMonitor,
   _resetPerformanceMonitor,
   PerformanceDataPusher,
+  PerformanceTelemetryEmitter,
   ServerGetter,
   SimCtlClientFactory,
   ExecFileAsyncFn,
@@ -748,4 +749,130 @@ root       1  0.0  0.0   407056   1632   ??  Ss   Mon09AM   0:01.23 /sbin/launch
     expect(data).toBeDefined();
     expect(data!.metrics.cpuUsagePercent).toBeNull();
   });
+
+  describe("performance telemetry emission", () => {
+    let fakeTelemetry: FakeTelemetryEmitter;
+
+    beforeEach(() => {
+      fakeTelemetry = new FakeTelemetryEmitter();
+    });
+
+    it("emits baseline telemetry on first sample", async () => {
+      monitor = new PerformanceMonitor(
+        fakeTimer, fakeAdbFactory, serverGetter,
+        undefined, undefined,
+        () => fakeTelemetry,
+      );
+      monitor.startMonitoring("emulator-5554", "com.example.app", "android");
+      monitor.start();
+
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+      expect(fakeTelemetry.events.length).toBeGreaterThanOrEqual(1);
+      const first = fakeTelemetry.events[0];
+      expect(first.changedMetrics.length).toBeGreaterThan(0);
+      expect(first.health).toBeDefined();
+    });
+
+    it("does not emit telemetry when health unchanged", async () => {
+      monitor = new PerformanceMonitor(
+        fakeTimer, fakeAdbFactory, serverGetter,
+        undefined, undefined,
+        () => fakeTelemetry,
+      );
+      monitor.startMonitoring("emulator-5554", "com.example.app", "android");
+      monitor.start();
+
+      // First tick — baseline
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+      const countAfterFirst = fakeTelemetry.events.length;
+
+      // Second tick — same metrics, no change
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+      expect(fakeTelemetry.events.length).toBe(countAfterFirst);
+    });
+
+    it("emits telemetry when metric crosses threshold", async () => {
+      monitor = new PerformanceMonitor(
+        fakeTimer, fakeAdbFactory, serverGetter,
+        undefined, undefined,
+        () => fakeTelemetry,
+      );
+      monitor.startMonitoring("emulator-5554", "com.example.app", "android");
+      monitor.start();
+
+      // First tick — healthy baseline
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+      const baselineCount = fakeTelemetry.events.length;
+
+      // Change gfxinfo to report bad FPS (below critical threshold of 45)
+      fakeAdbClient.setCommandResult(
+        "shell dumpsys gfxinfo com.example.app reset",
+        `
+          Total frames rendered: 10
+          50th percentile: 40.0ms
+          90th percentile: 50.0ms
+          95th percentile: 60.0ms
+          99th percentile: 70.0ms
+          Missed Vsync: 20
+          Slow UI thread: 15
+          Frame deadline missed: 25
+        `
+      );
+
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+      expect(fakeTelemetry.events.length).toBeGreaterThan(baselineCount);
+      const latest = fakeTelemetry.events[fakeTelemetry.events.length - 1];
+      expect(latest.changedMetrics.length).toBeGreaterThan(0);
+    });
+
+    it("sets deviceId context before emitting", async () => {
+      monitor = new PerformanceMonitor(
+        fakeTimer, fakeAdbFactory, serverGetter,
+        undefined, undefined,
+        () => fakeTelemetry,
+      );
+      monitor.startMonitoring("emulator-5554", "com.example.app", "android");
+      monitor.start();
+
+      await advanceTimeAndWait(fakeTimer, PerformanceMonitor.TICK_INTERVAL_MS);
+
+      expect(fakeTelemetry.lastContext).toBe("emulator-5554");
+    });
+  });
 });
+
+class FakeTelemetryEmitter implements PerformanceTelemetryEmitter {
+  events: Array<{
+    timestamp: number;
+    packageName: string | null;
+    fps: number | null;
+    frameTimeMs: number | null;
+    jankFrames: number | null;
+    touchLatencyMs: number | null;
+    memoryUsageMb: number | null;
+    cpuUsagePercent: number | null;
+    health: string;
+    changedMetrics: string[];
+  }> = [];
+  lastContext: string | null = null;
+
+  setContext(deviceId: string | null, _sessionId: string | null): void {
+    this.lastContext = deviceId;
+  }
+
+  recordPerformanceEvent(event: {
+    timestamp: number;
+    packageName: string | null;
+    fps: number | null;
+    frameTimeMs: number | null;
+    jankFrames: number | null;
+    touchLatencyMs: number | null;
+    memoryUsageMb: number | null;
+    cpuUsagePercent: number | null;
+    health: string;
+    changedMetrics: string[];
+  }): void {
+    this.events.push(event);
+  }
+}

@@ -201,6 +201,15 @@ export abstract class PushSubscriptionSocketServer<TFilter, TPushData> extends B
     this.sendJson(socket, response);
 
     logger.info(`[${this.serverName}] New subscriber ${subscriptionId}`);
+
+    this.onSubscribed(subscriptionId, filter, socket);
+  }
+
+  /**
+   * Called after a new subscriber is added. Override to send backfill data.
+   */
+  protected onSubscribed(_subscriptionId: string, _filter: F, _socket: Socket): void {
+    // Default: no-op
   }
 
   /**

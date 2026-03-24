@@ -52,6 +52,13 @@ dependencies {
   // AutoMobile SDK utilities
   implementation(projects.autoMobileSdk)
 
+  // OkHttp for network test demo
+  implementation(libs.okhttp)
+
+  // Coil for image loading
+  implementation(libs.coil.compose)
+  implementation(libs.coil.network.okhttp)
+
   testImplementation(libs.junit)
   testImplementation(projects.junitRunner)
 }

@@ -31,11 +31,16 @@ object AutoMobileNetwork {
   /**
    * Create an OkHttp Application-level Interceptor for HTTP request tracking.
    *
+   * @param captureHeaders Whether to capture request/response headers (default false for privacy)
+   * @param captureBodies Whether to capture request/response bodies (default false, truncated to 32KB)
    * @return An [Interceptor] that records network events, or null if not initialized
    */
-  fun interceptor(): Interceptor? {
+  fun interceptor(
+    captureHeaders: Boolean = false,
+    captureBodies: Boolean = false,
+  ): Interceptor? {
     val buf = buffer ?: return null
-    return AutoMobileNetworkInterceptor(buf, applicationId)
+    return AutoMobileNetworkInterceptor(buf, applicationId, captureHeaders, captureBodies)
   }
 
   /**

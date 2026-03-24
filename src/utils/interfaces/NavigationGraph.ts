@@ -10,6 +10,8 @@ export interface NavigationEvent {
   sequenceNumber: number;
   /** The application package ID (e.g., "com.example.app") */
   applicationId?: string;
+  /** The interaction that triggered this navigation (set by CtrlProxyClient) */
+  triggeringInteraction?: { type: string; elementText?: string; elementResourceId?: string } | null;
 }
 
 /**

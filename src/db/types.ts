@@ -531,6 +531,11 @@ export interface NetworkEventsTable {
   host: string | null;
   path: string | null;
   error: string | null;
+  request_headers_json: string | null;
+  response_headers_json: string | null;
+  request_body: string | null;
+  response_body: string | null;
+  content_type: string | null;
   created_at: Generated<string>;
 }
 
@@ -567,6 +572,51 @@ export interface OsEventsTable {
   category: string;
   kind: string;
   details_json: string | null;
+  created_at: Generated<string>;
+}
+
+export interface NavigationEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  destination: string;
+  source: string | null;
+  arguments_json: string | null;
+  metadata_json: string | null;
+  created_at: Generated<string>;
+}
+
+export interface StorageEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  file_name: string;
+  key: string | null;
+  value: string | null;
+  value_type: string | null;
+  change_type: string;
+  previous_value: string | null;
+  created_at: Generated<string>;
+}
+
+export interface LayoutEventsTable {
+  id: Generated<number>;
+  device_id: string | null;
+  timestamp: number;
+  application_id: string | null;
+  session_id: string | null;
+  sub_type: string;
+  composable_name: string | null;
+  composable_id: string | null;
+  recomposition_count: number | null;
+  duration_ms: number | null;
+  likely_cause: string | null;
+  details_json: string | null;
+  screen_name: string | null;
   created_at: Generated<string>;
 }
 
@@ -617,6 +667,9 @@ export interface Database {
   log_events: LogEventsTable;
   custom_events: CustomEventsTable;
   os_events: OsEventsTable;
+  navigation_events: NavigationEventsTable;
+  storage_events: StorageEventsTable;
+  layout_events: LayoutEventsTable;
 }
 
 // Convenience types for each table

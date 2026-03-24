@@ -126,7 +126,7 @@ describe("CtrlProxyClient", function() {
     }
   };
 
-  const flushPromises = async (iterations: number = 3): Promise<void> => {
+  const flushPromises = async (iterations: number = 5): Promise<void> => {
     for (let i = 0; i < iterations; i += 1) {
       await new Promise(resolve => setImmediate(resolve));
     }

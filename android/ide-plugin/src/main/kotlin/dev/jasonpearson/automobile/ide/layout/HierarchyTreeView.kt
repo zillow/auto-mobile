@@ -151,9 +151,10 @@ fun HierarchyTreeView(
 
     Column(modifier = modifier.fillMaxSize()) {
         // Search bar
-        SearchBar(
+        dev.jasonpearson.automobile.ide.components.SearchBar(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
+            placeholder = "Search views...",
             modifier = Modifier.fillMaxWidth().padding(8.dp),
         )
 
@@ -213,64 +214,6 @@ fun HierarchyTreeView(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = JewelTheme.globalColors
-
-    Row(
-        modifier = modifier
-            .height(28.dp)
-            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            "\uD83D\uDD0D", // Magnifying glass
-            fontSize = 12.sp,
-            color = colors.text.normal.copy(alpha = 0.4f),
-        )
-        Spacer(Modifier.width(6.dp))
-        BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            textStyle = TextStyle(
-                fontSize = 12.sp,
-                color = colors.text.normal,
-            ),
-            cursorBrush = SolidColor(colors.text.normal),
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-            decorationBox = { innerTextField ->
-                Box {
-                    if (query.isEmpty()) {
-                        Text(
-                            "Search views...",
-                            fontSize = 12.sp,
-                            color = colors.text.normal.copy(alpha = 0.4f),
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
-        if (query.isNotEmpty()) {
-            Text(
-                "\u2715", // X mark
-                fontSize = 10.sp,
-                color = colors.text.normal.copy(alpha = 0.5f),
-                modifier = Modifier
-                    .clickable { onQueryChange("") }
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(4.dp),
-            )
         }
     }
 }

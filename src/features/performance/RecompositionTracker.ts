@@ -13,6 +13,7 @@ import {
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { DefaultElementParser } from "../utility/ElementParser";
+import { TelemetryRecorder } from "../telemetry/TelemetryRecorder";
 
 const MAX_RECOMPOSITION_RECORDS = 10000;
 
@@ -254,7 +255,7 @@ export class RecompositionTracker {
     }
 
     const db = getDatabase();
-    const sessionId = new Date().toISOString().split("T")[0];
+    const sessionId = new Date(this.timer.now()).toISOString().split("T")[0];
     const timestamp = new Date(observationTimestamp).toISOString();
 
     try {
@@ -284,6 +285,30 @@ export class RecompositionTracker {
 
       if (rows.length > 0) {
         await db.insertInto("recomposition_metrics").values(rows).execute();
+      }
+
+      // Emit layout telemetry for recompositions
+      const recorder = TelemetryRecorder.getInstance();
+      recorder.setContext(device.deviceId, null);
+
+      // Emit all composables with any recomposition activity, sorted by count desc, top 10
+      const active = entries
+        .filter(e => e.total > 0)
+        .sort((a, b) => b.rolling1sAverage - a.rolling1sAverage)
+        .slice(0, 10);
+      for (const entry of active) {
+        const isExcessive = entry.rolling1sAverage > 2;
+        recorder.recordLayoutEvent({
+          timestamp: this.timer.now(),
+          applicationId: packageName,
+          subType: isExcessive ? "excessive_recomposition" : "recomposition",
+          composableName: entry.composableName ?? null,
+          composableId: entry.id,
+          recompositionCount: Math.round(entry.rolling1sAverage),
+          durationMs: entry.durationMs ?? null,
+          likelyCause: entry.likelyCause ?? null,
+          detailsJson: null,
+        });
       }
 
       await this.pruneOldRecords(db);

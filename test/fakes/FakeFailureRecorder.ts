@@ -3,14 +3,15 @@ import type {
   RecordToolFailureInput,
   RecordCrashInput,
   RecordAnrInput,
+  RecordNonFatalInput,
 } from "../../src/features/failures/FailureRecorder";
 
 /**
  * Recorded failure for testing.
  */
 interface RecordedFailure {
-  type: "tool_failure" | "crash" | "anr";
-  input: RecordToolFailureInput | RecordCrashInput | RecordAnrInput;
+  type: "tool_failure" | "crash" | "anr" | "nonfatal";
+  input: RecordToolFailureInput | RecordCrashInput | RecordAnrInput | RecordNonFatalInput;
   occurrenceId: string;
   timestamp: number;
 }
@@ -70,6 +71,21 @@ export class FakeFailureRecorder implements FailureRecorderService {
     return occurrenceId;
   }
 
+  /**
+   * Record a non-fatal (handled) exception.
+   */
+  async recordNonFatal(input: RecordNonFatalInput): Promise<string> {
+    this.checkShouldFail();
+    const occurrenceId = `occ_${this.nextOccurrenceId++}`;
+    this.recordedFailures.push({
+      type: "nonfatal",
+      input,
+      occurrenceId,
+      timestamp: Date.now(),
+    });
+    return occurrenceId;
+  }
+
   // Test helpers
 
   /**
@@ -98,6 +114,13 @@ export class FakeFailureRecorder implements FailureRecorderService {
    */
   getAnrs(): RecordedFailure[] {
     return this.recordedFailures.filter(f => f.type === "anr");
+  }
+
+  /**
+   * Get recorded non-fatals only.
+   */
+  getNonFatals(): RecordedFailure[] {
+    return this.recordedFailures.filter(f => f.type === "nonfatal");
   }
 
   /**

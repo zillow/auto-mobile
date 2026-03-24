@@ -103,6 +103,8 @@ class FakeTelemetryPushClientTest {
         client.emitEvent(TelemetryDisplayEvent.Network(
             timestamp = 1000L, method = "GET", statusCode = 200,
             url = "/users", durationMs = 42, host = null, path = "/users", error = null,
+            requestHeaders = null, responseHeaders = null,
+            requestBody = null, responseBody = null, contentType = null,
         ))
         client.emitEvent(TelemetryDisplayEvent.Os(
             timestamp = 2000L, category = "lifecycle", kind = "foreground", details = null,

@@ -2,6 +2,7 @@ import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { BackStackInfo } from "../../models";
 import { NavigationRepository } from "../../db/navigationRepository";
+import { TelemetryRecorder } from "../telemetry/TelemetryRecorder";
 import { TestCoverageRepository } from "../../db/testCoverageRepository";
 import type { NavigationEdge as DBNavigationEdge, NavigationNode as DBNavigationNode, TestCoverageSession } from "../../db/types";
 import {
@@ -382,6 +383,18 @@ export class NavigationGraphManager implements NavigationGraphService {
     this.currentScreen = screenName;
     await this.repository.touchApp(this.currentAppId);
     this.notifyGraphUpdated();
+
+    // Push to telemetry dashboard via TelemetryRecorder (has device context for subscriber filtering)
+    TelemetryRecorder.getInstance().recordNavigationEvent({
+      timestamp,
+      applicationId: this.currentAppId,
+      destination: screenName,
+      source: event.source ?? null,
+      arguments: event.arguments ?? null,
+      metadata: event.metadata ?? null,
+      triggeringInteraction: event.triggeringInteraction ?? null,
+      screenshotUri: `automobile:navigation/nodes/${node.id}/screenshot`,
+    });
   }
 
   /**

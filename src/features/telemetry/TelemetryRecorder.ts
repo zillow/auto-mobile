@@ -3,10 +3,18 @@ import { recordNetworkEvent, type RecordNetworkEventInput } from "../../db/netwo
 import { recordLogEvent, type RecordLogEventInput } from "../../db/logEventRepository";
 import { recordCustomEvent, type RecordCustomEventInput } from "../../db/customEventRepository";
 import { recordOsEvent, type RecordOsEventInput } from "../../db/osEventRepository";
+import { recordNavigationEvent, type RecordNavigationEventInput } from "../../db/navigationEventRepository";
+import { recordStorageEvent, type RecordStorageEventInput } from "../../db/storageEventRepository";
+import { recordLayoutEvent, type RecordLayoutEventInput } from "../../db/layoutEventRepository";
 import { getTelemetryPushServer } from "../../daemon/telemetryPushSocketServer";
 
+export type TelemetryCategory =
+  | "network" | "log" | "custom" | "os" | "navigation"
+  | "crash" | "anr" | "nonfatal" | "storage" | "layout"
+  | "performance" | "toolcall";
+
 export interface TelemetryEvent {
-  category: "network" | "log" | "custom" | "os";
+  category: TelemetryCategory;
   timestamp: number;
   deviceId: string | null;
   data: unknown;
@@ -21,6 +29,9 @@ export interface TelemetryRepository {
   recordLogEvent(input: RecordLogEventInput): Promise<void>;
   recordCustomEvent(input: RecordCustomEventInput): Promise<void>;
   recordOsEvent(input: RecordOsEventInput): Promise<void>;
+  recordNavigationEvent(input: RecordNavigationEventInput): Promise<void>;
+  recordStorageEvent(input: RecordStorageEventInput): Promise<void>;
+  recordLayoutEvent(input: RecordLayoutEventInput): Promise<void>;
 }
 
 const defaultRepository: TelemetryRepository = {
@@ -28,6 +39,9 @@ const defaultRepository: TelemetryRepository = {
   recordLogEvent: input => recordLogEvent(input),
   recordCustomEvent: input => recordCustomEvent(input),
   recordOsEvent: input => recordOsEvent(input),
+  recordNavigationEvent: input => recordNavigationEvent(input),
+  recordStorageEvent: input => recordStorageEvent(input),
+  recordLayoutEvent: input => recordLayoutEvent(input),
 };
 
 export class TelemetryRecorder {
@@ -79,6 +93,11 @@ export class TelemetryRecorder {
     host: string | null;
     path: string | null;
     error: string | null;
+    requestHeaders?: Record<string, string> | null;
+    responseHeaders?: Record<string, string> | null;
+    requestBody?: string | null;
+    responseBody?: string | null;
+    contentType?: string | null;
   }): Promise<void> {
     // Snapshot context before async work to avoid race with concurrent setContext() calls
     const { deviceId, sessionId } = this.snapshotContext();
@@ -149,6 +168,137 @@ export class TelemetryRecorder {
 
     this.pushToSocket({ category: "os", timestamp: event.timestamp, deviceId, data: event });
   }
+
+  async recordNavigationEvent(event: {
+    timestamp: number;
+    applicationId: string | null;
+    destination: string;
+    source: string | null;
+    arguments: Record<string, string> | null;
+    metadata: Record<string, string> | null;
+    triggeringInteraction?: { type: string; elementText?: string; elementResourceId?: string } | null;
+    screenshotUri?: string | null;
+  }): Promise<void> {
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordNavigationEventInput = { deviceId, sessionId, ...event };
+
+    try {
+      await this.repository.recordNavigationEvent(input);
+    } catch (e) {
+      logger.error(`[TelemetryRecorder] Failed to record navigation event: ${e}`);
+    }
+
+    this.pushToSocket({ category: "navigation", timestamp: event.timestamp, deviceId, data: event });
+  }
+
+  /**
+   * Record a failure (crash/anr/nonfatal) as a telemetry event.
+   * No separate DB write — failures are already stored in failure_occurrences.
+   */
+  recordFailureTelemetry(event: {
+    type: "crash" | "anr" | "nonfatal";
+    occurrenceId: string;
+    groupId: string;
+    severity: string;
+    title: string;
+    exceptionType?: string;
+    screen?: string | null;
+    timestamp: number;
+    stackTrace?: Array<{ className: string; methodName: string; fileName: string | null; lineNumber: number | null; isAppCode: boolean }> | null;
+  }): void {
+    const { deviceId } = this.snapshotContext();
+    this.pushToSocket({
+      category: event.type,
+      timestamp: event.timestamp,
+      deviceId,
+      data: event,
+    });
+  }
+
+  async recordStorageEvent(event: {
+    timestamp: number;
+    applicationId: string | null;
+    fileName: string;
+    key: string | null;
+    value: string | null;
+    valueType: string | null;
+    changeType: string;
+  }): Promise<void> {
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordStorageEventInput = { deviceId, sessionId, ...event };
+
+    try {
+      await this.repository.recordStorageEvent(input);
+    } catch (e) {
+      logger.error(`[TelemetryRecorder] Failed to record storage event: ${e}`);
+    }
+
+    this.pushToSocket({ category: "storage", timestamp: event.timestamp, deviceId, data: event });
+  }
+
+  async recordLayoutEvent(event: {
+    timestamp: number;
+    applicationId: string | null;
+    subType: string;
+    composableName: string | null;
+    composableId: string | null;
+    recompositionCount: number | null;
+    durationMs: number | null;
+    likelyCause: string | null;
+    detailsJson: string | null;
+    screenName?: string | null;
+  }): Promise<void> {
+    const { deviceId, sessionId } = this.snapshotContext();
+    const input: RecordLayoutEventInput = { deviceId, sessionId, ...event };
+
+    try {
+      await this.repository.recordLayoutEvent(input);
+    } catch (e) {
+      logger.error(`[TelemetryRecorder] Failed to record layout event: ${e}`);
+    }
+
+    this.pushToSocket({ category: "layout", timestamp: event.timestamp, deviceId, data: event });
+  }
+
+  /**
+   * Record a performance metric change as a telemetry event.
+   * Emitted when metrics cross health thresholds (healthy→warning→critical).
+   * Push-only — no separate DB write (performance data is already stored in performance_audit_results).
+   */
+  recordPerformanceEvent(event: {
+    timestamp: number;
+    packageName: string | null;
+    fps: number | null;
+    frameTimeMs: number | null;
+    jankFrames: number | null;
+    touchLatencyMs: number | null;
+    memoryUsageMb: number | null;
+    cpuUsagePercent: number | null;
+    health: string;
+    changedMetrics: string[];
+  }): void {
+    const { deviceId } = this.snapshotContext();
+    this.pushToSocket({
+      category: "performance",
+      timestamp: event.timestamp,
+      deviceId,
+      data: event,
+    });
+  }
+
+  /** Record a tool call execution with timing and status. */
+  recordToolCallEvent(event: {
+    timestamp: number;
+    toolName: string;
+    durationMs: number;
+    success: boolean;
+    error?: string | null;
+    args?: Record<string, unknown> | null;
+  }): void {
+    const { deviceId } = this.snapshotContext();
+    this.pushToSocket({ category: "toolcall", timestamp: event.timestamp, deviceId, data: event });
+  }
+
 
   private snapshotContext(): { deviceId: string | null; sessionId: string | null } {
     return { deviceId: this.deviceId, sessionId: this.sessionId };

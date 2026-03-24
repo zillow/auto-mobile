@@ -12,7 +12,9 @@ import dev.jasonpearson.automobile.sdk.crashes.AutoMobileCrashes
 import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import dev.jasonpearson.automobile.sdk.events.SdkEventBroadcaster
 import dev.jasonpearson.automobile.sdk.events.SdkEventBuffer
+import android.app.Application
 import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
+import dev.jasonpearson.automobile.sdk.interaction.AutoMobileClickTracker
 import dev.jasonpearson.automobile.sdk.logging.AutoMobileLog
 import dev.jasonpearson.automobile.sdk.network.AutoMobileNetwork
 import dev.jasonpearson.automobile.sdk.os.AutoMobileBroadcastInterceptor
@@ -98,6 +100,11 @@ object AutoMobileSDK {
     AutoMobileCrashes.initialize(appContext)
     AutoMobileAnr.initialize(appContext)
     AutoMobileBiometrics.initialize(appContext)
+
+    // Auto-track taps across all Activities (Compose, XML, React Native, etc.)
+    if (appContext is Application) {
+      AutoMobileClickTracker.initialize(appContext, appContext.packageName, buffer)
+    }
   }
 
   /**

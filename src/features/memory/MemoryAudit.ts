@@ -341,7 +341,8 @@ export class MemoryAudit {
     passed: boolean
   ): Promise<void> {
     try {
-      const sessionId = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const now = new Date();
+      const sessionId = now.toISOString().split("T")[0]; // YYYY-MM-DD
 
       const auditResult: NewMemoryAuditResult = {
         device_id: this.device.id,
@@ -375,6 +376,7 @@ export class MemoryAudit {
       logger.info(
         `[MemoryAudit] Stored audit result for ${packageName}/${toolName}: ${passed ? "PASSED" : "FAILED"}`
       );
+
     } catch (error) {
       logger.error(`[MemoryAudit] Failed to store audit result: ${error}`);
     }

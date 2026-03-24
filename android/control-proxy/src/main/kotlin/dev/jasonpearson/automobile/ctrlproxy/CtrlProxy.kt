@@ -143,6 +143,22 @@ class CtrlProxy : AccessibilityService() {
   @Volatile
   private var isRecording: Boolean = false
 
+  // Debounce timestamps — @Volatile since interaction events may trigger coroutines
+  @Volatile private var lastInputTextBroadcastMs: Long = 0
+  private val inputTextDebounceMs: Long = 100
+
+  @Volatile private var lastA11yFocusTapMs: Long = 0
+  private val a11yFocusTapDebounceMs: Long = 200
+
+  // Debounce for scroll events — accumulate delta and emit once per gesture.
+  // Store extracted fields instead of the raw AccessibilityEvent because
+  // Android recycles events after onAccessibilityEvent returns.
+  private var lastScrollBroadcastMs: Long = 0
+  private val scrollDebounceMs: Long = 300
+  @Volatile private var pendingScrollDeltaX: Int = 0
+  @Volatile private var pendingScrollDeltaY: Int = 0
+  private var pendingScrollPackageName: String? = null
+
   // Job for collecting hierarchy flow results
   private var hierarchyFlowJob: Job? = null
 
@@ -554,6 +570,11 @@ class CtrlProxy : AccessibilityService() {
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
+
+    // Ensure we receive ALL accessibility event types (XML config may be cached)
+    serviceInfo = serviceInfo?.apply {
+      eventTypes = AccessibilityEvent.TYPES_ALL_MASK
+    }
 
     try {
       overlayDrawer = OverlayDrawer(screenDimensionsProvider = { getScreenDimensions() })
@@ -992,23 +1013,50 @@ class CtrlProxy : AccessibilityService() {
     }
 
     try {
-      // Log accessibility events for debugging (reduced verbosity)
-      Log.v(TAG, "Accessibility event: ${event.eventType}, package: ${event.packageName}")
+      // Log accessibility events for debugging
+      if (event.packageName?.toString()?.contains("playground") == true) {
+        Log.d(TAG, "A11Y event type=${event.eventType} class=${event.className} pkg=${event.packageName} text=${event.text} contentChange=${event.contentChangeTypes} action=${event.action}")
+      }
 
       if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
         lastWindowClassName = event.className?.toString()
-        if (isRecording) recordInteractionEvent(event, "windowChange")
       }
 
+      // Broadcast interaction events for telemetry tracking.
+      // Also track TYPE_VIEW_ACCESSIBILITY_FOCUSED which fires when Compose
+      // moves accessibility focus after a tap (more reliable than TYPE_VIEW_CLICKED
+      // for Compose UIs). Debounce at 200ms to avoid duplicate events.
       when (event.eventType) {
         AccessibilityEvent.TYPE_VIEW_CLICKED ->
-          if (isRecording) recordInteractionEvent(event, "tap")
+          recordInteractionEvent(event, "tap")
         AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ->
-          if (isRecording) recordInteractionEvent(event, "longPress")
-        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ->
-          if (isRecording) recordInteractionEvent(event, "inputText")
+          recordInteractionEvent(event, "longPress")
+        // Compose doesn't fire TYPE_VIEW_CLICKED — detect taps via content changes
+        // on clickable elements. CONTENT_CHANGE_TYPE_STATE_DESCRIPTION (64) fires
+        // when Compose state changes (e.g., button click updates counter).
+        // CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION (4) fires on many Compose interactions.
+        AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val ct = event.contentChangeTypes
+            // State description change = likely user interaction (Compose state update)
+            if (ct and AccessibilityEvent.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION != 0) {
+              recordDebouncedInteraction(event, "stateChange")
+            }
+          }
+        }
+        AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
+          recordInteractionEvent(event, "navigate")
+        AccessibilityEvent.TYPE_VIEW_SELECTED ->
+          recordInteractionEvent(event, "select")
+        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
+          val now = System.currentTimeMillis()
+          if (now - lastInputTextBroadcastMs >= inputTextDebounceMs) {
+            lastInputTextBroadcastMs = now
+            recordInteractionEvent(event, "inputText")
+          }
+        }
         AccessibilityEvent.TYPE_VIEW_SCROLLED ->
-          if (isRecording) recordInteractionEvent(event, "swipe")
+          recordDebouncedScroll(event)
       }
 
       // Delegate to the smart debouncer for content/window changes
@@ -1036,24 +1084,40 @@ class CtrlProxy : AccessibilityService() {
       return
     }
 
-    val source = event.source
+    val source = try { event.source } catch (_: Exception) { null }
     val bounds =
         source?.let {
-          val rect = Rect()
-          it.getBoundsInScreen(rect)
-          ElementBounds(rect)
+          try {
+            val rect = Rect()
+            it.getBoundsInScreen(rect)
+            ElementBounds(rect)
+          } catch (_: Exception) { null }
         }
-    val element =
-        source?.let {
-          InteractionElement(
-              text = it.text?.toString(),
-              contentDescription = it.contentDescription?.toString(),
-              resourceId = it.viewIdResourceName,
-              className = it.className?.toString(),
-              bounds = bounds,
-          )
-        }
-    source?.recycle()
+    // Build element from source node, falling back to event-level data
+    val element = if (source != null) {
+      InteractionElement(
+          text = source.text?.toString(),
+          contentDescription = source.contentDescription?.toString(),
+          resourceId = source.viewIdResourceName,
+          className = source.className?.toString(),
+          bounds = bounds,
+      )
+    } else {
+      // Fallback: extract what we can from the AccessibilityEvent itself
+      val eventText = event.text?.joinToString("") { it.toString() }?.takeIf { it.isNotEmpty() }
+      val eventDesc = event.contentDescription?.toString()
+      val eventClass = event.className?.toString()
+      if (eventText != null || eventDesc != null || eventClass != null) {
+        InteractionElement(
+            text = eventText,
+            contentDescription = eventDesc,
+            resourceId = null,
+            className = eventClass,
+            bounds = null,
+        )
+      } else null
+    }
+    try { source?.recycle() } catch (_: Exception) { /* already recycled */ }
 
     val textValue =
         if (type == "inputText") {
@@ -1065,14 +1129,14 @@ class CtrlProxy : AccessibilityService() {
         }
 
     val scrollDeltaX =
-        if (type == "swipe" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-          event.scrollDeltaX
+        if (type == "scroll" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          pendingScrollDeltaX.takeIf { it != 0 } ?: event.scrollDeltaX
         } else {
           null
         }
     val scrollDeltaY =
-        if (type == "swipe" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-          event.scrollDeltaY
+        if (type == "scroll" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          pendingScrollDeltaY.takeIf { it != 0 } ?: event.scrollDeltaY
         } else {
           null
         }
@@ -1095,6 +1159,40 @@ class CtrlProxy : AccessibilityService() {
       } catch (e: Exception) {
         Log.e(TAG, "Error broadcasting interaction event", e)
       }
+    }
+  }
+
+  /**
+   * Debounce scroll events — accumulate deltas and emit once scrolling stops.
+   * TYPE_VIEW_SCROLLED fires many times per scroll gesture (every frame).
+   */
+  private fun recordDebouncedScroll(event: AccessibilityEvent) {
+    val now = System.currentTimeMillis()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      pendingScrollDeltaX += event.scrollDeltaX
+      pendingScrollDeltaY += event.scrollDeltaY
+    }
+    // Store package name — don't hold the event reference (Android recycles it)
+    pendingScrollPackageName = event.packageName?.toString()
+
+    if (now - lastScrollBroadcastMs >= scrollDebounceMs) {
+      lastScrollBroadcastMs = now
+      recordInteractionEvent(event, "scroll")
+      pendingScrollDeltaX = 0
+      pendingScrollDeltaY = 0
+      pendingScrollPackageName = null
+    }
+  }
+
+  /**
+   * Record an interaction event with debouncing to avoid duplicates.
+   * Used for TYPE_VIEW_ACCESSIBILITY_FOCUSED which fires alongside TYPE_VIEW_CLICKED.
+   */
+  private fun recordDebouncedInteraction(event: AccessibilityEvent, type: String) {
+    val now = System.currentTimeMillis()
+    if (now - lastA11yFocusTapMs >= a11yFocusTapDebounceMs) {
+      lastA11yFocusTapMs = now
+      recordInteractionEvent(event, type)
     }
   }
 
@@ -4166,6 +4264,11 @@ class CtrlProxy : AccessibilityService() {
             path = event.path,
             error = event.error,
             applicationId = event.applicationId,
+            requestHeaders = event.requestHeaders,
+            responseHeaders = event.responseHeaders,
+            requestBody = event.requestBody,
+            responseBody = event.responseBody,
+            contentType = event.contentType,
           ),
         )
         is SdkWebSocketFrameEvent -> WebSocketFrameResponse(

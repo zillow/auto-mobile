@@ -10,6 +10,7 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import crypto from "node:crypto";
 import type { FailureRecorderService } from "./interfaces/FailureRecorderService";
 import { getFailuresPushServer, FailureNotificationPush } from "../../daemon/failuresPushSocketServer";
+import { TelemetryRecorder } from "../telemetry/TelemetryRecorder";
 
 /**
  * Input for recording a tool failure
@@ -133,11 +134,17 @@ export interface RecordNonFatalInput {
 export class FailureRecorder implements FailureRecorderService {
   private repository: FailureAnalyticsRepository;
   private timer: Timer;
+  private telemetryRecorder: { recordFailureTelemetry: TelemetryRecorder["recordFailureTelemetry"] };
   private static instance: FailureRecorder | null = null;
 
-  constructor(repository?: FailureAnalyticsRepository, timer: Timer = defaultTimer) {
+  constructor(
+    repository?: FailureAnalyticsRepository,
+    timer: Timer = defaultTimer,
+    telemetryRecorder?: { recordFailureTelemetry: TelemetryRecorder["recordFailureTelemetry"] },
+  ) {
     this.repository = repository ?? new FailureAnalyticsRepository();
     this.timer = timer;
+    this.telemetryRecorder = telemetryRecorder ?? TelemetryRecorder.getInstance();
   }
 
   /**
@@ -274,6 +281,19 @@ export class FailureRecorder implements FailureRecorderService {
         `${input.exceptionType}: ${input.exceptionMessage}`
       );
 
+      // Push to telemetry timeline
+      this.telemetryRecorder.recordFailureTelemetry({
+        type: "crash",
+        occurrenceId,
+        groupId: signature,
+        severity,
+        title,
+        exceptionType: input.exceptionType,
+        screen: input.currentScreen ?? null,
+        timestamp: this.timer.now(),
+        stackTrace: input.stackTrace,
+      });
+
       return occurrenceId;
     } catch (error) {
       logger.error(`[FailureRecorder] Failed to record crash: ${error}`);
@@ -323,6 +343,18 @@ export class FailureRecorder implements FailureRecorderService {
         title,
         input.reason
       );
+
+      // Push to telemetry timeline
+      this.telemetryRecorder.recordFailureTelemetry({
+        type: "anr",
+        occurrenceId,
+        groupId: signature,
+        severity: "high",
+        title,
+        screen: input.currentScreen ?? null,
+        timestamp: this.timer.now(),
+        stackTrace: input.stackTrace ?? null,
+      });
 
       return occurrenceId;
     } catch (error) {
@@ -375,6 +407,19 @@ export class FailureRecorder implements FailureRecorderService {
         title,
         failureInput.message
       );
+
+      // Push to telemetry timeline
+      this.telemetryRecorder.recordFailureTelemetry({
+        type: "nonfatal",
+        occurrenceId,
+        groupId: signature,
+        severity,
+        title,
+        exceptionType: input.exceptionType,
+        screen: input.currentScreen ?? null,
+        timestamp: this.timer.now(),
+        stackTrace: input.stackTrace,
+      });
 
       return occurrenceId;
     } catch (error) {

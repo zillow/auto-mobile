@@ -47,6 +47,7 @@ fun DemoIndexScreen(
     onNavigateToTapTargets: () -> Unit,
     onNavigateToBugRepro: () -> Unit,
     onNavigateToHandledException: () -> Unit = {},
+    onNavigateToNetworkTest: () -> Unit = {},
     onNavigateBack: () -> Unit = {},
 ) {
   TrackRecomposition(id = "screen.demo.index", composableName = "DemoIndexScreen") {
@@ -100,6 +101,13 @@ fun DemoIndexScreen(
                 description = "Test handled exception reporting API.",
                 buttonLabel = "Open Exception Demo",
                 onClick = onNavigateToHandledException,
+            ),
+            DemoEntry(
+                id = "demo_network_test",
+                title = "Network Test",
+                description = "HTTP requests, failures, and random user images.",
+                buttonLabel = "Open Network Test",
+                onClick = onNavigateToNetworkTest,
             ),
         )
 

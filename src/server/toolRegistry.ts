@@ -7,6 +7,7 @@ import { UIStateExtractor } from "../features/navigation/UIStateExtractor";
 import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { serverConfig } from "../utils/ServerConfig";
 import { MemoryAudit } from "../features/memory/MemoryAudit";
+import { TelemetryRecorder } from "../features/telemetry/TelemetryRecorder";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { logger } from "../utils/logger";
@@ -166,6 +167,7 @@ class ToolRegistryClass {
       }
 
       logger.info(`[ToolRegistry] Tool ${name} called, sessionUuid=${sessionUuid}, daemonInitialized=${DaemonState.getInstance().isInitialized()}`);
+      const toolStartMs = this.timer.now();
       void this.toolCallRepository.recordToolCall({
         toolName: name,
         timestamp: new Date().toISOString(),
@@ -280,11 +282,26 @@ class ToolRegistryClass {
         }
 
         // Log tool response for debugging
-        if (response && typeof response === "object") {
-          if ("success" in response) {
-            logger.info(`[ToolRegistry] ${name} result: success=${response.success}${response.success === false ? `, error=${response.error || "unknown"}` : ""}`);
-          }
+        const toolSuccess = response && typeof response === "object" && "success" in response
+          ? response.success !== false
+          : true;
+        const toolError = response && typeof response === "object" && "error" in response
+          ? String(response.error || "")
+          : null;
+        if (response && typeof response === "object" && "success" in response) {
+          logger.info(`[ToolRegistry] ${name} result: success=${response.success}${response.success === false ? `, error=${response.error || "unknown"}` : ""}`);
         }
+
+        // Emit tool call telemetry
+        const toolDurationMs = this.timer.now() - toolStartMs;
+        TelemetryRecorder.getInstance().recordToolCallEvent({
+          timestamp: toolStartMs,
+          toolName: name,
+          durationMs: toolDurationMs,
+          success: toolSuccess,
+          error: toolError,
+          args: typeof args === "object" ? args : null,
+        });
 
         // After swipeOn executes with lookFor, update the tool call with scroll position
         if (name === "swipeOn" && args.lookFor && response?.success && response?.found) {

@@ -49,12 +49,12 @@ parse_required_versions() {
     REQUIRED_BUN_VERSION="1.3.6"  # fallback
   fi
 
+  # Node.js version extraction is optional — project uses Bun exclusively
   if [[ -z "${REQUIRED_NODE_MAJOR}" ]]; then
-    log_warn "Could not determine required node version from package.json"
-    REQUIRED_NODE_MAJOR="24"  # fallback
+    REQUIRED_NODE_MAJOR=""
   fi
 
-  log_info "Required versions: bun ${REQUIRED_BUN_VERSION}, node ${REQUIRED_NODE_MAJOR}.x"
+  log_info "Required versions: bun ${REQUIRED_BUN_VERSION}"
 }
 
 # Compare semver versions: returns 0 if $1 >= $2
@@ -125,23 +125,26 @@ ensure_gum() {
 ensure_auto_mobile() {
   # Always build the project to pick up latest changes
   log_info "Building TypeScript project..."
-  if ! (cd "${PROJECT_ROOT}" && bunx turbo run build --output-logs=errors-only); then
+  if ! (cd "${PROJECT_ROOT}" && bun run turbo run build --output-logs=errors-only); then
     log_error "Failed to build TypeScript project."
     return 1
   fi
 
-  # Always reinstall globally to pick up changes
-  log_info "Installing auto-mobile globally via bun add -g..."
-  if (cd "${PROJECT_ROOT}" && bun add -g . 2>/dev/null); then
-    hash -r 2>/dev/null || true
-    if command -v auto-mobile >/dev/null 2>&1; then
-      log_info "auto-mobile CLI installed globally."
-      return 0
-    fi
+  # Register the package locally via bun link
+  log_info "Linking auto-mobile via bun link..."
+  if ! (cd "${PROJECT_ROOT}" && bun link 2>/dev/null); then
+    log_warn "bun link failed — CLI may not reflect latest changes"
   fi
 
-  log_error "Failed to install auto-mobile globally."
-  log_error "Try running manually: cd ${PROJECT_ROOT} && bun add -g ."
+  # Verify CLI is available
+  hash -r 2>/dev/null || true
+  if command -v auto-mobile >/dev/null 2>&1; then
+    log_info "auto-mobile CLI available."
+    return 0
+  fi
+
+  log_error "auto-mobile CLI not found after build."
+  log_error "Try running manually: cd ${PROJECT_ROOT} && bun link"
   return 1
 }
 
@@ -318,18 +321,10 @@ ensure_dependencies() {
   # Post-install validation
   parse_required_versions
 
-  # Verify node meets requirements
+  # Node.js is no longer required — project uses Bun exclusively.
+  # Log if present but don't fail if missing.
   if command -v node >/dev/null 2>&1; then
-    local node_major
-    node_major=$(node --version | sed 's/^v//' | cut -d. -f1)
-    if [[ "${node_major}" -lt "${REQUIRED_NODE_MAJOR}" ]]; then
-      log_error "Node.js v${node_major}.x found but v${REQUIRED_NODE_MAJOR}.x required after install"
-      return 1
-    fi
-    log_info "Node.js $(node --version) verified"
-  else
-    log_error "Node.js not found after install"
-    return 1
+    log_info "Node.js $(node --version) available (optional)"
   fi
 
   # Verify bun meets requirements
