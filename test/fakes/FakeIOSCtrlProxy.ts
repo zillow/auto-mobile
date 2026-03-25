@@ -10,6 +10,7 @@ import {
   CtrlProxySelectAllResult,
   CtrlProxyPressHomeResult,
   CtrlProxyLaunchAppResult,
+  CtrlProxyClipboardResult,
   CtrlProxyHierarchyResponse,
   CtrlProxyPerfTiming,
   CtrlProxyHierarchy
@@ -101,6 +102,13 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
   private voiceOverActivateResult: CtrlProxyVoiceOverActionResult | null = null;
   private multiFingerSwipeResult: CtrlProxySwipeResult | null = null;
   private actionResult: CtrlProxyActionResult | null = null;
+  private clipboardResult: CtrlProxyClipboardResult | null = null;
+
+  // Clipboard call history
+  private clipboardHistory: Array<{
+    action: "copy" | "paste" | "clear" | "get";
+    text?: string;
+  }> = [];
 
   // VoiceOver call history
   private voiceOverActivateHistory: Array<{
@@ -233,6 +241,14 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
    */
   setActionResult(result: CtrlProxyActionResult | null): void {
     this.actionResult = result;
+  }
+
+  setClipboardResult(result: CtrlProxyClipboardResult | null): void {
+    this.clipboardResult = result;
+  }
+
+  getClipboardHistory(): Array<{ action: "copy" | "paste" | "clear" | "get"; text?: string }> {
+    return [...this.clipboardHistory];
   }
 
   // MARK: - Assertion Methods
@@ -383,6 +399,7 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
     this.voiceOverActivateHistory = [];
     this.actionHistory = [];
     this.multiFingerSwipeHistory = [];
+    this.clipboardHistory = [];
   }
 
   // MARK: - Private Helpers
@@ -828,6 +845,29 @@ export class FakeIOSCtrlProxy implements CtrlProxyService {
     return {
       success: true,
       action,
+      totalTimeMs: 50,
+    };
+  }
+
+  async requestClipboard(
+    action: "copy" | "paste" | "clear" | "get",
+    text?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyClipboardResult> {
+    await this.applyDelay("clipboard");
+    this.checkFailure("clipboard");
+
+    this.clipboardHistory.push({ action, text });
+
+    if (this.clipboardResult) {
+      return this.clipboardResult;
+    }
+
+    return {
+      success: true,
+      action,
+      text: action === "get" ? "fake clipboard text" : undefined,
       totalTimeMs: 50,
     };
   }

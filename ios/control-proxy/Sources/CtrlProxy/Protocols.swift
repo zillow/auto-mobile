@@ -72,6 +72,11 @@ public protocol GesturePerforming {
     /// Perform IME action (done, next, search, etc.)
     func performImeAction(_ action: String) throws
 
+    // MARK: - Clipboard
+
+    /// Perform clipboard operation (get, copy, clear, paste)
+    func clipboard(action: String, text: String?) throws -> String?
+
     // MARK: - Actions
 
     /// Perform action on element by resourceId or label (content-desc)

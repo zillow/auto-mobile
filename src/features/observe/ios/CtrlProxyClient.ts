@@ -78,6 +78,7 @@ import { CtrlProxyText } from "./CtrlProxyText";
 import { CtrlProxyHierarchy } from "./CtrlProxyHierarchy";
 import { CtrlProxyScreenshot } from "./CtrlProxyScreenshot";
 import { CtrlProxyNavigation } from "./CtrlProxyNavigation";
+import { CtrlProxyClipboard } from "./CtrlProxyClipboard";
 import { CtrlProxyVoiceOver } from "./CtrlProxyVoiceOver";
 
 // Import types
@@ -103,6 +104,7 @@ import type {
   CtrlProxyVoiceOverResult,
   CtrlProxyVoiceOverActionResult,
   CtrlProxyActionResult,
+  CtrlProxyClipboardResult,
   WebSocketMessage,
 } from "./types";
 
@@ -173,6 +175,11 @@ export interface CtrlProxyService {
   requestSelectAll(
     timeoutMs?: number, perf?: PerformanceTracker
   ): Promise<CtrlProxySelectAllResult>;
+
+  requestClipboard(
+    action: "copy" | "paste" | "clear" | "get",
+    text?: string, timeoutMs?: number, perf?: PerformanceTracker
+  ): Promise<CtrlProxyClipboardResult>;
 
   requestPressHome(
     timeoutMs?: number, perf?: PerformanceTracker
@@ -255,6 +262,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
   private _hierarchy: CtrlProxyHierarchy | null = null;
   private _screenshot: CtrlProxyScreenshot | null = null;
   private _navigation: CtrlProxyNavigation | null = null;
+  private _clipboard: CtrlProxyClipboard | null = null;
   private _voiceOver: CtrlProxyVoiceOver | null = null;
 
   // Logging tag for base class
@@ -430,6 +438,13 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
       this._navigation = new CtrlProxyNavigation(this.createDelegateContext());
     }
     return this._navigation;
+  }
+
+  private get clipboard(): CtrlProxyClipboard {
+    if (!this._clipboard) {
+      this._clipboard = new CtrlProxyClipboard(this.createDelegateContext());
+    }
+    return this._clipboard;
   }
 
   private get voiceOver(): CtrlProxyVoiceOver {
@@ -621,6 +636,16 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
             totalTimeMs: message.totalTimeMs ?? 0,
             error: message.error,
             perfTiming: message.perfTiming
+          };
+          break;
+
+        case "clipboard_result":
+          result = {
+            success: message.success ?? true,
+            action: (message as { action?: string }).action ?? "",
+            text: (message as { text?: string }).text,
+            totalTimeMs: message.totalTimeMs ?? 0,
+            error: message.error,
           };
           break;
 
@@ -834,6 +859,19 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
     bundleId: string, timeoutMs: number = 5000, perf?: PerformanceTracker
   ): Promise<CtrlProxyLaunchAppResult> {
     return this.navigation.requestLaunchApp(bundleId, timeoutMs, perf);
+  }
+
+  // ===========================================================================
+  // Delegated Public Methods - Clipboard
+  // ===========================================================================
+
+  async requestClipboard(
+    action: "copy" | "paste" | "clear" | "get",
+    text?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<CtrlProxyClipboardResult> {
+    return this.clipboard.requestClipboard(action, text, timeoutMs, perf);
   }
 
   // ===========================================================================

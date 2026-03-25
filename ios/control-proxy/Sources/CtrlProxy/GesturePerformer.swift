@@ -10,6 +10,9 @@ public class GesturePerformer: GesturePerforming {
         case elementNotFound(String)
         case gestureFailed(String)
         case notSupported(String)
+        case missingParameter(String)
+        case clipboardEmpty
+        case unsupportedAction(String)
 
         public var errorDescription: String? {
             switch self {
@@ -21,6 +24,12 @@ public class GesturePerformer: GesturePerforming {
                 return "Gesture failed: \(reason)"
             case let .notSupported(feature):
                 return "Feature not supported: \(feature)"
+            case let .missingParameter(param):
+                return "Missing parameter: \(param)"
+            case .clipboardEmpty:
+                return "Clipboard is empty"
+            case let .unsupportedAction(action):
+                return "Unsupported action: \(action)"
             }
         }
     }
@@ -339,6 +348,45 @@ public class GesturePerformer: GesturePerforming {
             }
         }
 
+        // MARK: - Clipboard
+
+        public func clipboard(action: String, text: String?) throws -> String? {
+            switch action {
+            case "get":
+                return runOnMainThread {
+                    UIPasteboard.general.string
+                }
+
+            case "copy":
+                guard let text = text else {
+                    throw GestureError.missingParameter("text required for copy")
+                }
+                runOnMainThread {
+                    UIPasteboard.general.string = text
+                }
+                return nil
+
+            case "clear":
+                runOnMainThread {
+                    UIPasteboard.general.items = []
+                }
+                return nil
+
+            case "paste":
+                let clipboardText: String? = runOnMainThread {
+                    UIPasteboard.general.string
+                }
+                guard let pasteText = clipboardText, !pasteText.isEmpty else {
+                    throw GestureError.clipboardEmpty
+                }
+                try typeText(text: pasteText)
+                return nil
+
+            default:
+                throw GestureError.unsupportedAction(action)
+            }
+        }
+
         public func pressHome() throws {
             runOnMainThread {
                 XCUIDevice.shared.press(.home)
@@ -452,6 +500,10 @@ public class GesturePerformer: GesturePerforming {
 
         public func getOrientation() -> String {
             return "unknown"
+        }
+
+        public func clipboard(action _: String, text _: String?) throws -> String? {
+            throw GestureError.notSupported("XCUITest only available on iOS")
         }
 
         public func pressHome() throws {

@@ -160,6 +160,8 @@ public class FakeGesturePerformer: GesturePerforming {
     private var pressHomeCallCount = 0
     private var appLaunchHistory: [String] = []
     private var appTerminateHistory: [String] = []
+    private var clipboardHistory: [(action: String, text: String?)] = []
+    private var clipboardContents: String? = nil
 
     public init() {}
 
@@ -227,6 +229,14 @@ public class FakeGesturePerformer: GesturePerforming {
         appTerminateHistory
     }
 
+    public func getClipboardHistory() -> [(action: String, text: String?)] {
+        clipboardHistory
+    }
+
+    public func setClipboardContents(_ text: String?) {
+        clipboardContents = text
+    }
+
     public func clearHistory() {
         tapHistory.removeAll()
         doubleTapHistory.removeAll()
@@ -243,6 +253,7 @@ public class FakeGesturePerformer: GesturePerforming {
         pressHomeCallCount = 0
         appLaunchHistory.removeAll()
         appTerminateHistory.removeAll()
+        clipboardHistory.removeAll()
     }
 
     // MARK: - Private Helpers
@@ -325,6 +336,25 @@ public class FakeGesturePerformer: GesturePerforming {
     public func performImeAction(_ action: String) throws {
         try checkFailure("imeAction")
         imeActionHistory.append(action)
+    }
+
+    public func clipboard(action: String, text: String?) throws -> String? {
+        try checkFailure("clipboard")
+        clipboardHistory.append((action: action, text: text))
+        switch action {
+        case "get":
+            return clipboardContents
+        case "copy":
+            clipboardContents = text
+            return nil
+        case "clear":
+            clipboardContents = nil
+            return nil
+        case "paste":
+            return nil
+        default:
+            return nil
+        }
     }
 
     public func performAction(_ action: String, resourceId: String?, label: String?) throws {

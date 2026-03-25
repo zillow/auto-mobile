@@ -4,6 +4,7 @@ import { BootedDevice, ClipboardResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { CtrlProxyClient } from "../observe/android";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../observe/ios";
 
 export class Clipboard {
   private device: BootedDevice;
@@ -29,12 +30,9 @@ export class Clipboard {
             this.executeAndroidClipboard(action, text)
           );
         case "ios":
-          perf.end();
-          return {
-            success: false,
-            action,
-            error: "iOS clipboard operations are not yet supported"
-          };
+          return await perf.track("iosClipboard", () =>
+            this.executeIOSClipboard(action, text)
+          );
         default:
           perf.end();
           return {
@@ -53,6 +51,30 @@ export class Clipboard {
     } finally {
       perf.end();
     }
+  }
+
+  private async executeIOSClipboard(
+    action: "copy" | "paste" | "clear" | "get",
+    text?: string
+  ): Promise<ClipboardResult> {
+    if (action === "copy" && !text) {
+      return { success: false, action, error: "Text is required for copy action" };
+    }
+
+    const client = IOSCtrlProxyClient.getInstance(this.device);
+    const result = await client.requestClipboard(action, text);
+
+    if (!result.success) {
+      return { success: false, action, error: result.error };
+    }
+
+    logger.info(`[Clipboard] ${action} via iOS CtrlProxy: ${result.totalTimeMs}ms`);
+    return {
+      success: true,
+      action,
+      text: result.text,
+      method: "a11y"
+    };
   }
 
   /**

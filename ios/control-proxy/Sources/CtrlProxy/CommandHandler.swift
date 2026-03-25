@@ -351,12 +351,17 @@ public class CommandHandler: CommandHandling {
     // MARK: - Clipboard
 
     private func handleClipboard(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
-        // Stub: Clipboard operations not yet fully implemented
-        return WebSocketResponse.error(
+        guard let action = request.action else {
+            throw CommandError.missingParameter("action")
+        }
+
+        let resultText = try gesturePerformer.clipboard(action: action, text: request.text)
+
+        return WebSocketResponse.success(
             type: ResponseType.clipboardResult.rawValue,
             requestId: request.requestId,
-            error: "Clipboard operations not yet implemented on iOS",
-            totalTimeMs: totalTimeMs(from: startTime)
+            totalTimeMs: totalTimeMs(from: startTime),
+            text: resultText
         )
     }
 
