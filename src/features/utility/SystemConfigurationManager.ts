@@ -1,5 +1,7 @@
 import { AdbClientFactory, defaultAdbClientFactory } from "../../utils/android-cmdline-tools/AdbClientFactory";
 import type { AdbExecutor } from "../../utils/android-cmdline-tools/interfaces/AdbExecutor";
+import type { ProcessExecutor } from "../../utils/ProcessExecutor";
+import { DefaultProcessExecutor } from "../../utils/ProcessExecutor";
 import { logger } from "../../utils/logger";
 import {
   BootedDevice,
@@ -18,16 +20,22 @@ type CommandAttempt = {
   command: string;
 };
 
-const IOS_STUB_ERROR = "iOS support is not implemented yet.";
+const IOS_PHYSICAL_DEVICE_ERROR = "Localization changes are only supported on iOS Simulator.";
 const DEFAULT_CALENDAR_SYSTEM = "gregory";
 
 export class SystemConfigurationManager {
   private device: BootedDevice;
   private adb: AdbExecutor;
+  private processExecutor: ProcessExecutor;
 
-  constructor(device: BootedDevice, adbFactory: AdbClientFactory = defaultAdbClientFactory) {
+  constructor(
+    device: BootedDevice,
+    adbFactory: AdbClientFactory = defaultAdbClientFactory,
+    processExecutor: ProcessExecutor = new DefaultProcessExecutor()
+  ) {
     this.device = device;
     this.adb = adbFactory.create(device);
+    this.processExecutor = processExecutor;
   }
 
   async setLocale(languageTag: string, options: { broadcast?: boolean } = {}): Promise<SetLocaleResult> {
@@ -38,6 +46,10 @@ export class SystemConfigurationManager {
         languageTag,
         error: "languageTag must be a non-empty string"
       };
+    }
+
+    if (this.device.platform === "ios") {
+      return this.setLocaleIos(trimmedTag);
     }
 
     if (this.device.platform !== "android") {
@@ -114,6 +126,10 @@ export class SystemConfigurationManager {
       };
     }
 
+    if (this.device.platform === "ios") {
+      return this.setTimeZoneIos(trimmedZone);
+    }
+
     if (this.device.platform !== "android") {
       return {
         success: false,
@@ -143,6 +159,14 @@ export class SystemConfigurationManager {
   }
 
   async setTextDirection(rtl: boolean, options: { broadcast?: boolean } = {}): Promise<SetTextDirectionResult> {
+    if (this.device.platform === "ios") {
+      return {
+        success: false,
+        rtl,
+        error: "Text direction is not supported on iOS. RTL is driven by the app's language; set an RTL locale (e.g., ar_SA) instead."
+      };
+    }
+
     if (this.device.platform !== "android") {
       return {
         success: false,
@@ -218,6 +242,10 @@ export class SystemConfigurationManager {
   }
 
   async set24HourFormat(enabled: boolean): Promise<Set24HourFormatResult> {
+    if (this.device.platform === "ios") {
+      return this.set24HourFormatIos(enabled);
+    }
+
     if (this.device.platform !== "android") {
       return {
         success: false,
@@ -248,6 +276,10 @@ export class SystemConfigurationManager {
   }
 
   async getCalendarSystem(): Promise<GetCalendarSystemResult> {
+    if (this.device.platform === "ios") {
+      return this.getCalendarSystemIos();
+    }
+
     if (this.device.platform !== "android") {
       return {
         success: false,
@@ -288,6 +320,10 @@ export class SystemConfigurationManager {
   }
 
   async getLocalizationSettings(): Promise<LocalizationSettingsResult> {
+    if (this.device.platform === "ios") {
+      return this.getLocalizationSettingsIos();
+    }
+
     if (this.device.platform !== "android") {
       return {
         success: false,
@@ -332,9 +368,6 @@ export class SystemConfigurationManager {
   }
 
   private getPlatformError(): string {
-    if (this.device.platform === "ios") {
-      return IOS_STUB_ERROR;
-    }
     return `Unsupported platform: ${this.device.platform}`;
   }
 
@@ -460,5 +493,185 @@ export class SystemConfigurationManager {
     }
 
     return null;
+  }
+
+  // --- iOS Simulator methods ---
+
+  private isSimulator(): boolean {
+    return /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i.test(
+      this.device.deviceId
+    );
+  }
+
+  private iosSpawnCommand(command: string): string {
+    return `xcrun simctl spawn ${this.device.deviceId} ${command}`;
+  }
+
+  private async iosDefaultsRead(domain: string, key: string): Promise<string | null> {
+    try {
+      const result = await this.processExecutor.exec(
+        this.iosSpawnCommand(`defaults read ${domain} ${key}`)
+      );
+      return this.normalizeSettingValue(result.stdout);
+    } catch {
+      return null;
+    }
+  }
+
+  private async iosDefaultsWrite(domain: string, key: string, value: string): Promise<void> {
+    await this.processExecutor.exec(
+      this.iosSpawnCommand(`defaults write ${domain} ${key} ${value}`)
+    );
+  }
+
+  private toAppleLocale(languageTag: string): string {
+    return languageTag.replace(/-/g, "_");
+  }
+
+  private async setLocaleIos(languageTag: string): Promise<SetLocaleResult> {
+    if (!this.isSimulator()) {
+      return { success: false, languageTag, error: IOS_PHYSICAL_DEVICE_ERROR };
+    }
+
+    try {
+      const previousLanguageTag = await this.iosDefaultsRead(".GlobalPreferences", "AppleLocale");
+      const appleLocale = this.toAppleLocale(languageTag);
+      await this.iosDefaultsWrite(".GlobalPreferences", "AppleLocale", appleLocale);
+      return {
+        success: true,
+        languageTag,
+        previousLanguageTag,
+        method: "defaults write AppleLocale"
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        languageTag,
+        error: `Failed to set locale: ${errorMessage}`
+      };
+    }
+  }
+
+  private async setTimeZoneIos(zoneId: string): Promise<SetTimeZoneResult> {
+    if (!this.isSimulator()) {
+      return { success: false, zoneId, error: IOS_PHYSICAL_DEVICE_ERROR };
+    }
+
+    try {
+      const previousZoneId = await this.iosDefaultsRead(".GlobalPreferences", "AppleTimeZone");
+
+      // Disable auto-timezone before setting
+      await this.iosDefaultsWrite(
+        "com.apple.mobiletimerd",
+        "AutomaticTimeZoneSetting",
+        "-bool NO"
+      );
+
+      await this.iosDefaultsWrite(".GlobalPreferences", "AppleTimeZone", zoneId);
+      return {
+        success: true,
+        zoneId,
+        previousZoneId
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        zoneId,
+        error: `Failed to set time zone: ${errorMessage}`
+      };
+    }
+  }
+
+  private async set24HourFormatIos(enabled: boolean): Promise<Set24HourFormatResult> {
+    if (!this.isSimulator()) {
+      return { success: false, enabled, error: IOS_PHYSICAL_DEVICE_ERROR };
+    }
+
+    try {
+      const previousRaw = await this.iosDefaultsRead(".GlobalPreferences", "AppleICUForce24HourTime");
+      const previousFormat = this.normalizeTimeFormat(
+        previousRaw === "1" ? "24" : previousRaw === "0" ? "12" : previousRaw
+      );
+
+      const boolValue = enabled ? "-bool YES" : "-bool NO";
+      await this.iosDefaultsWrite(".GlobalPreferences", "AppleICUForce24HourTime", boolValue);
+      return {
+        success: true,
+        enabled,
+        previousFormat
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        enabled,
+        error: `Failed to set 24-hour format: ${errorMessage}`
+      };
+    }
+  }
+
+  private async getCalendarSystemIos(): Promise<GetCalendarSystemResult> {
+    if (!this.isSimulator()) {
+      return {
+        success: false,
+        calendarSystem: DEFAULT_CALENDAR_SYSTEM,
+        source: "default",
+        error: IOS_PHYSICAL_DEVICE_ERROR
+      };
+    }
+
+    const calendar = await this.iosDefaultsRead(".GlobalPreferences", "AppleCalendar");
+    if (calendar) {
+      return {
+        success: true,
+        calendarSystem: calendar,
+        source: "default"
+      };
+    }
+
+    const locale = await this.iosDefaultsRead(".GlobalPreferences", "AppleLocale");
+    if (locale) {
+      const calendarFromLocale = this.extractCalendarFromLocale(locale);
+      if (calendarFromLocale) {
+        return {
+          success: true,
+          calendarSystem: calendarFromLocale,
+          locale,
+          source: "locale"
+        };
+      }
+    }
+
+    return {
+      success: true,
+      calendarSystem: DEFAULT_CALENDAR_SYSTEM,
+      locale: locale ?? null,
+      source: "default"
+    };
+  }
+
+  private async getLocalizationSettingsIos(): Promise<LocalizationSettingsResult> {
+    if (!this.isSimulator()) {
+      return { success: false, error: IOS_PHYSICAL_DEVICE_ERROR };
+    }
+
+    const locale = await this.iosDefaultsRead(".GlobalPreferences", "AppleLocale");
+    const timeZone = await this.iosDefaultsRead(".GlobalPreferences", "AppleTimeZone");
+    const timeFormatRaw = await this.iosDefaultsRead(".GlobalPreferences", "AppleICUForce24HourTime");
+    const timeFormat = this.normalizeTimeFormat(
+      timeFormatRaw === "1" ? "24" : timeFormatRaw === "0" ? "12" : timeFormatRaw
+    );
+    const calendarResult = await this.getCalendarSystemIos();
+
+    return {
+      success: true,
+      locale,
+      timeZone,
+      textDirection: null,
+      timeFormat,
+      calendarSystem: calendarResult.calendarSystem ?? null
+    };
   }
 }
