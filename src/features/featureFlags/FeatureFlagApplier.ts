@@ -48,6 +48,9 @@ export class DefaultFeatureFlagApplier implements FeatureFlagApplier {
       case "raw-element-search":
         serverConfig.setRawElementSearchEnabled(enabled);
         break;
+      case "mcp-recording":
+        serverConfig.setMcpRecordingEnabled(enabled);
+        break;
     }
   }
 }

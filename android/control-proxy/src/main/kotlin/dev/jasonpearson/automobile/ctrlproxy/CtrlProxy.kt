@@ -818,8 +818,8 @@ class CtrlProxy : AccessibilityService() {
                     duration,
                 )
               },
-              onRequestSetText = { requestId, text, resourceId ->
-                performSetText(requestId, text, resourceId)
+              onRequestSetText = { requestId, text, resourceId, dismissKeyboard ->
+                performSetText(requestId, text, resourceId, dismissKeyboard)
               },
               onRequestImeAction = { requestId, action -> performImeAction(requestId, action) },
               onRequestSelectAll = { requestId -> performSelectAll(requestId) },
@@ -2456,7 +2456,7 @@ class CtrlProxy : AccessibilityService() {
    * Perform text input using AccessibilityService's ACTION_SET_TEXT. This is significantly faster
    * than ADB's input text command.
    */
-  private fun performSetText(requestId: String?, text: String, resourceId: String?) {
+  private fun performSetText(requestId: String?, text: String, resourceId: String?, dismissKeyboard: Boolean = false) {
     val startTime = System.currentTimeMillis()
     Log.d(TAG, "performSetText: text='${text.take(20)}...' resourceId=$resourceId")
     perfProvider.serial("performSetText")
@@ -2508,6 +2508,22 @@ class CtrlProxy : AccessibilityService() {
       perfProvider.end()
 
       Log.d(TAG, "Set text completed: success=$success")
+
+      // Dismiss the soft keyboard if requested.
+      // When enabled (via --dismiss-keyboard-after-input or per-call dismissKeyboard param),
+      // SHOW_MODE_HIDDEN suppresses the keyboard globally for the accessibility service.
+      // This prevents the keyboard from stealing touch events and accessibility focus
+      // from UI elements behind it during subsequent tapOn steps.
+      if (success && dismissKeyboard) {
+        try {
+          softKeyboardController.setShowMode(
+              android.accessibilityservice.AccessibilityService.SHOW_MODE_HIDDEN
+          )
+          Log.d(TAG, "[KeyboardDismiss] Set SHOW_MODE_HIDDEN after text injection")
+        } catch (e: Exception) {
+          Log.w(TAG, "[KeyboardDismiss] softKeyboardController failed", e)
+        }
+      }
 
       // Trigger a hierarchy refresh after successful text input
       // This ensures the next observe will get the updated text

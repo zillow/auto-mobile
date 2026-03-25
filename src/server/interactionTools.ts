@@ -21,10 +21,14 @@ import {
   BootedDevice,
 } from "../models";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
+import { DefaultElementFinder } from "../features/utility/ElementFinder";
+import { AssertVisible } from "../features/action/AssertVisible";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import { createJSONToolResponse, createStructuredToolResponse } from "../utils/toolUtils";
 import { resolveSwipeDirection } from "../utils/swipeOnUtils";
 import { RecompositionTracker } from "../features/performance/RecompositionTracker";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
+import { serverConfig } from "../utils/ServerConfig";
 import {
   createElementIdTextSelectorSchema,
   elementContainerSchema,
@@ -59,6 +63,7 @@ import type {
   RecentAppsArgs,
   RotateArgs,
   ClipboardArgs,
+  AssertVisibleArgs,
 } from "./interactionToolTypes";
 
 import {
@@ -100,6 +105,7 @@ export type {
   RecentAppsArgs,
   RotateArgs,
   ClipboardArgs,
+  AssertVisibleArgs,
 };
 
 // Re-export system tray helpers for backward compatibility
@@ -122,12 +128,12 @@ export {
 export const shakeSchema = addDeviceTargetingToSchema(z.object({
   duration: z.number().optional().describe("Shake duration in ms (default: 1000)"),
   intensity: z.number().optional().describe("Shake acceleration intensity (default: 100)"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const keyboardSchema = addDeviceTargetingToSchema(z.object({
   action: z.enum(["open", "close", "detect"]).describe("Keyboard action"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 const tapOnBaseSchema = z.object({
@@ -142,16 +148,57 @@ const tapOnBaseSchema = z.object({
   searchUntil: z.object({
     duration: z.number().min(100).max(12000).optional().describe("Polling duration (ms, default: 500)"),
   }).optional().describe("Poll for element before tapping"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }).strict();
 
 const tapOnSelectorSchema = addDeviceTargetingToSchema(
   tapOnBaseSchema.extend(elementIdTextFieldsSchema.shape).strict()
 );
 
-export const tapOnSchema = tapOnSelectorSchema.superRefine((value, ctx) => {
+const tapOnByIdSchema = tapOnSelectorSchema.superRefine((value, ctx) => {
   validateElementIdTextSelector(value, ctx);
 });
+
+const tapOnByTextSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    text: z.string().min(1).describe("Element text"),
+    tapClickableParent: z.boolean().optional().describe(
+      "Tap the nearest clickable parent that contains the text element. " +
+      "Useful for list items where the clickable row doesn't have a resource-id " +
+      "but contains children with text."
+    )
+  }).strict()
+);
+
+const tapOnByClickableSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    clickable: z.literal(true).describe(
+      "Select clickable elements. Use with selectionStrategy: 'first' to tap " +
+      "the first clickable item in a list without knowing its text or ID."
+    ),
+    scrollableContainer: z.boolean().optional().describe(
+      "Only search within scrollable containers (lists/RecyclerViews). " +
+      "Use this to avoid tapping search bars or other clickable UI elements " +
+      "when you want the first list item."
+    )
+  }).strict()
+);
+
+const tapOnBySiblingOfTextSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    siblingOfText: z.string().min(1).describe(
+      "Find a clickable element that is a sibling of an element containing this text. " +
+      "Useful for tapping checkboxes, icons, or buttons next to a specific text label."
+    )
+  }).strict()
+);
+
+export const tapOnSchema = z.union([
+  tapOnByIdSchema,
+  tapOnByTextSchema,
+  tapOnByClickableSchema,
+  tapOnBySiblingOfTextSchema
+]);
 
 const tapOnResultSchema = z.object({
   success: z.boolean(),
@@ -221,7 +268,7 @@ export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
   holdDurationMs: z.number().min(100).max(3000).optional().describe(
     "Hold duration ms (min: 100, max: 3000, default: 100)"
   ),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
@@ -238,7 +285,7 @@ export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
   apexPause: z.number().min(0).max(3000).optional().describe("Pause duration at swipe apex in ms (0-3000)"),
   returnSpeed: z.number().min(0.1).max(3.0).optional().describe("Speed multiplier for return swipe (0.1-3.0)"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Swipe speed preset"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const pinchOnSchema = addDeviceTargetingToSchema(z.object({
@@ -253,21 +300,21 @@ export const pinchOnSchema = addDeviceTargetingToSchema(z.object({
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
   autoTarget: z.boolean().optional().describe("Auto-target pinchable containers"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const clearTextSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const selectAllTextSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const pressButtonSchema = addDeviceTargetingToSchema(z.object({
   button: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
     .describe("Button to press"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 const systemTrayNotificationSchema = z.object({
@@ -283,7 +330,7 @@ const systemTraySchemaBase = z.object({
   ),
   notification: systemTrayNotificationSchema.optional().describe("Notification criteria to match"),
   awaitTimeout: z.number().optional().describe("Timeout in ms to wait for notification (default: 5000)"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 });
 
 export const systemTraySchema = addDeviceTargetingToSchema(systemTraySchemaBase).superRefine((value, ctx) => {
@@ -319,59 +366,79 @@ export const systemTraySchema = addDeviceTargetingToSchema(systemTraySchemaBase)
 export const pressKeySchema = addDeviceTargetingToSchema(z.object({
   key: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
     .describe("Key to press"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const stopAppSchema = addDeviceTargetingToSchema(z.object({
   appId: z.string().describe("App package ID"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const clearStateSchema = addDeviceTargetingToSchema(z.object({
   appId: z.string().describe("App package ID"),
   clearKeychain: z.boolean().optional().describe("Clear iOS keychain"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const inputTextSchema = addDeviceTargetingToSchema(z.object({
-  text: z.string().describe("Text to input"),
+  text: z.string().min(1).describe("Text to input"),
   imeAction: z.enum(["done", "next", "search", "send", "go", "previous"]).optional()
     .describe("IME action after input"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  dismissKeyboard: z.boolean().optional()
+    .describe("(Android only) Dismiss soft keyboard after input. Overrides server-level --dismiss-keyboard-after-input flag. Ignored on iOS."),
+  platform: platformSchema
 }));
 
 export const openLinkSchema = addDeviceTargetingToSchema(z.object({
   url: z.string().describe("URL to open"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const imeActionSchema = addDeviceTargetingToSchema(z.object({
   action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const recentAppsSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const homeScreenSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const rotateSchema = addDeviceTargetingToSchema(z.object({
   orientation: z.enum(["portrait", "landscape"]).describe("Orientation"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 export const clipboardSchema = addDeviceTargetingToSchema(z.object({
   action: z.enum(["copy", "paste", "clear", "get"]).describe("Clipboard action: copy=set clipboard, paste=paste into focused field, clear=clear clipboard, get=get clipboard content"),
   text: z.string().optional().describe("Text to copy (required for 'copy' action)"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
+
+const assertVisibleByTextSchema = addDeviceTargetingToSchema(z.object({
+  text: z.string().min(1).describe("Element text to find"),
+  containerElementId: z.string().optional().describe("Container element ID to scope search"),
+  timeout: z.number().min(500).max(30000).optional().describe("Timeout in ms (default: 3000, min: 500, max: 30000). Use higher values for screens with loading/network calls"),
+  platform: platformSchema
+}).strict());
+
+const assertVisibleByIdSchema = addDeviceTargetingToSchema(z.object({
+  id: z.string().min(1).describe("Element resource ID / accessibility identifier"),
+  containerElementId: z.string().optional().describe("Container element ID to scope search"),
+  timeout: z.number().min(500).max(30000).optional().describe("Timeout in ms (default: 3000, min: 500, max: 30000). Use higher values for screens with loading/network calls"),
+  platform: platformSchema
+}).strict());
+
+export const assertVisibleSchema = z.union([assertVisibleByTextSchema, assertVisibleByIdSchema]);
 
 // ============================================================================
 // Tool Registration
 // ============================================================================
+
+const sharedElementFinder = new DefaultElementFinder();
 
 export function registerInteractionTools() {
   // Tap on handler
@@ -386,6 +453,10 @@ export function registerInteractionTools() {
       action: args.action,
       duration: args.duration,
       searchUntil: args.searchUntil,
+      tapClickableParent: args.tapClickableParent,
+      clickable: args.clickable,
+      scrollableContainer: args.scrollableContainer,
+      siblingOfText: args.siblingOfText,
     }, progress);
 
     const searchStats = result.searchUntil;
@@ -724,8 +795,9 @@ export function registerInteractionTools() {
   // Input text handler
   const inputTextHandler = async (device: BootedDevice, args: InputTextArgs) => {
     RecompositionTracker.getInstance().recordInteraction();
+    const dismissKeyboard = args.dismissKeyboard ?? serverConfig.isDismissKeyboardAfterInputEnabled();
     const inputText = new InputText(device);
-    const result = await inputText.execute(args.text, args.imeAction);
+    const result = await inputText.execute(args.text, args.imeAction, dismissKeyboard);
     return createJSONToolResponse({
       message: `Input text`,
       observation: result.observation,
@@ -878,6 +950,18 @@ export function registerInteractionTools() {
     }
   };
 
+  const assertVisibleHandler = async (
+    device: BootedDevice,
+    args: AssertVisibleArgs,
+    _progress?: ProgressCallback,
+    signal?: AbortSignal
+  ) => {
+    const observeScreen = new RealObserveScreen(device);
+    const assertVisible = new AssertVisible(observeScreen, sharedElementFinder);
+    const result = await assertVisible.execute(args, signal);
+    return createJSONToolResponse(result);
+  };
+
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "clearText",
@@ -1027,6 +1111,15 @@ export function registerInteractionTools() {
     "Clipboard operations (copy/paste/clear/get)",
     clipboardSchema,
     clipboardHandler,
+    false // Does not support progress notifications
+  );
+
+  // Register the assertVisible tool
+  ToolRegistry.registerDeviceAware(
+    "assertVisible",
+    "Assert that an element is visible on screen (polls until found or timeout)",
+    assertVisibleSchema,
+    assertVisibleHandler,
     false // Does not support progress notifications
   );
 }

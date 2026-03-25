@@ -127,9 +127,14 @@ export class TapOnElement extends BaseVisualChange {
   }
 
   private validateOptions(options: TapOnElementOptions): string | null {
-    const selectorCount = [options.text, options.elementId].filter(Boolean).length;
+    const selectorCount = [
+      options.text,
+      options.elementId,
+      options.clickable,
+      options.siblingOfText
+    ].filter(Boolean).length;
     if (selectorCount !== 1) {
-      return "tapOn requires exactly one of text or elementId";
+      return "tapOn requires exactly one of text, elementId, clickable, or siblingOfText";
     }
 
     if (options.container) {
@@ -181,7 +186,34 @@ export class TapOnElement extends BaseVisualChange {
     viewHierarchy: ViewHierarchyResult
   ): { selection: ElementSelectionResult; containerFound: boolean } {
     const containerFound = this.isContainerAvailable(viewHierarchy, options.container);
+
+    if (options.siblingOfText) {
+      return {
+        selection: this.elementSelector.selectClickableSiblingOfText(viewHierarchy, options.siblingOfText, {
+          container: options.container,
+          fuzzyMatch: true,
+          caseSensitive: false,
+          strategy: options.selectionStrategy
+        }),
+        containerFound
+      };
+    }
+
     if (options.text) {
+      // If tapClickableParent is true, find the clickable parent containing the text
+      if (options.tapClickableParent) {
+        return {
+          selection: this.elementSelector.selectClickableParentByText(viewHierarchy, options.text, {
+            container: options.container,
+            fuzzyMatch: true,
+            caseSensitive: false,
+            strategy: options.selectionStrategy
+          }),
+          containerFound
+        };
+      }
+
+      // Standard text selection
       return {
         selection: this.elementSelector.selectByText(viewHierarchy, options.text, {
           container: options.container,
@@ -192,6 +224,7 @@ export class TapOnElement extends BaseVisualChange {
         containerFound
       };
     }
+
     if (options.elementId) {
       return {
         selection: this.elementSelector.selectByResourceId(viewHierarchy, options.elementId, {
@@ -202,7 +235,19 @@ export class TapOnElement extends BaseVisualChange {
         containerFound
       };
     }
-    throw new ActionableError("tapOn requires non-blank text or elementId to interact with");
+
+    if (options.clickable) {
+      return {
+        selection: this.elementSelector.selectClickable(viewHierarchy, {
+          container: options.container,
+          strategy: options.selectionStrategy,
+          scrollableContainer: options.scrollableContainer
+        }),
+        containerFound
+      };
+    }
+
+    throw new ActionableError("tapOn requires non-blank text, elementId, clickable, or siblingOfText to interact with");
   }
 
   private prepareViewHierarchyForResponse(
@@ -400,16 +445,18 @@ export class TapOnElement extends BaseVisualChange {
       );
     }
 
+    const containerHint = options.container
+      ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
+      : "";
+
     let baseError: string;
-    if (options.text) {
-      const containerHint = options.container
-        ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
-        : "";
+    if (options.siblingOfText) {
+      baseError = `No clickable sibling found next to element with text '${options.siblingOfText}'${containerHint}`;
+    } else if (options.text) {
       baseError = `Element not found with provided text '${options.text}'${containerHint}`;
+    } else if (options.clickable) {
+      baseError = `No clickable element found${containerHint}`;
     } else {
-      const containerHint = options.container
-        ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
-        : "";
       baseError = `Element not found with provided elementId '${options.elementId}'${containerHint}`;
     }
 

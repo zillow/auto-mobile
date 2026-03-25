@@ -58,6 +58,65 @@ export class DefaultElementSelector implements ElementSelector {
     return this.pickMatch(matches, strategy);
   }
 
+  selectClickableParentByText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    options?: {
+      container?: { elementId?: string; text?: string } | null;
+      fuzzyMatch?: boolean;
+      caseSensitive?: boolean;
+      strategy?: ElementSelectionStrategy;
+    }
+  ): ElementSelectionResult {
+    const strategy = options?.strategy ?? "first";
+    const matches = this.finder.findClickableParentsContainingText(
+      viewHierarchy,
+      text,
+      options?.container ?? null,
+      options?.fuzzyMatch ?? true,
+      options?.caseSensitive ?? false
+    );
+    return this.pickMatch(matches, strategy);
+  }
+
+  selectClickable(
+    viewHierarchy: ViewHierarchyResult,
+    options?: {
+      container?: { elementId?: string; text?: string } | null;
+      strategy?: ElementSelectionStrategy;
+      scrollableContainer?: boolean;
+    }
+  ): ElementSelectionResult {
+    const strategy = options?.strategy ?? "first";
+    const matches = this.finder.findClickableElementsInContainer(
+      viewHierarchy,
+      options?.container ?? null,
+      options?.scrollableContainer ?? false
+    );
+    return this.pickMatch(matches, strategy);
+  }
+
+  selectClickableSiblingOfText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    options?: {
+      container?: { elementId?: string; text?: string } | null;
+      fuzzyMatch?: boolean;
+      caseSensitive?: boolean;
+      strategy?: ElementSelectionStrategy;
+    }
+  ): ElementSelectionResult {
+    const strategy = options?.strategy ?? "first";
+    const matches = this.finder.findClickableSiblingsOfText(
+      viewHierarchy,
+      text,
+      options?.container ?? null,
+      options?.fuzzyMatch ?? true,
+      options?.caseSensitive ?? false
+    );
+    return this.pickMatch(matches, strategy);
+  }
+
   private pickMatch(matches: Element[], strategy: ElementSelectionStrategy): ElementSelectionResult {
     const totalMatches = matches.length;
     if (totalMatches === 0) {

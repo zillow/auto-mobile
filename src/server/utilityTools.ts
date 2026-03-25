@@ -6,16 +6,16 @@ import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { BootedDevice, Platform } from "../models";
-import { addDeviceTargetingToSchema, addSessionUuidToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, addSessionUuidToSchema, platformSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
 export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
   deviceId: z.string().describe("Device ID"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: platformSchema
 }));
 
 const changeLocalizationBaseSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform"),
+  platform: platformSchema,
   locale: z.string().min(1).optional().describe("Locale tag (e.g., ar-SA, ja-JP)"),
   timeZone: z.string().min(1).optional().describe("Zone ID (e.g., America/Los_Angeles)"),
   textDirection: z.enum(["ltr", "rtl"]).optional().describe("Text direction"),

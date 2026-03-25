@@ -5,7 +5,7 @@ import { DebugSearch } from "../features/debug/DebugSearch";
 import { BugReport } from "../features/debug/BugReport";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice, Platform } from "../models";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
 import { isDebugModeEnabled } from "../utils/debug";
 import {
   elementContainerSchema,
@@ -43,7 +43,7 @@ export interface BugReportArgs {
 
 // Schema definitions
 const debugSearchBaseSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  platform: platformSchema,
   text: z.string().optional().describe("Text to search for in elements"),
   elementId: elementIdTextFieldsSchema.shape.elementId.describe(
     "Element resource ID / accessibility identifier to search for"
@@ -62,7 +62,7 @@ export const debugSearchSchema = addDeviceTargetingToSchema(debugSearchBaseSchem
 });
 
 export const bugReportSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  platform: platformSchema,
   appId: z.string().optional().describe("App package ID to filter logcat for specific app"),
   logcatLines: z.number().optional().describe("Number of recent logcat lines to include (default: 1000)"),
   saveDir: z.string().optional().describe("Directory to save report to")

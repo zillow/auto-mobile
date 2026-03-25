@@ -15,7 +15,8 @@ export class InputText extends BaseVisualChange {
 
   async execute(
     text: string,
-    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
+    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous",
+    dismissKeyboard: boolean = false
   ): Promise<SendTextResult & { method?: "a11y" }> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("inputText");
@@ -38,9 +39,11 @@ export class InputText extends BaseVisualChange {
           switch (this.device.platform) {
             case "android":
               return await perf.track("androidTextInput", () =>
-                this.executeAndroidTextInput(text, imeAction)
+                this.executeAndroidTextInput(text, imeAction, dismissKeyboard)
               );
             case "ios":
+              // dismissKeyboard is Android-only — it works around an emulator
+              // bug where the soft keyboard stays visible after setText.
               return await perf.track("iOSTextInput", () =>
                 this.executeiOSTextInput(text, imeAction)
               );
@@ -78,12 +81,13 @@ export class InputText extends BaseVisualChange {
    */
   private async executeAndroidTextInput(
     text: string,
-    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
+    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous",
+    dismissKeyboard: boolean = false
   ): Promise<SendTextResult & { method?: "a11y" }> {
     // Use accessibility service exclusively (fastest method, ~10-30ms vs ~200-300ms for ADB)
     // It also natively supports Unicode without needing virtual keyboard
     const a11yClient = AndroidCtrlProxyClient.getInstance(this.device, this.adb);
-    const a11yResult = await a11yClient.requestSetText(text);
+    const a11yResult = await a11yClient.requestSetText(text, undefined, undefined, undefined, dismissKeyboard);
 
     if (a11yResult.success) {
       logger.info(`[InputText] Text input via accessibility service: ${a11yResult.totalTimeMs}ms`);

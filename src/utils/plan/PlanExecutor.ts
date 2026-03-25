@@ -54,6 +54,47 @@ export class DefaultPlanExecutor implements PlanExecutor {
   }
 
   /**
+   * Extract the actual tool result from an MCP-formatted response.
+   *
+   * Tool handlers return responses wrapped by createJSONToolResponse():
+   *   { content: [{ type: "text", text: '{"success": false, "error": "..."}' }] }
+   *
+   * This method unwraps the MCP content envelope to get the actual result object
+   * (e.g., { success: false, error: "Element not found" }).
+   *
+   * If the response already has "success" at the top level (not wrapped), it is
+   * returned as-is for backward compatibility.
+   */
+  private extractToolResult(response: any): any {
+    if (!response || typeof response !== "object") {
+      return response;
+    }
+
+    // If "success" exists at the top level, the response is already unwrapped
+    if ("success" in response) {
+      return response;
+    }
+
+    // Unwrap MCP content format: { content: [{ type: "text", text: "JSON string" }] }
+    if (Array.isArray(response.content) && response.content.length > 0) {
+      const firstContent = response.content[0];
+      if (firstContent?.type === "text" && typeof firstContent.text === "string") {
+        try {
+          const parsed = JSON.parse(firstContent.text);
+          if (parsed && typeof parsed === "object" && "success" in parsed) {
+            return parsed;
+          }
+          return response;
+        } catch {
+          return response;
+        }
+      }
+    }
+
+    return response;
+  }
+
+  /**
    * Execute a plan step by step
    * @param plan Plan to execute
    * @param startStep Starting step index (default 0)
@@ -210,20 +251,27 @@ export class DefaultPlanExecutor implements PlanExecutor {
           // Execute the tool
           logger.info(`[PLAN_STEP_${i + 1}] Calling ${step.tool} with params: ${JSON.stringify(parsedParams).substring(0, 200)}`);
           const response = await tool.handler(parsedParams, undefined, signal);
-          logger.info(`[PLAN_STEP_${i + 1}] ${step.tool} completed. Response success: ${response?.success !== false ? "true" : "FALSE"}`);
+
+          // Extract the actual tool result from the response.
+          // Tool handlers return MCP-formatted responses via createJSONToolResponse():
+          //   { content: [{ type: "text", text: '{"success": false, "error": "..."}' }] }
+          // We need to unwrap this to check the actual success/failure status.
+          const toolResult = this.extractToolResult(response);
+          logger.info(`[PLAN_STEP_${i + 1}] ${step.tool} completed. Response success: ${toolResult?.success !== false ? "true" : "FALSE"}`);
 
           // Check if the response indicates failure
-          if (response && typeof response === "object" && "success" in response && response.success === false) {
-            logger.error(`[PLAN_STEP_${i + 1}] FAILED: ${step.tool} - ${response.error || "Unknown error"}`);
+          if (toolResult && typeof toolResult === "object" && "success" in toolResult && toolResult.success === false) {
+            const errorMsg = toolResult.error || "Unknown error";
+            logger.error(`[PLAN_STEP_${i + 1}] FAILED: ${step.tool} - ${errorMsg}`);
             debugSteps.push({
               step: `Execute step ${i + 1}: ${step.tool}`,
               status: "failed",
               durationMs: this.timer.now() - stepStartTime,
               details: {
                 params: step.params,
-                error: "error" in response ? String(response.error) : "Tool execution failed",
+                error: String(errorMsg),
                 // Include debug info from tool response if available
-                ...(response.debug ? { toolDebug: response.debug } : {})
+                ...(toolResult.debug ? { toolDebug: toolResult.debug } : {})
               }
             });
 
@@ -234,7 +282,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
               failedStep: {
                 stepIndex: i,
                 tool: step.tool,
-                error: "error" in response ? String(response.error) : "Tool execution failed"
+                error: String(errorMsg)
               },
               debug: {
                 executionTimeMs: this.timer.now() - startTime,
@@ -603,14 +651,19 @@ export class DefaultPlanExecutor implements PlanExecutor {
           );
           const response = await tool.handler(parsedParams, undefined, signal);
 
-          // Check if response indicates failure
+          // Unwrap MCP-formatted responses (same as sequential path) so that
+          // failures inside { content: [{ text: '{"success":false,...}' }] }
+          // are detected instead of silently treated as success.
+          const toolResult = this.extractToolResult(response);
+          const checkResult = toolResult ?? response;
+
           if (
-            response &&
-            typeof response === "object" &&
-            "success" in response &&
-            response.success === false
+            checkResult &&
+            typeof checkResult === "object" &&
+            "success" in checkResult &&
+            checkResult.success === false
           ) {
-            const errorMsg = "error" in response ? String(response.error) : "Tool execution failed";
+            const errorMsg = "error" in checkResult ? String(checkResult.error) : "Tool execution failed";
             logger.error(`[PARALLEL_EXEC][${device}] Tool failed: ${errorMsg}`);
 
             return {

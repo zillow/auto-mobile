@@ -6,6 +6,8 @@
 
 Almost all other tool calls have built-in observation via the [interaction loop](interaction-loop.md), but we also have a standalone [observe](observe/index.md) tool that specifically performs just that action to get the AI agent up to speed.
 
+- ✅ `assertVisible` polls the view hierarchy until an element matching text or resource ID is visible (or times out). Useful as a gate between interaction steps in test plans.
+
 #### Interactions
 
 - 👆 `tapOn` supports tap, double-tap, long press, and long-press drag actions.
@@ -52,6 +54,7 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 #### Testing & Debugging {#testing-debugging}
 
 - 🧪 `executePlan` (daemon mode only) executes a series of tool calls from a YAML plan content, stopping if any step fails.
+- 🎬 `recordSteps` captures MCP tool calls as a replayable YAML test plan. Use `action: "begin"` to start, `action: "end"` to stop and export, or `action: "status"` to check recording state. `begin` and `end` require the `mcp-recording` feature flag; `status` is always available.
 - 🔒 `criticalSection` (daemon mode only) coordinates multiple devices at a synchronization barrier for serialized steps.
 - 🩺 `doctor` runs diagnostic checks to verify AutoMobile setup and environment configuration.
 - 🐛 `bugReport` generates a comprehensive bug report including screen state, view hierarchy, logcat, screenshot, and optional highlight metadata.

@@ -6,16 +6,16 @@ import { NavigationGraphManager } from "../features/navigation/NavigationGraphMa
 import { Explore, ExploreOptions } from "../features/navigation/Explore";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
 export const navigateToSchema = addDeviceTargetingToSchema(z.object({
   targetScreen: z.string().describe("Target screen name"),
-  platform: z.enum(["android", "ios"]).default("android")
+  platform: platformSchema.default("android")
 }));
 
 export const getNavigationGraphSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).default("android")
+  platform: platformSchema.default("android")
 }));
 
 export const exploreSchema = addDeviceTargetingToSchema(z.object({
@@ -27,7 +27,7 @@ export const exploreSchema = addDeviceTargetingToSchema(z.object({
   mode: z.enum(["discover", "validate", "hybrid"]).optional().describe("Mode (default: hybrid)"),
   packageName: z.string().optional().describe("Package to limit exploration"),
   dryRun: z.boolean().optional().describe("Dry run (no interactions)"),
-  platform: z.enum(["android", "ios"]).default("android")
+  platform: platformSchema.default("android")
 }));
 
 

@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Shared platform schema — single source of truth for all tool schemas. */
+export const platformSchema = z.enum(["android", "ios"]).describe("Target platform");
+
 export const DEVICE_LABEL_DESCRIPTION =
   "Device label for multi-device plans (e.g., \"A\", \"B\")";
 

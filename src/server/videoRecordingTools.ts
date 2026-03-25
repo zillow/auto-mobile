@@ -8,7 +8,7 @@ import {
   VideoQualityPreset,
 } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
 import {
   listActiveVideoRecordings,
   startVideoRecording,
@@ -59,7 +59,7 @@ const highlightSchema = z.object({
 
 const videoRecordingSchema = addDeviceTargetingToSchema(z.object({
   action: z.enum(["start", "stop"]).describe("Action to perform"),
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  platform: platformSchema,
   deviceId: z.string().optional().describe("Optional device ID override"),
   recordingId: z.string().optional().describe("Recording ID to stop"),
   qualityPreset: z.enum(["low", "medium", "high"]).optional().describe("Recording quality preset"),

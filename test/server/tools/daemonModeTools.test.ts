@@ -11,15 +11,15 @@ describe("Daemon-only MCP tools", () => {
     (ToolRegistry as any).tools.clear();
   });
 
-  test("does not register executePlan or criticalSection outside daemon mode", () => {
+  test("registers plan tools in both modes, criticalSection only in daemon mode", () => {
     createMcpServer();
 
     const toolNames = ToolRegistry.getToolDefinitions().map(tool => tool.name);
-    expect(toolNames).not.toContain("executePlan");
+    expect(toolNames).toContain("executePlan");
     expect(toolNames).not.toContain("criticalSection");
   });
 
-  test("registers executePlan and criticalSection in daemon mode", () => {
+  test("registers criticalSection in daemon mode", () => {
     createMcpServer({ daemonMode: true });
 
     const toolNames = ToolRegistry.getToolDefinitions().map(tool => tool.name);

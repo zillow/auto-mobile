@@ -36,6 +36,15 @@ function resolvePackageRunner(): string | null {
 }
 
 /**
+ * Write a message to stderr so it never corrupts the MCP stdio channel.
+ * When the MCP server runs in proxy mode, stdout carries JSON-RPC traffic.
+ * All daemon lifecycle messages must go to stderr (or the file logger).
+ */
+function stderrLog(message: string): void {
+  process.stderr.write(message + "\n");
+}
+
+/**
  * Daemon Manager
  *
  * Handles daemon lifecycle:
@@ -105,23 +114,23 @@ export class DaemonManager {
     // Check for any running daemon processes from ANY worktree
     const otherDaemons = this.findAllDaemonProcesses();
     if (otherDaemons.length > 0) {
-      console.log(
+      stderrLog(
         `\nWARNING: Found ${otherDaemons.length} other auto-mobile daemon process(es) running:`
       );
       for (const pid of otherDaemons) {
-        console.log(`  - PID ${pid}`);
+        stderrLog(`  - PID ${pid}`);
       }
-      console.log(
+      stderrLog(
         `\nThese may be from other worktrees and can cause device pool conflicts.`
       );
-      console.log(`Stopping all other daemons before starting new one...`);
+      stderrLog(`Stopping all other daemons before starting new one...`);
 
       for (const pid of otherDaemons) {
         try {
           process.kill(pid, "SIGTERM");
-          console.log(`  Stopped PID ${pid}`);
+          stderrLog(`  Stopped PID ${pid}`);
         } catch (error) {
-          console.log(`  Failed to stop PID ${pid}: ${error}`);
+          stderrLog(`  Failed to stop PID ${pid}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
 
@@ -133,7 +142,7 @@ export class DaemonManager {
     // This ensures only one daemon runs on the host system (per user)
     const status = await this.status();
     if (status.running) {
-      console.log(
+      stderrLog(
         `Found existing daemon (PID ${status.pid}, port ${status.port}), stopping it...`
       );
       await this.stop();
@@ -147,7 +156,7 @@ export class DaemonManager {
       try {
         await unlink(SOCKET_PATH);
       } catch (error) {
-        logger.warn(`Failed to remove stale socket file: ${error}`);
+        logger.warn(`Failed to remove stale socket file: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     if (existsSync(PID_FILE_PATH)) {
@@ -155,11 +164,11 @@ export class DaemonManager {
       try {
         await unlink(PID_FILE_PATH);
       } catch (error) {
-        logger.warn(`Failed to remove stale PID file: ${error}`);
+        logger.warn(`Failed to remove stale PID file: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
-    console.log("Starting AutoMobile daemon...");
+    stderrLog("Starting AutoMobile daemon...");
 
     // Resolve the current binary so the daemon uses the same version.
     // process.argv[1] is the entry script (e.g. dist/src/index.js).
@@ -210,6 +219,9 @@ export class DaemonManager {
     if (options.videoMaxArchiveSizeMb !== undefined) {
       args.push("--video-archive-size-mb", options.videoMaxArchiveSizeMb.toString());
     }
+    if (options.mcpRecording) {
+      args.push("--mcp-recording");
+    }
 
     // Create secure temp directory with random suffix to prevent symlink attacks
     const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
@@ -238,11 +250,11 @@ export class DaemonManager {
     }
 
     const newStatus = await this.status();
-    console.log(
+    stderrLog(
       `Daemon started successfully (PID ${newStatus.pid}, port ${newStatus.port})`
     );
-    console.log(`Socket: ${newStatus.socketPath}`);
-    console.log(`Logs: ${logPath}`);
+    stderrLog(`Socket: ${newStatus.socketPath}`);
+    stderrLog(`Logs: ${logPath}`);
   }
 
   /**
@@ -252,11 +264,11 @@ export class DaemonManager {
     const status = await this.status();
 
     if (!status.running) {
-      console.log("Daemon is not running");
+      stderrLog("Daemon is not running");
       return;
     }
 
-    console.log(`Stopping daemon (PID ${status.pid})...`);
+    stderrLog(`Stopping daemon (PID ${status.pid})...`);
 
     const pid = status.pid!;
 
@@ -268,7 +280,7 @@ export class DaemonManager {
       const stopped = await this.waitForStop(pid, timeout);
 
       if (!stopped) {
-        console.log(`Daemon did not stop gracefully, sending SIGKILL...`);
+        stderrLog(`Daemon did not stop gracefully, sending SIGKILL...`);
         process.kill(pid, "SIGKILL");
 
         // Wait a bit more
@@ -280,7 +292,7 @@ export class DaemonManager {
         await unlink(PID_FILE_PATH);
       }
 
-      console.log("Daemon stopped");
+      stderrLog("Daemon stopped");
     } catch (error) {
       // Process doesn't exist or we don't have permission
       if (
@@ -291,7 +303,7 @@ export class DaemonManager {
         if (existsSync(PID_FILE_PATH)) {
           await unlink(PID_FILE_PATH);
         }
-        console.log("Daemon was not running (cleaned up stale PID file)");
+        stderrLog("Daemon was not running (cleaned up stale PID file)");
       } else {
         throw error;
       }
@@ -330,7 +342,7 @@ export class DaemonManager {
         version: pidData.version,
       };
     } catch (error) {
-      logger.warn(`Error reading PID file: ${error}`);
+      logger.warn(`Error reading PID file: ${error instanceof Error ? error.message : String(error)}`);
       return { running: false };
     }
   }
@@ -339,7 +351,7 @@ export class DaemonManager {
    * Restart the daemon
    */
   async restart(options: DaemonOptions = {}): Promise<void> {
-    console.log("Restarting daemon...");
+    stderrLog("Restarting daemon...");
     await this.stop();
     // Wait a bit before starting
     await this.timer.sleep(1000);
@@ -449,6 +461,8 @@ export async function runDaemonCommand(
             options.debug = true;
           } else if (args[i] === "--debug-perf") {
             options.debugPerf = true;
+          } else if (args[i] === "--mcp-recording") {
+            options.mcpRecording = true;
           } else if (args[i] === "--plan-execution-lock-scope") {
             const scope = args[i + 1];
             if (scope === "global" || scope === "session") {
@@ -527,6 +541,8 @@ export async function runDaemonCommand(
             options.debug = true;
           } else if (args[i] === "--debug-perf") {
             options.debugPerf = true;
+          } else if (args[i] === "--mcp-recording") {
+            options.mcpRecording = true;
           } else if (args[i] === "--plan-execution-lock-scope") {
             const scope = args[i + 1];
             if (scope === "global" || scope === "session") {
@@ -721,7 +737,7 @@ export async function runDaemonCommand(
     if (error instanceof ActionableError) {
       console.error(`Error: ${error.message}`);
     } else {
-      console.error(`Unexpected error: ${error}`);
+      console.error(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
     }
     process.exit(1);
   }

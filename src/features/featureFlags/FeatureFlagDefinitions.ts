@@ -7,7 +7,8 @@ export type FeatureFlagKey =
   | "predictive-ui"
   | "force-accessibility-mode"
   | "accessibility-auto-detect"
-  | "raw-element-search";
+  | "raw-element-search"
+  | "mcp-recording";
 
 export type FeatureFlagConfig = Record<string, unknown>;
 
@@ -86,5 +87,11 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     label: "Accessibility auto-detect",
     description: "Automatically detect and adapt to TalkBack/VoiceOver when enabled.",
     defaultValue: true,
+  },
+  {
+    key: "mcp-recording",
+    label: "MCP call recording",
+    description: "Enable the recordSteps tool to capture MCP tool calls as replayable YAML test plans.",
+    defaultValue: false,
   },
 ];

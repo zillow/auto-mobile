@@ -53,6 +53,28 @@ export interface ElementFinder {
 
   findClickableElements(viewHierarchy: ViewHierarchyResult): Element[];
 
+  findClickableElementsInContainer(
+    viewHierarchy: ViewHierarchyResult,
+    container: { elementId?: string; text?: string } | null,
+    scrollableContainer: boolean
+  ): Element[];
+
+  findClickableParentsContainingText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    container: { elementId?: string; text?: string } | null,
+    fuzzyMatch: boolean,
+    caseSensitive: boolean
+  ): Element[];
+
+  findClickableSiblingsOfText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    container: { elementId?: string; text?: string } | null,
+    fuzzyMatch: boolean,
+    caseSensitive: boolean
+  ): Element[];
+
   findChildElements(viewHierarchy: ViewHierarchyResult, parentElement: Element): Element[];
 
   findSpannables(element: Element): Element[] | null;

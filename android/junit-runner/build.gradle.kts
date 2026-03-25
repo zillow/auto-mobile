@@ -108,6 +108,7 @@ tasks.withType<Test> {
   environment("AUTOMOBILE_CTRL_PROXY_APK_PATH", accessibilityApk.get().asFile.absolutePath)
   systemProperty("automobile.ctrl.proxy.apk.path", accessibilityApk.get().asFile.absolutePath)
   systemProperty("automobile.daemon.force.restart", "true")
+  systemProperty("automobile.daemon.local.project.path", rootProject.rootDir.parentFile.absolutePath)
 
   testLogging {
     // Show standard output and error for tests

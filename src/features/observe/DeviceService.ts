@@ -200,7 +200,8 @@ export interface DeviceService {
     text: string,
     resourceId?: string,
     timeoutMs?: number,
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    dismissKeyboard?: boolean
   ): Promise<TextResult>;
 
   /**

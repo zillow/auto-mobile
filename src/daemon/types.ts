@@ -90,6 +90,8 @@ export interface DaemonOptions {
   videoFormat?: string;
   /** Default video archive size limit in MB */
   videoMaxArchiveSizeMb?: number;
+  /** Enable MCP recording feature flag */
+  mcpRecording?: boolean;
 }
 
 /**

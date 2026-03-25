@@ -125,6 +125,7 @@ data class RequestSetText(
   override val requestId: String? = null,
   val text: String,
   val resourceId: String? = null,
+  val dismissKeyboard: Boolean = false,
 ) : WebSocketRequest()
 
 @Serializable

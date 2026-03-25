@@ -43,6 +43,7 @@ export interface PressKeyArgs {
 export interface InputTextArgs {
   text: string;
   imeAction?: "done" | "next" | "search" | "send" | "go" | "previous";
+  dismissKeyboard?: boolean;
   platform: Platform;
 }
 
@@ -65,6 +66,10 @@ export interface TapOnArgs {
     duration?: number;
   };
   platform: Platform;
+  tapClickableParent?: boolean;
+  clickable?: boolean;
+  scrollableContainer?: boolean;
+  siblingOfText?: string;
 }
 
 export interface DragAndDropArgs {
@@ -146,5 +151,13 @@ export interface RotateArgs {
 export interface ClipboardArgs {
   action: "copy" | "paste" | "clear" | "get";
   text?: string;
+  platform: Platform;
+}
+
+export interface AssertVisibleArgs {
+  text?: string;
+  id?: string;
+  containerElementId?: string;
+  timeout?: number;
   platform: Platform;
 }

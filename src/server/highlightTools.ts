@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import {
   ActionableError,
@@ -38,7 +38,7 @@ const generateHighlightId = (timer: Timer = defaultTimer): string => {
 };
 
 const highlightBaseSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  platform: platformSchema,
   deviceId: z.string().optional().describe("Optional device ID override"),
   timeoutMs: z.number().int().positive().optional().describe("Highlight request timeout ms (default: 5000)"),
   description: z.string().optional().describe("Optional description of the highlight"),

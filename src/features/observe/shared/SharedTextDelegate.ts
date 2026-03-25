@@ -15,11 +15,16 @@ export class SharedTextDelegate {
     this.context = context;
   }
 
+  /**
+   * @param dismissKeyboard Android-only. Suppresses the soft keyboard via
+   *   SHOW_MODE_HIDDEN after setText. Ignored on iOS (no handler on Swift side).
+   */
   async requestSetText(
     text: string,
     resourceId?: string,
     timeoutMs: number = 5000,
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    dismissKeyboard: boolean = false
   ): Promise<BaseResult> {
     this.context.cancelScreenshotBackoff();
 
@@ -42,6 +47,9 @@ export class SharedTextDelegate {
     const params: Record<string, unknown> = { text };
     if (resourceId) {
       params.resourceId = resourceId;
+    }
+    if (dismissKeyboard) {
+      params.dismissKeyboard = true;
     }
 
     const msg = createMessage("request_set_text", requestId, params);

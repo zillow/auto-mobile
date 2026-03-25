@@ -62,6 +62,7 @@ data class LegacyWebSocketRequest(
     // Text input parameters
     val text: String? = null,
     val resourceId: String? = null, // Optional: target specific element by resource-id
+    val dismissKeyboard: Boolean = false,
     // Certificate parameters
     val certificate: String? = null,
     val alias: String? = null,
@@ -148,7 +149,7 @@ class WebSocketServer(
         ) -> Unit)? =
         null,
     private val onRequestSetText:
-        ((requestId: String?, text: String, resourceId: String?) -> Unit)? =
+        ((requestId: String?, text: String, resourceId: String?, dismissKeyboard: Boolean) -> Unit)? =
         null,
     private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null,
     private val onRequestSelectAll: ((requestId: String?) -> Unit)? = null,
@@ -603,7 +604,7 @@ class WebSocketServer(
           Log.d(TAG, "Received set_text request (requestId: ${request.requestId})")
           val text = request.text
           if (text != null) {
-            onRequestSetText?.invoke(request.requestId, text, request.resourceId)
+            onRequestSetText?.invoke(request.requestId, text, request.resourceId, request.dismissKeyboard)
           } else {
             Log.w(TAG, "Set text request missing required text")
           }

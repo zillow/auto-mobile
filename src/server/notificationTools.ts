@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ActionableError, BootedDevice, Platform } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
 import { PostNotification, PostNotificationOptions } from "../features/utility/PostNotification";
 
 export interface PostNotificationArgs extends PostNotificationOptions {
@@ -22,7 +22,7 @@ export const postNotificationSchema = addDeviceTargetingToSchema(
     imagePath: z.string().optional().describe("Host image file path to push to /sdcard/Download/automobile when imageType is bigPicture"),
     actions: z.array(actionSchema).optional().describe("Action buttons to include"),
     channelId: z.string().optional().describe("Notification channel ID (Android only)"),
-    platform: z.enum(["android", "ios"]).describe("Platform")
+    platform: platformSchema
   })
 );
 

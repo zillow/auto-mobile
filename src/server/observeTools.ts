@@ -9,7 +9,7 @@ import { BootedDevice, Element, ObserveResult, ViewHierarchyResult } from "../mo
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { IdentifyInteractions, IdentifyInteractionsOptions } from "../features/observe/IdentifyInteractions";
-import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, platformSchema } from "./toolSchemaHelpers";
 import { DefaultElementFinder } from "../features/utility/ElementFinder";
 import type { ElementFinder } from "../utils/interfaces/ElementFinder";
 import { defaultTimer } from "../utils/SystemTimer";
@@ -26,6 +26,7 @@ import {
   selectedElementSchema,
   systemInsetsSchema
 } from "./toolOutputSchemas";
+
 // Schema definitions
 // waitFor accepts elementId OR text directly (oneOf), plus optional timeout
 const waitForSchema = z.union([
@@ -40,7 +41,7 @@ const waitForSchema = z.union([
 ]);
 
 export const observeSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform"),
+  platform: platformSchema,
   waitFor: waitForSchema.optional().describe("Wait for element to appear before returning observation"),
   raw: z.boolean().optional().describe("When true, include unprocessed view hierarchy in response alongside normal output (default: false)")
 }));
@@ -85,7 +86,7 @@ const observeResultSchema = z.object({
 }).passthrough();
 
 export const identifyInteractionsSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform"),
+  platform: platformSchema,
   filter: z.object({
     types: z.array(z.enum(["navigation", "input", "action", "scroll", "toggle"]))
       .optional()
