@@ -16,7 +16,7 @@ import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 object SdkEventBroadcaster {
 
   const val ACTION_SDK_EVENT_BATCH = "dev.jasonpearson.automobile.sdk.EVENT_BATCH"
-  internal const val MAX_BATCH_BYTES = 500_000 // 500KB per Intent
+  internal const val MAX_BATCH_BYTES = 100_000 // 100KB per Intent — lower to avoid TransactionTooLargeException
 
   /**
    * Broadcast a batch of events. Called by [SdkEventBuffer] on flush.

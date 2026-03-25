@@ -39,10 +39,14 @@ object AutoMobileClickTracker {
     private const val TAP_SLOP_PX = 20 // Max movement to still be a tap
     private const val TAP_TIMEOUT_MS = 500L // Max duration for a tap
 
+    /** Minimum interval between accessibility tree traversals to avoid piling up work. */
+    private const val TAP_DEBOUNCE_MS = 100L
+
     private var buffer: SdkEventBuffer? = null
     private var applicationId: String? = null
     private val handler = Handler(Looper.getMainLooper())
     private val wrappedActivities = java.util.WeakHashMap<Activity, Boolean>()
+    @Volatile private var lastTapProcessedAt = 0L
 
     fun initialize(application: Application, appId: String?, buffer: SdkEventBuffer) {
         this.buffer = buffer
@@ -119,6 +123,9 @@ object AutoMobileClickTracker {
 
         private fun emitTapEvent(x: Float, y: Float, durationMs: Long) {
             val buf = buffer ?: return
+            val now = System.currentTimeMillis()
+            if (now - lastTapProcessedAt < TAP_DEBOUNCE_MS) return
+            lastTapProcessedAt = now
             try {
                 val decorView = window.decorView
                 val info = findDeepestNodeAt(decorView, x.toInt(), y.toInt())

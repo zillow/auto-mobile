@@ -1,10 +1,10 @@
 package dev.jasonpearson.automobile.sdk
 
 import android.content.Context
-import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import dev.jasonpearson.automobile.protocol.NavigationSourceType
 import dev.jasonpearson.automobile.protocol.SdkCustomEvent
-import dev.jasonpearson.automobile.protocol.SdkEventSerializer
 import dev.jasonpearson.automobile.protocol.SdkNavigationEvent
 import dev.jasonpearson.automobile.sdk.anr.AutoMobileAnr
 import dev.jasonpearson.automobile.sdk.biometrics.AutoMobileBiometrics
@@ -85,15 +85,10 @@ object AutoMobileSDK {
     buffer.start()
     eventBuffer = buffer
 
-    // Initialize telemetry subsystems with the shared buffer
+    // Thread-safe subsystems — can initialize from any thread
     AutoMobileNetwork.initialize(appContext.packageName, buffer)
     AutoMobileLog.initialize(appContext.packageName, buffer)
-    AutoMobileOsEvents.initialize(appContext, buffer)
     AutoMobileBroadcastInterceptor.initialize(appContext, buffer)
-
-    // Initialize existing subsystems
-    RecompositionTracker.initialize(appContext)
-    AutoMobileNotifications.initialize(appContext)
     DatabaseInspector.initialize(appContext)
     SharedPreferencesInspector.initialize(appContext)
     AutoMobileFailures.initialize(appContext)
@@ -101,9 +96,15 @@ object AutoMobileSDK {
     AutoMobileAnr.initialize(appContext)
     AutoMobileBiometrics.initialize(appContext)
 
-    // Auto-track taps across all Activities (Compose, XML, React Native, etc.)
-    if (appContext is Application) {
-      AutoMobileClickTracker.initialize(appContext, appContext.packageName, buffer)
+    // Subsystems that register lifecycle observers or activity callbacks must run on main thread
+    val mainHandler = Handler(Looper.getMainLooper())
+    mainHandler.post {
+      AutoMobileOsEvents.initialize(appContext, buffer)
+      RecompositionTracker.initialize(appContext)
+      AutoMobileNotifications.initialize(appContext)
+      if (appContext is Application) {
+        AutoMobileClickTracker.initialize(appContext, appContext.packageName, buffer)
+      }
     }
   }
 
@@ -132,7 +133,7 @@ object AutoMobileSDK {
 
   /**
    * Notifies all registered listeners of a navigation event. This method is typically called by
-   * framework adapters. Also broadcasts the event via Intent for cross-process communication.
+   * framework adapters. Events are routed through the shared event buffer for async delivery.
    *
    * @param event The navigation event to emit
    */
@@ -149,44 +150,23 @@ object AutoMobileSDK {
       }
     }
 
-    // Broadcast event for cross-process communication (e.g., to accessibility service)
-    context?.let { ctx ->
-      try {
-        val timestamp = System.currentTimeMillis()
+    // Route navigation events through the shared event buffer so they are
+    // batched and broadcast on the buffer's background thread instead of
+    // blocking the caller (which is often the main thread).
+    val buf = eventBuffer ?: return
+    val ctx = context ?: return
+    val timestamp = System.currentTimeMillis()
 
-        // Create protocol event for type-safe serialization
-        val sdkEvent = SdkNavigationEvent(
-          timestamp = timestamp,
-          applicationId = ctx.packageName,
-          destination = event.destination,
-          source = event.source.toProtocolType(),
-          arguments = event.arguments.mapValues { it.value?.toString() ?: "null" },
-          metadata = event.metadata,
-        )
-
-        val intent =
-            Intent(ACTION_NAVIGATION_EVENT).apply {
-              // Type-safe serialized event (new protocol)
-              putExtra(SdkEventSerializer.EXTRA_SDK_EVENT_JSON, SdkEventSerializer.toJson(sdkEvent))
-              putExtra(SdkEventSerializer.EXTRA_SDK_EVENT_TYPE, SdkEventSerializer.EventTypes.NAVIGATION)
-
-              // Legacy extras for backward compatibility with older AccessibilityService versions
-              putExtra(EXTRA_DESTINATION, event.destination)
-              putExtra(EXTRA_SOURCE, event.source.name)
-              putExtra(EXTRA_TIMESTAMP, timestamp)
-              putExtra(EXTRA_APPLICATION_ID, ctx.packageName)
-              // Serialize arguments as strings
-              event.arguments.forEach { (key, value) ->
-                putExtra("arg_$key", value?.toString() ?: "null")
-              }
-              // Serialize metadata
-              event.metadata.forEach { (key, value) -> putExtra("meta_$key", value) }
-            }
-        ctx.sendBroadcast(intent)
-      } catch (e: Exception) {
-        e.printStackTrace()
-      }
-    }
+    buf.add(
+      SdkNavigationEvent(
+        timestamp = timestamp,
+        applicationId = ctx.packageName,
+        destination = event.destination,
+        source = event.source.toProtocolType(),
+        arguments = event.arguments.mapValues { it.value?.toString() ?: "null" },
+        metadata = event.metadata,
+      )
+    )
   }
 
   /**
