@@ -461,7 +461,11 @@ class ToolRegistryClass {
         }
       };
 
-      server.tool(tool.name, tool.description, tool.schema, wrappedHandler);
+      server.registerTool(tool.name, {
+        description: tool.description,
+        inputSchema: tool.schema,
+        ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {})
+      }, wrappedHandler);
     });
   }
 
