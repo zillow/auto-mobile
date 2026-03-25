@@ -322,10 +322,14 @@ wait_for_startup_report() {
   local start_ms
   start_ms=$(get_time_ms)
   local last_non_report=""
+  local partial=""
 
   while true; do
     local line=""
     if IFS= read -r -t 1 line <&"$fd"; then
+      # Prepend any partial data accumulated from previous timeout reads
+      line="${partial}${line}"
+      partial=""
       log_line "$stderr_log" "$line" "$prefix"
       if [[ "$line" == STARTUP_BENCHMARK* ]]; then
         local report="${line#STARTUP_BENCHMARK }"
@@ -338,15 +342,37 @@ wait_for_startup_report() {
           printf -v "$last_line_var" '%s' "$last_non_report"
         fi
         return 0
+      elif [[ "$line" == *STARTUP_BENCHMARK* ]]; then
+        # Line contains the prefix but not at the start — a prior partial read
+        # consumed leading bytes. Extract the report from the embedded prefix.
+        local report="${line#*STARTUP_BENCHMARK }"
+        if [[ -n "$report_var" ]]; then
+          printf -v "$report_var" '%s' "$report"
+        else
+          printf '%s\n' "$report"
+        fi
+        if [[ -n "$last_line_var" ]]; then
+          printf -v "$last_line_var" '%s' "$last_non_report"
+        fi
+        return 0
       fi
       last_non_report="$line"
+    else
+      # read -t timed out or hit EOF; if line has partial data, accumulate it
+      if [[ -n "$line" ]]; then
+        partial="${partial}${line}"
+      fi
     fi
 
     local now_ms
     now_ms=$(get_time_ms)
     if (( now_ms - start_ms >= timeout_ms )); then
       if [[ -n "$last_line_var" ]]; then
-        printf -v "$last_line_var" '%s' "$last_non_report"
+        if [[ -n "$partial" ]]; then
+          printf -v "$last_line_var" '%s' "$partial"
+        else
+          printf -v "$last_line_var" '%s' "$last_non_report"
+        fi
       fi
       return 1
     fi
