@@ -3,7 +3,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { ensureDirExists, statAsync, renameAsync } from "./io";
+import { ensureDirExists, statAsync, renameAsync, readdirAsync, unlinkAsync } from "./io";
 
 /**
  * Interface for logger functionality
@@ -87,6 +87,27 @@ let logStream = fs.createWriteStream(logFilePath, { flags: "a" });
 // Maximum log file size (10MB)
 const MAX_LOG_SIZE = 10 * 1024 * 1024;
 
+// Maximum number of log files to keep (including the active one)
+const MAX_LOG_FILES = 10;
+
+// Maximum number of log files to delete per prune pass
+const MAX_PRUNE_LOG_FILES = 10;
+
+// Remove oldest log files when the count exceeds MAX_LOG_FILES
+const pruneOldLogFiles = async (): Promise<void> => {
+  const entries = await readdirAsync(logsDir);
+  const logFiles = entries.filter(f => f.endsWith(".log")).sort();
+
+  if (logFiles.length <= MAX_LOG_FILES) return;
+
+  // Sort alphabetically — server.log sorts last, server-<timestamp>.log files
+  // sort chronologically. Delete the oldest until we're at the limit.
+  const toDelete = logFiles.slice(0, logFiles.length - MAX_LOG_FILES).slice(0, MAX_PRUNE_LOG_FILES);
+  for (const file of toDelete) {
+    await unlinkAsync(path.join(logsDir, file));
+  }
+};
+
 // Function to check log file size and rotate if necessary
 const checkAndRotateLog = async (): Promise<void> => {
   try {
@@ -108,6 +129,9 @@ const checkAndRotateLog = async (): Promise<void> => {
 
         // Always create a new log stream after rotation attempt
         logStream = fs.createWriteStream(logFilePath, { flags: "a" });
+
+        // Prune old log files to stay within the cap
+        await pruneOldLogFiles();
       }
     }
   } catch (err) {

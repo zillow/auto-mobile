@@ -8,6 +8,7 @@ export const readdirAsync = fsPromises.readdir;
 
 // Additional promisified fs functions
 export const renameAsync = fsPromises.rename;
+export const unlinkAsync = fsPromises.unlink;
 
 // Helper functions for common operations
 export const ensureDirExists = async (dirPath: string): Promise<void> => {
