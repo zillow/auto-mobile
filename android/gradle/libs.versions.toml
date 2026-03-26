@@ -64,6 +64,7 @@ okhttp = "5.3.2"
 
 # Publishing
 mavenpublish = "0.36.0"
+compose-multiplatform = "1.8.1"
 
 [plugins]
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
@@ -72,6 +73,7 @@ android-application = { id = "com.android.application", version.ref = "build-and
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "build-kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "build-kotlin" }
 mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenpublish" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 
 [libraries]
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "core-splashscreen" }

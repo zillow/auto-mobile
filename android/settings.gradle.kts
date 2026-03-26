@@ -42,7 +42,11 @@ include(":test-plan-validation")
 
 include(":video-server")
 
+include(":desktop-core")
+
 include(":ide-plugin")
+
+include(":desktop-app")
 
 include(":playground:analytics")
 

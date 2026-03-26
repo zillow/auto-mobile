@@ -8,7 +8,7 @@
 # the timeout expires (default 60 minutes).
 #
 # Components watched (in order):
-#   1. IntelliJ/Android Studio IDE plugin
+#   1. Desktop app (Compose Desktop via desktop-core + desktop-app)
 #   2. Android AccessibilityService (with sha updates for TypeScript)
 #   3. iOS CtrlProxy (with sha updates for TypeScript)
 #   4. MCP TypeScript daemon
@@ -17,13 +17,11 @@
 #   ./scripts/local-dev/hot-reload.sh [options]
 #
 # Options:
-#   --ide <name>         Pre-select IDE by name (skip prompt)
 #   --device <id>        Target specific ADB device
 #   --simulator <udid>   Target specific iOS simulator
 #   --once               Build all components once and exit
 #   --poll-interval <s>  File watch interval (default: 2)
 #   --timeout <m>        Background watcher timeout in minutes (default: 60)
-#   --no-ide-restart     Install IDE plugin without restarting
 #   --help               Show help
 #
 # Environment:
@@ -59,17 +57,14 @@ DERIVED_DATA_PATH="/tmp/automobile-ctrl-proxy"
 PID_FILE="${PROJECT_ROOT}/.automobile-hot-reload.pid"
 
 # CLI options with defaults
-IDE_NAME=""
 DEVICE_ID=""
 SIMULATOR_ID=""
 RUN_ONCE=false
 POLL_INTERVAL=2
 TIMEOUT_MINUTES=60
-NO_IDE_RESTART=false
 
 # Runtime state
-IDE_PLUGINS_DIR=""
-IDE_PLUGIN_ENABLED=false
+DESKTOP_APP_ENABLED=false
 ANDROID_ENABLED=false
 IOS_ENABLED=false
 HAVE_DEVICE=false
@@ -94,19 +89,17 @@ Usage: $0 [options]
 AutoMobile unified hot-reload development workflow.
 
 Watches all components in a single loop:
-  1. IntelliJ/Android Studio IDE plugin
+  1. Desktop app (Compose Desktop)
   2. Android AccessibilityService (with sha updates)
   3. iOS CtrlProxy (with sha updates)
   4. MCP TypeScript daemon
 
 Options:
-  --ide <name>         Pre-select IDE by name (e.g., "Android Studio")
   --device <id>        Target specific ADB device
   --simulator <udid>   Target specific iOS simulator
   --once               Build all components once and exit
   --poll-interval <s>  File watch interval (default: 2)
   --timeout <m>        Background watcher timeout in minutes (default: 60)
-  --no-ide-restart     Install IDE plugin without restarting
   --help               Show this help text
 
 Environment variables:
@@ -315,111 +308,13 @@ hash_apk_watch_state() {
   done | sort | hash_stream
 }
 
-# Restart IDE using full path (not relying on Spotlight)
-# Uses direct binary execution instead of 'open -a "..."'
-restart_ide_full_path() {
-  if [[ -z "${SELECTED_IDE_NAME}" || -z "${SELECTED_IDE_PATH}" ]]; then
-    log_error "No IDE selected. Call select_ide first."
+# Setup desktop app
+setup_desktop_app() {
+  log_info "Building desktop app (desktop-core + desktop-app)..."
+  if ! build_desktop_app; then
+    log_error "Desktop app build failed. Fix errors and retry."
     return 1
   fi
-
-  log_info "Restarting ${SELECTED_IDE_NAME}..."
-
-  # Extract app name for osascript
-  local app_name
-  app_name=$(basename "${SELECTED_IDE_PATH}" .app)
-
-  # Determine the binary name inside the .app bundle
-  local binary_name
-  if [[ "${SELECTED_IDE_TYPE}" == "android-studio" ]]; then
-    binary_name="studio"
-  else
-    binary_name="idea"
-  fi
-
-  # Find the actual binary path
-  local binary_path="${SELECTED_IDE_PATH}/Contents/MacOS/${binary_name}"
-  if [[ ! -x "${binary_path}" ]]; then
-    log_warn "Binary not found at ${binary_path}, falling back to open command"
-    binary_path=""
-  fi
-
-  # Step 1: Graceful quit via osascript
-  log_info "Sending quit signal..."
-  osascript -e "tell application \"${app_name}\" to quit" 2>/dev/null || true
-
-  # Step 2: Wait for exit (max 10s)
-  local count=0
-  local process_pattern="${binary_name}"
-
-  while pgrep -f "${process_pattern}" >/dev/null 2>&1 && [[ ${count} -lt 10 ]]; do
-    sleep 1
-    count=$((count + 1))
-  done
-
-  # Step 3: Force kill if still running
-  if pgrep -f "${process_pattern}" >/dev/null 2>&1; then
-    log_warn "Force killing IDE..."
-    pkill -9 -f "${process_pattern}" 2>/dev/null || true
-    sleep 1
-  fi
-
-  # Step 4: Relaunch using full binary path (completely bypasses Spotlight)
-  log_info "Launching ${app_name} from ${SELECTED_IDE_PATH}..."
-  if [[ -n "${binary_path}" ]]; then
-    # Launch the binary directly in background
-    # This completely bypasses Spotlight and Launch Services
-    nohup "${binary_path}" >/dev/null 2>&1 &
-  else
-    # Fallback: use open with full .app path (still avoids Spotlight name lookup)
-    open "${SELECTED_IDE_PATH}"
-  fi
-
-  log_info "IDE restarted."
-  return 0
-}
-
-# Setup IDE plugin
-setup_ide_plugin() {
-  if [[ "$(uname -s)" != "Darwin" ]]; then
-    log_warn "IDE plugin hot-reload only supported on macOS."
-    return 1
-  fi
-
-  if ! ensure_gum; then
-    if [[ -z "${IDE_NAME}" ]]; then
-      log_warn "gum not available. Use --ide <name> to specify the IDE."
-      return 1
-    fi
-  fi
-
-  log_info "Detecting installed IDEs..."
-  if ! select_ide "${IDE_NAME}"; then
-    log_error "IDE selection failed."
-    return 1
-  fi
-
-  IDE_PLUGINS_DIR=$(get_ide_plugins_dir)
-  if [[ -z "${IDE_PLUGINS_DIR}" ]]; then
-    log_error "Could not determine plugins directory."
-    return 1
-  fi
-
-  log_info "Plugins directory: ${IDE_PLUGINS_DIR}"
-  # shellcheck disable=SC2153  # IDE_PLUGIN_DIR is defined in lib/ide-plugin.sh
-  log_info "IDE plugin source: ${IDE_PLUGIN_DIR}/src"
-
-  log_info "Building IDE plugin..."
-  if ! build_ide_plugin; then
-    log_error "IDE plugin build failed. Fix errors and retry."
-    return 1
-  fi
-
-  if ! install_ide_plugin "${IDE_PLUGINS_DIR}"; then
-    log_error "IDE plugin install failed."
-    return 1
-  fi
-
   return 0
 }
 
@@ -514,10 +409,10 @@ unified_watch_loop() {
   local poll_interval="${1:-2}"
 
   log_info "Starting unified watch loop (poll interval ${poll_interval}s)..."
-  log_info "Watching: IDE plugin=$(bool_str ${IDE_PLUGIN_ENABLED}), Android=$(bool_str ${ANDROID_ENABLED}), iOS=$(bool_str ${IOS_ENABLED}), TypeScript=true"
+  log_info "Watching: Desktop app=$(bool_str ${DESKTOP_APP_ENABLED}), Android=$(bool_str ${ANDROID_ENABLED}), iOS=$(bool_str ${IOS_ENABLED}), TypeScript=true"
 
   # Initialize hashes
-  if [[ "${IDE_PLUGIN_ENABLED}" == "true" ]]; then
+  if [[ "${DESKTOP_APP_ENABLED}" == "true" ]]; then
     LAST_IDE_PLUGIN_HASH="$(hash_ide_plugin_state)"
   fi
   if [[ "${ANDROID_ENABLED}" == "true" ]]; then
@@ -548,26 +443,18 @@ unified_watch_loop() {
       fi
     fi
 
-    # === 1. Check IDE plugin changes ===
-    if [[ "${IDE_PLUGIN_ENABLED}" == "true" ]]; then
+    # === 1. Check desktop app changes ===
+    if [[ "${DESKTOP_APP_ENABLED}" == "true" ]]; then
       local next_ide_hash
       next_ide_hash="$(hash_ide_plugin_state)"
       if [[ "${next_ide_hash}" != "${LAST_IDE_PLUGIN_HASH}" ]]; then
-        log_info "[IDE Plugin] Change detected. Rebuilding..."
+        log_info "[Desktop App] Change detected. Rebuilding and restarting..."
         LAST_IDE_PLUGIN_HASH="${next_ide_hash}"
 
-        if build_ide_plugin; then
-          if install_ide_plugin "${IDE_PLUGINS_DIR}"; then
-            if [[ "${NO_IDE_RESTART}" != "true" ]]; then
-              restart_ide_full_path
-            else
-              log_info "[IDE Plugin] Installed. Restart IDE to apply changes."
-            fi
-          else
-            log_warn "[IDE Plugin] Install failed; waiting for next change."
-          fi
+        if build_desktop_app; then
+          run_desktop_app
         else
-          log_warn "[IDE Plugin] Build failed; waiting for next change."
+          log_warn "[Desktop App] Build failed; waiting for next change."
         fi
 
         LAST_IDE_PLUGIN_HASH="$(hash_ide_plugin_state)"
@@ -723,15 +610,6 @@ cleanup() {
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --ide)
-      if [[ $# -lt 2 ]]; then
-        log_error "--ide requires a value."
-        usage
-        exit 1
-      fi
-      IDE_NAME="$2"
-      shift 2
-      ;;
     --device)
       if [[ $# -lt 2 ]]; then
         log_error "--device requires a value."
@@ -772,10 +650,6 @@ while [[ $# -gt 0 ]]; do
       TIMEOUT_MINUTES="$2"
       shift 2
       ;;
-    --no-ide-restart)
-      NO_IDE_RESTART=true
-      shift
-      ;;
     --help|-h)
       usage
       exit 0
@@ -802,12 +676,12 @@ fi
 
 log_info "=== AutoMobile Unified Hot-Reload ==="
 
-# Setup IDE plugin
-if setup_ide_plugin; then
-  IDE_PLUGIN_ENABLED=true
-  log_info "IDE plugin setup complete."
+# Setup desktop app
+if setup_desktop_app; then
+  DESKTOP_APP_ENABLED=true
+  log_info "Desktop app setup complete."
 else
-  log_warn "IDE plugin setup failed. Continuing without IDE plugin hot-reload."
+  log_warn "Desktop app setup failed. Continuing without desktop app hot-reload."
 fi
 
 # Setup Android
@@ -829,8 +703,8 @@ fi
 # Handle --once mode
 if [[ "${RUN_ONCE}" == "true" ]]; then
   log_info "Run-once mode complete."
-  if [[ "${IDE_PLUGIN_ENABLED}" == "true" && "${NO_IDE_RESTART}" != "true" ]]; then
-    restart_ide_full_path
+  if [[ "${DESKTOP_APP_ENABLED}" == "true" ]]; then
+    run_desktop_app
   fi
   exit 0
 fi
@@ -841,9 +715,9 @@ kill_previous
 # Change to project root
 cd "${PROJECT_ROOT}"
 
-# Restart IDE for initial plugin install (foreground, before backgrounding)
-if [[ "${IDE_PLUGIN_ENABLED}" == "true" && "${NO_IDE_RESTART}" != "true" ]]; then
-  restart_ide_full_path
+# Launch desktop app for initial run (foreground, before backgrounding watcher)
+if [[ "${DESKTOP_APP_ENABLED}" == "true" ]]; then
+  run_desktop_app
 fi
 
 # Launch background watcher
@@ -855,6 +729,7 @@ WATCHER_LOG="${PROJECT_ROOT}/scratch/hot-reload.log"
   # shellcheck disable=SC2317,SC2329 # invoked indirectly via trap
   watcher_cleanup() {
     log_info "Watcher stopping..."
+    stop_desktop_app
     stop_ctrl_proxy_ios
     rm -f "${PID_FILE}"
   }

@@ -14,6 +14,54 @@ permissions:
   packages: write
 
 jobs:
+  build-desktop-core:
+    name: "Build Desktop Core Module"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":desktop-core:build -x test"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+  desktop-core-unit-tests:
+    name: "Run Desktop Core Unit Tests"
+    runs-on: ubuntu-latest
+    needs: build-desktop-core
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":desktop-core:test"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Upload Test Results"
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-core-test-results
+          path: android/desktop-core/build/reports/tests/test/
+
   build-ide-plugin:
     name: "Build IDE Plugin"
     runs-on: ubuntu-latest
@@ -80,6 +128,54 @@ jobs:
         with:
           name: ide-plugin-test-results
           path: android/ide-plugin/build/reports/tests/test/
+
+  build-desktop-app:
+    name: "Build Desktop App"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":desktop-app:build -x test"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+  desktop-app-unit-tests:
+    name: "Run Desktop App Unit Tests"
+    runs-on: ubuntu-latest
+    needs: build-desktop-app
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":desktop-app:test"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Upload Test Results"
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-app-test-results
+          path: android/desktop-app/build/reports/tests/test/
 
   validate-xml:
     name: "Validate XML"

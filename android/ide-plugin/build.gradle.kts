@@ -24,22 +24,23 @@ sourceSets {
 }
 
 dependencies {
+  // Shared module (UX, unix socket architecture, settings, data sources)
+  // Exclude coroutines and Compose runtime since IntelliJ provides them
+  implementation(project(":desktop-core")) {
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    exclude(group = "org.jetbrains.compose.runtime")
+    exclude(group = "org.jetbrains.compose.ui")
+    exclude(group = "org.jetbrains.compose.foundation")
+    exclude(group = "org.jetbrains.compose.material3")
+  }
+
   // Shared validation module
   implementation(project(":test-plan-validation"))
 
   // Kotlin ecosystem (provided by IntelliJ platform, don't bundle)
   compileOnly(libs.kotlinx.coroutines)
   compileOnly(libs.kotlinx.serialization)
-
-  // MCP Kotlin SDK for client communication
-  implementation("io.modelcontextprotocol:kotlin-sdk:0.9.0") {
-    // Exclude coroutines since IntelliJ provides them
-    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
-  }
-  // Ktor client engine for MCP transport (CIO = Coroutine-based I/O)
-  implementation("io.ktor:ktor-client-cio:3.4.1") {
-    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
-  }
 
   // YAML and JSON schema validation (transitive from test-plan-validation)
   implementation(libs.snakeyaml)

@@ -12,6 +12,7 @@ import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
+/** IDE-specific LabeledTextField using Jewel's TextFieldState API. */
 @Composable
 fun LabeledTextField(
     label: String,

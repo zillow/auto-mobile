@@ -5,15 +5,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
-
-/** Interface for accessing AutoMobile settings without coupling to IntelliJ APIs. */
-interface SettingsProvider {
-  var enableYamlLinting: Boolean
-  var testPlanOutputDirectory: String
-  var fogModeEnabled: Boolean
-  var autoFocusEnabled: Boolean
-  var failuresDateRange: String  // "1h", "24h", "3d", "7d", "30d"
-}
+import dev.jasonpearson.automobile.desktop.core.settings.SettingsProvider
 
 @State(
     name = "com.automobile.ide.settings.AutoMobileSettings",
@@ -25,6 +17,8 @@ class AutoMobileSettings : PersistentStateComponent<AutoMobileSettings>, Setting
   override var fogModeEnabled: Boolean = true
   override var autoFocusEnabled: Boolean = true
   override var failuresDateRange: String = "24h"  // Default to 24 hours
+  override var androidIde: String = "auto"
+  override var iosIde: String = "auto"
 
   override fun getState(): AutoMobileSettings = this
 
