@@ -3,7 +3,7 @@
   "name": "dev.jasonpearson/auto-mobile",
   "title": "AutoMobile",
   "description": "Mobile device interaction automation via MCP",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "websiteUrl": "https://kaeawc.github.io/auto-mobile/",
   "repository": {
     "url": "https://github.com/kaeawc/auto-mobile",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@kaeawc/auto-mobile",
-      "version": "0.0.13",
+      "version": "0.0.14",
       "runtimeHint": "bunx",
       "transport": {
         "type": "stdio"
