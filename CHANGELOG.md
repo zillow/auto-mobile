@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.0.15] - 2026-03-26
+### Other
+- No changes.
+
 ## [v0.0.14] - 2026-03-26
 ### Added
 - feat: implement iOS clipboard operations (get/copy/paste/clear) ([#1501](https://github.com/kaeawc/auto-mobile/issues/1501)) (ios)
