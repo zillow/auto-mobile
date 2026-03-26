@@ -1320,7 +1320,7 @@ export class NavigationGraphManager implements NavigationGraphService {
   }
 
   private notifyGraphUpdated(): void {
-    logger.info(`[NAVIGATION_GRAPH] notifyGraphUpdated called, ${this.graphUpdateListeners.length} listeners`);
+    logger.debug(`[NAVIGATION_GRAPH] notifyGraphUpdated called, ${this.graphUpdateListeners.length} listeners`);
     for (const listener of this.graphUpdateListeners) {
       try {
         listener();

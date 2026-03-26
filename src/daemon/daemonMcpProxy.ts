@@ -294,6 +294,6 @@ export class DaemonMcpProxy {
     }
     this.connected = false;
     this.invalidateCache();
-    logger.info("[DaemonMcpProxy] Disconnected from daemon");
+    logger.debug("[DaemonMcpProxy] Disconnected from daemon");
   }
 }

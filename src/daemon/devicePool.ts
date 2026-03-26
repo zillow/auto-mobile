@@ -618,9 +618,9 @@ export class DevicePool {
    * This enables parallel test execution with limited devices.
    */
   async assignDeviceToSession(sessionId: string, platform?: Platform): Promise<string> {
-    logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: assignDeviceToSession called for session ${sessionId}`);
-    logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Current devices.size: ${this.devices.size}`);
-    logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Device IDs: ${Array.from(this.devices.keys()).join(", ")}`);
+    logger.debug(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: assignDeviceToSession called for session ${sessionId}`);
+    logger.debug(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Current devices.size: ${this.devices.size}`);
+    logger.debug(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Device IDs: ${Array.from(this.devices.keys()).join(", ")}`);
 
     const maxAttempts = Math.ceil(this.DEVICE_WAIT_TIMEOUT_MS / this.DEVICE_WAIT_INTERVAL_MS);
     let firstAttemptLogged = false;

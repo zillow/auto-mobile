@@ -178,7 +178,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
 
     const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
     if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed hierarchy_update to ${sentCount} subscribers (device: ${deviceId})`);
+      logger.debug(`[DeviceDataStream] Pushed hierarchy_update to ${sentCount} subscribers (device: ${deviceId})`);
     }
   }
 
@@ -202,7 +202,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
 
     const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
     if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed screenshot_update to ${sentCount} subscribers (device: ${deviceId})`);
+      logger.debug(`[DeviceDataStream] Pushed screenshot_update to ${sentCount} subscribers (device: ${deviceId})`);
     }
   }
 
@@ -219,7 +219,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
 
     const sentCount = this.pushToSubscribers({ message, targetDeviceId: null });
     if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed navigation_update to ${sentCount} subscribers`);
+      logger.debug(`[DeviceDataStream] Pushed navigation_update to ${sentCount} subscribers`);
     }
   }
 
@@ -236,7 +236,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
 
     const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
     if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed performance_update to ${sentCount} subscribers (device: ${deviceId})`);
+      logger.debug(`[DeviceDataStream] Pushed performance_update to ${sentCount} subscribers (device: ${deviceId})`);
     }
   }
 
@@ -253,7 +253,7 @@ export class DeviceDataStreamSocketServer extends PushSubscriptionSocketServer<
 
     const sentCount = this.pushToSubscribers({ message, targetDeviceId: deviceId });
     if (sentCount > 0) {
-      logger.info(`[DeviceDataStream] Pushed storage_update to ${sentCount} subscribers (device: ${deviceId})`);
+      logger.debug(`[DeviceDataStream] Pushed storage_update to ${sentCount} subscribers (device: ${deviceId})`);
     }
   }
 

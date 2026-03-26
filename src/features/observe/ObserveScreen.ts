@@ -364,7 +364,7 @@ export class RealObserveScreen implements ObserveScreen {
         if (viewHierarchy.notificationPermissionDetected !== undefined) {
           result.notificationPermissionDetected = viewHierarchy.notificationPermissionDetected;
           if (viewHierarchy.notificationPermissionDetected) {
-            logger.info("[ObserveScreen] Notification permission dialog detected in view hierarchy");
+            logger.debug("[ObserveScreen] Notification permission dialog detected in view hierarchy");
           }
         }
       }
@@ -407,7 +407,7 @@ export class RealObserveScreen implements ObserveScreen {
       result.intentChooserDetected = intentChooserDetected;
 
       if (intentChooserDetected) {
-        logger.info("[ObserveScreen] Intent chooser dialog detected in view hierarchy");
+        logger.debug("[ObserveScreen] Intent chooser dialog detected in view hierarchy");
       }
     } catch (error) {
       logger.warn(`[ObserveScreen] Failed to detect intent chooser: ${error}`);
@@ -422,12 +422,12 @@ export class RealObserveScreen implements ObserveScreen {
    */
   public async collectActiveWindow(result: ObserveResult): Promise<void> {
     try {
-      logger.info("[OBSERVER] collectActiveWindow");
+      logger.debug("[OBSERVER] collectActiveWindow");
       const windowStart = this.timer.now();
 
       const activeWindow = await this.window.getActive();
 
-      logger.info(`Active window retrieval took ${this.timer.now() - windowStart}ms`);
+      logger.debug(`Active window retrieval took ${this.timer.now() - windowStart}ms`);
       if (activeWindow) {
         result.activeWindow = activeWindow;
       }
@@ -791,13 +791,13 @@ export class RealObserveScreen implements ObserveScreen {
     const startTime = this.timer.now();
 
     try {
-      logger.info("[OBSERVE_CACHE] Getting most recent cached observe result");
+      logger.debug("[OBSERVE_CACHE] Getting most recent cached observe result");
 
       // Check in-memory cache first
       const memoryResult = await this.checkInMemoryObserveCache();
       if (memoryResult) {
         const duration = this.timer.now() - startTime;
-        logger.info(`[OBSERVE_CACHE] Found recent result in memory cache (${duration}ms)`);
+        logger.debug(`[OBSERVE_CACHE] Found recent result in memory cache (${duration}ms)`);
         return memoryResult;
       }
 
@@ -805,13 +805,13 @@ export class RealObserveScreen implements ObserveScreen {
       const diskResult = await this.checkDiskObserveCache();
       if (diskResult) {
         const duration = this.timer.now() - startTime;
-        logger.info(`[OBSERVE_CACHE] Found recent result in disk cache (${duration}ms)`);
+        logger.debug(`[OBSERVE_CACHE] Found recent result in disk cache (${duration}ms)`);
         return diskResult;
       }
 
       // No cached result available
       const duration = this.timer.now() - startTime;
-      logger.info(`[OBSERVE_CACHE] No cached observe result available (${duration}ms)`);
+      logger.debug(`[OBSERVE_CACHE] No cached observe result available (${duration}ms)`);
 
       return {
         updatedAt: new Date().toISOString(),
@@ -838,10 +838,10 @@ export class RealObserveScreen implements ObserveScreen {
    */
   private async checkInMemoryObserveCache(): Promise<ObserveResult | null> {
     const cacheSize = RealObserveScreen.observeResultCache.size;
-    logger.info(`[OBSERVE_CACHE] Checking in-memory cache, size: ${cacheSize}`);
+    logger.debug(`[OBSERVE_CACHE] Checking in-memory cache, size: ${cacheSize}`);
 
     if (cacheSize === 0) {
-      logger.info("[OBSERVE_CACHE] In-memory cache is empty");
+      logger.debug("[OBSERVE_CACHE] In-memory cache is empty");
       return null;
     }
 
@@ -857,7 +857,7 @@ export class RealObserveScreen implements ObserveScreen {
 
       if (age >= ttl) {
         expiredKeys.push(key);
-        logger.info(`[OBSERVE_CACHE] Removing expired cache entry: ${key} (age: ${age}ms > TTL: ${ttl}ms)`);
+        logger.debug(`[OBSERVE_CACHE] Removing expired cache entry: ${key} (age: ${age}ms > TTL: ${ttl}ms)`);
       } else {
         // Check if this is the most recent valid entry
         if (!mostRecentEntry || cachedEntry.timestamp > mostRecentEntry.timestamp) {
@@ -873,11 +873,11 @@ export class RealObserveScreen implements ObserveScreen {
 
     if (mostRecentEntry) {
       const age = now - mostRecentEntry.timestamp;
-      logger.info(`[OBSERVE_CACHE] Found most recent in-memory result (age: ${age}ms)`);
+      logger.debug(`[OBSERVE_CACHE] Found most recent in-memory result (age: ${age}ms)`);
       return mostRecentEntry.observeResult;
     }
 
-    logger.info("[OBSERVE_CACHE] No valid entries in in-memory cache");
+    logger.debug("[OBSERVE_CACHE] No valid entries in in-memory cache");
     return null;
   }
 
@@ -886,7 +886,7 @@ export class RealObserveScreen implements ObserveScreen {
    * @returns Promise<ObserveResult | null> - Most recent cached result or null
    */
   private async checkDiskObserveCache(): Promise<ObserveResult | null> {
-    logger.info("[OBSERVE_CACHE] Checking disk cache");
+    logger.debug("[OBSERVE_CACHE] Checking disk cache");
 
     try {
       // Get all JSON files in the cache directory
@@ -894,7 +894,7 @@ export class RealObserveScreen implements ObserveScreen {
       const jsonFiles = files.filter(file => file.endsWith(".json") && file.startsWith("observe_"));
 
       if (jsonFiles.length === 0) {
-        logger.info("[OBSERVE_CACHE] No observe result files found in disk cache");
+        logger.debug("[OBSERVE_CACHE] No observe result files found in disk cache");
         return null;
       }
 
@@ -920,7 +920,7 @@ export class RealObserveScreen implements ObserveScreen {
 
       if (mostRecentFile) {
         const age = now - mostRecentFile.mtime;
-        logger.info(`[OBSERVE_CACHE] Loading most recent disk cache file (age: ${age}ms)`);
+        logger.debug(`[OBSERVE_CACHE] Loading most recent disk cache file (age: ${age}ms)`);
 
         const cacheData = await readFileAsync(mostRecentFile.path, "utf8");
         const cachedResult: ObserveResult = JSON.parse(cacheData);
@@ -932,11 +932,11 @@ export class RealObserveScreen implements ObserveScreen {
           observeResult: cachedResult
         });
 
-        logger.info(`[OBSERVE_CACHE] Updated in-memory cache from disk cache`);
+        logger.debug(`[OBSERVE_CACHE] Updated in-memory cache from disk cache`);
         return cachedResult;
       }
 
-      logger.info("[OBSERVE_CACHE] No valid files in disk cache");
+      logger.debug("[OBSERVE_CACHE] No valid files in disk cache");
       return null;
     } catch (error) {
       logger.warn(`[OBSERVE_CACHE] Error checking disk cache: ${error}`);
@@ -953,7 +953,7 @@ export class RealObserveScreen implements ObserveScreen {
     const timestampKey = timestamp.toString();
 
     try {
-      logger.info(`[OBSERVE_CACHE] Caching observe result with timestamp ${timestamp}`);
+      logger.debug(`[OBSERVE_CACHE] Caching observe result with timestamp ${timestamp}`);
 
       // Cache in memory
       RealObserveScreen.observeResultCache.set(timestampKey, {
@@ -964,7 +964,7 @@ export class RealObserveScreen implements ObserveScreen {
       // Cache on disk
       await this.saveObserveResultToDisk(timestampKey, observeResult);
 
-      logger.info(`[OBSERVE_CACHE] Successfully cached observe result, in-memory cache size: ${RealObserveScreen.observeResultCache.size}`);
+      logger.debug(`[OBSERVE_CACHE] Successfully cached observe result, in-memory cache size: ${RealObserveScreen.observeResultCache.size}`);
     } catch (error) {
       logger.warn(`[OBSERVE_CACHE] Error caching observe result: ${error}`);
     }
@@ -981,7 +981,7 @@ export class RealObserveScreen implements ObserveScreen {
       const filePath = path.join(RealObserveScreen.observeResultCacheDir, filename);
 
       await writeFileAsync(filePath, JSON.stringify(observeResult, null, 2));
-      logger.info(`[OBSERVE_CACHE] Saved observe result to disk: ${filename}`);
+      logger.debug(`[OBSERVE_CACHE] Saved observe result to disk: ${filename}`);
     } catch (error) {
       logger.warn(`[OBSERVE_CACHE] Failed to save observe result to disk: ${error}`);
     }

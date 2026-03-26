@@ -138,7 +138,7 @@ export class NavigationRepository {
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    logger.info(`[NAV_REPO] New screen discovered: ${screenName} (id=${result.id})`);
+    logger.debug(`[NAV_REPO] New screen discovered: ${screenName} (id=${result.id})`);
 
     return result;
   }
@@ -256,7 +256,7 @@ export class NavigationRepository {
       .executeTakeFirstOrThrow();
 
     const toolInfo = toolName ? ` via ${toolName}` : " (unknown)";
-    logger.info(
+    logger.debug(
       `[NAV_REPO] Edge created: ${fromScreen} → ${toScreen}${toolInfo} (id=${result.id})`
     );
 

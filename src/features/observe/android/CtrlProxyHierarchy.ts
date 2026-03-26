@@ -156,7 +156,7 @@ export class CtrlProxyHierarchy {
         const duration = this.context.timer.now() - startTime;
 
         if (freshData) {
-          logger.info(`[CTRL_PROXY] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
+          logger.debug(`[CTRL_PROXY] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
           return {
             hierarchy: freshData.hierarchy,
             fresh: true,
@@ -172,7 +172,7 @@ export class CtrlProxyHierarchy {
           const currentCache = this.context.getCachedHierarchy();
           if (currentCache) {
             currentCache.fresh = false;
-            logger.info(`[CTRL_PROXY] Returning stale cached data (updatedAt: ${currentCache.hierarchy.updatedAt}), marked cache as stale`);
+            logger.debug(`[CTRL_PROXY] Returning stale cached data (updatedAt: ${currentCache.hierarchy.updatedAt}), marked cache as stale`);
             return {
               hierarchy: currentCache.hierarchy,
               fresh: false,
@@ -225,7 +225,7 @@ export class CtrlProxyHierarchy {
         AndroidCtrlProxyManager.getInstance(this.context.device, this.context.adb).isAvailable()
       );
       if (!available) {
-        logger.info("[CTRL_PROXY] Service not available, will use fallback");
+        logger.debug("[CTRL_PROXY] Service not available, will use fallback");
         perf.end();
         return null;
       }
@@ -243,7 +243,7 @@ export class CtrlProxyHierarchy {
       // If no hierarchy from WebSocket or data is stale, sync to get fresh data
       const needsSync = !hierarchyData || !isFresh;
       if (needsSync) {
-        logger.info(`[CTRL_PROXY] WebSocket returned ${hierarchyData ? "stale" : "no"} data (fresh=${isFresh}), syncing for fresh data`);
+        logger.debug(`[CTRL_PROXY] WebSocket returned ${hierarchyData ? "stale" : "no"} data (fresh=${isFresh}), syncing for fresh data`);
 
         const syncResult = await perf.track("syncRequest", () =>
           this.requestHierarchySync(perf, disableAllFiltering, signal)
@@ -255,7 +255,7 @@ export class CtrlProxyHierarchy {
             androidPerfTiming = syncResult.perfTiming;
           }
           isFresh = true;
-          logger.info("[CTRL_PROXY] Successfully retrieved hierarchy via sync ADB method");
+          logger.debug("[CTRL_PROXY] Successfully retrieved hierarchy via sync ADB method");
         } else if (!hierarchyData) {
           logger.warn("[CTRL_PROXY] Both WebSocket and sync methods failed, will use fallback");
           perf.end();
@@ -281,7 +281,7 @@ export class CtrlProxyHierarchy {
       perf.end();
 
       const duration = this.context.timer.now() - startTime;
-      logger.info(`[CTRL_PROXY] Successfully retrieved and converted hierarchy in ${duration}ms (fresh: ${isFresh}, updatedAt: ${hierarchyData!.updatedAt})`);
+      logger.debug(`[CTRL_PROXY] Successfully retrieved and converted hierarchy in ${duration}ms (fresh: ${isFresh}, updatedAt: ${hierarchyData!.updatedAt})`);
 
       return convertedHierarchy;
     } catch (error) {
@@ -307,7 +307,7 @@ export class CtrlProxyHierarchy {
     const effectiveTimeoutMs = Math.max(0, timeoutMs);
 
     try {
-      logger.info("[CTRL_PROXY] Requesting hierarchy sync via WebSocket");
+      logger.debug("[CTRL_PROXY] Requesting hierarchy sync via WebSocket");
 
       // Ensure WebSocket connection is established
       await this.context.ensureConnected(perf);
@@ -319,7 +319,7 @@ export class CtrlProxyHierarchy {
 
       // Fall back to ADB broadcast if WebSocket failed
       if (!sentViaWebSocket) {
-        logger.info("[CTRL_PROXY] Falling back to ADB broadcast");
+        logger.debug("[CTRL_PROXY] Falling back to ADB broadcast");
         const uuid = `sync_${this.context.timer.now()}_${generateSecureId()}`;
         await perf.track("sendBroadcast", async () => {
           await this.context.adb.executeCommand(
@@ -362,7 +362,7 @@ export class CtrlProxyHierarchy {
     const startTime = this.context.timer.now();
 
     try {
-      logger.info("[CTRL_PROXY] Converting accessibility service format to ViewHierarchyResult format");
+      logger.debug("[CTRL_PROXY] Converting accessibility service format to ViewHierarchyResult format");
 
       const hierarchyToConvert: AccessibilityNode | undefined = accessibilityHierarchy.hierarchy;
       const resolvedPackageName = accessibilityHierarchy.packageName;
@@ -412,7 +412,7 @@ export class CtrlProxyHierarchy {
       };
 
       const duration = this.context.timer.now() - startTime;
-      logger.info(`[CTRL_PROXY] Format conversion completed in ${duration}ms`);
+      logger.debug(`[CTRL_PROXY] Format conversion completed in ${duration}ms`);
 
       return result;
     } catch (error) {
@@ -534,7 +534,7 @@ export class CtrlProxyHierarchy {
         // Send "nudge" after staleCheckDelay
         if (!staleCheckSent && elapsed >= staleCheckDelay) {
           staleCheckSent = true;
-          logger.info(`[CTRL_PROXY] No push received after ${staleCheckDelay}ms, sending stale check request (sinceTimestamp: ${minTimestamp})`);
+          logger.debug(`[CTRL_PROXY] No push received after ${staleCheckDelay}ms, sending stale check request (sinceTimestamp: ${minTimestamp})`);
           this.sendHierarchyIfStaleRequest(minTimestamp);
         }
 

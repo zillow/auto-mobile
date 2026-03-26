@@ -367,7 +367,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
     if (this.cachedInstallation && this.cachedInstallation.isInstalled) {
       const cacheAge = this.timer.now() - this.cachedInstallation.timestamp;
       if (cacheAge < AndroidCtrlProxyManager.STATUS_CACHE_TTL) {
-        logger.info(`[CTRL_PROXY] Using cached installation status (age: ${cacheAge}ms): ${this.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
+        logger.debug(`[CTRL_PROXY] Using cached installation status (age: ${cacheAge}ms): ${this.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
         return this.cachedInstallation.isInstalled;
       } else {
         this.cachedInstallation = null;
@@ -375,7 +375,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
     }
 
     try {
-      logger.info("[CTRL_PROXY] Checking if accessibility service is installed");
+      logger.debug("[CTRL_PROXY] Checking if accessibility service is installed");
       const result = await this.adb.executeCommand(`shell pm list packages | grep ${AndroidCtrlProxyManager.PACKAGE}`, undefined, undefined, true);
       const isInstalled = result.stdout.includes(AndroidCtrlProxyManager.PACKAGE);
 
@@ -385,7 +385,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
         timestamp: this.timer.now()
       };
 
-      logger.info(`[CTRL_PROXY] Service installation status: ${isInstalled ? "installed" : "not installed"} (cached for ${AndroidCtrlProxyManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
+      logger.debug(`[CTRL_PROXY] Service installation status: ${isInstalled ? "installed" : "not installed"} (cached for ${AndroidCtrlProxyManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
       return isInstalled;
     } catch (error) {
       logger.warn(`[CTRL_PROXY] Error checking installation status: ${error}`);
@@ -401,7 +401,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
     if (this.cachedEnabled && this.cachedEnabled.isEnabled) {
       const cacheAge = this.timer.now() - this.cachedEnabled.timestamp;
       if (cacheAge < AndroidCtrlProxyManager.STATUS_CACHE_TTL) {
-        logger.info(`[CTRL_PROXY] Using cached enabled status (age: ${cacheAge}ms): ${this.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
+        logger.debug(`[CTRL_PROXY] Using cached enabled status (age: ${cacheAge}ms): ${this.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
         return this.cachedEnabled.isEnabled;
       } else {
         this.cachedEnabled = null;
@@ -409,7 +409,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
     }
 
     try {
-      logger.info("[CTRL_PROXY] Checking if accessibility service is enabled");
+      logger.debug("[CTRL_PROXY] Checking if accessibility service is enabled");
       const result = await this.adb.executeCommand("shell settings get secure enabled_accessibility_services");
       const isEnabled = result.stdout.includes(AndroidCtrlProxyManager.PACKAGE);
 
@@ -419,7 +419,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
         timestamp: this.timer.now()
       };
 
-      logger.info(`[CTRL_PROXY] Service enabled status: ${isEnabled ? "enabled" : "disabled"} (cached for ${AndroidCtrlProxyManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
+      logger.debug(`[CTRL_PROXY] Service enabled status: ${isEnabled ? "enabled" : "disabled"} (cached for ${AndroidCtrlProxyManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
       return isEnabled;
     } catch (error) {
       logger.warn(`[CTRL_PROXY] Error checking enabled status: ${error}`);
@@ -433,10 +433,10 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
    */
   async isEnabledForUser(userId: number): Promise<boolean> {
     try {
-      logger.info(`[CTRL_PROXY] Checking if accessibility service is enabled for user ${userId}`);
+      logger.debug(`[CTRL_PROXY] Checking if accessibility service is enabled for user ${userId}`);
       const result = await this.adb.executeCommand(`shell settings --user ${userId} get secure enabled_accessibility_services`);
       const isEnabled = result.stdout.includes(AndroidCtrlProxyManager.PACKAGE);
-      logger.info(`[CTRL_PROXY] Service enabled status for user ${userId}: ${isEnabled ? "enabled" : "disabled"}`);
+      logger.debug(`[CTRL_PROXY] Service enabled status for user ${userId}: ${isEnabled ? "enabled" : "disabled"}`);
       return isEnabled;
     } catch (error) {
       logger.warn(`[CTRL_PROXY] Error checking enabled status for user ${userId}: ${error}`);
@@ -455,14 +455,14 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
     if (this.cachedAvailability && this.cachedAvailability.isAvailable) {
       const cacheAge = this.timer.now() - this.cachedAvailability.timestamp;
       if (cacheAge < AndroidCtrlProxyManager.AVAILABILITY_CACHE_TTL) {
-        logger.info(`[CTRL_PROXY] Using cached overall availability (age: ${cacheAge}ms): ${this.cachedAvailability.isAvailable}`);
+        logger.debug(`[CTRL_PROXY] Using cached overall availability (age: ${cacheAge}ms): ${this.cachedAvailability.isAvailable}`);
         return this.cachedAvailability.isAvailable;
       } else {
         this.cachedAvailability = null;
       }
     }
 
-    logger.info(`[CTRL_PROXY] Checking availability (no cached result available)`);
+    logger.debug(`[CTRL_PROXY] Checking availability (no cached result available)`);
 
     try {
       // Check installation and enabled status in parallel for better performance
@@ -480,7 +480,7 @@ export class AndroidCtrlProxyManager implements CtrlProxyManager {
         timestamp: this.timer.now()
       };
 
-      logger.info(`[CTRL_PROXY] Availability check completed in ${duration}ms - Available: ${available} (cached for ${AndroidCtrlProxyManager.AVAILABILITY_CACHE_TTL / 1000 / 60} minutes)`);
+      logger.debug(`[CTRL_PROXY] Availability check completed in ${duration}ms - Available: ${available} (cached for ${AndroidCtrlProxyManager.AVAILABILITY_CACHE_TTL / 1000 / 60} minutes)`);
       return available;
     } catch (error) {
       const duration = this.timer.now() - startTime;

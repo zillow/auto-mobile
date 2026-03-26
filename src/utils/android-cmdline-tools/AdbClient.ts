@@ -296,7 +296,7 @@ export class AdbClient implements AdbExecutor {
     // Only log longer commands or ones that take significant time
     if (duration > 10 || command.includes("screencap") || command.includes("uiautomator") || command.includes("getevent")) {
       const outputSize = result.stdout.length + result.stderr.length;
-      logger.info(`[ADB] Command completed in ${duration}ms (output: ${outputSize} bytes): ${command.length > 50 ? command.substring(0, 50) + "..." : command}`);
+      logger.debug(`[ADB] Command completed in ${duration}ms (output: ${outputSize} bytes): ${command.length > 50 ? command.substring(0, 50) + "..." : command}`);
     }
 
     return result;
@@ -403,14 +403,12 @@ export class AdbClient implements AdbExecutor {
 
     // Log which device is receiving this command for parallel execution debugging
     const deviceInfo = this.device ? `[DEVICE:${this.device.deviceId}]` : "[NO-DEVICE]";
-    logger.info(`[ADB] ${deviceInfo} Executing: ${command.length > 80 ? command.substring(0, 80) + "..." : command}`);
+    logger.debug(`[ADB] ${deviceInfo} Executing: ${command.length > 80 ? command.substring(0, 80) + "..." : command}`);
 
     if (noRetry) {
       // No retry - just execute once
       try {
         const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
-        const duration = this.timer.now() - startTime;
-        logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
         return result;
       } catch (error) {
         if (resolvedSignal?.aborted) {
@@ -429,8 +427,6 @@ export class AdbClient implements AdbExecutor {
           throw new Error(OPERATION_CANCELLED_MESSAGE);
         }
         const result = await this.execWithSignal(adbPath, fullArgs, maxBuffer, timeoutMs, resolvedSignal);
-        const duration = this.timer.now() - startTime;
-        logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
         return result;
       },
       {

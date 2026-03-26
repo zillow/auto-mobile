@@ -800,7 +800,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       }
 
       const requestId = this.requestManager.generateId("action");
-      logger.info(`[CTRL_PROXY] Creating action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
+      logger.debug(`[CTRL_PROXY] Creating action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
 
       const actionPromise = this.requestManager.register<A11yActionResult>(
         requestId, "action", timeoutMs,
@@ -813,14 +813,14 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         }
         const message = JSON.stringify({ type: "request_action", requestId, action, resourceId });
         this.ws.send(message);
-        logger.info(`[CTRL_PROXY] Sent action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
+        logger.debug(`[CTRL_PROXY] Sent action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
       });
 
       const result = await perf.track("waitForAction", () => actionPromise);
       const clientDuration = this.timer.now() - startTime;
 
       if (result.success) {
-        logger.info(`[CTRL_PROXY] Action completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, action=${result.action}`);
+        logger.debug(`[CTRL_PROXY] Action completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, action=${result.action}`);
       } else {
         logger.warn(`[CTRL_PROXY] Action failed after ${clientDuration}ms: ${result.error}`);
       }
@@ -984,7 +984,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
 
       if (result.success) {
         const dataSize = result.data ? result.data.length : 0;
-        logger.info(`[CTRL_PROXY] Screenshot received in ${duration}ms (${dataSize} base64 chars)`);
+        logger.debug(`[CTRL_PROXY] Screenshot received in ${duration}ms (${dataSize} base64 chars)`);
       } else {
         logger.warn(`[CTRL_PROXY] Screenshot failed after ${duration}ms: ${result.error}`);
       }
@@ -1000,12 +1000,12 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
   async verifyServiceReady(maxAttempts: number = 5, delayMs: number = 500, timeoutMs: number = 3000): Promise<boolean> {
     const result = await this.retryExecutor.execute(
       async attempt => {
-        logger.info(`[CTRL_PROXY] Verifying service ready (attempt ${attempt}/${maxAttempts})`);
+        logger.debug(`[CTRL_PROXY] Verifying service ready (attempt ${attempt}/${maxAttempts})`);
 
         const hierarchyResult = await this.requestHierarchySync(new NoOpPerformanceTracker(), false, undefined, timeoutMs);
 
         if (hierarchyResult && hierarchyResult.hierarchy) {
-          logger.info(`[CTRL_PROXY] Service verified ready after ${attempt} attempt(s)`);
+          logger.debug(`[CTRL_PROXY] Service verified ready after ${attempt} attempt(s)`);
           return true;
         }
 
@@ -1132,12 +1132,12 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
         logger.debug(`[CTRL_PROXY] Port forwarding already active (localhost:${this.localPort})`);
         return;
       }
-      logger.info(`[CTRL_PROXY] Port forwarding was lost, re-establishing...`);
+      logger.debug(`[CTRL_PROXY] Port forwarding was lost, re-establishing...`);
       this.portForwardingSetup = false;
     }
 
     try {
-      logger.info(`[CTRL_PROXY] Setting up port forwarding for WebSocket: localhost:${this.localPort} → device:${PortManager.DEVICE_PORT} (device: ${this.device.deviceId})`);
+      logger.debug(`[CTRL_PROXY] Setting up port forwarding for WebSocket: localhost:${this.localPort} → device:${PortManager.DEVICE_PORT} (device: ${this.device.deviceId})`);
 
       await perf.track("clearPortForward", () =>
         this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {})
@@ -1148,7 +1148,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       );
 
       this.portForwardingSetup = true;
-      logger.info(`[CTRL_PROXY] Port forwarding setup complete (localhost:${this.localPort})`);
+      logger.debug(`[CTRL_PROXY] Port forwarding setup complete (localhost:${this.localPort})`);
     } catch (error) {
       logger.warn(`[CTRL_PROXY] Failed to setup port forwarding: ${error}`);
       throw error;

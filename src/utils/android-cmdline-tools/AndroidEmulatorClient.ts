@@ -845,36 +845,36 @@ export class AndroidEmulatorClient implements AndroidEmulator {
     const backgroundPoller = async () => {
       while (pollingActive && !foundDeviceId) {
         try {
-          logger.info(`Background polling iteration - checking for emulator '${avdName}'...`);
+          logger.debug(`Background polling iteration - checking for emulator '${avdName}'...`);
 
           // For local emulators, check for running devices
-          logger.info(`Checking for running local emulators...`);
+          logger.debug(`Checking for running local emulators...`);
           const runningEmulators = await this.getBootedDevices();
-          logger.info(`Device scan complete - found ${runningEmulators.length} running emulators`);
+          logger.debug(`Device scan complete - found ${runningEmulators.length} running emulators`);
 
           if (runningEmulators.length > 0) {
-            logger.info(`Found ${runningEmulators.length} running emulators: ${runningEmulators.map(e => `${e.name}(${e.deviceId})`).join(", ")}`);
+            logger.debug(`Found ${runningEmulators.length} running emulators: ${runningEmulators.map(e => `${e.name}(${e.deviceId})`).join(", ")}`);
 
             // Look for emulator by name first
             let emulator = runningEmulators.find(emu => emu.name === avdName);
-            logger.info(`Exact name match for '${avdName}': ${emulator ? `Found ${emulator.deviceId}` : "Not found"}`);
+            logger.debug(`Exact name match for '${avdName}': ${emulator ? `Found ${emulator.deviceId}` : "Not found"}`);
 
             // If not found by exact name, try to find any local emulator
             if (!emulator) {
               emulator = runningEmulators.find(emu => emu.source === "local");
               if (emulator) {
-                logger.info(`Found local emulator with deviceId ${emulator.deviceId}, but name mismatch. Expected: ${avdName}, Found: ${emulator.name}`);
+                logger.debug(`Found local emulator with deviceId ${emulator.deviceId}, but name mismatch. Expected: ${avdName}, Found: ${emulator.name}`);
               } else {
-                logger.info(`No local emulators found to use as fallback`);
+                logger.debug(`No local emulators found to use as fallback`);
               }
             }
 
             if (emulator && emulator.deviceId) {
-              logger.info(`Target emulator found: ${emulator.name} (${emulator.deviceId}) - starting readiness checks`);
+              logger.debug(`Target emulator found: ${emulator.name} (${emulator.deviceId}) - starting readiness checks`);
 
               // Check if the device is online and ready
               // Run device state and package manager checks in parallel for faster detection
-              logger.info(`[PARALLEL] Running device state and package manager checks for ${emulator.deviceId}...`);
+              logger.debug(`[PARALLEL] Running device state and package manager checks for ${emulator.deviceId}...`);
               const adb = this.adbFactory.create(emulator);
               try {
                 const [deviceStateResult, packageManagerResult] = await Promise.allSettled([
@@ -884,42 +884,42 @@ export class AndroidEmulatorClient implements AndroidEmulator {
 
                 // Check device state result
                 if (deviceStateResult.status !== "fulfilled" || packageManagerResult.status !== "fulfilled") {
-                  logger.info(`[PARALLEL] Checks not yet complete: deviceStatus: ${deviceStateResult.status}, packageManager: ${packageManagerResult.status}`);
+                  logger.debug(`[PARALLEL] Checks not yet complete: deviceStatus: ${deviceStateResult.status}, packageManager: ${packageManagerResult.status}`);
                 } else {
                   const stateOutput = deviceStateResult.value.stdout.trim();
-                  logger.info(`[PARALLEL] Package manager command completed for ${emulator.deviceId} - output: ${packageManagerResult.value.stdout.length} bytes`);
+                  logger.debug(`[PARALLEL] Package manager command completed for ${emulator.deviceId} - output: ${packageManagerResult.value.stdout.length} bytes`);
                   if (!stateOutput.includes("device")) {
-                    logger.info(`[PARALLEL] ❌ Device state check failed for ${emulator.deviceId}: state="${stateOutput}"`);
+                    logger.debug(`[PARALLEL] ❌ Device state check failed for ${emulator.deviceId}: state="${stateOutput}"`);
                   } else if (!packageManagerResult.value.stdout || !packageManagerResult.value.stdout.includes("package:")) {
-                    logger.info(`[PARALLEL] ❌ Package manager returned no packages for ${emulator.deviceId} (${packageManagerResult.value.stdout.length} bytes output)`);
+                    logger.debug(`[PARALLEL] ❌ Package manager returned no packages for ${emulator.deviceId} (${packageManagerResult.value.stdout.length} bytes output)`);
                   } else if (packageManagerResult.value.stderr || packageManagerResult.value.stderr.includes("Failure")) {
-                    logger.info(`[PARALLEL] ❌ Package manager returned failure for ${emulator.deviceId}: ${packageManagerResult.value.stderr}`);
+                    logger.debug(`[PARALLEL] ❌ Package manager returned failure for ${emulator.deviceId}: ${packageManagerResult.value.stderr}`);
                   } else {
-                    logger.info(`[PARALLEL] ✅ Device state check passed for ${emulator.deviceId}`);
-                    logger.info(`[PARALLEL] ✅ Package manager is responsive for ${emulator.deviceId} - emulator is ready!`);
-                    logger.info(`[PARALLEL] ✅ No package manager errors detected - marking emulator as ready`);
+                    logger.debug(`[PARALLEL] ✅ Device state check passed for ${emulator.deviceId}`);
+                    logger.debug(`[PARALLEL] ✅ Package manager is responsive for ${emulator.deviceId} - emulator is ready!`);
+                    logger.debug(`[PARALLEL] ✅ No package manager errors detected - marking emulator as ready`);
                     foundDeviceId = emulator.deviceId;
                     return;
                   }
                 }
               } catch (parallelError) {
-                logger.info(`[PARALLEL] ❌ Parallel checks failed for ${emulator.deviceId}: ${parallelError}`);
+                logger.debug(`[PARALLEL] ❌ Parallel checks failed for ${emulator.deviceId}: ${parallelError}`);
               }
             } else {
-              logger.info(`No suitable emulator found for '${avdName}' - will continue polling`);
+              logger.debug(`No suitable emulator found for '${avdName}' - will continue polling`);
             }
           } else {
-            logger.info(`No running emulators detected - will continue polling`);
+            logger.debug(`No running emulators detected - will continue polling`);
           }
         } catch (error) {
-          logger.info(`Background polling error (will continue): ${error}`);
+          logger.debug(`Background polling error (will continue): ${error}`);
         }
 
         // Always wait at least the minimum polling interval
-        logger.info(`Background polling cycle complete - sleeping ${pollingIntervalMs}ms before next check`);
+        logger.debug(`Background polling cycle complete - sleeping ${pollingIntervalMs}ms before next check`);
         await this.sleep(pollingIntervalMs);
       }
-      logger.info(`Background polling stopped - pollingActive: ${pollingActive}, foundDeviceId: ${foundDeviceId}`);
+      logger.debug(`Background polling stopped - pollingActive: ${pollingActive}, foundDeviceId: ${foundDeviceId}`);
     };
 
     // Start background polling immediately
