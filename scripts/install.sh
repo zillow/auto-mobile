@@ -1751,6 +1751,9 @@ generate_auto_mobile_config() {
     if [[ -n "${bun_path}" ]]; then
         env_parts="\"PATH\":\"${bun_path}\""
     fi
+    if [[ -n "${BUN_CONFIG_REGISTRY:-}" ]]; then
+        env_parts="${env_parts:+${env_parts},}\"BUN_CONFIG_REGISTRY\":\"${BUN_CONFIG_REGISTRY}\""
+    fi
 
     local args='"@kaeawc/auto-mobile@latest"'
     case "${preset}" in
@@ -1790,6 +1793,9 @@ generate_auto_mobile_config_toml() {
     if [[ -n "${bun_path}" ]]; then
         has_env=true
     fi
+    if [[ -n "${BUN_CONFIG_REGISTRY:-}" ]]; then
+        has_env=true
+    fi
 
     cat << EOF
 [mcp_servers.auto-mobile]
@@ -1802,6 +1808,9 @@ EOF
         echo "[mcp_servers.auto-mobile.env]"
         if [[ -n "${bun_path}" ]]; then
             echo "PATH = \"${bun_path}\""
+        fi
+        if [[ -n "${BUN_CONFIG_REGISTRY:-}" ]]; then
+            echo "BUN_CONFIG_REGISTRY = \"${BUN_CONFIG_REGISTRY}\""
         fi
         if [[ "${preset}" == "development" && -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
             echo "ANDROID_HOME = \"${android_home}\""
@@ -1905,6 +1914,9 @@ generate_auto_mobile_config_yaml() {
     if [[ -n "${bun_path}" ]]; then
         has_env=true
     fi
+    if [[ -n "${BUN_CONFIG_REGISTRY:-}" ]]; then
+        has_env=true
+    fi
 
     cat << EOF
 extensions:
@@ -1921,6 +1933,9 @@ EOF
         echo "    env:"
         if [[ -n "${bun_path}" ]]; then
             echo "      PATH: \"${bun_path}\""
+        fi
+        if [[ -n "${BUN_CONFIG_REGISTRY:-}" ]]; then
+            echo "      BUN_CONFIG_REGISTRY: \"${BUN_CONFIG_REGISTRY}\""
         fi
         if [[ "${preset}" == "development" && -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
             echo "      ANDROID_HOME: \"${android_home}\""
@@ -2969,6 +2984,56 @@ handle_bun_setup() {
     fi
 
     return 0
+}
+
+# Check if the public npm registry is reachable. If not (e.g. corporate
+# firewall), prompt the user for a custom BUN_CONFIG_REGISTRY so that bunx
+# can resolve packages through their internal registry / proxy.
+check_npm_registry() {
+    # Skip if already set — the env-var forwarding added elsewhere will handle it.
+    if [[ -n "${BUN_CONFIG_REGISTRY:-}" ]]; then
+        return 0
+    fi
+
+    # Skip in non-interactive mode — nothing we can prompt for.
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        return 0
+    fi
+
+    # Quick probe: fetch the package metadata from the public registry.
+    # A 2-second timeout keeps this fast on healthy networks.
+    local registry_ok=false
+    if command_exists curl; then
+        if curl -sfSL --max-time 2 "https://registry.npmjs.org/@kaeawc/auto-mobile/latest" >/dev/null 2>&1; then
+            registry_ok=true
+        fi
+    elif command_exists wget; then
+        if wget -q --timeout=2 -O /dev/null "https://registry.npmjs.org/@kaeawc/auto-mobile/latest" 2>/dev/null; then
+            registry_ok=true
+        fi
+    else
+        # No way to check — optimistically continue.
+        return 0
+    fi
+
+    if [[ "${registry_ok}" == "true" ]]; then
+        return 0
+    fi
+
+    log_warn "Could not reach the public npm registry (registry.npmjs.org)."
+    log_warn "This usually means your network requires a corporate registry or proxy."
+    echo ""
+
+    if gum confirm "Do you use a custom npm registry (e.g. Artifactory, Nexus)?"; then
+        local registry_url
+        registry_url=$(gum input --prompt "Registry URL: " --placeholder "https://registry.corp.example.com/npm/")
+        if [[ -n "${registry_url}" ]]; then
+            export BUN_CONFIG_REGISTRY="${registry_url}"
+            log_info "BUN_CONFIG_REGISTRY set to ${BUN_CONFIG_REGISTRY}"
+        fi
+    else
+        log_warn "Continuing without a custom registry — bunx may fail to install packages."
+    fi
 }
 
 check_android_sdk() {
@@ -4036,6 +4101,9 @@ main() {
 
     # Bun setup — must happen before MCP config writing since configs reference bunx
     handle_bun_setup
+
+    # Check npm registry reachability — prompt for custom registry if blocked
+    check_npm_registry
 
     # Verify bunx is available before writing configs that depend on it.
     # If bun installation failed, don't rewrite working npx configs to bunx.
