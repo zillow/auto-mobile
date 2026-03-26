@@ -1723,23 +1723,19 @@ show_config_diff() {
 }
 
 # Build the PATH env value that ensures bunx is available for GUI clients.
-# Desktop apps (Claude Desktop, Cursor, etc.) don't inherit shell PATH,
-# so we must inject ~/.bun/bin explicitly.
+# Only includes paths not already on the system PATH (e.g. ~/.bun/bin,
+# /opt/homebrew/bin). Returns empty if nothing extra is needed.
 _bun_path_env() {
-    local bun_bin="${HOME}/.bun/bin"
-    local brew_bin=""
+    # Always include ~/.bun/bin — GUI clients (Claude Desktop, Cursor, etc.)
+    # won't have it on their PATH even if the installer's shell does.
+    local parts="${HOME}/.bun/bin"
     if command_exists brew; then
+        local brew_bin
         brew_bin="$(brew --prefix 2>/dev/null)/bin"
+        if [[ ":${PATH}:" != *":${brew_bin}:"* ]]; then
+            parts="${parts}:${brew_bin}"
+        fi
     fi
-    # Prepend bun + brew to the user's current PATH so we don't lose
-    # user-specific entries (e.g. Android SDK, custom tool paths).
-    # We bake in the current PATH at install time since GUI clients
-    # don't inherit shell profile PATH.
-    local parts="${bun_bin}"
-    if [[ -n "${brew_bin}" ]]; then
-        parts="${parts}:${brew_bin}"
-    fi
-    parts="${parts}:${PATH}"
     echo "${parts}"
 }
 
@@ -1750,29 +1746,27 @@ generate_auto_mobile_config() {
     local bun_path
     bun_path=$(_bun_path_env)
 
+    # Build env object parts
+    local env_parts=""
+    if [[ -n "${bun_path}" ]]; then
+        env_parts="\"PATH\":\"${bun_path}\""
+    fi
+
+    local args='"@kaeawc/auto-mobile@latest"'
     case "${preset}" in
-        minimal)
-            cat << EOF
-{"command":"bunx","args":["@kaeawc/auto-mobile@latest"],"env":{"PATH":"${bun_path}"}}
-EOF
-            ;;
         development)
+            args='"@kaeawc/auto-mobile@latest","--debug","--debug-perf"'
             if [[ -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
-                cat << EOF
-{"command":"bunx","args":["@kaeawc/auto-mobile@latest","--debug","--debug-perf"],"env":{"PATH":"${bun_path}","ANDROID_HOME":"${android_home}"}}
-EOF
-            else
-                cat << EOF
-{"command":"bunx","args":["@kaeawc/auto-mobile@latest","--debug","--debug-perf"],"env":{"PATH":"${bun_path}"}}
-EOF
+                env_parts="${env_parts:+${env_parts},}\"ANDROID_HOME\":\"${android_home}\""
             fi
             ;;
-        *)
-            cat << EOF
-{"command":"bunx","args":["@kaeawc/auto-mobile@latest"],"env":{"PATH":"${bun_path}"}}
-EOF
-            ;;
     esac
+
+    if [[ -n "${env_parts}" ]]; then
+        echo "{\"command\":\"bunx\",\"args\":[${args}],\"env\":{${env_parts}}}"
+    else
+        echo "{\"command\":\"bunx\",\"args\":[${args}]}"
+    fi
 }
 
 # Generate auto-mobile MCP server config in TOML format (for Codex)
@@ -1782,50 +1776,37 @@ generate_auto_mobile_config_toml() {
     local bun_path
     bun_path=$(_bun_path_env)
 
+    local args='["@kaeawc/auto-mobile@latest"]'
+    local has_env=false
     case "${preset}" in
-        minimal)
-            cat << EOF
-[mcp_servers.auto-mobile]
-command = "bunx"
-args = ["@kaeawc/auto-mobile@latest"]
-
-[mcp_servers.auto-mobile.env]
-PATH = "${bun_path}"
-EOF
-            ;;
         development)
+            args='["@kaeawc/auto-mobile@latest", "--debug", "--debug-perf"]'
             if [[ -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
-                cat << EOF
-[mcp_servers.auto-mobile]
-command = "bunx"
-args = ["@kaeawc/auto-mobile@latest", "--debug", "--debug-perf"]
-
-[mcp_servers.auto-mobile.env]
-PATH = "${bun_path}"
-ANDROID_HOME = "${android_home}"
-EOF
-            else
-                cat << EOF
-[mcp_servers.auto-mobile]
-command = "bunx"
-args = ["@kaeawc/auto-mobile@latest", "--debug", "--debug-perf"]
-
-[mcp_servers.auto-mobile.env]
-PATH = "${bun_path}"
-EOF
+                has_env=true
             fi
             ;;
-        *)
-            cat << EOF
+    esac
+
+    if [[ -n "${bun_path}" ]]; then
+        has_env=true
+    fi
+
+    cat << EOF
 [mcp_servers.auto-mobile]
 command = "bunx"
-args = ["@kaeawc/auto-mobile@latest"]
-
-[mcp_servers.auto-mobile.env]
-PATH = "${bun_path}"
+args = ${args}
 EOF
-            ;;
-    esac
+
+    if [[ "${has_env}" == "true" ]]; then
+        echo ""
+        echo "[mcp_servers.auto-mobile.env]"
+        if [[ -n "${bun_path}" ]]; then
+            echo "PATH = \"${bun_path}\""
+        fi
+        if [[ "${preset}" == "development" && -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
+            echo "ANDROID_HOME = \"${android_home}\""
+        fi
+    fi
 }
 
 # Check if yq is installed
@@ -1908,57 +1889,24 @@ generate_auto_mobile_config_yaml() {
     local bun_path
     bun_path=$(_bun_path_env)
 
+    local has_env=false
+    local args_block='      - "@kaeawc/auto-mobile@latest"'
     case "${preset}" in
-        minimal)
-            cat << EOF
-extensions:
-  auto-mobile:
-    name: auto-mobile
-    type: stdio
-    enabled: true
-    cmd: bunx
-    args:
-      - "@kaeawc/auto-mobile@latest"
-    env:
-      PATH: "${bun_path}"
-EOF
-            ;;
         development)
+            args_block='      - "@kaeawc/auto-mobile@latest"
+      - "--debug"
+      - "--debug-perf"'
             if [[ -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
-                cat << EOF
-extensions:
-  auto-mobile:
-    name: auto-mobile
-    type: stdio
-    enabled: true
-    cmd: bunx
-    args:
-      - "@kaeawc/auto-mobile@latest"
-      - "--debug"
-      - "--debug-perf"
-    env:
-      PATH: "${bun_path}"
-      ANDROID_HOME: "${android_home}"
-EOF
-            else
-                cat << EOF
-extensions:
-  auto-mobile:
-    name: auto-mobile
-    type: stdio
-    enabled: true
-    cmd: bunx
-    args:
-      - "@kaeawc/auto-mobile@latest"
-      - "--debug"
-      - "--debug-perf"
-    env:
-      PATH: "${bun_path}"
-EOF
+                has_env=true
             fi
             ;;
-        *)
-            cat << EOF
+    esac
+
+    if [[ -n "${bun_path}" ]]; then
+        has_env=true
+    fi
+
+    cat << EOF
 extensions:
   auto-mobile:
     name: auto-mobile
@@ -1966,12 +1914,18 @@ extensions:
     enabled: true
     cmd: bunx
     args:
-      - "@kaeawc/auto-mobile@latest"
-    env:
-      PATH: "${bun_path}"
+${args_block}
 EOF
-            ;;
-    esac
+
+    if [[ "${has_env}" == "true" ]]; then
+        echo "    env:"
+        if [[ -n "${bun_path}" ]]; then
+            echo "      PATH: \"${bun_path}\""
+        fi
+        if [[ "${preset}" == "development" && -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
+            echo "      ANDROID_HOME: \"${android_home}\""
+        fi
+    fi
 }
 
 # Merge auto-mobile config into existing YAML config (for Goose)
