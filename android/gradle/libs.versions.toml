@@ -64,7 +64,7 @@ okhttp = "5.3.2"
 
 # Publishing
 mavenpublish = "0.36.0"
-compose-multiplatform = "1.8.1"
+compose-multiplatform = "1.10.3"
 
 [plugins]
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
