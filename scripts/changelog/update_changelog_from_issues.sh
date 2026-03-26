@@ -27,7 +27,7 @@ if [ -z "$SINCE_TAG" ]; then
 fi
 
 if [ -n "$SINCE_TAG" ]; then
-  SINCE_DATE=$(git show -s --format=%cI "$SINCE_TAG")
+  SINCE_DATE=$(git show -s --format=%cI "$SINCE_TAG^{commit}")
 else
   ROOT_COMMIT=$(git rev-list --max-parents=0 HEAD)
   SINCE_DATE=$(git show -s --format=%cI "$ROOT_COMMIT")
