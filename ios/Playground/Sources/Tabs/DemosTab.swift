@@ -1,3 +1,4 @@
+import AutoMobileSDK
 import SwiftUI
 
 struct DemosTab: View {
@@ -6,6 +7,48 @@ struct DemosTab: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("SDK Features") {
+                    NavigationLink {
+                        SDKStatusDemo()
+                    } label: {
+                        DemoRow(
+                            title: "SDK Status",
+                            description: "AutoMobile SDK state and controls",
+                            icon: "antenna.radiowaves.left.and.right"
+                        )
+                    }
+
+                    NavigationLink {
+                        ErrorTrackingDemo()
+                    } label: {
+                        DemoRow(
+                            title: "Error Tracking",
+                            description: "Test handled exception recording",
+                            icon: "exclamationmark.octagon.fill"
+                        )
+                    }
+
+                    NavigationLink {
+                        BiometricsDemo()
+                    } label: {
+                        DemoRow(
+                            title: "Biometrics",
+                            description: "Test biometric override injection",
+                            icon: "faceid"
+                        )
+                    }
+
+                    NavigationLink {
+                        NetworkTrackingDemo()
+                    } label: {
+                        DemoRow(
+                            title: "Network Tracking",
+                            description: "Test network request monitoring",
+                            icon: "network"
+                        )
+                    }
+                }
+
                 Section("Performance") {
                     NavigationLink {
                         ScrollPerformanceDemo()
@@ -131,6 +174,7 @@ struct ScrollPerformanceDemo: View {
         .background(theme.background)
         .navigationTitle("Scroll Performance")
         .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "ScrollPerformanceDemo")
     }
 }
 
@@ -204,6 +248,7 @@ struct AnimationDemo: View {
         .background(theme.background)
         .navigationTitle("Animations")
         .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "AnimationDemo")
     }
 }
 
@@ -317,6 +362,7 @@ struct HeavyComputationDemo: View {
         .background(theme.background)
         .navigationTitle("Heavy Computation")
         .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "HeavyComputationDemo")
     }
 
     private func blockMainThread() {
@@ -333,7 +379,8 @@ struct HeavyComputationDemo: View {
         progress = 0
         result = "Computing in background..."
 
-        Task {
+        // Run computation on a background queue to avoid blocking the main actor
+        DispatchQueue.global(qos: .userInitiated).async {
             var sum: Double = 0
             let iterations = 10_000_000
             let updateInterval = iterations / 100
@@ -342,13 +389,14 @@ struct HeavyComputationDemo: View {
                 sum += sin(Double(i)) * cos(Double(i))
 
                 if i % updateInterval == 0 {
-                    await MainActor.run {
-                        progress = Double(i) / Double(iterations)
+                    let p = Double(i) / Double(iterations)
+                    DispatchQueue.main.async {
+                        progress = p
                     }
                 }
             }
 
-            await MainActor.run {
+            DispatchQueue.main.async {
                 progress = 1.0
                 result = String(format: "Computation result: %.6f", sum)
                 isComputing = false
@@ -375,7 +423,7 @@ struct FormDemo: View {
                 TextField("Email", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
-                    .autocapitalization(.none)
+                    .textInputAutocapitalization(.never)
             }
 
             Section("Preferences") {
@@ -561,6 +609,337 @@ struct AccessibilityDemo: View {
         .background(theme.background)
         .navigationTitle("Accessibility")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - SDK Status Demo
+
+struct SDKStatusDemo: View {
+    @State private var sdkEnabled: Bool = AutoMobileSDK.shared.isEnabled
+    @State private var eventName = ""
+    @State private var eventProperty = ""
+    @State private var statusMessage = ""
+    @Environment(\.autoMobileTheme) private var theme
+
+    var body: some View {
+        List {
+            Section("SDK State") {
+                HStack {
+                    Text("Initialized")
+                    Spacer()
+                    Text(AutoMobileSDK.shared.isInitialized ? "Yes" : "No")
+                        .foregroundStyle(AutoMobileSDK.shared.isInitialized ? Color.autoMobileSuccess : .secondary)
+                }
+
+                HStack {
+                    Text("Bundle ID")
+                    Spacer()
+                    Text(AutoMobileSDK.shared.bundleId ?? "N/A")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Toggle("Enabled", isOn: $sdkEnabled)
+                    .onChange(of: sdkEnabled) { _, newValue in
+                        AutoMobileSDK.shared.setEnabled(newValue)
+                    }
+
+                HStack {
+                    Text("Navigation Listeners")
+                    Spacer()
+                    Text("\(AutoMobileSDK.shared.listenerCount)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Track Custom Event") {
+                TextField("Event Name", text: $eventName)
+                TextField("Property (key=value)", text: $eventProperty)
+
+                Button("Track Event") {
+                    var props: [String: String] = [:]
+                    if eventProperty.contains("=") {
+                        let parts = eventProperty.split(separator: "=", maxSplits: 1)
+                        if parts.count == 2 {
+                            props[String(parts[0])] = String(parts[1])
+                        }
+                    }
+                    AutoMobileSDK.shared.trackEvent(name: eventName, properties: props)
+                    statusMessage = "Tracked: \(eventName)"
+                }
+                .disabled(eventName.isEmpty)
+
+                if !statusMessage.isEmpty {
+                    Text(statusMessage)
+                        .foregroundStyle(Color.autoMobileSuccess)
+                        .font(.caption)
+                }
+            }
+
+            Section("Storage Inspection") {
+                HStack {
+                    Text("UserDefaults Inspector")
+                    Spacer()
+                    Text(UserDefaultsInspector.shared.isEnabled ? "Enabled" : "Disabled")
+                        .foregroundStyle(UserDefaultsInspector.shared.isEnabled ? Color.autoMobileSuccess : .secondary)
+                }
+
+                HStack {
+                    Text("Database Inspector")
+                    Spacer()
+                    Text(DatabaseInspector.shared.isEnabled ? "Enabled" : "Disabled")
+                        .foregroundStyle(DatabaseInspector.shared.isEnabled ? Color.autoMobileSuccess : .secondary)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(theme.background)
+        .navigationTitle("SDK Status")
+        .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "SDKStatusDemo")
+    }
+}
+
+// MARK: - Error Tracking Demo
+
+struct ErrorTrackingDemo: View {
+    @State private var errorCount = 0
+    @State private var lastError = ""
+    @Environment(\.autoMobileTheme) private var theme
+
+    var body: some View {
+        List {
+            Section("Handled Exceptions") {
+                HStack {
+                    Text("Recorded Errors")
+                    Spacer()
+                    Text("\(AutoMobileFailures.shared.eventCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                Button("Record Test Error") {
+                    let error = NSError(
+                        domain: "PlaygroundDemo",
+                        code: 1001,
+                        userInfo: [NSLocalizedDescriptionKey: "Demo error for testing"]
+                    )
+                    AutoMobileFailures.shared.recordHandledException(
+                        error,
+                        message: "Triggered from demo",
+                        currentScreen: "ErrorTrackingDemo"
+                    )
+                    errorCount = AutoMobileFailures.shared.eventCount
+                    lastError = "PlaygroundDemo:1001"
+                }
+
+                Button("Record Network Error") {
+                    let error = NSError(
+                        domain: NSURLErrorDomain,
+                        code: NSURLErrorTimedOut,
+                        userInfo: [NSLocalizedDescriptionKey: "The request timed out"]
+                    )
+                    AutoMobileFailures.shared.recordHandledException(
+                        error,
+                        message: "API call failed",
+                        currentScreen: "ErrorTrackingDemo"
+                    )
+                    errorCount = AutoMobileFailures.shared.eventCount
+                    lastError = "NSURLErrorDomain:\(NSURLErrorTimedOut)"
+                }
+
+                if !lastError.isEmpty {
+                    Text("Last: \(lastError)")
+                        .font(.caption)
+                        .foregroundStyle(Color.autoMobileError)
+                }
+            }
+
+            Section("Recent Events") {
+                let events = AutoMobileFailures.shared.getRecentEvents()
+                if events.isEmpty {
+                    Text("No errors recorded")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(events.suffix(5).reversed(), id: \.timestamp) { event in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(event.errorDomain)
+                                .font(.headline)
+                                .foregroundStyle(theme.textPrimary)
+                            if let msg = event.customMessage {
+                                Text(msg)
+                                    .font(.caption)
+                                    .foregroundStyle(theme.textSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                Button("Clear All Events", role: .destructive) {
+                    AutoMobileFailures.shared.clearEvents()
+                    errorCount = 0
+                    lastError = ""
+                }
+                .foregroundStyle(Color.autoMobileRed)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(theme.background)
+        .navigationTitle("Error Tracking")
+        .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "ErrorTrackingDemo")
+    }
+}
+
+// MARK: - Biometrics Demo
+
+struct BiometricsDemo: View {
+    @State private var selectedResult = "success"
+    @State private var statusMessage = ""
+    @Environment(\.autoMobileTheme) private var theme
+
+    private let resultOptions = ["success", "failure", "cancel", "error"]
+
+    var body: some View {
+        List {
+            Section("Override Biometric Result") {
+                Picker("Result", selection: $selectedResult) {
+                    ForEach(resultOptions, id: \.self) { option in
+                        Text(option.capitalized).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Button("Set Override") {
+                    let result: BiometricResult
+                    switch selectedResult {
+                    case "success": result = .success
+                    case "failure": result = .failure
+                    case "cancel": result = .cancel
+                    default: result = .error(code: 7, message: "Too many attempts")
+                    }
+                    AutoMobileBiometrics.shared.overrideResult(result)
+                    statusMessage = "Override set: \(selectedResult)"
+                }
+
+                Button("Consume Override") {
+                    if let result = AutoMobileBiometrics.shared.consumeOverride() {
+                        statusMessage = "Consumed: \(result)"
+                    } else {
+                        statusMessage = "No override available"
+                    }
+                }
+
+                Button("Clear Override") {
+                    AutoMobileBiometrics.shared.clearOverride()
+                    statusMessage = "Override cleared"
+                }
+            }
+
+            Section("Status") {
+                HStack {
+                    Text("Has Override")
+                    Spacer()
+                    Text(AutoMobileBiometrics.shared.hasOverride ? "Yes" : "No")
+                        .foregroundStyle(AutoMobileBiometrics.shared.hasOverride ? Color.autoMobileSuccess : .secondary)
+                }
+
+                if !statusMessage.isEmpty {
+                    Text(statusMessage)
+                        .font(.caption)
+                        .foregroundStyle(Color.autoMobileInfo)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(theme.background)
+        .navigationTitle("Biometrics")
+        .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "BiometricsDemo")
+    }
+}
+
+// MARK: - Network Tracking Demo
+
+struct NetworkTrackingDemo: View {
+    @State private var requestCount = 0
+    @State private var lastRequest = ""
+    @Environment(\.autoMobileTheme) private var theme
+
+    var body: some View {
+        List {
+            Section("Manual Recording") {
+                Button("Record GET Request") {
+                    AutoMobileNetwork.shared.recordRequest(
+                        url: "https://api.example.com/users",
+                        method: "GET",
+                        statusCode: 200,
+                        responseBodySize: 2048,
+                        durationMs: 150.0
+                    )
+                    requestCount += 1
+                    lastRequest = "GET /users → 200"
+                }
+
+                Button("Record POST Request") {
+                    AutoMobileNetwork.shared.recordRequest(
+                        url: "https://api.example.com/posts",
+                        method: "POST",
+                        requestBodySize: 512,
+                        statusCode: 201,
+                        responseBodySize: 128,
+                        durationMs: 250.0
+                    )
+                    requestCount += 1
+                    lastRequest = "POST /posts → 201"
+                }
+
+                Button("Record Failed Request") {
+                    AutoMobileNetwork.shared.recordRequest(
+                        url: "https://api.example.com/timeout",
+                        method: "GET",
+                        durationMs: 30000.0,
+                        error: "The request timed out"
+                    )
+                    requestCount += 1
+                    lastRequest = "GET /timeout → Error"
+                }
+            }
+
+            Section("WebSocket Events") {
+                Button("Record WebSocket Frame") {
+                    AutoMobileNetwork.shared.recordWebSocketFrame(
+                        url: "wss://ws.example.com/stream",
+                        direction: .received,
+                        frameType: .text,
+                        payloadSize: 1024
+                    )
+                    requestCount += 1
+                    lastRequest = "WS frame received (1024 bytes)"
+                }
+            }
+
+            Section("Status") {
+                HStack {
+                    Text("Events Recorded")
+                    Spacer()
+                    Text("\(requestCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                if !lastRequest.isEmpty {
+                    Text(lastRequest)
+                        .font(.caption)
+                        .foregroundStyle(Color.autoMobileInfo)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(theme.background)
+        .navigationTitle("Network Tracking")
+        .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(destination: "NetworkTrackingDemo")
     }
 }
 

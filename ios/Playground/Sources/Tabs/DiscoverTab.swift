@@ -1,3 +1,4 @@
+import AutoMobileSDK
 import SwiftUI
 
 struct DiscoverTab: View {
@@ -121,6 +122,10 @@ struct VideoDetailView: View {
         .background(theme.background)
         .navigationTitle("Video")
         .navigationBarTitleDisplayMode(.inline)
+        .trackNavigation(
+            destination: "VideoDetail",
+            arguments: ["videoId": video.id, "title": video.title]
+        )
     }
 }
 

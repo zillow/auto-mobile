@@ -2,7 +2,7 @@ name: Playground
 options:
   bundleIdPrefix: dev.jasonpearson.automobile
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
   xcodeVersion: "15.0"
 
 configFiles:
@@ -11,7 +11,11 @@ configFiles:
 
 settings:
   base:
-    SWIFT_VERSION: "5.0"
+    SWIFT_VERSION: "5"
+
+packages:
+  AutoMobileSDK:
+    path: ../auto-mobile-sdk
 
 targets:
   Playground:
@@ -24,6 +28,8 @@ targets:
       - path: Sources/Theme
       - path: Sources/Assets.xcassets
         type: folder
+    dependencies:
+      - package: AutoMobileSDK
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

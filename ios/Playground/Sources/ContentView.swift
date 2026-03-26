@@ -1,3 +1,4 @@
+import AutoMobileSDK
 import SwiftUI
 
 enum Tab: Hashable {
@@ -31,6 +32,12 @@ struct ContentView: View {
                 .tag(Tab.settings)
         }
         .tint(.autoMobileRed)
+        .onChange(of: selectedTab) { _, newTab in
+            SwiftUINavigationAdapter.shared.trackNavigation(
+                destination: "\(newTab)",
+                metadata: ["type": "tab_switch"]
+            )
+        }
     }
 }
 
