@@ -28,17 +28,14 @@ import kotlinx.serialization.json.JsonObject
  * This class manages AI-powered plan generation from prompts and AI-assisted failure recovery using
  * the AutoMobile MCP server with support for OpenAI, Anthropic, and Google models.
  */
-class AutoMobileAgent(
+open class AutoMobileAgent(
     private val configProvider: ConfigProvider = DefaultConfigProvider(),
     private val fileSystemOperations: FileSystemOperations = DefaultFileSystemOperations(),
     private val aiAgentFactory: AIAgentFactory = DefaultAIAgentFactory(),
     private val timeProvider: TimeProvider = DefaultTimeProvider(),
     private val mcpClient: MCPClient = DefaultMCPClient(),
+    internal val recoveryConfigProvider: RecoveryConfigProvider = DaemonRecoveryConfigProvider(),
 ) {
-
-  companion object {
-    private const val MAX_TOOL_CALLS = 5
-  }
 
   /** Supported AI model providers */
   enum class ModelProvider {
@@ -93,9 +90,16 @@ class AutoMobileAgent(
     }
   }
 
-  /** Attempts AI-assisted recovery for failed test execution using AutoMobile MCP server. */
-  fun attemptAiRecovery(failureOutput: String, errorOutput: String): RecoveryResult {
+  /**
+   * Attempts AI-assisted recovery for a failed test step using AutoMobile MCP tools.
+   *
+   * The agent receives structured context about the failure and uses MCP tools to get the device
+   * back on track. After the agent finishes, we call observe ourselves (outside the tool budget) to
+   * capture the device state for verification.
+   */
+  open fun attemptAiRecovery(context: FailedStepContext): RecoveryOutcome {
     val startTime = timeProvider.currentTimeMillis()
+    val maxToolCalls = recoveryConfigProvider.getMaxRecoveryToolCalls()
 
     try {
       // Initialize MCP connection
@@ -105,63 +109,73 @@ class AutoMobileAgent(
       }
 
       val modelConfig = configProvider.getModelConfig()
-      val aiAgent = aiAgentFactory.createAIAgentWithMCPTools(modelConfig, mcpClient)
+      val aiAgent = aiAgentFactory.createAIAgentWithMCPTools(modelConfig, mcpClient, maxToolCalls)
+
+      val succeededStepsSummary =
+          if (context.succeededSteps.isEmpty()) {
+            "  (none — the first step failed)"
+          } else {
+            context.succeededSteps.joinToString("\n") { step ->
+              "  - Step ${step.stepIndex + 1}: ${step.tool} (completed)"
+            }
+          }
 
       val recoveryPrompt =
           """
-        An AutoMobile test execution failed with the following details:
+        A test plan step failed. Here is the context:
 
-        FAILURE OUTPUT:
-        $failureOutput
+        FAILED STEP: Step ${context.failedStepIndex + 1} using tool "${context.failedTool}"
+        ERROR: ${context.error}
 
-        ERROR OUTPUT:
-        $errorOutput
+        PREVIOUSLY SUCCEEDED STEPS:
+        $succeededStepsSummary
 
-        You have access to AutoMobile tools to observe and interact with the device:
-        - observe: Get current device state and UI hierarchy
-        - tapOn: Tap on UI elements by text, coordinates, or description
-        - typeText: Enter text into input fields
-        - swipe: Perform swipe gestures for scrolling
-        - waitFor: Wait for elements to appear or conditions to be met
-        - goBack: Navigate back in the app
+        PLAN YAML:
+        ${context.planContent}
 
-        Please analyze the failure and attempt recovery by:
-        1. First observing the current device state
-        2. Understanding what went wrong
-        3. Taking corrective actions to get the test back on track
-        4. You have a maximum of $MAX_TOOL_CALLS tool calls to achieve recovery
+        You have a maximum of $maxToolCalls tool calls to recover the device state so the
+        test can resume from step ${context.failedStepIndex + 2}.
 
-        Focus on common mobile testing issues like:
+        Instructions:
+        1. Call observe to see the current device state.
+        2. Take corrective actions (tap, type, swipe, wait, etc.) to address the failure.
+        3. Focus on getting the device ready for the NEXT step in the plan.
+
+        Common issues to watch for:
         - Elements not found (try alternative selectors or wait longer)
-        - Timing issues (add appropriate waits)
-        - UI state problems (navigate to correct screen)
         - Pop-ups or dialogs blocking interaction
-        - Network or loading issues
-
-        Start by observing the current state, then take specific actions to recover.
+        - Wrong screen (navigate to the correct screen)
+        - Timing issues (add appropriate waits)
       """
               .trimIndent()
 
       val recoveryResult = runBlocking {
         try {
-          println("Starting AI recovery with AutoMobile MCP tools...")
+          println("Starting AI recovery for step ${context.failedStepIndex + 1} (${context.failedTool})...")
 
-          val response = aiAgent.run(recoveryPrompt) ?: ""
+          aiAgent.run(recoveryPrompt)
 
-          println("AI recovery completed")
-          println("Recovery response: $response")
+          println("AI recovery agent finished, verifying device state...")
 
-          // Determine success based on the response content
-          val success =
-              response.contains("recovery", ignoreCase = true) &&
-                  !response.contains("failed", ignoreCase = true)
+          // Call observe ourselves to capture post-recovery state
+          val observeResult =
+              try {
+                mcpClient.callTool("observe", mapOf("withViewHierarchy" to true))
+              } catch (e: Exception) {
+                println("Warning: Post-recovery observe failed: ${e.message}")
+                null
+              }
 
           val recoveryTime = timeProvider.currentTimeMillis() - startTime
-          RecoveryResult(success, recoveryTime)
+          RecoveryOutcome(
+              success = observeResult != null,
+              recoveryTimeMs = recoveryTime,
+              observeResultAfterRecovery = observeResult,
+          )
         } catch (e: Exception) {
           println("AI recovery execution failed: ${e.message}")
           val recoveryTime = timeProvider.currentTimeMillis() - startTime
-          RecoveryResult(false, recoveryTime)
+          RecoveryOutcome(false, recoveryTime)
         }
       }
 
@@ -169,7 +183,6 @@ class AutoMobileAgent(
     } catch (e: Exception) {
       println("AI recovery initialization failed: ${e.message}")
     } finally {
-      // Cleanup MCP connection if needed
       try {
         mcpClient.disconnect()
       } catch (e: Exception) {
@@ -178,7 +191,7 @@ class AutoMobileAgent(
     }
 
     val recoveryTime = timeProvider.currentTimeMillis() - startTime
-    return RecoveryResult(false, recoveryTime)
+    return RecoveryOutcome(false, recoveryTime)
   }
 
   private fun shouldRegeneratePlan(planFile: File): Boolean {
@@ -280,8 +293,6 @@ class AutoMobileAgent(
       }
     }
   }
-
-  data class RecoveryResult(val success: Boolean, val recoveryTimeMs: Long)
 
   // MCP Client interface and implementation
   interface MCPClient {
@@ -801,6 +812,7 @@ class AutoMobileAgent(
     fun createAIAgentWithMCPTools(
         config: ModelConfig,
         mcpClient: MCPClient,
+        maxToolCalls: Int = 5,
     ): AIAgent<String, String>
   }
 
@@ -922,6 +934,7 @@ class AutoMobileAgent(
     override fun createAIAgentWithMCPTools(
         config: ModelConfig,
         mcpClient: MCPClient,
+        maxToolCalls: Int,
     ): AIAgent<String, String> {
       val executor =
           when (config.provider) {
@@ -950,7 +963,7 @@ class AutoMobileAgent(
         The available tools are discovered dynamically from the MCP server.
 
         IMPORTANT CONSTRAINTS:
-        - You have a maximum of $MAX_TOOL_CALLS tool calls per recovery attempt
+        - You have a maximum of $maxToolCalls tool calls per recovery attempt
         - Always start by observing the current device state
         - Focus on practical, immediate fixes rather than complex workarounds
         - If you can't fix the issue within the tool call limit, explain what you discovered

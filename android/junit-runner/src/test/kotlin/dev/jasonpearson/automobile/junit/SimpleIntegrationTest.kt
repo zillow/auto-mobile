@@ -13,42 +13,16 @@ class SimpleIntegrationTest {
   }
 
   @Test
-  fun testAutoMobileTestAnnotationHasCorrectDefaultValues() {
-    val method = SimpleTestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
-    val annotation = method.getAnnotation(AutoMobileTest::class.java)
-
-    assertNotNull(annotation)
-    assertEquals("test-plans/launch-clock-app.yaml", annotation.plan)
-    assertEquals("", annotation.prompt)
-    assertEquals(0, annotation.maxRetries)
-    assertTrue(annotation.aiAssistance)
-    assertEquals(30000L, annotation.timeoutMs)
-    assertEquals("auto", annotation.device)
-  }
-
-  @Test
-  fun testPlanParameterTakesPrecedenceOverValue() {
-    val method = SimpleTestTargetClass::class.java.getMethod("testWithPlanParameter")
-    val annotation = method.getAnnotation(AutoMobileTest::class.java)
-
-    assertNotNull(annotation)
-    assertEquals("test-plans/launch-clock-app.yaml", annotation.plan)
-    assertFalse(annotation.aiAssistance)
-  }
-
-  @Test
-  fun testAnnotationConfigurationOptions() {
-    val method = SimpleTestTargetClass::class.java.getMethod("testWithSpecificDevice")
-    val annotation = method.getAnnotation(AutoMobileTest::class.java)
-
-    assertNotNull(annotation)
-    assertEquals("test-plans/launch-clock-app.yaml", annotation.plan)
-    assertEquals("emulator-5554", annotation.device)
+  fun testAutoMobilePlanExecutionOptionsDefaults() {
+    val options = AutoMobilePlanExecutionOptions()
+    assertEquals(30000L, options.timeoutMs)
+    assertEquals("auto", options.device)
+    assertTrue(options.aiAssistance)
+    assertEquals(0, options.maxRetries)
   }
 
   @Test
   fun testSystemPropertyDefaults() {
-    // Test that system properties have sensible defaults
     val debugMode = System.getProperty("automobile.debug", "false").toBoolean()
     val ciMode = System.getProperty("automobile.ci.mode", "false").toBoolean()
 
@@ -61,14 +35,14 @@ class SimpleIntegrationTest {
 class SimpleTestTargetClass {
 
   @Test
-  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml")
-  fun testWithAutoMobileAnnotation() {}
+  fun testWithPlan() {
+    // In real usage: AutoMobilePlan("test-plans/launch-clock-app.yaml").execute()
+  }
 
   @Test
-  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", aiAssistance = false)
-  fun testWithPlanParameter() {}
-
-  @Test
-  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", device = "emulator-5554")
-  fun testWithSpecificDevice() {}
+  fun testWithOptions() {
+    // In real usage: AutoMobilePlan("test-plans/launch-clock-app.yaml").execute(
+    //     AutoMobilePlanExecutionOptions(device = "emulator-5554")
+    // )
+  }
 }

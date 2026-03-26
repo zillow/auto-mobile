@@ -56,6 +56,7 @@ import { registerDeviceSnapshotResources } from "./deviceSnapshotResources";
 import { registerDatabaseResources } from "./databaseResources";
 import { registerFailuresResources } from "./failuresResources";
 import { registerStorageResources } from "./storageResources";
+import { registerFeatureFlagResources } from "./featureFlagResources";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import { startupBenchmark } from "../utils/startupBenchmark";
 
@@ -170,6 +171,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDatabaseResources();
   registerFailuresResources();
   registerStorageResources();
+  registerFeatureFlagResources();
   startupBenchmark.endPhase("resourceRegistration");
 
   // Create a new MCP server

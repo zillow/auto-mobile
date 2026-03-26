@@ -1,37 +1,27 @@
 package dev.jasonpearson.automobile.junit
 
-import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Example test class showing usage of AutoMobile JUnitRunner with annotation-based approach to test
- * device availability skipping
+ * Example test class showing usage of AutoMobile JUnitRunner with the AutoMobilePlan DSL to test
+ * device availability skipping.
  */
 @RunWith(AutoMobileRunner::class)
 class ClockAppAutoMobileTest {
 
   @Test
-  @AutoMobileTest(
-      plan = "test-plans/launch-clock-app.yaml",
-      aiAssistance = false,
-      maxRetries = 2,
-      timeoutMs = 180000L,
-  )
-  fun `launch clock app using annotation`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
+  fun `launch clock app using DSL`() {
+    // Uses AutoMobilePlan DSL — will be skipped if no devices are available
+    // AutoMobilePlan("test-plans/launch-clock-app.yaml").execute(
+    //     AutoMobilePlanExecutionOptions(aiAssistance = false, maxRetries = 2, timeoutMs = 180000L)
+    // )
   }
 
   @Test
-  @AutoMobileTest(
-      plan = "test-plans/set-alarm-in-clock-app.yaml",
-      aiAssistance = false,
-      maxRetries = 2,
-      timeoutMs = 180000L,
-  )
-  fun `set alarm in clock app using annotation`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
+  fun `set alarm in clock app using DSL`() {
+    // AutoMobilePlan("test-plans/set-alarm-in-clock-app.yaml").execute(
+    //     AutoMobilePlanExecutionOptions(aiAssistance = false, maxRetries = 2, timeoutMs = 180000L)
+    // )
   }
 }

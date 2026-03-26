@@ -18,18 +18,18 @@ class JUnitRunnerMemoryTest {
     @BeforeClass
     @JvmStatic
     fun setUpClass() {
-      System.setProperty("automobile.junit.memory.heapdump.dir", "../heap-dump")
+      MemoryDiagnostics.forceGc()
     }
 
     @AfterClass
     @JvmStatic
     fun tearDownClass() {
-      System.clearProperty("automobile.junit.memory.heapdump.dir")
+      MemoryDiagnostics.forceGc()
     }
   }
 
   @After
-  fun cleanUp() {
+  fun tearDown() {
     SystemPropertyCache.clear()
     PlanCache.clear()
     RegexCache.clear()
@@ -38,23 +38,20 @@ class JUnitRunnerMemoryTest {
   }
 
   @Test
-  fun shouldNotLeakOverManyTests() {
-    val runner = AutoMobileRunner(SimpleTestTargetClass::class.java)
-    val method = SimpleTestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
-    val annotation = method.getAnnotation(AutoMobileTest::class.java)
-    val resolvedPlanPath = runner.invokeResolvePlanPath("test-plans/launch-clock-app.yaml")
-
+  fun shouldNotLeakOverManyPlanCacheOperations() {
     val maxGrowthBytes = resolveMaxGrowthBytes()
     val baseline = forceGcAndSnapshot()
 
+    // Simulate repeated plan cache operations — the hot path during test execution
+    val planContent = "name: memory-test\nsteps:\n  - tool: observe\n    withViewHierarchy: true"
+
     repeat(ITERATIONS) { iteration ->
-      runSimpleTest(
-          runner = runner,
-          annotation = annotation,
-          methodName = method.name,
-          resolvedPlanPath = resolvedPlanPath,
-          iteration = iteration,
-      )
+      val key = "test-plans/plan-$iteration.yaml"
+      PlanCache.cacheContent(key, planContent)
+      PlanCache.getCachedContent(key)
+
+      // Base64 encode (same as the executor does)
+      Base64.getEncoder().encodeToString(planContent.toByteArray())
 
       if ((iteration + 1) % GC_INTERVAL == 0) {
         forceGcAndWait()
@@ -76,41 +73,6 @@ class JUnitRunnerMemoryTest {
         "Heap growth ${formatBytes(deltaBytes)} exceeded limit ${formatBytes(maxGrowthBytes)}",
         deltaBytes <= maxGrowthBytes,
     )
-  }
-
-  private fun runSimpleTest(
-      runner: AutoMobileRunner,
-      annotation: AutoMobileTest,
-      methodName: String,
-      resolvedPlanPath: String,
-      iteration: Int,
-  ) {
-    val planContent =
-        PlanCache.getCachedContent(resolvedPlanPath)
-            ?: File(resolvedPlanPath).readText().also {
-              PlanCache.cacheContent(resolvedPlanPath, it)
-            }
-    val base64Content = Base64.getEncoder().encodeToString(planContent.toByteArray())
-
-    runner.invokeBuildDaemonExecutePlanArgs(
-        base64Content,
-        annotation,
-        "session-$iteration",
-        methodName,
-        SimpleTestTargetClass::class.java.simpleName,
-    )
-
-    if (iteration % 25 == 0) {
-      AutoMobileRunner.writeTestLog(
-          testName = "memoryIteration$iteration",
-          className = "JUnitRunnerMemoryTest",
-          stdout = "Memory iteration $iteration",
-          stderr = "",
-          exitCode = 0,
-          executionTimeMs = 1L,
-          success = true,
-      )
-    }
   }
 
   private fun forceGcAndSnapshot(): MemorySnapshot {
@@ -142,10 +104,4 @@ class JUnitRunnerMemoryTest {
     val mb = bytes.toDouble() / (1024.0 * 1024.0)
     return String.format("%.2f MiB", mb)
   }
-}
-
-private fun AutoMobileRunner.invokeResolvePlanPath(planPath: String): String {
-  val method = this::class.java.getDeclaredMethod("resolvePlanPath", String::class.java)
-  method.isAccessible = true
-  return method.invoke(this, planPath) as String
 }

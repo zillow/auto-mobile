@@ -2,7 +2,6 @@ package dev.jasonpearson.automobile.slides
 
 import dev.jasonpearson.automobile.junit.AutoMobilePlan
 import dev.jasonpearson.automobile.junit.AutoMobileRunner
-import dev.jasonpearson.automobile.junit.AutoMobileTest
 import org.junit.Assert.assertTrue
 import org.junit.Ignore
 import org.junit.Test

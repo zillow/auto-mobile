@@ -34,6 +34,7 @@ class AutoMobilePlanExecutorTest {
     DaemonSocketClientManager.testClient = null
     AutoMobileSharedUtils.testDeviceChecker = null
     DaemonHeartbeat.testController = null
+    AutoMobilePlanExecutor.testAgent = null
   }
 
   @Test

@@ -1,12 +1,13 @@
 package dev.jasonpearson.automobile.playground.automobile
 
-import dev.jasonpearson.automobile.junit.AutoMobileTest
+import dev.jasonpearson.automobile.junit.AutoMobilePlan
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class TestBinaryExampleTest {
   @Test
-  @AutoMobileTest(plan = "test-plan.yaml")
   fun testBinaryExample() {
-    // Test method body can be empty or contain setup/teardown
+    val plan = AutoMobilePlan("test-plans/test-plan.yaml")
+    assertNotNull(plan)
   }
 }

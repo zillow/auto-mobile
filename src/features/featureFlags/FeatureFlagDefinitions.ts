@@ -7,7 +7,8 @@ export type FeatureFlagKey =
   | "predictive-ui"
   | "force-accessibility-mode"
   | "accessibility-auto-detect"
-  | "raw-element-search";
+  | "raw-element-search"
+  | "ai-recovery";
 
 export type FeatureFlagConfig = Record<string, unknown>;
 
@@ -86,5 +87,14 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     label: "Accessibility auto-detect",
     description: "Automatically detect and adapt to TalkBack/VoiceOver when enabled.",
     defaultValue: true,
+  },
+  {
+    key: "ai-recovery",
+    label: "AI recovery",
+    description: "AI-assisted recovery for failed test steps.",
+    defaultValue: true,
+    defaultConfig: {
+      maxToolCalls: 5,
+    },
   },
 ];
