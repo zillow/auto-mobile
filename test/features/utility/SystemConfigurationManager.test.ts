@@ -271,6 +271,76 @@ describe("SystemConfigurationManager", () => {
     });
   });
 
+  // --- iOS Simulator: setCalendarSystem ---
+
+  describe("iOS simulator setCalendarSystem", () => {
+    test("writes AppleCalendar via defaults write and reads back", async () => {
+      fakeExec.setCommandResponse("defaults read .GlobalPreferences AppleCalendar", execResult("japanese\n"));
+      const mgr = new SystemConfigurationManager(IOS_SIMULATOR, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("japanese");
+
+      expect(result.success).toBe(true);
+      expect(result.calendarSystem).toBe("japanese");
+      expect(
+        fakeExec.wasCommandExecuted(
+          `xcrun simctl spawn ${IOS_SIMULATOR.deviceId} defaults write .GlobalPreferences AppleCalendar japanese`
+        )
+      ).toBe(true);
+    });
+
+    test("reads previous calendar system before writing", async () => {
+      fakeExec.setCommandResponse("defaults read .GlobalPreferences AppleCalendar", execResult("buddhist\n"));
+      const mgr = new SystemConfigurationManager(IOS_SIMULATOR, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("buddhist");
+
+      expect(result.success).toBe(true);
+      expect(result.previousCalendarSystem).toBe("buddhist");
+    });
+
+    test("returns error when read-back does not match requested value", async () => {
+      fakeExec.setCommandResponse("defaults read .GlobalPreferences AppleCalendar", execResult("gregory\n"));
+      const mgr = new SystemConfigurationManager(IOS_SIMULATOR, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("buddhist");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Read-back verification failed");
+      expect(result.calendarSystem).toBe("gregory");
+    });
+
+    test("returns error for empty calendarSystem", async () => {
+      const mgr = new SystemConfigurationManager(IOS_SIMULATOR, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("  ");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("calendarSystem must be a non-empty string");
+    });
+
+    test("returns error for physical iOS device", async () => {
+      const mgr = new SystemConfigurationManager(IOS_PHYSICAL, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("japanese");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Localization changes are only supported on iOS Simulator.");
+      expect(fakeExec.getExecutedCommands()).toHaveLength(0);
+    });
+
+    test("returns error when defaults write fails", async () => {
+      const originalExec = fakeExec.exec.bind(fakeExec);
+      fakeExec.exec = async (command, options) => {
+        if (command.includes("defaults write .GlobalPreferences AppleCalendar")) {
+          throw new Error("simctl failed");
+        }
+        return originalExec(command, options);
+      };
+
+      const mgr = new SystemConfigurationManager(IOS_SIMULATOR, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("japanese");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Failed to set calendar system");
+    });
+  });
+
   // --- iOS Simulator: getCalendarSystem ---
 
   describe("iOS simulator getCalendarSystem", () => {
@@ -313,6 +383,45 @@ describe("SystemConfigurationManager", () => {
       expect(result.success).toBe(true);
       expect(fakeExec.getExecutedCommands()).toHaveLength(0);
       expect(fakeAdbClient.wasCommandExecuted("cmd locale set-locales en-US")).toBe(true);
+    });
+  });
+
+  describe("Android setCalendarSystem", () => {
+    test("writes calendar_type via adb and reads back", async () => {
+      fakeAdbClient.setCommandResult("shell settings get system calendar_type", "japanese");
+      const mgr = new SystemConfigurationManager(ANDROID_DEVICE, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("japanese");
+
+      expect(result.success).toBe(true);
+      expect(result.calendarSystem).toBe("japanese");
+      expect(fakeAdbClient.wasCommandExecuted("settings put system calendar_type japanese")).toBe(true);
+    });
+
+    test("reads previous calendar system before writing", async () => {
+      fakeAdbClient.setCommandResult("shell settings get system calendar_type", "buddhist");
+      const mgr = new SystemConfigurationManager(ANDROID_DEVICE, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("buddhist");
+
+      expect(result.success).toBe(true);
+      expect(result.previousCalendarSystem).toBe("buddhist");
+    });
+
+    test("returns error when read-back does not match requested value", async () => {
+      fakeAdbClient.setCommandResult("shell settings get system calendar_type", "gregory");
+      const mgr = new SystemConfigurationManager(ANDROID_DEVICE, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("buddhist");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Read-back verification failed");
+      expect(result.calendarSystem).toBe("gregory");
+    });
+
+    test("returns error for empty calendarSystem", async () => {
+      const mgr = new SystemConfigurationManager(ANDROID_DEVICE, fakeAdbFactory, fakeExec);
+      const result = await mgr.setCalendarSystem("  ");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("calendarSystem must be a non-empty string");
     });
   });
 

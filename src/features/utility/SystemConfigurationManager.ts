@@ -8,6 +8,7 @@ import {
   GetCalendarSystemResult,
   LocalizationSettingsResult,
   Set24HourFormatResult,
+  SetCalendarSystemResult,
   SetLocaleResult,
   SetTextDirectionResult,
   SetTimeZoneResult
@@ -271,6 +272,58 @@ export class SystemConfigurationManager {
         enabled,
         previousFormat: this.normalizeTimeFormat(previousFormat),
         error: `Failed to set 24-hour format: ${errorMessage}`
+      };
+    }
+  }
+
+  async setCalendarSystem(calendarSystem: string): Promise<SetCalendarSystemResult> {
+    const trimmed = calendarSystem.trim();
+    if (!trimmed) {
+      return {
+        success: false,
+        calendarSystem,
+        error: "calendarSystem must be a non-empty string"
+      };
+    }
+
+    if (this.device.platform === "ios") {
+      return this.setCalendarSystemIos(trimmed);
+    }
+
+    if (this.device.platform !== "android") {
+      return {
+        success: false,
+        calendarSystem: trimmed,
+        error: this.getPlatformError()
+      };
+    }
+
+    const previous = await this.getCalendarSystem();
+    const previousCalendarSystem = previous.calendarSystem ?? null;
+
+    try {
+      await this.adb.executeCommand(`shell settings put system calendar_type ${trimmed}`);
+      const readBack = await this.readSetting("shell settings get system calendar_type");
+      if (!readBack || readBack !== trimmed) {
+        return {
+          success: false,
+          calendarSystem: readBack ?? trimmed,
+          previousCalendarSystem,
+          error: `Read-back verification failed: expected "${trimmed}" but got "${readBack ?? "null"}"`
+        };
+      }
+      return {
+        success: true,
+        calendarSystem: readBack,
+        previousCalendarSystem
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        calendarSystem: trimmed,
+        previousCalendarSystem,
+        error: `Failed to set calendar system: ${errorMessage}`
       };
     }
   }
@@ -608,6 +661,38 @@ export class SystemConfigurationManager {
         success: false,
         enabled,
         error: `Failed to set 24-hour format: ${errorMessage}`
+      };
+    }
+  }
+
+  private async setCalendarSystemIos(calendarSystem: string): Promise<SetCalendarSystemResult> {
+    if (!this.isSimulator()) {
+      return { success: false, calendarSystem, error: IOS_PHYSICAL_DEVICE_ERROR };
+    }
+
+    try {
+      const previousCalendarSystem = await this.iosDefaultsRead(".GlobalPreferences", "AppleCalendar");
+      await this.iosDefaultsWrite(".GlobalPreferences", "AppleCalendar", calendarSystem);
+      const readBack = await this.iosDefaultsRead(".GlobalPreferences", "AppleCalendar");
+      if (!readBack || readBack !== calendarSystem) {
+        return {
+          success: false,
+          calendarSystem: readBack ?? calendarSystem,
+          previousCalendarSystem,
+          error: `Read-back verification failed: expected "${calendarSystem}" but got "${readBack ?? "null"}"`
+        };
+      }
+      return {
+        success: true,
+        calendarSystem: readBack,
+        previousCalendarSystem
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        calendarSystem,
+        error: `Failed to set calendar system: ${errorMessage}`
       };
     }
   }

@@ -62,7 +62,7 @@
   },
   {
     "name": "changeLocalization",
-    "description": "Change locale, time zone, text direction, and time format",
+    "description": "Change locale, time zone, text direction, time format, and calendar system",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -100,6 +100,11 @@
             "12",
             "24"
           ]
+        },
+        "calendarSystem": {
+          "description": "Calendar system (e.g., gregory, japanese, buddhist, islamic-civil)",
+          "type": "string",
+          "minLength": 1
         },
         "sessionUuid": {
           "description": "Session UUID for device targeting",

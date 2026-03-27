@@ -19,12 +19,13 @@ const changeLocalizationBaseSchema = z.object({
   locale: z.string().min(1).optional().describe("Locale tag (e.g., ar-SA, ja-JP)"),
   timeZone: z.string().min(1).optional().describe("Zone ID (e.g., America/Los_Angeles)"),
   textDirection: z.enum(["ltr", "rtl"]).optional().describe("Text direction"),
-  timeFormat: z.enum(["12", "24"]).optional().describe("Time format")
+  timeFormat: z.enum(["12", "24"]).optional().describe("Time format"),
+  calendarSystem: z.string().min(1).optional().describe("Calendar system (e.g., gregory, japanese, buddhist, islamic-civil)")
 });
 
 export const changeLocalizationSchema = addDeviceTargetingToSchema(changeLocalizationBaseSchema).refine(values =>
-  values.locale || values.timeZone || values.textDirection || values.timeFormat, {
-  message: "At least one of locale, timeZone, textDirection, or timeFormat must be provided."
+  values.locale || values.timeZone || values.textDirection || values.timeFormat || values.calendarSystem, {
+  message: "At least one of locale, timeZone, textDirection, timeFormat, or calendarSystem must be provided."
 });
 
 // Export interfaces for type safety
@@ -39,6 +40,7 @@ export interface ChangeLocalizationArgs {
   timeZone?: string;
   textDirection?: "ltr" | "rtl";
   timeFormat?: "12" | "24";
+  calendarSystem?: string;
 }
 
 // Register tools
@@ -65,6 +67,7 @@ export function registerUtilityTools() {
       timeZone?: string;
       textDirection?: "ltr" | "rtl";
       timeFormat?: "12" | "24";
+      calendarSystem?: string;
     } = {};
     const errors: string[] = [];
 
@@ -106,6 +109,15 @@ export function registerUtilityTools() {
       }
     }
 
+    if (args.calendarSystem !== undefined) {
+      const result = await manager.setCalendarSystem(args.calendarSystem);
+      if (result.success) {
+        changes.calendarSystem = result.calendarSystem;
+      } else {
+        errors.push(result.error ?? "Failed to set calendar system");
+      }
+    }
+
     const success = errors.length === 0;
     let intentBroadcast = false;
     if (Object.keys(changes).length > 0 && device.platform === "android") {
@@ -130,7 +142,7 @@ export function registerUtilityTools() {
 
   ToolRegistry.registerDeviceAware(
     "changeLocalization",
-    "Change locale, time zone, text direction, and time format",
+    "Change locale, time zone, text direction, time format, and calendar system",
     changeLocalizationSchema,
     changeLocalizationHandler
   );

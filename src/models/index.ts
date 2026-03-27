@@ -60,6 +60,7 @@ export * from "./SetAccessibilityFocusOptions";
 export * from "./SetAccessibilityFocusResult";
 export * from "./SendTextResult";
 export * from "./Set24HourFormatResult";
+export * from "./SetCalendarSystemResult";
 export * from "./SetLocaleResult";
 export * from "./SetTextDirectionResult";
 export * from "./SetTimeZoneResult";
