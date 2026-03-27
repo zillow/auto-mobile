@@ -97,7 +97,9 @@ export async function createToolExecutionContext(
 
     // Start test coverage session for navigation graph tracking
     // This enables automatic tracking of screens and transitions during test execution
-    const navManager = NavigationGraphManager.getInstance();
+    const navManager = sessionUuid
+      ? NavigationGraphManager.getInstanceForSession(sessionUuid)
+      : NavigationGraphManager.getInstance();
     if (navManager.getCurrentAppId()) {
       await navManager.startTestSession(sessionUuid);
       logger.info(`[ToolExecutionContext] Started test coverage tracking for session ${sessionUuid}`);
@@ -135,7 +137,7 @@ async function ensureAccessibilityServiceReady(deviceId: string, sessionId: stri
       logger.info(`[ToolExecutionContext] Accessibility service setup failed`, { perfTiming: JSON.stringify(timings, null, 2) });
     }
     throw new ActionableError(
-      `Failed to setup accessibility service for session ${sessionId}: ${setupResult.error || setupResult.message}`
+      `Failed to setup accessibility service for device ${deviceId} (session ${sessionId}): ${setupResult.error || setupResult.message}`
     );
   }
 

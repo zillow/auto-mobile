@@ -330,6 +330,9 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
   // Singleton instances per device
   private static instances: Map<string, CtrlProxyClient> = new Map();
 
+  // Session binding for multi-agent isolation
+  private boundSessionId: string | null = null;
+
   // Hierarchy caching (accessed by delegates via context)
   private cachedHierarchy: CachedHierarchy | null = null;
 
@@ -408,6 +411,23 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       );
     }
     return CtrlProxyClient.instances.get(deviceId)!;
+  }
+
+  /**
+   * Bind this client to a session for multi-agent NavigationGraphManager isolation.
+   * Called when a tool execution context binds a session to this device.
+   */
+  public bindSession(sessionId: string): void {
+    this.boundSessionId = sessionId;
+  }
+
+  /**
+   * Get the NavigationGraphManager for the bound session, or the global singleton.
+   */
+  private getNavigationGraphManager(): NavigationGraphManager {
+    return this.boundSessionId
+      ? NavigationGraphManager.getInstanceForSession(this.boundSessionId)
+      : NavigationGraphManager.getInstance();
   }
 
   /**
@@ -1057,7 +1077,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
   getHierarchyNavigationDetector(): HierarchyNavigationDetector {
     if (!this.hierarchyNavigationDetector) {
       this.hierarchyNavigationDetector = new HierarchyNavigationDetector(
-        NavigationGraphManager.getInstance(),
+        this.getNavigationGraphManager(),
         { timer: this.timer }
       );
 
@@ -1069,7 +1089,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
             .captureAndStore(this.device, this.adb, appId, screenName)
             .then(screenshotPath => {
               if (screenshotPath) {
-                NavigationGraphManager.getInstance()
+                this.getNavigationGraphManager()
                   .updateNodeScreenshot(appId, screenName, screenshotPath)
                   .catch(err => logger.warn(`[CTRL_PROXY] Failed to update hierarchy screenshot: ${err}`));
               }
@@ -1507,14 +1527,14 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
           }
 
           logger.info(`[CTRL_PROXY] Navigation event: ${event.destination} (app: ${event.applicationId})`);
-          await NavigationGraphManager.getInstance().recordNavigationEvent(event);
+          await this.getNavigationGraphManager().recordNavigationEvent(event);
 
           if (event.applicationId && event.destination) {
             NavigationScreenshotManager.getInstance()
               .captureAndStore(this.device, this.adb, event.applicationId, event.destination)
               .then(screenshotPath => {
                 if (screenshotPath) {
-                  NavigationGraphManager.getInstance()
+                  this.getNavigationGraphManager()
                     .updateNodeScreenshot(event.applicationId!, event.destination!, screenshotPath)
                     .catch(err => logger.warn(`[CTRL_PROXY] Failed to update screenshot: ${err}`));
                 }
@@ -2055,7 +2075,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       let currentScreen = event.currentScreen;
       if (!currentScreen) {
         try {
-          const navManager = NavigationGraphManager.getInstance();
+          const navManager = this.getNavigationGraphManager();
           currentScreen = navManager.getCurrentScreen() ?? undefined;
         } catch {
           // Continue without screen
@@ -2092,7 +2112,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
       let currentScreen = event.currentScreen;
       if (!currentScreen) {
         try {
-          const navManager = NavigationGraphManager.getInstance();
+          const navManager = this.getNavigationGraphManager();
           currentScreen = navManager.getCurrentScreen() ?? undefined;
         } catch {
           // Continue without screen
@@ -2133,7 +2153,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
 
       let currentScreen: string | undefined;
       try {
-        const navManager = NavigationGraphManager.getInstance();
+        const navManager = this.getNavigationGraphManager();
         currentScreen = navManager.getCurrentScreen() ?? undefined;
       } catch {
         // Continue without screen

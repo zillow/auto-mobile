@@ -34,6 +34,7 @@ import { startFailuresPushSocketServer, stopFailuresPushSocketServer } from "./f
 import { startTelemetryPushSocketServer, stopTelemetryPushSocketServer } from "./telemetryPushSocketServer";
 import { CtrlProxyClient } from "../features/observe/android";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
+import { RealObserveScreen } from "../features/observe/ObserveScreen";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
@@ -80,6 +81,11 @@ export class Daemon {
     this.daemonSessionId = randomUUID();
     this.timer = timer;
     this.sessionManager = new SessionManager();
+    // Register centralized cleanup for session-scoped state
+    this.sessionManager.onSessionRelease((sessionId, deviceId) => {
+      NavigationGraphManager.releaseSession(sessionId);
+      RealObserveScreen.clearCache(deviceId);
+    });
     this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
     this.devicePool = new DevicePool(
       this.sessionManager,

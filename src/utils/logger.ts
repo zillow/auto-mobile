@@ -98,7 +98,7 @@ const pruneOldLogFiles = async (): Promise<void> => {
   const entries = await readdirAsync(logsDir);
   const logFiles = entries.filter(f => f.endsWith(".log")).sort();
 
-  if (logFiles.length <= MAX_LOG_FILES) return;
+  if (logFiles.length <= MAX_LOG_FILES) {return;}
 
   // Sort alphabetically — server.log sorts last, server-<timestamp>.log files
   // sort chronologically. Delete the oldest until we're at the limit.

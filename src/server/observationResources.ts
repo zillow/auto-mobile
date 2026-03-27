@@ -23,7 +23,9 @@ export function resetScreenshotFileSystem(): void {
 // Resource URIs
 export const RESOURCE_URIS = {
   LATEST_OBSERVATION: "automobile:observation/latest",
-  LATEST_SCREENSHOT: "automobile:observation/latest/screenshot"
+  LATEST_SCREENSHOT: "automobile:observation/latest/screenshot",
+  DEVICE_OBSERVATION: "automobile:observation/{deviceId}/latest",
+  DEVICE_SCREENSHOT: "automobile:observation/{deviceId}/latest/screenshot",
 } as const;
 
 // Helper to get the latest screenshot path from cache
@@ -141,9 +143,89 @@ async function getLatestScreenshot(): Promise<ResourceContent> {
   }
 }
 
+// Device-scoped handler for observation (with deviceId parameter)
+async function getDeviceObservation(params: Record<string, string>): Promise<ResourceContent> {
+  const { deviceId } = params;
+  const uri = `automobile:observation/${deviceId}/latest`;
+  try {
+    const cachedResult = RealObserveScreen.getRecentCachedResultForDevice(deviceId);
+
+    if (!cachedResult) {
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({
+          error: `No observation available for device ${deviceId}. Call the 'observe' tool first.`
+        }, null, 2)
+      };
+    }
+
+    return {
+      uri,
+      mimeType: "application/json",
+      text: stringifyToolResponse(cachedResult)
+    };
+  } catch (error) {
+    logger.error(`[ObservationResources] Failed to get observation for device ${deviceId}: ${error}`);
+    return {
+      uri,
+      mimeType: "application/json",
+      text: JSON.stringify({
+        error: `Failed to retrieve observation for device ${deviceId}: ${error}`
+      }, null, 2)
+    };
+  }
+}
+
+// Device-scoped handler for screenshot (with deviceId parameter)
+async function getDeviceScreenshot(params: Record<string, string>): Promise<ResourceContent> {
+  const { deviceId } = params;
+  const uri = `automobile:observation/${deviceId}/latest/screenshot`;
+  try {
+    const cachedResult = RealObserveScreen.getRecentCachedResultForDevice(deviceId);
+    if (!cachedResult) {
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({
+          error: `No observation available for device ${deviceId}. Call the 'observe' tool first.`
+        }, null, 2)
+      };
+    }
+
+    const screenshotPath = RealObserveScreen.getRecentCachedScreenshotPathForDevice(deviceId);
+    if (!screenshotPath) {
+      const screenshotError = RealObserveScreen.getRecentCachedScreenshotErrorForDevice(deviceId);
+      const errorMessage = screenshotError
+        ? `No screenshot available for device ${deviceId}: ${screenshotError}`
+        : `No screenshot available for device ${deviceId}. Call the 'observe' tool again.`;
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({ error: errorMessage }, null, 2)
+      };
+    }
+
+    const imageBuffer = await screenshotFileSystem.readFile(screenshotPath);
+    const base64Image = imageBuffer.toString("base64");
+    const mimeType = screenshotPath.endsWith(".webp") ? "image/webp" : "image/png";
+
+    return { uri, mimeType, blob: base64Image };
+  } catch (error) {
+    logger.error(`[ObservationResources] Failed to get screenshot for device ${deviceId}: ${error}`);
+    return {
+      uri,
+      mimeType: "application/json",
+      text: JSON.stringify({
+        error: `Failed to retrieve screenshot for device ${deviceId}: ${error}`
+      }, null, 2)
+    };
+  }
+}
+
 // Register all observation resources
 export function registerObservationResources(): void {
-  // Register latest observation as text/json resource
+  // Register latest observation as text/json resource (all devices)
   ResourceRegistry.register(
     RESOURCE_URIS.LATEST_OBSERVATION,
     "Latest Observation",
@@ -152,13 +234,31 @@ export function registerObservationResources(): void {
     getLatestObservation
   );
 
-  // Register latest screenshot as image blob resource
+  // Register latest screenshot as image blob resource (all devices)
   ResourceRegistry.register(
     RESOURCE_URIS.LATEST_SCREENSHOT,
     "Latest Screenshot",
     "The most recent screen capture as a PNG or WebP image. Updated automatically after each observe() call.",
     "image/png",
     getLatestScreenshot
+  );
+
+  // Register device-scoped observation template
+  ResourceRegistry.registerTemplate(
+    RESOURCE_URIS.DEVICE_OBSERVATION,
+    "Device Observation",
+    "Screen observation for a specific device. Use when multiple devices are active.",
+    "application/json",
+    getDeviceObservation
+  );
+
+  // Register device-scoped screenshot template
+  ResourceRegistry.registerTemplate(
+    RESOURCE_URIS.DEVICE_SCREENSHOT,
+    "Device Screenshot",
+    "Screen capture for a specific device. Use when multiple devices are active.",
+    "image/png",
+    getDeviceScreenshot
   );
 
   logger.info("[ObservationResources] Registered observation resources");

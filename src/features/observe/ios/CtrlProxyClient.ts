@@ -234,6 +234,9 @@ export interface CtrlProxyService {
 export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxyService {
   private static instances: Map<string, CtrlProxyClient> = new Map();
 
+  // Session binding for multi-agent isolation
+  private boundSessionId: string | null = null;
+
   // Default port matches CtrlProxy on iOS
   public static readonly DEFAULT_PORT = 8765;
 
@@ -309,6 +312,22 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
       CtrlProxyClient.instances.set(key, new CtrlProxyClient(device, resolvedPort));
     }
     return CtrlProxyClient.instances.get(key)!;
+  }
+
+  /**
+   * Bind this client to a session for multi-agent NavigationGraphManager isolation.
+   */
+  public bindSession(sessionId: string): void {
+    this.boundSessionId = sessionId;
+  }
+
+  /**
+   * Get the NavigationGraphManager for the bound session, or the global singleton.
+   */
+  private getNavigationGraphManager(): NavigationGraphManager {
+    return this.boundSessionId
+      ? NavigationGraphManager.getInstanceForSession(this.boundSessionId)
+      : NavigationGraphManager.getInstance();
   }
 
   /**
@@ -1086,7 +1105,7 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
   public getHierarchyNavigationDetector(): HierarchyNavigationDetector {
     if (!this.hierarchyNavigationDetector) {
       this.hierarchyNavigationDetector = new HierarchyNavigationDetector(
-        NavigationGraphManager.getInstance(),
+        this.getNavigationGraphManager(),
         { timer: this.timer }
       );
     }

@@ -53,7 +53,17 @@ import type { ScreenshotService } from "./interfaces/ScreenshotService";
  */
 interface ObserveResultCache {
   timestamp: number;
+  deviceId: string;
   observeResult: ObserveResult;
+}
+
+/**
+ * Per-device screenshot state
+ */
+interface ScreenshotState {
+  path: string | null;
+  error: string | null;
+  timestamp: number;
 }
 
 /**
@@ -73,19 +83,30 @@ export class RealObserveScreen implements ObserveScreen {
   private predictiveUIState: PredictiveUIStateInterface;
   private timer: Timer;
 
-  // Static cache for observe results
+  // Static cache for observe results (keyed by "deviceId:timestamp")
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
   private static observeResultCacheDir: string = getTempDir(TEMP_SUBDIRS.OBSERVE_RESULTS);
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-  private static latestScreenshotPath: string | null = null;
-  private static latestScreenshotError: string | null = null;
-  private static latestScreenshotTimestamp: number | null = null;
+  // Per-device screenshot state
+  private static screenshotStateByDevice: Map<string, ScreenshotState> = new Map();
 
   /**
    * Get the most recent cached observe result from memory (static accessor).
-   * Returns the most recently cached result if available and not expired.
+   * Returns the most recently cached result across ALL devices if available and not expired.
    */
   static getRecentCachedResult(): ObserveResult | undefined {
+    return RealObserveScreen.findMostRecentCachedResult();
+  }
+
+  /**
+   * Get the most recent cached observe result for a specific device.
+   * Returns undefined if no valid cached result exists for that device.
+   */
+  static getRecentCachedResultForDevice(deviceId: string): ObserveResult | undefined {
+    return RealObserveScreen.findMostRecentCachedResult(deviceId);
+  }
+
+  private static findMostRecentCachedResult(deviceId?: string): ObserveResult | undefined {
     if (RealObserveScreen.observeResultCache.size === 0) {
       return undefined;
     }
@@ -95,6 +116,9 @@ export class RealObserveScreen implements ObserveScreen {
     let mostRecentTimestamp = 0;
 
     for (const entry of RealObserveScreen.observeResultCache.values()) {
+      if (deviceId && entry.deviceId !== deviceId) {
+        continue;
+      }
       const age = now - entry.timestamp;
       if (age <= RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS && entry.timestamp > mostRecentTimestamp) {
         mostRecentEntry = entry;
@@ -106,29 +130,53 @@ export class RealObserveScreen implements ObserveScreen {
   }
 
   /**
-   * Get the most recent cached screenshot path (if any).
+   * Get the most recent cached screenshot path (if any) across all devices.
    */
   static getRecentCachedScreenshotPath(): string | undefined {
-    const state = RealObserveScreen.getLatestScreenshotState();
+    const state = RealObserveScreen.findLatestScreenshotState();
     return state?.path ?? undefined;
   }
 
   /**
-   * Get the most recent cached screenshot error (if any).
+   * Get the most recent cached screenshot path for a specific device.
+   */
+  static getRecentCachedScreenshotPathForDevice(deviceId: string): string | undefined {
+    const state = RealObserveScreen.findLatestScreenshotState(deviceId);
+    return state?.path ?? undefined;
+  }
+
+  /**
+   * Get the most recent cached screenshot error (if any) across all devices.
    */
   static getRecentCachedScreenshotError(): string | undefined {
-    const state = RealObserveScreen.getLatestScreenshotState();
+    const state = RealObserveScreen.findLatestScreenshotState();
     return state?.error ?? undefined;
   }
 
   /**
-   * Clear the in-memory cache (for testing purposes).
+   * Get the most recent cached screenshot error for a specific device.
    */
-  static clearCache(): void {
-    RealObserveScreen.observeResultCache.clear();
-    RealObserveScreen.latestScreenshotPath = null;
-    RealObserveScreen.latestScreenshotError = null;
-    RealObserveScreen.latestScreenshotTimestamp = null;
+  static getRecentCachedScreenshotErrorForDevice(deviceId: string): string | undefined {
+    const state = RealObserveScreen.findLatestScreenshotState(deviceId);
+    return state?.error ?? undefined;
+  }
+
+  /**
+   * Clear the in-memory cache.
+   * @param deviceId - If provided, only clears cache for that device. Otherwise clears all.
+   */
+  static clearCache(deviceId?: string): void {
+    if (deviceId) {
+      for (const [key, entry] of RealObserveScreen.observeResultCache.entries()) {
+        if (entry.deviceId === deviceId) {
+          RealObserveScreen.observeResultCache.delete(key);
+        }
+      }
+      RealObserveScreen.screenshotStateByDevice.delete(deviceId);
+    } else {
+      RealObserveScreen.observeResultCache.clear();
+      RealObserveScreen.screenshotStateByDevice.clear();
+    }
     ScreenshotJobTracker.clear();
   }
 
@@ -170,30 +218,45 @@ export class RealObserveScreen implements ObserveScreen {
     }
   }
 
-  private static getLatestScreenshotState(): { path: string | null; error: string | null } | null {
-    const timestamp = RealObserveScreen.latestScreenshotTimestamp;
-    if (!timestamp) {
-      return null;
+  private static findLatestScreenshotState(deviceId?: string): { path: string | null; error: string | null } | null {
+    const now = defaultTimer.now();
+
+    if (deviceId) {
+      const state = RealObserveScreen.screenshotStateByDevice.get(deviceId);
+      if (!state) {
+        return null;
+      }
+      if (now - state.timestamp > RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS) {
+        RealObserveScreen.screenshotStateByDevice.delete(deviceId);
+        return null;
+      }
+      return { path: state.path, error: state.error };
     }
 
-    const age = defaultTimer.now() - timestamp;
-    if (age > RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS) {
-      RealObserveScreen.latestScreenshotPath = null;
-      RealObserveScreen.latestScreenshotError = null;
-      RealObserveScreen.latestScreenshotTimestamp = null;
-      return null;
+    // Find most recent across all devices
+    let mostRecent: ScreenshotState | null = null;
+    for (const [id, state] of RealObserveScreen.screenshotStateByDevice.entries()) {
+      if (now - state.timestamp > RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS) {
+        RealObserveScreen.screenshotStateByDevice.delete(id);
+        continue;
+      }
+      if (!mostRecent || state.timestamp > mostRecent.timestamp) {
+        mostRecent = state;
+      }
     }
 
-    return {
-      path: RealObserveScreen.latestScreenshotPath,
-      error: RealObserveScreen.latestScreenshotError
-    };
+    if (!mostRecent) {
+      return null;
+    }
+    return { path: mostRecent.path, error: mostRecent.error };
   }
 
-  private static updateLatestScreenshotCache(path?: string, error?: string): void {
-    RealObserveScreen.latestScreenshotPath = path ?? null;
-    RealObserveScreen.latestScreenshotError = error ?? null;
-    RealObserveScreen.latestScreenshotTimestamp = defaultTimer.now();
+  private static updateLatestScreenshotCache(deviceId: string, path?: string, error?: string): void {
+    RealObserveScreen.screenshotStateByDevice.set(deviceId, {
+      path: path ?? null,
+      error: error ?? null,
+      timestamp: defaultTimer.now(),
+    });
   }
 
   private async handleScreenshotResult(
@@ -206,25 +269,25 @@ export class RealObserveScreen implements ObserveScreen {
         logger.debug("[OBSERVE] Screenshot capture cancelled");
         return;
       }
-      RealObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
+      RealObserveScreen.updateLatestScreenshotCache(this.device.deviceId, undefined, errorMessage);
       logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
       return;
     }
 
     if (!screenshotResult.path) {
-      RealObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture returned no file path");
+      RealObserveScreen.updateLatestScreenshotCache(this.device.deviceId, undefined, "Screenshot capture returned no file path");
       logger.warn("[OBSERVE] Screenshot capture succeeded but no file path was returned");
       return;
     }
 
     const exists = await pathExists(screenshotResult.path);
     if (!exists) {
-      RealObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot file missing after capture");
+      RealObserveScreen.updateLatestScreenshotCache(this.device.deviceId, undefined, "Screenshot file missing after capture");
       logger.warn(`[OBSERVE] Screenshot capture reported success but file missing: ${screenshotResult.path}`);
       return;
     }
 
-    RealObserveScreen.updateLatestScreenshotCache(screenshotResult.path);
+    RealObserveScreen.updateLatestScreenshotCache(this.device.deviceId, screenshotResult.path);
   }
 
   /**
@@ -668,7 +731,7 @@ export class RealObserveScreen implements ObserveScreen {
         logger.debug("[OBSERVE] Screenshot capture cancelled");
         return;
       }
-      RealObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
+      RealObserveScreen.updateLatestScreenshotCache(this.device.deviceId, undefined, errorMessage);
       logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
     }
   }
@@ -838,7 +901,8 @@ export class RealObserveScreen implements ObserveScreen {
    */
   private async checkInMemoryObserveCache(): Promise<ObserveResult | null> {
     const cacheSize = RealObserveScreen.observeResultCache.size;
-    logger.debug(`[OBSERVE_CACHE] Checking in-memory cache, size: ${cacheSize}`);
+    const deviceId = this.device.deviceId;
+    logger.debug(`[OBSERVE_CACHE] Checking in-memory cache for device ${deviceId}, size: ${cacheSize}`);
 
     if (cacheSize === 0) {
       logger.debug("[OBSERVE_CACHE] In-memory cache is empty");
@@ -848,7 +912,7 @@ export class RealObserveScreen implements ObserveScreen {
     const now = this.timer.now();
     const ttl = RealObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS;
 
-    // Remove expired entries and find most recent
+    // Remove expired entries and find most recent for this device
     const expiredKeys: string[] = [];
     let mostRecentEntry: ObserveResultCache | null = null;
 
@@ -858,8 +922,8 @@ export class RealObserveScreen implements ObserveScreen {
       if (age >= ttl) {
         expiredKeys.push(key);
         logger.debug(`[OBSERVE_CACHE] Removing expired cache entry: ${key} (age: ${age}ms > TTL: ${ttl}ms)`);
-      } else {
-        // Check if this is the most recent valid entry
+      } else if (cachedEntry.deviceId === deviceId) {
+        // Only consider entries for this device
         if (!mostRecentEntry || cachedEntry.timestamp > mostRecentEntry.timestamp) {
           mostRecentEntry = cachedEntry;
         }
@@ -873,11 +937,11 @@ export class RealObserveScreen implements ObserveScreen {
 
     if (mostRecentEntry) {
       const age = now - mostRecentEntry.timestamp;
-      logger.debug(`[OBSERVE_CACHE] Found most recent in-memory result (age: ${age}ms)`);
+      logger.debug(`[OBSERVE_CACHE] Found most recent in-memory result for device ${deviceId} (age: ${age}ms)`);
       return mostRecentEntry.observeResult;
     }
 
-    logger.debug("[OBSERVE_CACHE] No valid entries in in-memory cache");
+    logger.debug(`[OBSERVE_CACHE] No valid entries in in-memory cache for device ${deviceId}`);
     return null;
   }
 
@@ -889,9 +953,11 @@ export class RealObserveScreen implements ObserveScreen {
     logger.debug("[OBSERVE_CACHE] Checking disk cache");
 
     try {
-      // Get all JSON files in the cache directory
+      // Get JSON files in the cache directory for this device
+      const deviceId = this.device.deviceId;
+      const devicePrefix = `observe_${deviceId.replace(/:/g, "_")}_`;
       const files = await readdirAsync(RealObserveScreen.observeResultCacheDir);
-      const jsonFiles = files.filter(file => file.endsWith(".json") && file.startsWith("observe_"));
+      const jsonFiles = files.filter(file => file.endsWith(".json") && file.startsWith(devicePrefix));
 
       if (jsonFiles.length === 0) {
         logger.debug("[OBSERVE_CACHE] No observe result files found in disk cache");
@@ -926,10 +992,12 @@ export class RealObserveScreen implements ObserveScreen {
         const cachedResult: ObserveResult = JSON.parse(cacheData);
 
         // Also update the in-memory cache
-        const timestamp = mostRecentFile.mtime.toString();
-        RealObserveScreen.observeResultCache.set(timestamp, {
+        const deviceId = this.device.deviceId;
+        const cacheKey = `${deviceId}:${mostRecentFile.mtime}`;
+        RealObserveScreen.observeResultCache.set(cacheKey, {
           timestamp: mostRecentFile.mtime,
-          observeResult: cachedResult
+          deviceId,
+          observeResult: cachedResult,
         });
 
         logger.debug(`[OBSERVE_CACHE] Updated in-memory cache from disk cache`);
@@ -950,19 +1018,21 @@ export class RealObserveScreen implements ObserveScreen {
    */
   async cacheObserveResult(observeResult: ObserveResult): Promise<void> {
     const timestamp = this.timer.now();
-    const timestampKey = timestamp.toString();
+    const deviceId = this.device.deviceId;
+    const cacheKey = `${deviceId}:${timestamp}`;
 
     try {
-      logger.debug(`[OBSERVE_CACHE] Caching observe result with timestamp ${timestamp}`);
+      logger.debug(`[OBSERVE_CACHE] Caching observe result for device ${deviceId} with timestamp ${timestamp}`);
 
       // Cache in memory
-      RealObserveScreen.observeResultCache.set(timestampKey, {
+      RealObserveScreen.observeResultCache.set(cacheKey, {
         timestamp,
-        observeResult
+        deviceId,
+        observeResult,
       });
 
       // Cache on disk
-      await this.saveObserveResultToDisk(timestampKey, observeResult);
+      await this.saveObserveResultToDisk(cacheKey, observeResult);
 
       logger.debug(`[OBSERVE_CACHE] Successfully cached observe result, in-memory cache size: ${RealObserveScreen.observeResultCache.size}`);
     } catch (error) {
@@ -972,12 +1042,13 @@ export class RealObserveScreen implements ObserveScreen {
 
   /**
    * Save observe result to disk cache
-   * @param timestamp - Timestamp for filename
+   * @param cacheKey - Cache key (deviceId:timestamp) for filename
    * @param observeResult - The observe result to save
    */
-  private async saveObserveResultToDisk(timestamp: string, observeResult: ObserveResult): Promise<void> {
+  private async saveObserveResultToDisk(cacheKey: string, observeResult: ObserveResult): Promise<void> {
     try {
-      const filename = `observe_${timestamp}.json`;
+      // Replace colons with underscores for filesystem safety
+      const filename = `observe_${cacheKey.replace(/:/g, "_")}.json`;
       const filePath = path.join(RealObserveScreen.observeResultCacheDir, filename);
 
       await writeFileAsync(filePath, JSON.stringify(observeResult, null, 2));
@@ -1212,7 +1283,7 @@ export class RealObserveScreen implements ObserveScreen {
    */
   private async getLatestScreenshotPath(): Promise<string | undefined> {
     try {
-      const cachedPath = RealObserveScreen.getRecentCachedScreenshotPath();
+      const cachedPath = RealObserveScreen.getRecentCachedScreenshotPathForDevice(this.device.deviceId);
       if (cachedPath) {
         const exists = await pathExists(cachedPath);
         if (exists) {
@@ -1347,7 +1418,7 @@ export class RealObserveScreen implements ObserveScreen {
       logger.error("Critical error in observe command:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       ScreenshotJobTracker.cancelJob(this.device.deviceId);
-      RealObserveScreen.updateLatestScreenshotCache(undefined, `Observation failed: ${errorMessage}`);
+      RealObserveScreen.updateLatestScreenshotCache(this.device.deviceId, undefined, `Observation failed: ${errorMessage}`);
       return {
         updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },

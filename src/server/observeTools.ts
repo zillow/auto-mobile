@@ -239,7 +239,9 @@ export function registerObserveTools() {
 
       // Record back stack information in navigation graph if available
       if (result.backStack && result.activeWindow?.appId) {
-        const navGraph = NavigationGraphManager.getInstance();
+        const navGraph = args.sessionUuid
+          ? NavigationGraphManager.getInstanceForSession(args.sessionUuid)
+          : NavigationGraphManager.getInstance();
         // Only record if we have a current app and screen
         if (navGraph.getCurrentAppId() === result.activeWindow.appId && navGraph.getCurrentScreen()) {
           navGraph.recordBackStack(result.backStack);
@@ -288,7 +290,9 @@ export function registerObserveTools() {
     try {
       const observeScreen = new RealObserveScreen(device);
       const cachedResult = await observeScreen.getMostRecentCachedObserveResult();
-      const navigationGraph = NavigationGraphManager.getInstance();
+      const navigationGraph = args.sessionUuid
+        ? NavigationGraphManager.getInstanceForSession(args.sessionUuid)
+        : NavigationGraphManager.getInstance();
       const currentScreen = navigationGraph.getCurrentScreen();
       const navigationEdges = args.includeContext?.navigationGraph !== false && currentScreen
         ? await navigationGraph.getEdgesFrom(currentScreen)

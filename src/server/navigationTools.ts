@@ -83,7 +83,9 @@ export function registerNavigationTools() {
     args: GetNavigationGraphArgs
   ) => {
     try {
-      const manager = NavigationGraphManager.getInstance();
+      const manager = args.sessionUuid
+        ? NavigationGraphManager.getInstanceForSession(args.sessionUuid)
+        : NavigationGraphManager.getInstance();
       const stats = await manager.getStats();
       const graph = await manager.exportGraph();
 

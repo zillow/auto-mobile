@@ -4,7 +4,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
 import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
-import { defaultNavigationGraphManager, type NavigationEdge, type NavigationGraphService } from "./NavigationGraphManager";
+import { NavigationGraphManager, type NavigationEdge, type NavigationGraphService } from "./NavigationGraphManager";
 import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
 import { SwipeOnElement } from "../action/SwipeOnElement";
@@ -106,7 +106,7 @@ export class Explore extends BaseVisualChange {
     navigationManager?: NavigationGraphService
   ) {
     super(device, adb, timer);
-    this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
+    this.navigationManager = navigationManager ?? NavigationGraphManager.getInstance();
     this.exploredElements = new Map();
     this.elementParser = new DefaultElementParser();
   }

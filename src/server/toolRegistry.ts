@@ -9,6 +9,8 @@ import { serverConfig } from "../utils/ServerConfig";
 import { MemoryAudit } from "../features/memory/MemoryAudit";
 import { TelemetryRecorder } from "../features/telemetry/TelemetryRecorder";
 import { defaultAdbClientFactory } from "../utils/android-cmdline-tools/AdbClientFactory";
+import { CtrlProxyClient as AndroidCtrlProxyClient } from "../features/observe/android/CtrlProxyClient";
+import { CtrlProxyClient as IOSCtrlProxyClient } from "../features/observe/ios/CtrlProxyClient";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { logger } from "../utils/logger";
 import { DaemonState } from "../daemon/daemonState";
@@ -203,16 +205,43 @@ class ToolRegistryClass {
 
       let device: BootedDevice | undefined;
       if (shouldResolveDevice) {
-        // Ensure device is ready and get the device ID
-        logger.info(`[ToolRegistry] ${name}: Resolving device for platform=${platform}, providedDeviceId=${providedDeviceId}`);
-        device = await this.deviceSessionManager.ensureDeviceReady(
-          platform,
-          providedDeviceId,
-          { skipCtrlProxyDownload: serverConfig.isSkipCtrlProxyDownloadEnabled() }
-        );
-        logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
+        if (sessionUuid && DaemonState.getInstance().isInitialized() && providedDeviceId) {
+          // Daemon session path: device already resolved via createToolExecutionContext.
+          // Construct BootedDevice directly to avoid mutating global DeviceSessionManager state.
+          const resolvedPlatform = (platform === "android" || platform === "ios") ? platform : "android";
+          const pooledDevice = DaemonState.getInstance().getDevicePool().getDevice(providedDeviceId);
+          device = {
+            deviceId: providedDeviceId,
+            name: pooledDevice?.name ?? providedDeviceId,
+            platform: pooledDevice?.platform ?? resolvedPlatform,
+            iosVersion: pooledDevice?.iosVersion,
+          };
+          logger.info(`[ToolRegistry] ${name}: Using session-resolved device ${device.deviceId}`);
+        } else {
+          // Legacy single-agent path or no session: use DeviceSessionManager (may set global state)
+          logger.info(`[ToolRegistry] ${name}: Resolving device for platform=${platform}, providedDeviceId=${providedDeviceId}`);
+          device = await this.deviceSessionManager.ensureDeviceReady(
+            platform,
+            providedDeviceId,
+            { skipCtrlProxyDownload: serverConfig.isSkipCtrlProxyDownloadEnabled() }
+          );
+          logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
+        }
       } else {
         logger.info(`[ToolRegistry] ${name}: Skipping device resolution.`);
+      }
+
+      // Bind session to device's CtrlProxyClient for multi-agent NavigationGraphManager isolation
+      if (device && sessionUuid) {
+        try {
+          if (device.platform === "android") {
+            AndroidCtrlProxyClient.getInstance(device).bindSession(sessionUuid);
+          } else if (device.platform === "ios") {
+            IOSCtrlProxyClient.getInstance(device).bindSession(sessionUuid);
+          }
+        } catch {
+          // CtrlProxy may not be initialized yet — binding is best-effort
+        }
       }
 
       try {
@@ -226,9 +255,14 @@ class ToolRegistryClass {
         ];
         if (navigationRelevantTools.includes(name)) {
           // Extract UI state from the most recent cached observation
-          const cachedResult = RealObserveScreen.getRecentCachedResult();
+          const cachedResult = device
+            ? RealObserveScreen.getRecentCachedResultForDevice(device.deviceId)
+            : RealObserveScreen.getRecentCachedResult();
           const uiState = new UIStateExtractor().extractFromObservation(cachedResult);
-          NavigationGraphManager.getInstance().recordToolCall(name, args, uiState);
+          const navManager = sessionUuid
+            ? NavigationGraphManager.getInstanceForSession(sessionUuid)
+            : NavigationGraphManager.getInstance();
+          navManager.recordToolCall(name, args, uiState);
         }
 
         let response: any | undefined;
@@ -307,7 +341,10 @@ class ToolRegistryClass {
         if (name === "swipeOn" && args.lookFor && response?.success && response?.found) {
           const scrollPosition = UIStateExtractor.createScrollPosition(args);
           if (scrollPosition) {
-            NavigationGraphManager.getInstance().updateScrollPosition(scrollPosition);
+            const scrollNavManager = sessionUuid
+              ? NavigationGraphManager.getInstanceForSession(sessionUuid)
+              : NavigationGraphManager.getInstance();
+            scrollNavManager.updateScrollPosition(scrollPosition);
           }
         }
 
@@ -339,7 +376,8 @@ class ToolRegistryClass {
         if (error instanceof ActionableError) {
           throw error;
         }
-        throw new ActionableError(`Failed to execute tool ${name}: ${error}`);
+        const deviceContext = device ? ` on device ${device.deviceId}` : "";
+        throw new ActionableError(`Failed to execute tool ${name}${deviceContext}: ${error}`);
       } finally {
         if (device && name === "executePlan" && args?.cleanupAppId) {
           await this.cleanupService.cleanup(device, {
@@ -364,6 +402,9 @@ class ToolRegistryClass {
               const deviceId = session.assignedDevice;
               sessionManager.releaseSession(session.sessionId);
               await devicePool.releaseDevice(deviceId);
+              // Clean up session-scoped navigation state and observe cache
+              NavigationGraphManager.releaseSession(releaseSessionUuid);
+              RealObserveScreen.clearCache(deviceId);
               logger.info(`Auto-released session ${session.sessionId} and freed device ${deviceId} after executePlan`);
             }
           } catch (releaseError) {

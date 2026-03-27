@@ -19,7 +19,7 @@ class FakeFeatureFlagRepository implements FeatureFlagRepository {
     const existing = this.flags.find(f => f.key === key);
     if (existing) {
       existing.enabled = enabled;
-      if (config !== undefined) existing.config = config ?? undefined;
+      if (config !== undefined) {existing.config = config ?? undefined;}
     } else {
       this.flags.push({ key, enabled, config: config ?? undefined });
     }

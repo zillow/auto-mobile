@@ -157,4 +157,73 @@ describe("SessionManager", () => {
       expect(stats.assignedDevices).toBe(2);
     });
   });
+
+  describe("onSessionRelease callbacks", () => {
+    test("should invoke release callbacks when session is released", async () => {
+      await sessionManager.createSession("session-cb", "emulator-5554", "android");
+
+      const released: { sessionId: string; deviceId: string }[] = [];
+      sessionManager.onSessionRelease((sessionId, deviceId) => {
+        released.push({ sessionId, deviceId });
+      });
+
+      await sessionManager.releaseSession("session-cb");
+
+      expect(released).toHaveLength(1);
+      expect(released[0].sessionId).toBe("session-cb");
+      expect(released[0].deviceId).toBe("emulator-5554");
+    });
+
+    test("should continue releasing even if a callback throws", async () => {
+      await sessionManager.createSession("session-err", "emulator-5554", "android");
+
+      const results: string[] = [];
+      sessionManager.onSessionRelease(() => {
+        throw new Error("callback error");
+      });
+      sessionManager.onSessionRelease(sessionId => {
+        results.push(sessionId);
+      });
+
+      await sessionManager.releaseSession("session-err");
+
+      // Second callback should still fire despite first throwing
+      expect(results).toEqual(["session-err"]);
+    });
+
+    test("should invoke release callbacks when expired session is accessed via getSession", async () => {
+      await sessionManager.createSession("session-expiry", "emulator-5554", "android");
+
+      const released: { sessionId: string; deviceId: string }[] = [];
+      sessionManager.onSessionRelease((sessionId, deviceId) => {
+        released.push({ sessionId, deviceId });
+      });
+
+      // Advance time past the 30-minute session timeout
+      fakeTimer.advanceTime(31 * 60 * 1000);
+
+      // Accessing the expired session should trigger cleanup + callback
+      const result = sessionManager.getSession("session-expiry");
+      expect(result).toBeNull();
+      expect(released).toHaveLength(1);
+      expect(released[0].sessionId).toBe("session-expiry");
+      expect(released[0].deviceId).toBe("emulator-5554");
+    });
+
+    test("should invoke release callbacks when cleanup timer fires for expired sessions", async () => {
+      await sessionManager.createSession("session-timer", "emulator-5556", "android");
+
+      const released: { sessionId: string; deviceId: string }[] = [];
+      sessionManager.onSessionRelease((sessionId, deviceId) => {
+        released.push({ sessionId, deviceId });
+      });
+
+      // Advance past session timeout + cleanup interval (30min + 5min)
+      fakeTimer.advanceTime(36 * 60 * 1000);
+
+      expect(released).toHaveLength(1);
+      expect(released[0].sessionId).toBe("session-timer");
+      expect(released[0].deviceId).toBe("emulator-5556");
+    });
+  });
 });

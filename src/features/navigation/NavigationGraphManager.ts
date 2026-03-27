@@ -108,6 +108,8 @@ type HistoryCursor = {
  */
 export class NavigationGraphManager implements NavigationGraphService {
   private static instance: NavigationGraphManager | null = null;
+  // Per-session instances for multi-agent isolation
+  private static sessionInstances: Map<string, NavigationGraphManager> = new Map();
 
   private repository: NavigationRepository;
   private testCoverageRepository: TestCoverageRepository;
@@ -152,6 +154,7 @@ export class NavigationGraphManager implements NavigationGraphService {
 
   /**
    * Get the singleton instance of NavigationGraphManager.
+   * Used for non-daemon single-agent mode.
    */
   public static getInstance(): NavigationGraphManager {
     if (!NavigationGraphManager.instance) {
@@ -161,10 +164,40 @@ export class NavigationGraphManager implements NavigationGraphService {
   }
 
   /**
+   * Get or create a session-scoped instance for multi-agent isolation.
+   * Each session gets its own transient state (currentAppId, currentScreen,
+   * toolCallHistory, activeTestSession) while sharing the SQLite repositories.
+   */
+  public static getInstanceForSession(sessionId: string): NavigationGraphManager {
+    let instance = NavigationGraphManager.sessionInstances.get(sessionId);
+    if (!instance) {
+      instance = new NavigationGraphManager();
+      NavigationGraphManager.sessionInstances.set(sessionId, instance);
+    }
+    return instance;
+  }
+
+  /**
+   * Release a session-scoped instance and its transient state.
+   */
+  public static releaseSession(sessionId: string): void {
+    const instance = NavigationGraphManager.sessionInstances.get(sessionId);
+    if (instance) {
+      instance.activeTestSession = null;
+      instance.toolCallHistory = [];
+      instance.activeNavigation = null;
+      instance.graphUpdateListeners = [];
+      NavigationGraphManager.sessionInstances.delete(sessionId);
+      logger.debug(`[NAV_GRAPH] Released session instance: ${sessionId}`);
+    }
+  }
+
+  /**
    * Reset the singleton instance (for testing).
    */
   public static resetInstance(): void {
     NavigationGraphManager.instance = null;
+    NavigationGraphManager.sessionInstances.clear();
   }
 
   /**
@@ -1355,9 +1388,3 @@ export class NavigationGraphManager implements NavigationGraphService {
     return Math.min(normalized, this.HISTORY_PAGE_MAX);
   }
 }
-
-/**
- * Default singleton instance of NavigationGraphManager.
- * Use this for production code. For testing, use NavigationGraphManager.createForTesting().
- */
-export const defaultNavigationGraphManager: NavigationGraphService = NavigationGraphManager.getInstance();

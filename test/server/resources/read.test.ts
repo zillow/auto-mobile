@@ -185,16 +185,17 @@ describe("MCP Resources Read", () => {
     const observeScreen = new RealObserveScreen(mockDevice, new FakeAdbExecutor());
     await observeScreen.cacheObserveResult(observeScreen.createBaseResult());
 
-    (RealObserveScreen as any).latestScreenshotPath = null;
-    (RealObserveScreen as any).latestScreenshotError = null;
-    (RealObserveScreen as any).latestScreenshotTimestamp = null;
+    // Clear any pre-existing screenshot state
+    (RealObserveScreen as any).screenshotStateByDevice.delete(mockDevice.deviceId);
 
     ScreenshotJobTracker.startJob(mockDevice.deviceId, async signal => {
       return new Promise(resolve => {
         const timeoutId = fakeTimer.setTimeout(() => {
-          (RealObserveScreen as any).latestScreenshotPath = screenshotPath;
-          (RealObserveScreen as any).latestScreenshotError = null;
-          (RealObserveScreen as any).latestScreenshotTimestamp = Date.now();
+          (RealObserveScreen as any).screenshotStateByDevice.set(mockDevice.deviceId, {
+            path: screenshotPath,
+            error: null,
+            timestamp: Date.now(),
+          });
           resolve({ success: true, path: screenshotPath });
         }, 25);
 

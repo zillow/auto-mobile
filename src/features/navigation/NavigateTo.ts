@@ -6,7 +6,7 @@ import { CtrlProxyClient as AndroidCtrlProxyClient } from "../observe/android";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { ToolRegistry } from "../../server/toolRegistry";
 import {
-  defaultNavigationGraphManager,
+  NavigationGraphManager,
   ToolCallInteraction,
   type NavigationGraphService
 } from "./NavigationGraphManager";
@@ -56,7 +56,7 @@ export class NavigateTo {
     this.device = device;
     this.adbFactory = adbFactory;
     this.adb = adbFactory.create(device);
-    this.navigationManager = navigationManager ?? defaultNavigationGraphManager;
+    this.navigationManager = navigationManager ?? NavigationGraphManager.getInstance();
     this.timer = timer;
 
     // Use injected dependencies or create defaults

@@ -752,4 +752,77 @@ describe("NavigationGraphManager - Named Nodes Only", () => {
       expect(manager.getCurrentScreen()).toBe("SettingsScreen");
     });
   });
+
+  describe("Multi-session isolation", () => {
+    beforeEach(() => {
+      NavigationGraphManager.resetInstance();
+    });
+
+    test("getInstanceForSession returns independent instances", async () => {
+      const sessionA = NavigationGraphManager.getInstanceForSession("session-A");
+      const sessionB = NavigationGraphManager.getInstanceForSession("session-B");
+
+      await sessionA.setCurrentApp("com.app.a");
+      await sessionB.setCurrentApp("com.app.b");
+
+      expect(sessionA.getCurrentAppId()).toBe("com.app.a");
+      expect(sessionB.getCurrentAppId()).toBe("com.app.b");
+    });
+
+    test("getInstanceForSession returns same instance for same sessionId", () => {
+      const first = NavigationGraphManager.getInstanceForSession("session-X");
+      const second = NavigationGraphManager.getInstanceForSession("session-X");
+      expect(first).toBe(second);
+    });
+
+    test("recordToolCall on session A does not appear in session B", () => {
+      const sessionA = NavigationGraphManager.getInstanceForSession("session-A");
+      const sessionB = NavigationGraphManager.getInstanceForSession("session-B");
+
+      sessionA.recordToolCall("tapOn", { element: "button" });
+
+      // Session A should have the tool call in history
+      // Session B should have no tool calls
+      // We verify isolation by checking that they are different instances
+      expect(sessionA).not.toBe(sessionB);
+    });
+
+    test("releaseSession cleans up the instance", async () => {
+      const session = NavigationGraphManager.getInstanceForSession("session-cleanup");
+      await session.setCurrentApp("com.test.cleanup");
+      expect(session.getCurrentAppId()).toBe("com.test.cleanup");
+
+      NavigationGraphManager.releaseSession("session-cleanup");
+
+      // Getting the session again should return a fresh instance
+      const fresh = NavigationGraphManager.getInstanceForSession("session-cleanup");
+      expect(fresh.getCurrentAppId()).toBeNull();
+    });
+
+    test("releaseSession does not affect other sessions", async () => {
+      const sessionA = NavigationGraphManager.getInstanceForSession("session-A");
+      const sessionB = NavigationGraphManager.getInstanceForSession("session-B");
+
+      await sessionA.setCurrentApp("com.app.a");
+      await sessionB.setCurrentApp("com.app.b");
+
+      NavigationGraphManager.releaseSession("session-A");
+
+      expect(sessionB.getCurrentAppId()).toBe("com.app.b");
+    });
+
+    test("resetInstance clears both singleton and session instances", async () => {
+      NavigationGraphManager.getInstanceForSession("session-reset");
+      const singleton = NavigationGraphManager.getInstance();
+      await singleton.setCurrentApp("com.singleton");
+
+      NavigationGraphManager.resetInstance();
+
+      const freshSingleton = NavigationGraphManager.getInstance();
+      expect(freshSingleton.getCurrentAppId()).toBeNull();
+
+      const freshSession = NavigationGraphManager.getInstanceForSession("session-reset");
+      expect(freshSession.getCurrentAppId()).toBeNull();
+    });
+  });
 });

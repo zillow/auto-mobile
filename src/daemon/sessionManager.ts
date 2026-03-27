@@ -47,12 +47,15 @@ export interface Session {
  * This enables parallel tests to each have their own device
  * while sharing centralized state in the daemon.
  */
+export type SessionReleaseCallback = (sessionId: string, deviceId: string) => void;
+
 export class SessionManager {
   private sessions: Map<string, Session> = new Map();
   private sessionDeviceMap: Map<string, string> = new Map(); // sessionId -> deviceId
   private deviceSessionMap: Map<string, string> = new Map(); // deviceId -> sessionId (reverse lookup)
   private cleanupTimer: NodeJS.Timeout | null = null;
   private timer: Timer;
+  private releaseCallbacks: SessionReleaseCallback[] = [];
 
   // Session timeout: 30 minutes
   private readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -66,6 +69,14 @@ export class SessionManager {
     this.timer = timer;
     // Start periodic cleanup of expired sessions
     this.startCleanupTimer();
+  }
+
+  /**
+   * Register a callback to be invoked when a session is released.
+   * Used for centralized cleanup of session-scoped state (e.g., NavigationGraphManager).
+   */
+  onSessionRelease(callback: SessionReleaseCallback): void {
+    this.releaseCallbacks.push(callback);
   }
 
   /**
@@ -113,7 +124,16 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (session && this.isSessionExpired(session)) {
       logger.info(`Session ${sessionId} has expired, removing`);
+      const deviceId = session.assignedDevice;
       this.removeSession(sessionId);
+      // Notify release callbacks so session-scoped state is cleaned up
+      for (const callback of this.releaseCallbacks) {
+        try {
+          callback(sessionId, deviceId);
+        } catch (error) {
+          logger.warn(`Session expiry callback failed for ${sessionId}: ${error}`);
+        }
+      }
       return null;
     }
     return session || null;
@@ -194,6 +214,16 @@ export class SessionManager {
 
     const deviceId = session.assignedDevice;
     this.removeSession(sessionId);
+
+    // Notify release callbacks for centralized cleanup
+    for (const callback of this.releaseCallbacks) {
+      try {
+        callback(sessionId, deviceId);
+      } catch (error) {
+        logger.warn(`Session release callback failed for ${sessionId}: ${error}`);
+      }
+    }
+
     logger.info(`Released session ${sessionId}, freeing device ${deviceId}`);
 
     return deviceId;
@@ -361,7 +391,19 @@ export class SessionManager {
         );
 
         for (const sessionId of expiredSessions) {
+          const session = this.sessions.get(sessionId);
+          const deviceId = session?.assignedDevice;
           this.removeSession(sessionId);
+          // Notify release callbacks so session-scoped state is cleaned up
+          if (deviceId) {
+            for (const callback of this.releaseCallbacks) {
+              try {
+                callback(sessionId, deviceId);
+              } catch (error) {
+                logger.warn(`Session cleanup callback failed for ${sessionId}: ${error}`);
+              }
+            }
+          }
         }
       }
     }, this.CLEANUP_INTERVAL_MS);

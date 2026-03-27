@@ -504,4 +504,88 @@ describe("ObserveScreen", function() {
       })).toBeNull();
     });
   });
+
+  describe("Multi-device cache isolation", function() {
+    const deviceA: BootedDevice = { deviceId: "emulator-5554", name: "Pixel A", platform: "android" };
+    const deviceB: BootedDevice = { deviceId: "emulator-5556", name: "Pixel B", platform: "android" };
+
+    beforeEach(function() {
+      RealObserveScreen.clearCache();
+    });
+
+    test("getRecentCachedResultForDevice returns only that device's entries", async function() {
+      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor());
+      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor());
+
+      const resultA: ObserveResult = {
+        ...screenA.createBaseResult(),
+        viewHierarchy: "hierarchy-A",
+      };
+      const resultB: ObserveResult = {
+        ...screenB.createBaseResult(),
+        viewHierarchy: "hierarchy-B",
+      };
+
+      await screenA.cacheObserveResult(resultA);
+      await screenB.cacheObserveResult(resultB);
+
+      const cachedA = RealObserveScreen.getRecentCachedResultForDevice(deviceA.deviceId);
+      const cachedB = RealObserveScreen.getRecentCachedResultForDevice(deviceB.deviceId);
+
+      expect(cachedA?.viewHierarchy).toBe("hierarchy-A");
+      expect(cachedB?.viewHierarchy).toBe("hierarchy-B");
+    });
+
+    test("getRecentCachedResult returns most recent across all devices", async function() {
+      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor());
+      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor());
+
+      await screenA.cacheObserveResult({ ...screenA.createBaseResult(), viewHierarchy: "A" });
+      await Bun.sleep(1); // Ensure different timestamp
+      await screenB.cacheObserveResult({ ...screenB.createBaseResult(), viewHierarchy: "B" });
+
+      // Most recent should be B (cached second)
+      const recent = RealObserveScreen.getRecentCachedResult();
+      expect(recent?.viewHierarchy).toBe("B");
+    });
+
+    test("clearCache with deviceId only clears that device", async function() {
+      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor());
+      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor());
+
+      await screenA.cacheObserveResult(screenA.createBaseResult());
+      await screenB.cacheObserveResult(screenB.createBaseResult());
+
+      RealObserveScreen.clearCache(deviceA.deviceId);
+
+      expect(RealObserveScreen.getRecentCachedResultForDevice(deviceA.deviceId)).toBeUndefined();
+      expect(RealObserveScreen.getRecentCachedResultForDevice(deviceB.deviceId)).toBeDefined();
+    });
+
+    test("clearCache without deviceId clears all devices", async function() {
+      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor());
+      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor());
+
+      await screenA.cacheObserveResult(screenA.createBaseResult());
+      await screenB.cacheObserveResult(screenB.createBaseResult());
+
+      RealObserveScreen.clearCache();
+
+      expect(RealObserveScreen.getRecentCachedResultForDevice(deviceA.deviceId)).toBeUndefined();
+      expect(RealObserveScreen.getRecentCachedResultForDevice(deviceB.deviceId)).toBeUndefined();
+    });
+
+    test("getMostRecentCachedObserveResult returns only own device results", async function() {
+      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor());
+      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor());
+
+      const resultA: ObserveResult = { ...screenA.createBaseResult(), viewHierarchy: "A-hierarchy" };
+      await screenA.cacheObserveResult(resultA);
+      await screenB.cacheObserveResult({ ...screenB.createBaseResult(), viewHierarchy: "B-hierarchy" });
+
+      // screenA's getMostRecentCachedObserveResult should return A's result, not B's
+      const cached = await screenA.getMostRecentCachedObserveResult();
+      expect(cached.viewHierarchy).toBe("A-hierarchy");
+    });
+  });
 });

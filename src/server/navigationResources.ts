@@ -35,10 +35,13 @@ type NavigationGraphResourceProvider =
   NavigationGraphNodeResourceProvider &
   NavigationGraphHistoryProvider;
 
-let navigationGraphProvider: NavigationGraphResourceProvider = NavigationGraphManager.getInstance();
+let navigationGraphProvider: NavigationGraphResourceProvider | null = null;
+
+function getNavigationGraphProvider(): NavigationGraphResourceProvider {
+  return navigationGraphProvider ?? NavigationGraphManager.getInstance();
+}
 let updateListenerProvider: NavigationGraphSummaryProvider | null = null;
 let updateTimeout: ReturnType<typeof setTimeout> | null = null;
-let providerOverride = false;
 
 function scheduleNavigationGraphUpdate(): void {
   if (updateTimeout) {
@@ -67,9 +70,8 @@ function attachGraphUpdateListener(provider: NavigationGraphSummaryProvider): vo
 }
 
 export function setNavigationGraphProvider(provider: NavigationGraphResourceProvider | null): void {
-  navigationGraphProvider = provider ?? NavigationGraphManager.getInstance();
-  providerOverride = provider !== null;
-  attachGraphUpdateListener(navigationGraphProvider);
+  navigationGraphProvider = provider;
+  attachGraphUpdateListener(getNavigationGraphProvider());
 }
 
 async function getNavigationGraphResource(appId?: string): Promise<ResourceContent> {
@@ -80,10 +82,11 @@ async function getNavigationGraphResource(appId?: string): Promise<ResourceConte
   try {
     // Use exportGraphSummaryForApp if available and appId is provided
     let graph;
-    if (appId && navigationGraphProvider.exportGraphSummaryForApp) {
-      graph = await navigationGraphProvider.exportGraphSummaryForApp(appId);
+    const provider = getNavigationGraphProvider();
+    if (appId && provider.exportGraphSummaryForApp) {
+      graph = await provider.exportGraphSummaryForApp(appId);
     } else {
-      graph = await navigationGraphProvider.exportGraphSummary();
+      graph = await provider.exportGraphSummary();
     }
 
     return {
@@ -111,7 +114,7 @@ async function getNavigationGraphHistoryResource(
   } = {}
 ): Promise<ResourceContent> {
   try {
-    const history = await navigationGraphProvider.exportGraphHistory(options);
+    const history = await getNavigationGraphProvider().exportGraphHistory(options);
     return {
       uri,
       mimeType: "application/json",
@@ -141,7 +144,7 @@ async function getNavigationNodeByIdResource(nodeId: number): Promise<ResourceCo
   const uri = `automobile:navigation/nodes/${nodeId}`;
 
   try {
-    const nodeResource = await navigationGraphProvider.getNodeResourceById(nodeId);
+    const nodeResource = await getNavigationGraphProvider().getNodeResourceById(nodeId);
     if (!nodeResource) {
       return buildNavigationNodeError(uri, `Navigation node ${nodeId} not found.`);
     }
@@ -161,7 +164,7 @@ async function getNavigationNodeByScreenResource(screenName: string): Promise<Re
   const uri = `automobile:navigation/nodes?screen=${encodeURIComponent(screenName)}`;
 
   try {
-    const nodeResource = await navigationGraphProvider.getNodeResourceByScreen(screenName);
+    const nodeResource = await getNavigationGraphProvider().getNodeResourceByScreen(screenName);
     if (!nodeResource) {
       return buildNavigationNodeError(uri, `Navigation node for screen '${screenName}' not found.`);
     }
@@ -205,7 +208,7 @@ async function getNavigationNodeScreenshotResource(nodeId: number): Promise<Reso
 
   try {
     // Get the node to find its screenshot path
-    const nodeResource = await navigationGraphProvider.getNodeResourceById(nodeId);
+    const nodeResource = await getNavigationGraphProvider().getNodeResourceById(nodeId);
     if (!nodeResource || !nodeResource.node) {
       return {
         uri,
@@ -216,8 +219,7 @@ async function getNavigationNodeScreenshotResource(nodeId: number): Promise<Reso
 
     // Get the screenshot path from the database node
     // The node from repository includes screenshot_path
-    const navManager = NavigationGraphManager.getInstance();
-    const appId = navManager.getCurrentAppId();
+    const appId = NavigationGraphManager.getInstance().getCurrentAppId();
     if (!appId) {
       return {
         uri,
@@ -272,12 +274,9 @@ export function registerNavigationResources(options: {
 } = {}): void {
   if (options.navigationGraph) {
     navigationGraphProvider = options.navigationGraph;
-    providerOverride = true;
-  } else if (!providerOverride) {
-    navigationGraphProvider = NavigationGraphManager.getInstance();
   }
 
-  attachGraphUpdateListener(navigationGraphProvider);
+  attachGraphUpdateListener(getNavigationGraphProvider());
 
   ResourceRegistry.register(
     NAVIGATION_RESOURCE_URIS.GRAPH,

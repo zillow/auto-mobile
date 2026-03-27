@@ -23,6 +23,17 @@ import { defaultTimer } from "../../src/utils/SystemTimer";
  * Tracks method calls for test assertions
  */
 export class FakeCtrlProxy implements CtrlProxy {
+  // Session binding (matches CtrlProxyClient.bindSession for test compatibility)
+  private boundSessionId: string | null = null;
+
+  bindSession(sessionId: string): void {
+    this.boundSessionId = sessionId;
+  }
+
+  getBoundSessionId(): string | null {
+    return this.boundSessionId;
+  }
+
   // Configurable response data
   private hierarchyData: AccessibilityHierarchy | null = null;
   private screenshotData: string | null = null;

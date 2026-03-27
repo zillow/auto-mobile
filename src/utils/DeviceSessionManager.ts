@@ -807,7 +807,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
       xcTestClient.onPushUpdate(() => {
         logger.info(`[DeviceSessionManager] Received iOS UI change notification for ${deviceId}, clearing ObserveScreen cache`);
-        RealObserveScreen.clearCache();
+        RealObserveScreen.clearCache(deviceId);
       });
 
       DeviceSessionManager.pushUpdateListenersRegistered.add(deviceId);
