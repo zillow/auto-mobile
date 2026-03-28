@@ -34,7 +34,7 @@ dependencies {
   implementation(libs.kotlinx.serialization)
 
   // MCP Kotlin SDK for client communication
-  implementation("io.modelcontextprotocol:kotlin-sdk:0.9.0")
+  implementation("io.modelcontextprotocol:kotlin-sdk:0.10.0")
   // Ktor client engine for MCP transport
   implementation(libs.ktor.client.cio)
 
