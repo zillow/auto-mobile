@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { RealObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
+import { FakeTimer } from "../../fakes/FakeTimer";
 import { ObserveResult } from "../../../src/models/ObserveResult";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { logger } from "../../../src/utils/logger";
@@ -537,14 +538,18 @@ describe("ObserveScreen", function() {
     });
 
     test("getRecentCachedResult returns most recent across all devices", async function() {
-      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor());
-      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor());
+      const now = Date.now();
+      const timerA = new FakeTimer();
+      timerA.setCurrentTime(now - 1000);
+      const timerB = new FakeTimer();
+      timerB.setCurrentTime(now);
+      const screenA = new RealObserveScreen(deviceA, new FakeAdbExecutor(), undefined, timerA);
+      const screenB = new RealObserveScreen(deviceB, new FakeAdbExecutor(), undefined, timerB);
 
       await screenA.cacheObserveResult({ ...screenA.createBaseResult(), viewHierarchy: "A" });
-      await Bun.sleep(1); // Ensure different timestamp
       await screenB.cacheObserveResult({ ...screenB.createBaseResult(), viewHierarchy: "B" });
 
-      // Most recent should be B (cached second)
+      // Most recent should be B (timerB is 1s newer than timerA)
       const recent = RealObserveScreen.getRecentCachedResult();
       expect(recent?.viewHierarchy).toBe("B");
     });
