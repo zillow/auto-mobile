@@ -97,9 +97,7 @@ export async function createToolExecutionContext(
 
     // Start test coverage session for navigation graph tracking
     // This enables automatic tracking of screens and transitions during test execution
-    const navManager = sessionUuid
-      ? NavigationGraphManager.getInstanceForSession(sessionUuid)
-      : NavigationGraphManager.getInstance();
+    const navManager = NavigationGraphManager.getInstanceForSession(sessionUuid);
     if (navManager.getCurrentAppId()) {
       await navManager.startTestSession(sessionUuid);
       logger.info(`[ToolExecutionContext] Started test coverage tracking for session ${sessionUuid}`);

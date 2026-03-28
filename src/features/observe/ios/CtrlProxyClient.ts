@@ -318,7 +318,14 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxySer
    * Bind this client to a session for multi-agent NavigationGraphManager isolation.
    */
   public bindSession(sessionId: string): void {
-    this.boundSessionId = sessionId;
+    if (this.boundSessionId !== sessionId) {
+      this.boundSessionId = sessionId;
+      // Invalidate cached hierarchy detector so it picks up the new session's NavigationGraphManager
+      if (this.hierarchyNavigationDetector) {
+        this.hierarchyNavigationDetector.dispose();
+        this.hierarchyNavigationDetector = null;
+      }
+    }
   }
 
   /**

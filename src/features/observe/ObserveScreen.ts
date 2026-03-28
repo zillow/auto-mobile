@@ -173,11 +173,12 @@ export class RealObserveScreen implements ObserveScreen {
         }
       }
       RealObserveScreen.screenshotStateByDevice.delete(deviceId);
+      ScreenshotJobTracker.cancelJob(deviceId);
     } else {
       RealObserveScreen.observeResultCache.clear();
       RealObserveScreen.screenshotStateByDevice.clear();
+      ScreenshotJobTracker.clear();
     }
-    ScreenshotJobTracker.clear();
   }
 
   constructor(

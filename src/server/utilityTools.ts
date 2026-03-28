@@ -8,7 +8,6 @@ import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { BootedDevice, Platform } from "../models";
 import { addDeviceTargetingToSchema, addSessionUuidToSchema } from "./toolSchemaHelpers";
 import { DaemonState } from "../daemon/daemonState";
-import { createToolExecutionContext } from "./ToolExecutionContext";
 
 // Schema definitions
 export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
@@ -51,12 +50,22 @@ export function registerUtilityTools() {
   const setActiveDeviceHandler = async (args: SetActiveDeviceArgs & { sessionUuid?: string }) => {
     try {
       if (args.sessionUuid && DaemonState.getInstance().isInitialized()) {
-        // Session-scoped: bind device to this session only, don't mutate global state
+        // Session-scoped: bind the specific requested device to this session
         const sessionManager = DaemonState.getInstance().getSessionManager();
         const devicePool = DaemonState.getInstance().getDevicePool();
-        await createToolExecutionContext(args.sessionUuid, sessionManager, devicePool, {
-          platform: args.platform,
-        });
+        const pooledDevice = devicePool.getDevice(args.deviceId);
+        if (!pooledDevice) {
+          throw new ActionableError(`Device '${args.deviceId}' not found in device pool`);
+        }
+        // Release any existing session for this sessionUuid before rebinding
+        const existing = sessionManager.getSession(args.sessionUuid);
+        if (existing && existing.assignedDevice !== args.deviceId) {
+          await sessionManager.releaseSession(existing.sessionId);
+          await devicePool.releaseDevice(existing.assignedDevice);
+        }
+        if (!existing || existing.assignedDevice !== args.deviceId) {
+          await sessionManager.createSession(args.sessionUuid, args.deviceId, args.platform);
+        }
         logger.info(`[setActiveDevice] Bound device ${args.deviceId} to session ${args.sessionUuid}`);
       } else {
         // Legacy single-agent path: sets global active device

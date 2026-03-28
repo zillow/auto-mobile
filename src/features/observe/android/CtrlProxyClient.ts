@@ -418,7 +418,14 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
    * Called when a tool execution context binds a session to this device.
    */
   public bindSession(sessionId: string): void {
-    this.boundSessionId = sessionId;
+    if (this.boundSessionId !== sessionId) {
+      this.boundSessionId = sessionId;
+      // Invalidate cached hierarchy detector so it picks up the new session's NavigationGraphManager
+      if (this.hierarchyNavigationDetector) {
+        this.hierarchyNavigationDetector.dispose();
+        this.hierarchyNavigationDetector = null;
+      }
+    }
   }
 
   /**
