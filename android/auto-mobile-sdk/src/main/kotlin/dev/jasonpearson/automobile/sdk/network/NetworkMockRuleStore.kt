@@ -31,6 +31,8 @@ class NetworkMockRuleStore(private val clock: () -> Long = { System.currentTimeM
     const val EXTRA_ERROR_SIM_TYPE = "error_type"
     const val EXTRA_ERROR_SIM_LIMIT = "limit"
     const val EXTRA_ERROR_SIM_EXPIRES_AT = "expires_at"
+    private const val PERMISSION_NETWORK_CONTROL =
+        "dev.jasonpearson.automobile.sdk.permission.NETWORK_CONTROL"
 
     @Volatile private var instance: NetworkMockRuleStore? = null
 
@@ -189,7 +191,6 @@ class NetworkMockRuleStore(private val clock: () -> Long = { System.currentTimeM
 
   fun getRuleCount(): Int = rules.size
 
-  @SuppressLint("UnspecifiedRegisterReceiverFlag")
   fun registerReceiver(context: Context) {
     val filter =
         IntentFilter().apply {
@@ -197,11 +198,12 @@ class NetworkMockRuleStore(private val clock: () -> Long = { System.currentTimeM
           addAction(ACTION_NETWORK_ERROR_SIMULATION)
         }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+      context.registerReceiver(
+          receiver, filter, PERMISSION_NETWORK_CONTROL, null, Context.RECEIVER_EXPORTED)
     } else {
-      context.registerReceiver(receiver, filter)
+      context.registerReceiver(receiver, filter, PERMISSION_NETWORK_CONTROL, null)
     }
-    Log.d(TAG, "Registered broadcast receiver for network mock rules")
+    Log.d(TAG, "Registered broadcast receiver for network mock rules (permission-gated)")
   }
 
   fun unregisterReceiver(context: Context) {

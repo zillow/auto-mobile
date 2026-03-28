@@ -6,6 +6,7 @@
   <!-- Required for storage inspection to work with any app that has the AutoMobile SDK -->
   <!-- Note: This is appropriate for a debugging/development tool like AutoMobile -->
   <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+  <uses-permission android:name="dev.jasonpearson.automobile.sdk.permission.NETWORK_CONTROL" />
 
   <!-- Permissions required for accessibility service -->
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />

@@ -217,6 +217,18 @@ export function registerNetworkTools(): void {
         );
       }
 
+      // Validate regex patterns before creating the mock rule
+      try {
+        new RegExp(args.host);
+      } catch {
+        throw new ActionableError(`Invalid host regex: ${args.host}`);
+      }
+      try {
+        new RegExp(args.path);
+      } catch {
+        throw new ActionableError(`Invalid path regex: ${args.path}`);
+      }
+
       const mock = state.addMock({
         host: args.host,
         path: args.path,

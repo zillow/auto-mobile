@@ -453,6 +453,70 @@ export class DaemonManager {
   }
 }
 
+function parseDaemonArgs(args: string[]): DaemonOptions {
+  const options: DaemonOptions = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--port") {
+      options.port = parseInt(args[i + 1], 10);
+      i++;
+    } else if (args[i] === "--debug") {
+      options.debug = true;
+    } else if (args[i] === "--debug-perf") {
+      options.debugPerf = true;
+    } else if (args[i] === "--plan-execution-lock-scope") {
+      const scope = args[i + 1];
+      if (scope === "global" || scope === "session") {
+        options.planExecutionLockScope = scope;
+      }
+      i++;
+    } else if (args[i] === "--video-quality" || args[i] === "--video-quality-preset") {
+      options.videoQualityPreset = args[i + 1];
+      i++;
+    } else if (args[i] === "--video-target-bitrate-kbps") {
+      options.videoTargetBitrateKbps = parseInt(args[i + 1], 10);
+      i++;
+    } else if (args[i] === "--video-max-throughput-mbps") {
+      options.videoMaxThroughputMbps = Number(args[i + 1]);
+      i++;
+    } else if (args[i] === "--video-fps") {
+      options.videoFps = parseInt(args[i + 1], 10);
+      i++;
+    } else if (args[i] === "--video-format") {
+      options.videoFormat = args[i + 1];
+      i++;
+    } else if (args[i] === "--video-archive-size-mb") {
+      options.videoMaxArchiveSizeMb = Number(args[i + 1]);
+      i++;
+    } else if (args[i] === "--network-mockable") {
+      options.networkMockable = true;
+    } else if (args[i] === "--no-ui-perf-mode") {
+      options.noUiPerfMode = true;
+    } else if (args[i] === "--mem-perf-audit") {
+      options.memPerfAudit = true;
+    } else if (args[i] === "--accessibility-audit") {
+      options.accessibilityAudit = true;
+    } else if (args[i] === "--accessibility-level") {
+      options.accessibilityLevel = args[i + 1];
+      i++;
+    } else if (args[i] === "--accessibility-failure-mode") {
+      options.accessibilityFailureMode = args[i + 1];
+      i++;
+    } else if (args[i] === "--accessibility-min-severity") {
+      options.accessibilityMinSeverity = args[i + 1];
+      i++;
+    } else if (args[i] === "--accessibility-use-baseline") {
+      options.accessibilityUseBaseline = true;
+    } else if (args[i] === "--predictive-ui" || args[i] === "--predictive") {
+      options.predictiveUi = true;
+    } else if (args[i] === "--raw-element-search") {
+      options.rawElementSearch = true;
+    } else if (args[i] === "--skip-ctrl-proxy-download" || args[i] === "--skip-accessibility-download") {
+      options.skipCtrlProxyDownload = true;
+    }
+  }
+  return options;
+}
+
 /**
  * Run daemon management command
  */
@@ -471,70 +535,7 @@ export async function runDaemonCommand(
   try {
     switch (command) {
       case "start": {
-        const options: DaemonOptions = {};
-
-        // Parse args
-        for (let i = 0; i < args.length; i++) {
-          if (args[i] === "--port") {
-            options.port = parseInt(args[i + 1], 10);
-            i++;
-          } else if (args[i] === "--debug") {
-            options.debug = true;
-          } else if (args[i] === "--debug-perf") {
-            options.debugPerf = true;
-          } else if (args[i] === "--plan-execution-lock-scope") {
-            const scope = args[i + 1];
-            if (scope === "global" || scope === "session") {
-              options.planExecutionLockScope = scope;
-            }
-            i++;
-          } else if (args[i] === "--video-quality" || args[i] === "--video-quality-preset") {
-            options.videoQualityPreset = args[i + 1];
-            i++;
-          } else if (args[i] === "--video-target-bitrate-kbps") {
-            options.videoTargetBitrateKbps = parseInt(args[i + 1], 10);
-            i++;
-          } else if (args[i] === "--video-max-throughput-mbps") {
-            options.videoMaxThroughputMbps = Number(args[i + 1]);
-            i++;
-          } else if (args[i] === "--video-fps") {
-            options.videoFps = parseInt(args[i + 1], 10);
-            i++;
-          } else if (args[i] === "--video-format") {
-            options.videoFormat = args[i + 1];
-            i++;
-          } else if (args[i] === "--video-archive-size-mb") {
-            options.videoMaxArchiveSizeMb = Number(args[i + 1]);
-            i++;
-          } else if (args[i] === "--network-mockable") {
-            options.networkMockable = true;
-          } else if (args[i] === "--no-ui-perf-mode") {
-            options.noUiPerfMode = true;
-          } else if (args[i] === "--mem-perf-audit") {
-            options.memPerfAudit = true;
-          } else if (args[i] === "--accessibility-audit") {
-            options.accessibilityAudit = true;
-          } else if (args[i] === "--accessibility-level") {
-            options.accessibilityLevel = args[i + 1];
-            i++;
-          } else if (args[i] === "--accessibility-failure-mode") {
-            options.accessibilityFailureMode = args[i + 1];
-            i++;
-          } else if (args[i] === "--accessibility-min-severity") {
-            options.accessibilityMinSeverity = args[i + 1];
-            i++;
-          } else if (args[i] === "--accessibility-use-baseline") {
-            options.accessibilityUseBaseline = true;
-          } else if (args[i] === "--predictive-ui" || args[i] === "--predictive") {
-            options.predictiveUi = true;
-          } else if (args[i] === "--raw-element-search") {
-            options.rawElementSearch = true;
-          } else if (args[i] === "--skip-ctrl-proxy-download" || args[i] === "--skip-accessibility-download") {
-            options.skipCtrlProxyDownload = true;
-          }
-        }
-
-        await manager.start(options);
+        await manager.start(parseDaemonArgs(args));
         break;
       }
 
@@ -574,45 +575,7 @@ export async function runDaemonCommand(
       }
 
       case "restart": {
-        const options: DaemonOptions = {};
-
-        // Parse args (same as start)
-        for (let i = 0; i < args.length; i++) {
-          if (args[i] === "--port") {
-            options.port = parseInt(args[i + 1], 10);
-            i++;
-          } else if (args[i] === "--debug") {
-            options.debug = true;
-          } else if (args[i] === "--debug-perf") {
-            options.debugPerf = true;
-          } else if (args[i] === "--plan-execution-lock-scope") {
-            const scope = args[i + 1];
-            if (scope === "global" || scope === "session") {
-              options.planExecutionLockScope = scope;
-            }
-            i++;
-          } else if (args[i] === "--video-quality" || args[i] === "--video-quality-preset") {
-            options.videoQualityPreset = args[i + 1];
-            i++;
-          } else if (args[i] === "--video-target-bitrate-kbps") {
-            options.videoTargetBitrateKbps = parseInt(args[i + 1], 10);
-            i++;
-          } else if (args[i] === "--video-max-throughput-mbps") {
-            options.videoMaxThroughputMbps = Number(args[i + 1]);
-            i++;
-          } else if (args[i] === "--video-fps") {
-            options.videoFps = parseInt(args[i + 1], 10);
-            i++;
-          } else if (args[i] === "--video-format") {
-            options.videoFormat = args[i + 1];
-            i++;
-          } else if (args[i] === "--video-archive-size-mb") {
-            options.videoMaxArchiveSizeMb = Number(args[i + 1]);
-            i++;
-          }
-        }
-
-        await manager.restart(options);
+        await manager.restart(parseDaemonArgs(args));
         break;
       }
 

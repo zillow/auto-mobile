@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Signature-level permission so only same-signed apps (CtrlProxy) can send network control broadcasts -->
+    <permission
+        android:name="dev.jasonpearson.automobile.sdk.permission.NETWORK_CONTROL"
+        android:protectionLevel="signature" />
 </manifest>
