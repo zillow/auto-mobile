@@ -40,9 +40,15 @@ fun main() {
   // Force dark window decorations on macOS
   System.setProperty("apple.awt.application.appearance", "NSAppearanceNameDarkAqua")
 
+  // Enable macOS native transparent title bar
+  if (System.getProperty("os.name")?.lowercase()?.contains("mac") == true) {
+      System.setProperty("apple.awt.fullWindowContent", "true")
+      System.setProperty("apple.awt.transparentTitleBar", "true")
+  }
+
   application {
     val windowState = rememberWindowState(
-      size = DpSize(1280.dp, 800.dp),
+      size = DpSize(1440.dp, 900.dp),
       position = WindowPosition(Alignment.Center),
     )
 
