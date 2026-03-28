@@ -297,7 +297,170 @@ class AutoMobileNetworkInterceptorTest {
         assertNull(event.responseHeaders) // no response
     }
 
-    // --- NetworkRequestExecutor interface ---
+    // --- Mock enforcement tests ---
+
+    private fun fakeRuleMatcher(
+        matchResult: NetworkMockRuleStore.MatchedMockRule? = null,
+        errorSim: NetworkMockRuleStore.ErrorSimulationConfig? = null,
+    ): NetworkMockRuleStore.RuleMatcher {
+        return object : NetworkMockRuleStore.RuleMatcher {
+            override fun findMatchingRule(host: String, path: String, method: String) = matchResult
+            override fun getErrorSimulation() = errorSim
+        }
+    }
+
+    @Test
+    fun `mock rule returns synthetic response without calling chain`() {
+        val (buffer, flushed) = collectingBuffer()
+        var chainCalled = false
+        val chain = object : Interceptor.Chain {
+            override fun request() = Request.Builder().url("https://api.example.com/users").build()
+            override fun proceed(request: Request): Response {
+                chainCalled = true
+                return Response.Builder().request(request).code(200).protocol(Protocol.HTTP_2).message("OK")
+                    .body("ok".toResponseBody("text/plain".toMediaType())).build()
+            }
+            override fun connection() = null
+            override fun call() = throw UnsupportedOperationException()
+            override fun connectTimeoutMillis() = 10000
+            override fun writeTimeoutMillis() = 10000
+            override fun readTimeoutMillis() = 10000
+            override fun withConnectTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+            override fun withWriteTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+            override fun withReadTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+        }
+        val mockRule = NetworkMockRuleStore.MatchedMockRule(
+            mockId = "mock-1", statusCode = 503,
+            responseHeaders = mapOf("X-Mock" to "true"),
+            responseBody = """{"error":"service unavailable"}""",
+            contentType = "application/json",
+        )
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = fakeRuleMatcher(matchResult = mockRule))
+
+        val response = interceptor.intercept(chain)
+
+        assertEquals(false, chainCalled)
+        assertEquals(503, response.code)
+        assertEquals("""{"error":"service unavailable"}""", response.body?.string())
+
+        val event = flushed[0][0] as SdkNetworkRequestEvent
+        assertEquals(503, event.statusCode)
+        assertEquals("mocked:mock-1", event.error)
+    }
+
+    @Test
+    fun `no rule store passes through to real request`() {
+        val (buffer, flushed) = collectingBuffer()
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = null)
+
+        val response = interceptor.intercept(fakeChain(responseCode = 200))
+
+        assertEquals(200, response.code)
+        val event = flushed[0][0] as SdkNetworkRequestEvent
+        assertNull(event.error)
+    }
+
+    @Test
+    fun `error simulation http500 returns 500 response`() {
+        val (buffer, flushed) = collectingBuffer()
+        val sim = NetworkMockRuleStore.ErrorSimulationConfig(
+            errorType = "http500", limit = null, remaining = null, expiresAtEpochMs = 99999L,
+        )
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = fakeRuleMatcher(errorSim = sim))
+
+        val response = interceptor.intercept(fakeChain())
+
+        assertEquals(500, response.code)
+        val event = flushed[0][0] as SdkNetworkRequestEvent
+        assertEquals(500, event.statusCode)
+        assertEquals("simulated:http500", event.error)
+    }
+
+    @Test
+    fun `error simulation timeout throws SocketTimeoutException`() {
+        val (buffer, flushed) = collectingBuffer()
+        val sim = NetworkMockRuleStore.ErrorSimulationConfig(
+            errorType = "timeout", limit = null, remaining = null, expiresAtEpochMs = 99999L,
+        )
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = fakeRuleMatcher(errorSim = sim))
+
+        assertFailsWith<java.net.SocketTimeoutException> {
+            interceptor.intercept(fakeChain())
+        }
+
+        val event = flushed[0][0] as SdkNetworkRequestEvent
+        assertEquals("simulated:timeout", event.error)
+    }
+
+    @Test
+    fun `error simulation connectionRefused throws ConnectException`() {
+        val (buffer, flushed) = collectingBuffer()
+        val sim = NetworkMockRuleStore.ErrorSimulationConfig(
+            errorType = "connectionRefused", limit = null, remaining = null, expiresAtEpochMs = 99999L,
+        )
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = fakeRuleMatcher(errorSim = sim))
+
+        assertFailsWith<java.net.ConnectException> {
+            interceptor.intercept(fakeChain())
+        }
+    }
+
+    @Test
+    fun `error simulation dnsFailure throws UnknownHostException`() {
+        val (buffer, flushed) = collectingBuffer()
+        val sim = NetworkMockRuleStore.ErrorSimulationConfig(
+            errorType = "dnsFailure", limit = null, remaining = null, expiresAtEpochMs = 99999L,
+        )
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = fakeRuleMatcher(errorSim = sim))
+
+        assertFailsWith<java.net.UnknownHostException> {
+            interceptor.intercept(fakeChain())
+        }
+    }
+
+    @Test
+    fun `error simulation tlsFailure throws SSLException`() {
+        val (buffer, flushed) = collectingBuffer()
+        val sim = NetworkMockRuleStore.ErrorSimulationConfig(
+            errorType = "tlsFailure", limit = null, remaining = null, expiresAtEpochMs = 99999L,
+        )
+        val interceptor = AutoMobileNetworkInterceptor(buffer, ruleStore = fakeRuleMatcher(errorSim = sim))
+
+        assertFailsWith<javax.net.ssl.SSLException> {
+            interceptor.intercept(fakeChain())
+        }
+    }
+
+    @Test
+    fun `mock rule takes priority over error simulation`() {
+        val (buffer, _) = collectingBuffer()
+        val mockRule = NetworkMockRuleStore.MatchedMockRule(
+            mockId = "mock-1", statusCode = 404, responseHeaders = emptyMap(),
+            responseBody = "not found", contentType = "text/plain",
+        )
+        val sim = NetworkMockRuleStore.ErrorSimulationConfig(
+            errorType = "http500", limit = null, remaining = null, expiresAtEpochMs = 99999L,
+        )
+        val interceptor = AutoMobileNetworkInterceptor(
+            buffer, ruleStore = fakeRuleMatcher(matchResult = mockRule, errorSim = sim))
+
+        val response = interceptor.intercept(fakeChain())
+
+        assertEquals(404, response.code) // mock wins, not 500
+    }
+
+    @Test
+    fun `null error simulation passes through to real request`() {
+        val (buffer, _) = collectingBuffer()
+        val interceptor = AutoMobileNetworkInterceptor(
+            buffer, ruleStore = fakeRuleMatcher(matchResult = null, errorSim = null))
+
+        val response = interceptor.intercept(fakeChain(responseCode = 200))
+
+        assertEquals(200, response.code)
+    }
+
+    // --- Default behavior tests ---
 
     @Test
     fun `default captureHeaders and captureBodies are false`() {

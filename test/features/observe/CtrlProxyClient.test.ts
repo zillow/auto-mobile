@@ -740,12 +740,14 @@ describe("CtrlProxyClient", function() {
         const socket = await waitForSocket(getSocket);
         expect(socket).not.toBeNull();
         await waitForSocketOpen(socket);
-        await waitForSentMessages(socket);
+        await waitForSentMessages(socket, 2); // sync message + highlight request
 
-        // Verify the request payload was sent
-        expect(socket!.sentMessages.length).toBeGreaterThan(0);
-        const payload = JSON.parse(socket!.sentMessages[0]);
-        expect(payload.type).toBe("add_highlight");
+        // Find the highlight request among sent messages (sync messages may precede it)
+        const highlightMsg = socket!.sentMessages.find(m => {
+          try { return JSON.parse(m).type === "add_highlight"; } catch { return false; }
+        });
+        expect(highlightMsg).toBeDefined();
+        const payload = JSON.parse(highlightMsg!);
         expect(payload.id).toBe("highlight-1");
         expect(payload.shape.bounds.width).toBe(100);
 

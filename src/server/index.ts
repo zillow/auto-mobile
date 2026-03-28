@@ -39,6 +39,7 @@ import { registerDatabaseTools } from "./databaseTools";
 import { registerStorageTools } from "./storageTools";
 import { registerFormTools } from "./formTools";
 import { registerAccessibilityTools } from "./accessibilityTools";
+import { registerNetworkTools } from "./networkTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
 // Import resource registration functions
@@ -57,6 +58,7 @@ import { registerDatabaseResources } from "./databaseResources";
 import { registerFailuresResources } from "./failuresResources";
 import { registerStorageResources } from "./storageResources";
 import { registerFeatureFlagResources } from "./featureFlagResources";
+import { registerNetworkResources } from "./networkResources";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import { startupBenchmark } from "../utils/startupBenchmark";
 
@@ -152,6 +154,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerStorageTools();
   registerFormTools();
   registerAccessibilityTools();
+  registerNetworkTools();
   registerDebugTools();
   startupBenchmark.endPhase("toolRegistration");
 
@@ -172,6 +175,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerFailuresResources();
   registerStorageResources();
   registerFeatureFlagResources();
+  registerNetworkResources();
   startupBenchmark.endPhase("resourceRegistration");
 
   // Create a new MCP server

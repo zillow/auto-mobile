@@ -25,6 +25,7 @@ class ServerConfig {
   private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
   private _appearanceDefaults: AppearanceConfigInput = {};
   private _skipCtrlProxyDownload: boolean = false;
+  private _networkMockableEnabled: boolean = false;
 
   private constructor() {}
 
@@ -117,6 +118,14 @@ class ServerConfig {
 
   isSkipCtrlProxyDownloadEnabled(): boolean {
     return this._skipCtrlProxyDownload;
+  }
+
+  setNetworkMockableEnabled(enabled: boolean): void {
+    this._networkMockableEnabled = enabled;
+  }
+
+  isNetworkMockableEnabled(): boolean {
+    return this._networkMockableEnabled;
   }
 
 }

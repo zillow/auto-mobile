@@ -1,5 +1,6 @@
 import { logger } from "../../utils/logger";
 import { recordNetworkEvent, type RecordNetworkEventInput } from "../../db/networkEventRepository";
+import { NetworkState } from "../../server/NetworkState";
 import { recordLogEvent, type RecordLogEventInput } from "../../db/logEventRepository";
 import { recordCustomEvent, type RecordCustomEventInput } from "../../db/customEventRepository";
 import { recordOsEvent, type RecordOsEventInput } from "../../db/osEventRepository";
@@ -25,7 +26,7 @@ export interface TelemetryPushTarget {
 }
 
 export interface TelemetryRepository {
-  recordNetworkEvent(input: RecordNetworkEventInput): Promise<void>;
+  recordNetworkEvent(input: RecordNetworkEventInput): Promise<number>;
   recordLogEvent(input: RecordLogEventInput): Promise<void>;
   recordCustomEvent(input: RecordCustomEventInput): Promise<void>;
   recordOsEvent(input: RecordOsEventInput): Promise<void>;
@@ -103,13 +104,35 @@ export class TelemetryRecorder {
     const { deviceId, sessionId } = this.snapshotContext();
     const input: RecordNetworkEventInput = { deviceId, sessionId, ...event };
 
+    this.pushToSocket({ category: "network", timestamp: event.timestamp, deviceId, data: event });
+
+    // Only persist and notify when capture is enabled
+    if (!NetworkState.getInstance().capturing) {
+      return;
+    }
+
+    let recordId: number | null = null;
     try {
-      await this.repository.recordNetworkEvent(input);
+      recordId = await this.repository.recordNetworkEvent(input);
     } catch (e) {
       logger.error(`[TelemetryRecorder] Failed to record network event: ${e}`);
     }
 
-    this.pushToSocket({ category: "network", timestamp: event.timestamp, deviceId, data: event });
+    // Notify NetworkState for resource subscription dispatch (only if we got the DB id)
+    if (recordId !== null) {
+      NetworkState.getInstance().onNetworkEvent({
+        id: recordId,
+        timestamp: event.timestamp,
+        method: event.method,
+        url: event.url,
+        host: event.host,
+        path: event.path,
+        statusCode: event.statusCode,
+        durationMs: event.durationMs,
+        contentType: event.contentType ?? null,
+        error: event.error,
+      });
+    }
   }
 
   async recordLogEvent(event: {

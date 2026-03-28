@@ -43,6 +43,7 @@ import { startPerformanceMonitor, stopPerformanceMonitor, getPerformanceMonitor 
 import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
+import { serverConfig } from "../utils/ServerConfig";
 
 const DEVICE_DISCONNECT_POLL_INTERVAL_MS = 5000;
 const DEVICE_DISCONNECT_MISS_THRESHOLD = 2;
@@ -95,6 +96,26 @@ export class Daemon {
     );
     // Initialize singleton for daemon state access
     DaemonState.getInstance().initialize(this.sessionManager, this.devicePool);
+
+    // Apply CLI flags to serverConfig so daemon tools respect them
+    if (options.networkMockable) {
+      serverConfig.setNetworkMockableEnabled(true);
+    }
+    if (options.noUiPerfMode) {
+      serverConfig.setUiPerfMode(false);
+    }
+    if (options.memPerfAudit) {
+      serverConfig.setMemPerfAuditMode(true);
+    }
+    if (options.predictiveUi) {
+      serverConfig.setPredictiveUiEnabled(true);
+    }
+    if (options.rawElementSearch) {
+      serverConfig.setRawElementSearchEnabled(true);
+    }
+    if (options.skipCtrlProxyDownload) {
+      serverConfig.setSkipCtrlProxyDownload(true);
+    }
   }
 
   /**

@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.compose.compiler)
+  alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.mavenPublish)
   alias(libs.plugins.dokka)
 }
@@ -17,6 +18,10 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     consumerProguardFiles("consumer-rules.pro")
+  }
+
+  testOptions {
+    unitTests.isReturnDefaultValues = true
   }
 
   buildTypes {
@@ -48,6 +53,9 @@ dependencies {
 
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)
+
+  // Kotlin serialization (for NetworkMockRuleStore broadcast parsing)
+  implementation(libs.kotlinx.serialization)
 
   // OkHttp — compileOnly so consumers must bring their own dependency
   compileOnly(libs.okhttp)

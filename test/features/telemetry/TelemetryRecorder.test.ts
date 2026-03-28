@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import {
   TelemetryRecorder,
   type TelemetryRepository,
   type TelemetryPushTarget,
   type TelemetryEvent,
 } from "../../../src/features/telemetry/TelemetryRecorder";
+import { NetworkState } from "../../../src/server/NetworkState";
 import type { RecordNetworkEventInput } from "../../../src/db/networkEventRepository";
 import type { RecordLogEventInput } from "../../../src/db/logEventRepository";
 import type { RecordCustomEventInput } from "../../../src/db/customEventRepository";
@@ -22,10 +23,12 @@ class FakeRepository implements TelemetryRepository {
   storageEvents: RecordStorageEventInput[] = [];
   layoutEvents: RecordLayoutEventInput[] = [];
   shouldThrow = false;
+  private nextNetworkId = 1;
 
-  async recordNetworkEvent(input: RecordNetworkEventInput): Promise<void> {
+  async recordNetworkEvent(input: RecordNetworkEventInput): Promise<number> {
     if (this.shouldThrow) {throw new Error("db error");}
     this.networkEvents.push(input);
+    return this.nextNetworkId++;
   }
   async recordLogEvent(input: RecordLogEventInput): Promise<void> {
     if (this.shouldThrow) {throw new Error("db error");}
@@ -70,6 +73,12 @@ describe("TelemetryRecorder", () => {
     pushTarget = new FakePushTarget();
     recorder = new TelemetryRecorder(repo, () => pushTarget);
     TelemetryRecorder.resetInstance();
+    NetworkState.resetInstance();
+    NetworkState.getInstance().setCapture(true);
+  });
+
+  afterEach(() => {
+    NetworkState.resetInstance();
   });
 
   it("records network event to repository with context", async () => {
@@ -116,6 +125,28 @@ describe("TelemetryRecorder", () => {
     expect(pushTarget.pushedEvents[0].category).toBe("network");
     expect(pushTarget.pushedEvents[0].timestamp).toBe(1000);
     expect(pushTarget.pushedEvents[0].deviceId).toBeNull();
+  });
+
+  it("skips DB write when capture is disabled but still pushes to socket", async () => {
+    NetworkState.getInstance().setCapture(false);
+
+    await recorder.recordNetworkEvent({
+      timestamp: 1000,
+      applicationId: null,
+      url: "/test",
+      method: "GET",
+      statusCode: 200,
+      durationMs: 10,
+      requestBodySize: 0,
+      responseBodySize: 0,
+      protocol: null,
+      host: null,
+      path: null,
+      error: null,
+    });
+
+    expect(repo.networkEvents).toHaveLength(0);
+    expect(pushTarget.pushedEvents).toHaveLength(1);
   });
 
   it("includes deviceId in pushed events", async () => {

@@ -339,3 +339,34 @@ data class SetRecompositionTracking(
   override val requestId: String? = null,
   val enabled: Boolean,
 ) : WebSocketRequest()
+
+@Serializable
+@SerialName("set_network_mock_rules")
+data class SetNetworkMockRules(
+  override val requestId: String? = null,
+  val rules: List<NetworkMockRuleDto>,
+) : WebSocketRequest()
+
+@Serializable
+data class NetworkMockRuleDto(
+  val mockId: String,
+  val host: String,
+  val path: String,
+  val method: String,
+  val limit: Int? = null,
+  val remaining: Int? = null,
+  val statusCode: Int,
+  val responseHeaders: Map<String, String> = emptyMap(),
+  val responseBody: String = "",
+  val contentType: String = "application/json",
+)
+
+@Serializable
+@SerialName("set_network_error_simulation")
+data class SetNetworkErrorSimulation(
+  override val requestId: String? = null,
+  val enabled: Boolean,
+  val errorType: String? = null,
+  val limit: Int? = null,
+  val expiresAtEpochMs: Long? = null,
+) : WebSocketRequest()

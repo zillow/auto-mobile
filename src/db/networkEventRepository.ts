@@ -34,8 +34,8 @@ function getDb(db?: Kysely<Database>): Kysely<Database> {
 export async function recordNetworkEvent(
   input: RecordNetworkEventInput,
   db?: Kysely<Database>
-): Promise<void> {
-  await getDb(db)
+): Promise<number> {
+  const result = await getDb(db)
     .insertInto("network_events")
     .values({
       device_id: input.deviceId,
@@ -58,28 +58,33 @@ export async function recordNetworkEvent(
       response_body: input.responseBody ?? null,
       content_type: input.contentType ?? null,
     })
-    .execute();
+    .returning("id")
+    .executeTakeFirstOrThrow();
 
   cleanupIfNeeded(db);
+
+  return result.id;
 }
 
-export async function getNetworkEvents(
-  query: { deviceId?: string; sinceTimestamp?: number; limit?: number },
-  db?: Kysely<Database>
-): Promise<RecordNetworkEventInput[]> {
-  let q = getDb(db).selectFrom("network_events").selectAll();
+export interface NetworkEventWithId extends RecordNetworkEventInput {
+  id: number;
+}
 
-  if (query.deviceId) {
-    q = q.where("device_id", "=", query.deviceId);
-  }
-  if (query.sinceTimestamp) {
-    q = q.where("timestamp", ">=", query.sinceTimestamp);
-  }
+export interface NetworkEventQuery {
+  deviceId?: string;
+  sinceTimestamp?: number;
+  limit?: number;
+  host?: string;
+  method?: string;
+  statusCode?: string;
+  minStatusCode?: number;
+}
 
-  q = q.orderBy("timestamp", "desc").limit(query.limit ?? 100);
+const BODY_TRUNCATION_LIMIT = 10_240; // 10KB
 
-  const rows = await q.execute();
-  return rows.map(r => ({
+function mapRow(r: any): NetworkEventWithId {
+  return {
+    id: r.id,
     deviceId: r.device_id,
     timestamp: r.timestamp,
     applicationId: r.application_id,
@@ -99,7 +104,70 @@ export async function getNetworkEvents(
     requestBody: r.request_body ?? null,
     responseBody: r.response_body ?? null,
     contentType: r.content_type ?? null,
-  }));
+  };
+}
+
+export async function getNetworkEventById(
+  id: number,
+  db?: Kysely<Database>
+): Promise<NetworkEventWithId | null> {
+  const row = await getDb(db)
+    .selectFrom("network_events")
+    .selectAll()
+    .where("id", "=", id)
+    .executeTakeFirst();
+
+  if (!row) {
+    return null;
+  }
+
+  const event = mapRow(row);
+
+  // Truncate bodies to 10KB
+  if (event.requestBody && event.requestBody.length > BODY_TRUNCATION_LIMIT) {
+    event.requestBody = event.requestBody.slice(0, BODY_TRUNCATION_LIMIT);
+  }
+  if (event.responseBody && event.responseBody.length > BODY_TRUNCATION_LIMIT) {
+    event.responseBody = event.responseBody.slice(0, BODY_TRUNCATION_LIMIT);
+  }
+
+  return event;
+}
+
+export async function getNetworkEvents(
+  query: NetworkEventQuery,
+  db?: Kysely<Database>
+): Promise<NetworkEventWithId[]> {
+  let q = getDb(db).selectFrom("network_events").selectAll();
+
+  if (query.deviceId) {
+    q = q.where("device_id", "=", query.deviceId);
+  }
+  if (query.sinceTimestamp) {
+    q = q.where("timestamp", ">=", query.sinceTimestamp);
+  }
+  if (query.host) {
+    q = q.where("host", "=", query.host);
+  }
+  if (query.method) {
+    q = q.where("method", "=", query.method.toUpperCase());
+  }
+  if (query.statusCode) {
+    if (/^\d+$/.test(query.statusCode)) {
+      q = q.where("status_code", "=", parseInt(query.statusCode, 10));
+    } else if (/^\dxx$/i.test(query.statusCode)) {
+      const base = parseInt(query.statusCode[0], 10) * 100;
+      q = q.where("status_code", ">=", base).where("status_code", "<", base + 100);
+    }
+  }
+  if (query.minStatusCode !== undefined) {
+    q = q.where("status_code", ">=", query.minStatusCode);
+  }
+
+  q = q.orderBy("timestamp", "desc").limit(query.limit ?? 100);
+
+  const rows = await q.execute();
+  return rows.map(mapRow);
 }
 
 async function cleanupIfNeeded(db?: Kysely<Database>): Promise<void> {

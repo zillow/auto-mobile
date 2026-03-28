@@ -17,6 +17,7 @@ import dev.jasonpearson.automobile.sdk.failures.AutoMobileFailures
 import dev.jasonpearson.automobile.sdk.interaction.AutoMobileClickTracker
 import dev.jasonpearson.automobile.sdk.logging.AutoMobileLog
 import dev.jasonpearson.automobile.sdk.network.AutoMobileNetwork
+import dev.jasonpearson.automobile.sdk.network.NetworkMockRuleStore
 import dev.jasonpearson.automobile.sdk.os.AutoMobileBroadcastInterceptor
 import dev.jasonpearson.automobile.sdk.os.AutoMobileOsEvents
 import dev.jasonpearson.automobile.sdk.storage.SharedPreferencesInspector
@@ -86,7 +87,8 @@ object AutoMobileSDK {
     eventBuffer = buffer
 
     // Thread-safe subsystems — can initialize from any thread
-    AutoMobileNetwork.initialize(appContext.packageName, buffer)
+    NetworkMockRuleStore.initialize(appContext)
+    AutoMobileNetwork.initialize(appContext.packageName, buffer, NetworkMockRuleStore.getInstance().ruleMatcher)
     AutoMobileLog.initialize(appContext.packageName, buffer)
     AutoMobileBroadcastInterceptor.initialize(appContext, buffer)
     DatabaseInspector.initialize(appContext)

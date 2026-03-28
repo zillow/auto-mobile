@@ -171,6 +171,10 @@ class WebSocketServer(
         ((requestId: String?, permission: String?, requestPermission: Boolean?) -> Unit)? =
         null,
     private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null,
+    private val onSetNetworkMockRules: ((rulesJson: String) -> Unit)? = null,
+    private val onSetNetworkErrorSimulation:
+        ((enabled: Boolean, errorType: String?, limit: Int?, expiresAtEpochMs: Long?) -> Unit)? =
+        null,
     private val onGetCurrentFocus: ((requestId: String?) -> Unit)? = null,
     private val onGetTraversalOrder: ((requestId: String?) -> Unit)? = null,
     private val onAddHighlight:
@@ -698,6 +702,29 @@ class WebSocketServer(
             onSetRecompositionTracking?.invoke(enabled)
           } else {
             Log.w(TAG, "set_recomposition_tracking missing enabled flag")
+          }
+        }
+        "set_network_mock_rules" -> {
+          // Parse rules from raw JSON since LegacyWebSocketRequest can't hold arrays
+          try {
+            val parsed = protocolJson.decodeFromString<SetNetworkMockRules>(message)
+            val rulesJson = protocolJson.encodeToString(
+                kotlinx.serialization.builtins.ListSerializer(NetworkMockRuleDto.serializer()),
+                parsed.rules)
+            Log.d(TAG, "Received network mock rules: ${parsed.rules.size} rules")
+            onSetNetworkMockRules?.invoke(rulesJson)
+          } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse set_network_mock_rules", e)
+          }
+        }
+        "set_network_error_simulation" -> {
+          try {
+            val parsed = protocolJson.decodeFromString<SetNetworkErrorSimulation>(message)
+            Log.d(TAG, "Received network error simulation: enabled=${parsed.enabled} type=${parsed.errorType}")
+            onSetNetworkErrorSimulation?.invoke(
+                parsed.enabled, parsed.errorType, parsed.limit, parsed.expiresAtEpochMs)
+          } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse set_network_error_simulation", e)
           }
         }
         "get_current_focus" -> {

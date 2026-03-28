@@ -90,6 +90,28 @@ export interface DaemonOptions {
   videoFormat?: string;
   /** Default video archive size limit in MB */
   videoMaxArchiveSizeMb?: number;
+  /** Enable network mocking */
+  networkMockable?: boolean;
+  /** Disable UI performance mode */
+  noUiPerfMode?: boolean;
+  /** Enable memory performance audit */
+  memPerfAudit?: boolean;
+  /** Enable accessibility audit */
+  accessibilityAudit?: boolean;
+  /** Accessibility audit level */
+  accessibilityLevel?: string;
+  /** Accessibility audit failure mode */
+  accessibilityFailureMode?: string;
+  /** Accessibility audit minimum severity */
+  accessibilityMinSeverity?: string;
+  /** Accessibility audit use baseline */
+  accessibilityUseBaseline?: boolean;
+  /** Enable predictive UI */
+  predictiveUi?: boolean;
+  /** Enable raw element search */
+  rawElementSearch?: boolean;
+  /** Skip CtrlProxy download */
+  skipCtrlProxyDownload?: boolean;
 }
 
 /**

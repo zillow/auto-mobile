@@ -562,7 +562,45 @@ export class CtrlProxyClient extends DeviceServiceClient implements CtrlProxy {
   }
 
   protected onConnectionEstablished(): void {
-    // No additional setup needed
+    this.syncNetworkStateToDevice();
+  }
+
+  private syncNetworkStateToDevice(): void {
+    try {
+      const { NetworkState } = require("../../../server/NetworkState");
+      const state = NetworkState.getInstance();
+
+      // Always sync mock rules on reconnect — use limit (not remaining) so
+      // the device-side store reinitializes fresh counts. Sending an empty
+      // list clears stale rules that may linger from a previous connection.
+      const mocks = state.getMocks();
+      const rules = Array.from(mocks.values()).map((r: any) => ({
+        mockId: r.mockId,
+        host: r.host,
+        path: r.path,
+        method: r.method,
+        limit: r.limit,
+        remaining: r.limit,
+        statusCode: r.statusCode,
+        responseHeaders: r.responseHeaders,
+        responseBody: r.responseBody,
+        contentType: r.contentType,
+      }));
+      this.sendMessage(JSON.stringify({ type: "set_network_mock_rules", rules }));
+
+      // Always re-sync error simulation state (including disabled) so the
+      // device doesn't keep stale simulation config from a previous connection
+      const sim = state.simulation;
+      this.sendMessage(JSON.stringify({
+        type: "set_network_error_simulation",
+        enabled: sim !== null,
+        errorType: sim?.errorType ?? null,
+        limit: sim?.limit ?? null,
+        expiresAtEpochMs: sim?.expiresAt ?? null,
+      }));
+    } catch (e) {
+      logger.debug(`[CtrlProxyClient] Failed to sync network state on reconnect: ${e}`);
+    }
   }
 
   protected onConnectionClosed(): void {

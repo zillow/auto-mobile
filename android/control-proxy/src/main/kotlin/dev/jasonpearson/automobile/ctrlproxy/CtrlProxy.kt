@@ -38,6 +38,7 @@ import dev.jasonpearson.automobile.ctrlproxy.perf.PerfProvider
 import dev.jasonpearson.automobile.ctrlproxy.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.ctrlproxy.perf.TimeProvider
 import dev.jasonpearson.automobile.ctrlproxy.storage.StorageSubscriptionManager
+import dev.jasonpearson.automobile.sdk.network.NetworkMockRuleStore
 import dev.jasonpearson.automobile.protocol.AnrData
 import dev.jasonpearson.automobile.protocol.AnrEvent
 import dev.jasonpearson.automobile.protocol.CrashData
@@ -847,6 +848,10 @@ class CtrlProxy : AccessibilityService() {
               },
               onRequestDeviceInfo = { requestId -> performDeviceInfoRequest(requestId) },
               onSetRecompositionTracking = { enabled -> setRecompositionTrackingEnabled(enabled) },
+              onSetNetworkMockRules = { rulesJson -> broadcastNetworkMockRules(rulesJson) },
+              onSetNetworkErrorSimulation = { enabled, errorType, limit, expiresAt ->
+                broadcastNetworkErrorSimulation(enabled, errorType, limit, expiresAt)
+              },
               onGetCurrentFocus = { requestId -> handleGetCurrentFocus(requestId) },
               onGetTraversalOrder = { requestId -> handleGetTraversalOrder(requestId) },
               onAddHighlight = { requestId, highlightId, shape ->
@@ -1003,6 +1008,40 @@ class CtrlProxy : AccessibilityService() {
       sendBroadcast(intent)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to broadcast recomposition control", e)
+    }
+  }
+
+  private fun broadcastNetworkMockRules(rulesJson: String) {
+    try {
+      val intent =
+          Intent(NetworkMockRuleStore.ACTION_NETWORK_MOCK_RULES).apply {
+            putExtra(NetworkMockRuleStore.EXTRA_RULES_JSON, rulesJson)
+          }
+      sendBroadcast(intent)
+      Log.d(TAG, "Broadcast network mock rules")
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to broadcast network mock rules", e)
+    }
+  }
+
+  private fun broadcastNetworkErrorSimulation(
+      enabled: Boolean,
+      errorType: String?,
+      limit: Int?,
+      expiresAtEpochMs: Long?
+  ) {
+    try {
+      val intent =
+          Intent(NetworkMockRuleStore.ACTION_NETWORK_ERROR_SIMULATION).apply {
+            putExtra(NetworkMockRuleStore.EXTRA_ERROR_SIM_ENABLED, enabled)
+            errorType?.let { putExtra(NetworkMockRuleStore.EXTRA_ERROR_SIM_TYPE, it) }
+            limit?.let { putExtra(NetworkMockRuleStore.EXTRA_ERROR_SIM_LIMIT, it) }
+            expiresAtEpochMs?.let { putExtra(NetworkMockRuleStore.EXTRA_ERROR_SIM_EXPIRES_AT, it) }
+          }
+      sendBroadcast(intent)
+      Log.d(TAG, "Broadcast network error simulation: enabled=$enabled type=$errorType")
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to broadcast network error simulation", e)
     }
   }
 

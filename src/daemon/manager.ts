@@ -210,6 +210,39 @@ export class DaemonManager {
     if (options.videoMaxArchiveSizeMb !== undefined) {
       args.push("--video-archive-size-mb", options.videoMaxArchiveSizeMb.toString());
     }
+    if (options.networkMockable) {
+      args.push("--network-mockable");
+    }
+    if (options.noUiPerfMode) {
+      args.push("--no-ui-perf-mode");
+    }
+    if (options.memPerfAudit) {
+      args.push("--mem-perf-audit");
+    }
+    if (options.accessibilityAudit) {
+      args.push("--accessibility-audit");
+    }
+    if (options.accessibilityLevel) {
+      args.push("--accessibility-level", options.accessibilityLevel);
+    }
+    if (options.accessibilityFailureMode) {
+      args.push("--accessibility-failure-mode", options.accessibilityFailureMode);
+    }
+    if (options.accessibilityMinSeverity) {
+      args.push("--accessibility-min-severity", options.accessibilityMinSeverity);
+    }
+    if (options.accessibilityUseBaseline) {
+      args.push("--accessibility-use-baseline");
+    }
+    if (options.predictiveUi) {
+      args.push("--predictive-ui");
+    }
+    if (options.rawElementSearch) {
+      args.push("--raw-element-search");
+    }
+    if (options.skipCtrlProxyDownload) {
+      args.push("--skip-ctrl-proxy-download");
+    }
 
     // Create secure temp directory with random suffix to prevent symlink attacks
     const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
@@ -473,6 +506,31 @@ export async function runDaemonCommand(
           } else if (args[i] === "--video-archive-size-mb") {
             options.videoMaxArchiveSizeMb = Number(args[i + 1]);
             i++;
+          } else if (args[i] === "--network-mockable") {
+            options.networkMockable = true;
+          } else if (args[i] === "--no-ui-perf-mode") {
+            options.noUiPerfMode = true;
+          } else if (args[i] === "--mem-perf-audit") {
+            options.memPerfAudit = true;
+          } else if (args[i] === "--accessibility-audit") {
+            options.accessibilityAudit = true;
+          } else if (args[i] === "--accessibility-level") {
+            options.accessibilityLevel = args[i + 1];
+            i++;
+          } else if (args[i] === "--accessibility-failure-mode") {
+            options.accessibilityFailureMode = args[i + 1];
+            i++;
+          } else if (args[i] === "--accessibility-min-severity") {
+            options.accessibilityMinSeverity = args[i + 1];
+            i++;
+          } else if (args[i] === "--accessibility-use-baseline") {
+            options.accessibilityUseBaseline = true;
+          } else if (args[i] === "--predictive-ui" || args[i] === "--predictive") {
+            options.predictiveUi = true;
+          } else if (args[i] === "--raw-element-search") {
+            options.rawElementSearch = true;
+          } else if (args[i] === "--skip-ctrl-proxy-download" || args[i] === "--skip-accessibility-download") {
+            options.skipCtrlProxyDownload = true;
           }
         }
 

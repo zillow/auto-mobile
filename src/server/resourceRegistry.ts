@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { Resource, ResourceTemplate, ReadResourceRequestSchema, ListResourcesRequestSchema, ListResourceTemplatesRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Resource, ResourceTemplate, ReadResourceRequestSchema, ListResourcesRequestSchema, ListResourceTemplatesRequestSchema, SubscribeRequestSchema, UnsubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../utils/logger";
 
 // Interface for resource content handlers
@@ -43,6 +43,7 @@ class ResourceRegistryClass {
   private resources: Map<string, RegisteredResource> = new Map();
   private templates: Map<string, RegisteredResourceTemplate> = new Map();
   private server: McpServer | null = null;
+  private subscriptions: Set<string> = new Set();
 
   // Register a new resource
   register(
@@ -218,11 +219,41 @@ class ResourceRegistryClass {
         resourceTemplates: this.getTemplateDefinitions()
       };
     });
+
+    // Set handler for subscribe
+    server.server.setRequestHandler(SubscribeRequestSchema, async request => {
+      const { uri } = request.params;
+      this.subscriptions.add(uri);
+      logger.info(`[ResourceRegistry] Client subscribed to: ${uri}`);
+      return {};
+    });
+
+    // Set handler for unsubscribe
+    server.server.setRequestHandler(UnsubscribeRequestSchema, async request => {
+      const { uri } = request.params;
+      this.subscriptions.delete(uri);
+      logger.info(`[ResourceRegistry] Client unsubscribed from: ${uri}`);
+      return {};
+    });
   }
 
-  // Send resource update notification
+  // Check if a URI is subscribed
+  isSubscribed(uri: string): boolean {
+    return this.subscriptions.has(uri);
+  }
+
+  // Get all active subscriptions
+  getSubscriptions(): Set<string> {
+    return new Set(this.subscriptions);
+  }
+
+  // Send resource update notification (only if client is subscribed)
   async notifyResourceUpdated(uri: string): Promise<void> {
     if (!this.server) {
+      return;
+    }
+
+    if (!this.subscriptions.has(uri)) {
       return;
     }
 
@@ -269,10 +300,11 @@ class ResourceRegistryClass {
     }
   }
 
-  // Clear all registered resources and templates (for testing)
+  // Clear all registered resources, templates, and subscriptions (for testing)
   clearResources(): void {
     this.resources.clear();
     this.templates.clear();
+    this.subscriptions.clear();
   }
 }
 

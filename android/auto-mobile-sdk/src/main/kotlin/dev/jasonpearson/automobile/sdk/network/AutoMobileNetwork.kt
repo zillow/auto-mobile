@@ -16,31 +16,42 @@ object AutoMobileNetwork {
 
   @Volatile private var buffer: SdkEventBuffer? = null
   @Volatile private var applicationId: String? = null
+  @Volatile private var ruleStore: NetworkMockRuleStore.RuleMatcher? = null
 
   /**
    * Initialize the network module with a shared event buffer.
    *
    * @param applicationId The application package name
    * @param buffer The shared SDK event buffer
+   * @param ruleStore Optional rule matcher for mock enforcement and error simulation
    */
-  fun initialize(applicationId: String?, buffer: SdkEventBuffer) {
+  fun initialize(
+      applicationId: String?,
+      buffer: SdkEventBuffer,
+      ruleStore: NetworkMockRuleStore.RuleMatcher? = null,
+  ) {
     this.applicationId = applicationId
     this.buffer = buffer
+    this.ruleStore = ruleStore
   }
 
   /**
    * Create an OkHttp Application-level Interceptor for HTTP request tracking.
+   *
+   * When a [ruleStore] has been provided via [initialize], the interceptor also
+   * enforces mock rules and error simulation by short-circuiting matching requests.
    *
    * @param captureHeaders Whether to capture request/response headers (default false for privacy)
    * @param captureBodies Whether to capture request/response bodies (default false, truncated to 32KB)
    * @return An [Interceptor] that records network events, or null if not initialized
    */
   fun interceptor(
-    captureHeaders: Boolean = false,
-    captureBodies: Boolean = false,
+      captureHeaders: Boolean = false,
+      captureBodies: Boolean = false,
   ): Interceptor? {
     val buf = buffer ?: return null
-    return AutoMobileNetworkInterceptor(buf, applicationId, captureHeaders, captureBodies)
+    return AutoMobileNetworkInterceptor(
+        buf, applicationId, captureHeaders, captureBodies, ruleStore = ruleStore)
   }
 
   /**
