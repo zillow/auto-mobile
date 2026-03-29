@@ -59,6 +59,7 @@ fun TelemetryDetailPanel(
     onClose: () -> Unit,
     onOpenSource: ((String, Int, String) -> Unit)? = null,
     screenshotLoader: ScreenshotLoader? = null,
+    rendererRegistry: CustomEventRendererRegistry? = null,
     modifier: Modifier = Modifier,
 ) {
     // Layout events with hierarchy need a split layout — scrollable metadata on top,
@@ -114,7 +115,14 @@ fun TelemetryDetailPanel(
                 is TelemetryDisplayEvent.Navigation -> NavigationDetail(event, textColor, screenshotLoader)
                 is TelemetryDisplayEvent.Log -> LogDetail(event, textColor)
                 is TelemetryDisplayEvent.Os -> OsDetail(event, textColor)
-                is TelemetryDisplayEvent.Custom -> CustomDetail(event, textColor)
+                is TelemetryDisplayEvent.Custom -> {
+                    val config = rendererRegistry?.get(event.name)
+                    CustomEventRenderedDetail(
+                        event = event,
+                        config = config,
+                        textColor = textColor,
+                    )
+                }
                 is TelemetryDisplayEvent.Failure -> FailureDetail(event, textColor, onOpenSource)
                 is TelemetryDisplayEvent.Storage -> StorageDetail(event, textColor)
                 is TelemetryDisplayEvent.Layout -> LayoutDetailMetadata(event, textColor)
@@ -499,12 +507,6 @@ private fun OsDetail(event: TelemetryDisplayEvent.Os, textColor: Color) {
     DetailRow("Category", event.category, textColor)
     DetailRow("Kind", event.kind, textColor)
     event.details?.forEach { (k, v) -> DetailRow(k, v, textColor) }
-}
-
-@Composable
-private fun CustomDetail(event: TelemetryDisplayEvent.Custom, textColor: Color) {
-    DetailRow("Name", event.name, textColor)
-    event.properties.forEach { (k, v) -> DetailRow(k, v, textColor) }
 }
 
 @Composable

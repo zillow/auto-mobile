@@ -48,6 +48,8 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.jasonpearson.automobile.desktop.core.shell.NotificationRule
+import dev.jasonpearson.automobile.desktop.core.shell.NotificationRulesEditor
 import dev.jasonpearson.automobile.desktop.core.theme.SharedTheme
 
 /**
@@ -59,6 +61,8 @@ fun SettingsPanel(
     settings: SettingsProvider,
     onClose: () -> Unit,
     clientProvider: (() -> AutoMobileClient)? = null,
+    notificationRules: List<NotificationRule> = emptyList(),
+    onNotificationRulesChanged: (List<NotificationRule>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
   val colors = SharedTheme.globalColors
@@ -195,6 +199,16 @@ fun SettingsPanel(
         }
       }
     }
+
+    // === Notification Rules ===
+    Spacer(Modifier.height(24.dp))
+    HorizontalDivider(color = colors.text.normal.copy(alpha = 0.1f))
+    Spacer(Modifier.height(24.dp))
+
+    NotificationRulesEditor(
+        rules = notificationRules,
+        onRulesChanged = onNotificationRulesChanged,
+    )
 
     // === Feature Flags ===
     if (clientProvider != null) {

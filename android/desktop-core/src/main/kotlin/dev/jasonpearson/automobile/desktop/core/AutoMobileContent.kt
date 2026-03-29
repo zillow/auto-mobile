@@ -109,10 +109,21 @@ import dev.jasonpearson.automobile.desktop.core.failures.DateRange
 import dev.jasonpearson.automobile.desktop.core.layout.LayoutInspectorDashboard
 import dev.jasonpearson.automobile.desktop.core.performance.PerformanceVerticalPanel
 
+import dev.jasonpearson.automobile.desktop.core.shell.CenterTabStrip
+import dev.jasonpearson.automobile.desktop.core.shell.CenterTabType
+import dev.jasonpearson.automobile.desktop.core.shell.DetachedInspectorWindow
+import dev.jasonpearson.automobile.desktop.core.shell.InspectorPaneHeader
+import dev.jasonpearson.automobile.desktop.core.shell.RightInspectorPanel
+import dev.jasonpearson.automobile.desktop.core.shell.MetricsSnapshot
+import dev.jasonpearson.automobile.desktop.core.shell.NotificationRule
 import dev.jasonpearson.automobile.desktop.core.shell.ThreePaneShell
+import dev.jasonpearson.automobile.desktop.core.shell.ToastNotification
+import dev.jasonpearson.automobile.desktop.core.shell.ToastStack
+import dev.jasonpearson.automobile.desktop.core.shell.evaluateRule
 import dev.jasonpearson.automobile.desktop.core.tabs.HorizontalTab
 import dev.jasonpearson.automobile.desktop.core.tabs.HorizontalTabBar
 import dev.jasonpearson.automobile.desktop.core.telemetry.TelemetryDashboard
+import dev.jasonpearson.automobile.desktop.core.telemetry.TelemetryDisplayEvent
 import dev.jasonpearson.automobile.desktop.core.navigation.NavigationDashboard
 import dev.jasonpearson.automobile.desktop.core.navigation.NavigationScreenshotLoader
 import dev.jasonpearson.automobile.desktop.core.performance.PerformanceDashboard
@@ -191,13 +202,13 @@ fun AutoMobileContent(
   var showRightPane by remember { mutableStateOf(true) }
   var showBottomPane by remember { mutableStateOf(false) }  // collapsed by default
 
-  // Horizontal tabs at bottom (Navigation, Test Runs, Storage, Diagnostics)
+  // Horizontal tabs at bottom (Navigation, Test Runs, Storage, Diagnostics) — reorderable
   val horizontalTabs = remember {
-      listOf(
-          HorizontalTab("test_runs", "Test Runs", "🧪"),
-          HorizontalTab("storage", "Storage", "💾"),
-          HorizontalTab("diagnostics", "Diagnostics", "🩺"),
-          HorizontalTab("telemetry", "Telemetry", "📡"),
+      mutableStateListOf(
+          HorizontalTab("test_runs", "Test Runs", "\uD83E\uDDEA"),
+          HorizontalTab("storage", "Storage", "\uD83D\uDCBE"),
+          HorizontalTab("diagnostics", "Diagnostics", "\uD83E\uDE7A"),
+          HorizontalTab("telemetry", "Telemetry", "\uD83D\uDCE1"),
       )
   }
   var selectedHorizontalTabId by remember { mutableStateOf<String?>(null) }
@@ -659,9 +670,19 @@ fun AutoMobileContent(
   var currentReplayIndex by remember { mutableIntStateOf(0) }
   var isReplaying by remember { mutableStateOf(false) }
 
-  // Toggle between Layout Inspector and Navigation in the main content area
-  var showNavigationView by remember { mutableStateOf(false) }
+  // Center-pane tab state (replaces the old boolean toggle)
+  val centerOpenTabs = remember { mutableStateListOf(CenterTabType.Layout, CenterTabType.Navigation) }
+  var selectedCenterTab by remember { mutableStateOf(CenterTabType.Layout) }
+
   var isNavigationDetailView by remember { mutableStateOf(false) }
+
+  // Notification rules
+  val notificationRules = remember { mutableStateListOf<NotificationRule>() }
+  val toastNotifications = remember { mutableStateListOf<ToastNotification>() }
+
+  // Detachable right inspector pane
+  var isRightPaneDetached by remember { mutableStateOf(false) }
+  var selectedInspectorEvent by remember { mutableStateOf<TelemetryDisplayEvent?>(null) }
 
   // Setup state - true when AutoMobile service/daemon not detected or accessibility service not running
   // TODO: Replace with actual service detection
@@ -693,6 +714,38 @@ fun AutoMobileContent(
     }
   }
 
+  // Evaluate notification rules when metrics change
+  LaunchedEffect(notificationRules.size, crashCount, anrCount, toolFailureCount, currentFps, currentMemoryMb) {
+      val metrics = MetricsSnapshot(
+          crashCount = crashCount,
+          anrCount = anrCount,
+          toolFailureCount = toolFailureCount,
+          fps = currentFps,
+          memoryMb = currentMemoryMb,
+      )
+      notificationRules.forEach { rule ->
+          val msg = evaluateRule(rule, metrics)
+          if (msg != null) {
+              // Avoid duplicate toasts for same rule within 10 seconds (keyed on stable rule.id)
+              val recentlyFired = toastNotifications.any {
+                  it.ruleId == rule.id && (System.currentTimeMillis() - it.timestampMs) < 10_000
+              }
+              if (!recentlyFired) {
+                  toastNotifications.add(
+                      ToastNotification(
+                          id = "toast_${System.currentTimeMillis()}_${rule.id}",
+                          ruleId = rule.id,
+                          ruleName = rule.name,
+                          message = msg,
+                          severity = rule.severity,
+                          timestampMs = System.currentTimeMillis(),
+                      )
+                  )
+              }
+          }
+      }
+  }
+
   val colors = SharedTheme.globalColors
 
   // Track header height for padding non-navigation content
@@ -710,6 +763,11 @@ fun AutoMobileContent(
         settings = settingsProvider,
         onClose = { showSettings = false },
         clientProvider = clientProvider,
+        notificationRules = notificationRules,
+        onNotificationRulesChanged = { updated ->
+            notificationRules.clear()
+            notificationRules.addAll(updated)
+        },
         modifier = Modifier.fillMaxSize(),
     )
     return
@@ -733,47 +791,85 @@ fun AutoMobileContent(
       isDaemonConnected = connectedMcpProcess != null,
       centerContent = { mod ->
           Column(mod) {
-              // Main view area with Layout/Navigation toggle
+              // Center pane tab strip
+              CenterTabStrip(
+                  openTabs = centerOpenTabs,
+                  selectedTab = selectedCenterTab,
+                  onSelectTab = { selectedCenterTab = it },
+                  onCloseTab = { tab ->
+                      centerOpenTabs.remove(tab)
+                      if (selectedCenterTab == tab) {
+                          selectedCenterTab = centerOpenTabs.firstOrNull() ?: CenterTabType.Layout
+                      }
+                  },
+                  onAddTab = { tab ->
+                      if (tab !in centerOpenTabs) centerOpenTabs.add(tab)
+                      selectedCenterTab = tab
+                  },
+              )
+
+              // Main view area based on selected center tab
               Box(Modifier.weight(if (selectedHorizontalTabId != null) 0.5f else 1f)) {
                   val streamClient = observationStreamClient
-                  if (showNavigationView) {
-                      NavigationDashboard(
-                          highlightedScreens = replayHighlightedScreens,
-                          currentStepScreen = if (isReplaying && testFlowScreens.isNotEmpty()) testFlowScreens.getOrNull(currentReplayIndex) else null,
-                          onHighlightCleared = {
-                              testFlowScreens = emptyList()
-                              isReplaying = false
-                          },
-                          onDetailViewChanged = { isNavigationDetailView = it },
-                          dataSourceMode = dataSourceMode,
-                          clientProvider = clientProvider,
-                          selectedAppId = selectedAppId,
-                          observationStreamClient = observationStreamClient,
-                          screenshotLoader = remember(clientProvider, dataSourceMode) {
-                              if (dataSourceMode == DataSourceMode.Real && clientProvider != null)
-                                  NavigationScreenshotLoader(clientProvider) else null
-                          },
-                          settingsProvider = settings,
-                      )
-                  } else if (streamClient != null) {
-                      LayoutInspectorDashboard(
-                          dataSourceMode = dataSourceMode,
-                          clientProvider = clientProvider,
-                          observationStreamClient = streamClient,
-                          platform = platformString,
-                      )
+                  when (selectedCenterTab) {
+                      CenterTabType.Navigation -> {
+                          NavigationDashboard(
+                              highlightedScreens = replayHighlightedScreens,
+                              currentStepScreen = if (isReplaying && testFlowScreens.isNotEmpty()) testFlowScreens.getOrNull(currentReplayIndex) else null,
+                              onHighlightCleared = {
+                                  testFlowScreens = emptyList()
+                                  isReplaying = false
+                              },
+                              onDetailViewChanged = { isNavigationDetailView = it },
+                              dataSourceMode = dataSourceMode,
+                              clientProvider = clientProvider,
+                              selectedAppId = selectedAppId,
+                              observationStreamClient = observationStreamClient,
+                              screenshotLoader = remember(clientProvider, dataSourceMode) {
+                                  if (dataSourceMode == DataSourceMode.Real && clientProvider != null)
+                                      NavigationScreenshotLoader(clientProvider) else null
+                              },
+                              settingsProvider = settings,
+                          )
+                      }
+                      CenterTabType.Layout -> {
+                          if (streamClient != null) {
+                              LayoutInspectorDashboard(
+                                  dataSourceMode = dataSourceMode,
+                                  clientProvider = clientProvider,
+                                  observationStreamClient = streamClient,
+                                  platform = platformString,
+                              )
+                          }
+                      }
+                      CenterTabType.Telemetry -> {
+                          TelemetryDashboard(
+                              telemetryPushClient = telemetryPushClient,
+                              dataSourceMode = dataSourceMode,
+                              onOpenSource = onOpenSource,
+                              screenshotLoader = remember(clientProvider, dataSourceMode) {
+                                  if (dataSourceMode == DataSourceMode.Real && clientProvider != null)
+                                      NavigationScreenshotLoader(clientProvider) else null
+                              },
+                          )
+                      }
+                      CenterTabType.Diagnostics -> {
+                          DiagnosticsDashboard(
+                              connectedMcpProcess = connectedMcpProcess,
+                              dataSourceMode = dataSourceMode,
+                          )
+                      }
                   }
-                  MainContentViewToggle(
-                      showNavigation = showNavigationView,
-                      onToggle = { showNavigationView = it },
-                      modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
-                  )
               }
-              // Bottom tabs
+              // Bottom tabs (drag-and-drop reorderable)
               HorizontalTabBar(
                   tabs = horizontalTabs,
                   selectedTabId = selectedHorizontalTabId,
                   onTabSelected = { selectedHorizontalTabId = it },
+                  onTabsReordered = { reordered ->
+                      horizontalTabs.clear()
+                      horizontalTabs.addAll(reordered)
+                  },
               )
               if (selectedHorizontalTabId != null) {
                   Box(Modifier.fillMaxWidth().weight(0.5f)) {
@@ -783,7 +879,8 @@ fun AutoMobileContent(
                                   testFlowScreens = screens
                                   isReplaying = true
                                   currentReplayIndex = 0
-                                  showNavigationView = true
+                                  if (!centerOpenTabs.contains(CenterTabType.Navigation)) centerOpenTabs.add(CenterTabType.Navigation)
+                                  selectedCenterTab = CenterTabType.Navigation
                               },
                               dataSourceMode = dataSourceMode,
                               clientProvider = clientProvider,
@@ -917,12 +1014,28 @@ fun AutoMobileContent(
           }
       },
       rightPaneContent = {
-          Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-              Text(
-                  "Select an event to inspect",
-                  color = colors.text.normal.copy(alpha = 0.5f),
-                  fontSize = 12.sp,
-              )
+          if (!isRightPaneDetached) {
+              Column(Modifier.fillMaxSize()) {
+                  InspectorPaneHeader(
+                      title = "Inspector",
+                      isDetached = false,
+                      onDetachToggle = { isRightPaneDetached = true },
+                      onClose = { showRightPane = false },
+                  )
+                  InspectorBody(
+                      selectedEvent = selectedInspectorEvent,
+                      onClose = { selectedInspectorEvent = null },
+                      onOpenSource = onOpenSource,
+                  )
+              }
+          } else {
+              Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                  Text(
+                      "Inspector detached",
+                      color = colors.text.normal.copy(alpha = 0.3f),
+                      fontSize = 11.sp,
+                  )
+              }
           }
       },
       bottomPaneContent = {
@@ -935,44 +1048,64 @@ fun AutoMobileContent(
           }
       },
   )
+
+  // Toast notification overlay (top-right corner)
+  if (toastNotifications.isNotEmpty()) {
+      Box(Modifier.fillMaxSize()) {
+          ToastStack(
+              toasts = toastNotifications,
+              onDismiss = { id -> toastNotifications.removeAll { it.id == id } },
+              modifier = Modifier.align(Alignment.TopEnd),
+          )
+      }
+  }
+
+  // Detached inspector window
+  if (isRightPaneDetached) {
+      DetachedInspectorWindow(
+          title = "Inspector - AutoMobile",
+          onReattach = { isRightPaneDetached = false },
+      ) {
+          Column(Modifier.fillMaxSize()) {
+              InspectorPaneHeader(
+                  title = "Inspector (Detached)",
+                  isDetached = true,
+                  onDetachToggle = { isRightPaneDetached = false },
+                  onClose = { isRightPaneDetached = false },
+              )
+              InspectorBody(
+                  selectedEvent = selectedInspectorEvent,
+                  onClose = { selectedInspectorEvent = null },
+                  onOpenSource = onOpenSource,
+              )
+          }
+      }
+  }
 }
 
+/**
+ * Shared inspector body: shows the event detail panel or an empty-state placeholder.
+ */
 @Composable
-private fun MainContentViewToggle(
-    showNavigation: Boolean,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
+private fun InspectorBody(
+    selectedEvent: TelemetryDisplayEvent?,
+    onClose: () -> Unit,
+    onOpenSource: ((String, Int, String) -> Unit)?,
 ) {
     val colors = SharedTheme.globalColors
-    val bgColor = colors.panelBackground.copy(alpha = 0.85f)
-    val selectedBg = colors.text.normal.copy(alpha = 0.1f)
-    val borderColor = colors.text.normal.copy(alpha = 0.15f)
-
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(6.dp))
-            .padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        val options = listOf(false to "\uD83D\uDCD0 Layout", true to "\uD83E\uDDED Navigation")
-        options.forEach { (isNav, label) ->
-            val isSelected = showNavigation == isNav
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .then(if (isSelected) Modifier.background(selectedBg) else Modifier)
-                    .clickable { onToggle(isNav) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 11.sp,
-                    color = if (isSelected) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
-                )
-            }
+    if (selectedEvent != null) {
+        RightInspectorPanel(
+            selectedEvent = selectedEvent,
+            onClose = onClose,
+            onOpenSource = onOpenSource,
+        )
+    } else {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "Select an event to inspect",
+                color = colors.text.normal.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+            )
         }
     }
 }
