@@ -50,3 +50,8 @@ All together you get a system that looks like this:
 # Acknowledgement 
 
 By continuing to use AutoMobile, [you acknowledge and agree to the warnings and responsible use requirements](SECURITY.md).
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/zillow-auto-mobile).
+
