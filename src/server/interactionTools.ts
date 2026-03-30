@@ -149,9 +149,50 @@ const tapOnSelectorSchema = addDeviceTargetingToSchema(
   tapOnBaseSchema.extend(elementIdTextFieldsSchema.shape).strict()
 );
 
-export const tapOnSchema = tapOnSelectorSchema.superRefine((value, ctx) => {
+const tapOnByIdSchema = tapOnSelectorSchema.superRefine((value, ctx) => {
   validateElementIdTextSelector(value, ctx);
 });
+
+const tapOnByTextSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    text: z.string().min(1).describe("Element text"),
+    tapClickableParent: z.boolean().optional().describe(
+      "Tap the nearest clickable parent that contains the text element. " +
+      "Useful for list items where the clickable row doesn't have a resource-id " +
+      "but contains children with text."
+    )
+  }).strict()
+);
+
+const tapOnByClickableSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    clickable: z.literal(true).describe(
+      "Select clickable elements. Use with selectionStrategy: 'first' to tap " +
+      "the first clickable item in a list without knowing its text or ID."
+    ),
+    scrollableContainer: z.boolean().optional().describe(
+      "Only search within scrollable containers (lists/RecyclerViews). " +
+      "Use this to avoid tapping search bars or other clickable UI elements " +
+      "when you want the first list item."
+    )
+  }).strict()
+);
+
+const tapOnBySiblingOfTextSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    siblingOfText: z.string().min(1).describe(
+      "Find a clickable element that is a sibling of an element containing this text. " +
+      "Useful for tapping checkboxes, icons, or buttons next to a specific text label."
+    )
+  }).strict()
+);
+
+export const tapOnSchema = z.union([
+  tapOnByIdSchema,
+  tapOnByTextSchema,
+  tapOnByClickableSchema,
+  tapOnBySiblingOfTextSchema
+]);
 
 const tapOnResultSchema = z.object({
   success: z.boolean(),
@@ -386,6 +427,10 @@ export function registerInteractionTools() {
       action: args.action,
       duration: args.duration,
       searchUntil: args.searchUntil,
+      tapClickableParent: args.tapClickableParent,
+      clickable: args.clickable,
+      scrollableContainer: args.scrollableContainer,
+      siblingOfText: args.siblingOfText,
     }, progress);
 
     const searchStats = result.searchUntil;

@@ -65,6 +65,10 @@ export interface TapOnArgs {
     duration?: number;
   };
   platform: Platform;
+  tapClickableParent?: boolean;
+  clickable?: boolean;
+  scrollableContainer?: boolean;
+  siblingOfText?: string;
 }
 
 export interface DragAndDropArgs {

@@ -132,7 +132,7 @@ export class DefaultElementFinder implements ElementFinder {
     for (const searchNode of rootNodes) {
       this.parser.traverseNode(searchNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
-        logger.info(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]} ${nodeProperties["class"]}`);
+        logger.debug(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]} ${nodeProperties["class"]}`);
 
         // Check text attribute
         if (
@@ -140,7 +140,7 @@ export class DefaultElementFinder implements ElementFinder {
           typeof nodeProperties.text === "string" &&
           matchesText(nodeProperties.text)
         ) {
-          logger.info("[Element] Matches text property");
+          logger.debug("[Element] Matches text property");
           const parsedNode = this.parser.parseNodeBounds(node);
           if (parsedNode) {
             if (nodeProperties.text === text) {
@@ -154,7 +154,7 @@ export class DefaultElementFinder implements ElementFinder {
           typeof nodeProperties["content-desc"] === "string" &&
           matchesText(nodeProperties["content-desc"])
         ) {
-          logger.info("[Element] Matches content-desc property");
+          logger.debug("[Element] Matches content-desc property");
           const parsedNode = this.parser.parseNodeBounds(node);
           if (parsedNode) {
             if (nodeProperties["content-desc"] === text) {
@@ -168,7 +168,7 @@ export class DefaultElementFinder implements ElementFinder {
           typeof nodeProperties["ios-accessibility-label"] === "string" &&
           matchesText(nodeProperties["ios-accessibility-label"])
         ) {
-          logger.info("[Element] Matches ios-accessibility-label property");
+          logger.debug("[Element] Matches ios-accessibility-label property");
           const parsedNode = this.parser.parseNodeBounds(node);
           if (parsedNode) {
             if (nodeProperties["ios-accessibility-label"] === text) {
@@ -187,7 +187,7 @@ export class DefaultElementFinder implements ElementFinder {
             nodeProperties.clickable === "true"
           )
         ) {
-          logger.info("[Element] Matches clickable element with text");
+          logger.debug("[Element] Matches clickable element with text");
           const parsedNode = this.parser.parseNodeBounds(node);
           if (parsedNode) {
             partialMatches.push(parsedNode);
@@ -481,7 +481,6 @@ export class DefaultElementFinder implements ElementFinder {
     ];
     const scrollables: Element[] = [];
 
-    // Process each root node
     for (const rootNode of rootNodes) {
       this.parser.traverseNode(rootNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
@@ -540,8 +539,76 @@ export class DefaultElementFinder implements ElementFinder {
     ];
     const clickables: Element[] = [];
 
-    // Process each root node
     for (const rootNode of rootNodes) {
+      this.parser.traverseNode(rootNode, (node: any) => {
+        const nodeProperties = this.parser.extractNodeProperties(node);
+        if (nodeProperties.clickable === "true" || nodeProperties.clickable === true) {
+          const parsedNode = this.parser.parseNodeBounds(node);
+          if (parsedNode) {
+            clickables.push(parsedNode);
+          }
+        }
+      });
+    }
+
+    return clickables;
+  }
+
+  /**
+   * Find clickable elements, optionally restricted to a container.
+   * @param viewHierarchy - The view hierarchy to search
+   * @param container - Optional container to restrict search
+   * @param scrollableContainer - If true, only search within scrollable elements
+   * @returns Array of clickable elements
+   */
+  findClickableElementsInContainer(
+    viewHierarchy: ViewHierarchyResult,
+    container: { elementId?: string; text?: string } | null = null,
+    scrollableContainer: boolean = false
+  ): Element[] {
+    if (!viewHierarchy) {
+      return [];
+    }
+
+    const containerNode = container
+      ? this.findContainerNodeInternal(viewHierarchy, container)
+      : null;
+
+    if (container && !containerNode) {
+      return [];
+    }
+
+    let searchRoots = containerNode
+      ? [containerNode]
+      : [
+        ...this.parser.extractRootNodes(viewHierarchy),
+        ...this.parser.extractWindowRootNodes(viewHierarchy, "topmost-first")
+      ];
+
+    // If scrollableContainer is true, find all scrollable nodes first
+    // and then search for clickables only within those
+    if (scrollableContainer) {
+      const scrollableNodes: any[] = [];
+      for (const rootNode of searchRoots) {
+        this.parser.traverseNode(rootNode, (node: any) => {
+          const nodeProperties = this.parser.extractNodeProperties(node);
+          if (nodeProperties.scrollable === "true" || nodeProperties.scrollable === true) {
+            scrollableNodes.push(node);
+          }
+        });
+      }
+
+      if (scrollableNodes.length > 0) {
+        searchRoots = scrollableNodes;
+      } else {
+        // No scrollable containers found, return empty
+        return [];
+      }
+    }
+
+    const clickables: Element[] = [];
+
+    for (const rootNode of searchRoots) {
       this.parser.traverseNode(rootNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
         if (nodeProperties.clickable === "true" || nodeProperties.clickable === true) {
@@ -574,7 +641,6 @@ export class DefaultElementFinder implements ElementFinder {
     const childElements: Element[] = [];
     const parentBounds = parentElement.bounds;
 
-    // Find elements that are within the parent's bounds
     for (const rootNode of rootNodes) {
       this.parser.traverseNode(rootNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
@@ -734,5 +800,292 @@ export class DefaultElementFinder implements ElementFinder {
 
     // Use partial matching for text validation
     return this.textMatcher.partialTextMatch(foundElement.text, expectedText, false);
+  }
+
+  /**
+   * Find clickable parent elements that contain descendants matching the specified text.
+   * This traverses the hierarchy looking for clickable elements that have a descendant
+   * with matching text, returning the clickable parent (not the text element itself).
+   *
+   * @param viewHierarchy - The view hierarchy to search
+   * @param text - The text to search for in descendants
+   * @param container - Container element selector to restrict the search
+   * @param fuzzyMatch - Whether to use fuzzy matching
+   * @param caseSensitive - Whether to use case-sensitive matching
+   * @returns Array of clickable parent elements containing the text
+   */
+  findClickableParentsContainingText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    container: { elementId?: string; text?: string } | null = null,
+    fuzzyMatch: boolean = true,
+    caseSensitive: boolean = false
+  ): Element[] {
+    if (!viewHierarchy || !text) {
+      return [];
+    }
+
+    const matchesText = this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
+    const containerNode = container
+      ? this.findContainerNodeInternal(viewHierarchy, container)
+      : null;
+
+    if (container && !containerNode) {
+      return [];
+    }
+
+    const searchRoots = containerNode
+      ? [containerNode]
+      : this.parser.extractRootNodes(viewHierarchy);
+
+    const clickableParents = this.collectClickableParentsWithTextInRoots(searchRoots, matchesText);
+
+    if (clickableParents.length > 0) {
+      return clickableParents;
+    }
+
+    // Try window roots if no match in main hierarchy
+    if (!containerNode) {
+      const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+      for (const windowRoots of windowRootGroups) {
+        const windowMatches = this.collectClickableParentsWithTextInRoots(windowRoots, matchesText);
+        if (windowMatches.length > 0) {
+          return windowMatches;
+        }
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Internal method to find clickable elements that have descendants with matching text.
+   */
+  private collectClickableParentsWithTextInRoots(
+    rootNodes: ViewHierarchyNode[],
+    matchesText: (input?: string) => boolean
+  ): Element[] {
+    const matches: Element[] = [];
+
+    for (const rootNode of rootNodes) {
+      this.findClickableParentsInNode(rootNode, matchesText, matches);
+    }
+
+    return matches;
+  }
+
+  /**
+   * Find clickable elements that are siblings of elements containing the specified text.
+   * This finds nodes that share the same parent as a text-matching node.
+   *
+   * @param viewHierarchy - The view hierarchy to search
+   * @param text - The text to search for in sibling elements
+   * @param container - Container element selector to restrict the search
+   * @param fuzzyMatch - Whether to use fuzzy matching
+   * @param caseSensitive - Whether to use case-sensitive matching
+   * @returns Array of clickable sibling elements
+   */
+  findClickableSiblingsOfText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    container: { elementId?: string; text?: string } | null = null,
+    fuzzyMatch: boolean = true,
+    caseSensitive: boolean = false
+  ): Element[] {
+    if (!viewHierarchy || !text) {
+      return [];
+    }
+
+    const matchesText = this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
+    const containerNode = container
+      ? this.findContainerNodeInternal(viewHierarchy, container)
+      : null;
+
+    if (container && !containerNode) {
+      return [];
+    }
+
+    const searchRoots = containerNode
+      ? [containerNode]
+      : this.parser.extractRootNodes(viewHierarchy);
+
+    const siblings = this.collectClickableSiblingsWithTextInRoots(searchRoots, matchesText);
+
+    if (siblings.length > 0) {
+      return siblings;
+    }
+
+    // Try window roots if no match in main hierarchy
+    if (!containerNode) {
+      const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+      for (const windowRoots of windowRootGroups) {
+        const windowMatches = this.collectClickableSiblingsWithTextInRoots(windowRoots, matchesText);
+        if (windowMatches.length > 0) {
+          return windowMatches;
+        }
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Internal method to find clickable siblings of text-matching elements.
+   */
+  private collectClickableSiblingsWithTextInRoots(
+    rootNodes: ViewHierarchyNode[],
+    matchesText: (input?: string) => boolean
+  ): Element[] {
+    const results: Element[] = [];
+
+    for (const rootNode of rootNodes) {
+      this.findClickableSiblingsInNode(rootNode, matchesText, results);
+    }
+
+    return results;
+  }
+
+  /**
+   * Recursively search for clickable siblings of text-matching elements.
+   * When a node has children where one directly matches text and another is clickable,
+   * we return the clickable sibling.
+   *
+   * Uses nodeHasText (shallow) instead of nodeOrDescendantHasText (deep) to avoid
+   * false positives: a parent whose deeply-nested descendant has the text should not
+   * cause its other children to be collected as "siblings." The recursion naturally
+   * finds the correct level.
+   */
+  private findClickableSiblingsInNode(
+    node: ViewHierarchyNode,
+    matchesText: (input?: string) => boolean,
+    results: Element[]
+  ): void {
+    const children = node.node;
+    if (!children) {
+      return;
+    }
+
+    const childArray: ViewHierarchyNode[] = Array.isArray(children)
+      ? children
+      : [children];
+
+    // Check if any direct child has matching text (shallow — not descendants)
+    const hasTextMatch = childArray.some(child => this.nodeHasText(child, matchesText));
+
+    if (hasTextMatch) {
+      for (const child of childArray) {
+        const childProps = this.parser.extractNodeProperties(child);
+        const isClickable = childProps.clickable === "true" || childProps.clickable === true;
+
+        if (isClickable && !this.nodeHasText(child, matchesText)) {
+          const parsedNode = this.parser.parseNodeBounds(child);
+          if (parsedNode) {
+            results.push(parsedNode);
+          }
+        }
+      }
+    }
+
+    for (const child of childArray) {
+      this.findClickableSiblingsInNode(child, matchesText, results);
+    }
+  }
+
+  /**
+   * Recursively search for clickable elements that contain text-matching descendants.
+   */
+  private findClickableParentsInNode(
+    node: ViewHierarchyNode,
+    matchesText: (input?: string) => boolean,
+    results: Element[]
+  ): boolean {
+    const nodeProperties = this.parser.extractNodeProperties(node);
+    const isClickable = nodeProperties.clickable === "true" || nodeProperties.clickable === true;
+
+    // Check if this node or any descendant has matching text
+    const hasMatchingText = this.nodeOrDescendantHasText(node, matchesText);
+
+    if (isClickable && hasMatchingText) {
+      const parsedNode = this.parser.parseNodeBounds(node);
+      if (parsedNode) {
+        results.push(parsedNode);
+      }
+      // Don't recurse into children - we found a clickable parent
+      return true;
+    }
+
+    // Recurse into children
+    const children = node.node;
+    if (children) {
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          this.findClickableParentsInNode(child, matchesText, results);
+        }
+      } else if (typeof children === "object") {
+        this.findClickableParentsInNode(children as ViewHierarchyNode, matchesText, results);
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a node itself has text matching the predicate (shallow — no descendants).
+   */
+  private nodeHasText(
+    node: ViewHierarchyNode,
+    matchesText: (input?: string) => boolean
+  ): boolean {
+    const props = this.parser.extractNodeProperties(node);
+    const text = props.text;
+    const contentDesc = props["content-desc"];
+    const iosLabel = props["ios-accessibility-label"];
+
+    return (
+      (typeof text === "string" && matchesText(text)) ||
+      (typeof contentDesc === "string" && matchesText(contentDesc)) ||
+      (typeof iosLabel === "string" && matchesText(iosLabel))
+    );
+  }
+
+  /**
+   * Check if a node or any of its descendants has text matching the predicate.
+   */
+  private nodeOrDescendantHasText(
+    node: ViewHierarchyNode,
+    matchesText: (input?: string) => boolean
+  ): boolean {
+    const nodeProperties = this.parser.extractNodeProperties(node);
+
+    // Check this node's text properties
+    const nodeText = nodeProperties.text;
+    const nodeContentDesc = nodeProperties["content-desc"];
+    const nodeIosLabel = nodeProperties["ios-accessibility-label"];
+
+    if (
+      (typeof nodeText === "string" && matchesText(nodeText)) ||
+      (typeof nodeContentDesc === "string" && matchesText(nodeContentDesc)) ||
+      (typeof nodeIosLabel === "string" && matchesText(nodeIosLabel))
+    ) {
+      return true;
+    }
+
+    // Recursively check children
+    const children = node.node;
+    if (children) {
+      if (Array.isArray(children)) {
+        for (const child of children) {
+          if (this.nodeOrDescendantHasText(child, matchesText)) {
+            return true;
+          }
+        }
+      } else if (typeof children === "object") {
+        if (this.nodeOrDescendantHasText(children as ViewHierarchyNode, matchesText)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

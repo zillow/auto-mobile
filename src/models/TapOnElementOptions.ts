@@ -30,4 +30,22 @@ export interface TapOnElementOptions {
   // Optional flag to set accessibility focus before performing action (TalkBack mode)
   // If not specified, will be determined automatically based on TalkBack state
   focusFirst?: boolean;
+
+  // Optional flag to tap the nearest clickable parent that contains the text element.
+  // Useful for list items where the clickable row doesn't have a resource-id but
+  // contains children with text. Only works with text selection (not elementId).
+  tapClickableParent?: boolean;
+
+  // Select any clickable element. Use with selectionStrategy: 'first' to tap
+  // the first clickable item in a list without knowing its text or ID.
+  clickable?: boolean;
+
+  // Only search within scrollable containers (lists/RecyclerViews).
+  // Use this to avoid tapping search bars or other clickable UI elements
+  // when you want the first list item.
+  scrollableContainer?: boolean;
+
+  // Find a clickable element that is a sibling of an element containing this text.
+  // Useful for tapping checkboxes, icons, or buttons next to a specific text label.
+  siblingOfText?: string;
 }

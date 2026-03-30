@@ -4,6 +4,13 @@ import type { ViewHierarchyResult } from "../../src/models/ViewHierarchyResult";
 import type { ElementSelectionStrategy } from "../../src/models/ElementSelectionStrategy";
 import type { ElementSelector } from "../../src/utils/interfaces/ElementSelector";
 
+/**
+ * Deterministic fake for testing code that depends on ElementSelector.
+ *
+ * Limitation: the "random" selection strategy is not modeled — the fake always
+ * returns the pre-configured nextElement regardless of strategy. Tests that need
+ * to verify randomness should test DefaultElementSelector directly.
+ */
 export class FakeElementSelector implements ElementSelector {
   lastStrategy?: ElementSelectionStrategy;
   lastText?: string;
@@ -70,6 +77,51 @@ export class FakeElementSelector implements ElementSelector {
     void viewHierarchy;
     this.lastStrategy = options?.strategy;
     this.lastResourceId = resourceId;
+    return this.buildSelectionResult(options?.strategy);
+  }
+
+  selectClickableParentByText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    options?: {
+      container?: { elementId?: string; text?: string } | null;
+      fuzzyMatch?: boolean;
+      caseSensitive?: boolean;
+      strategy?: ElementSelectionStrategy;
+    }
+  ): ElementSelectionResult {
+    void viewHierarchy;
+    this.lastStrategy = options?.strategy;
+    this.lastText = text;
+    return this.buildSelectionResult(options?.strategy);
+  }
+
+  selectClickable(
+    viewHierarchy: ViewHierarchyResult,
+    options?: {
+      container?: { elementId?: string; text?: string } | null;
+      strategy?: ElementSelectionStrategy;
+      scrollableContainer?: boolean;
+    }
+  ): ElementSelectionResult {
+    void viewHierarchy;
+    this.lastStrategy = options?.strategy;
+    return this.buildSelectionResult(options?.strategy);
+  }
+
+  selectClickableSiblingOfText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    options?: {
+      container?: { elementId?: string; text?: string } | null;
+      fuzzyMatch?: boolean;
+      caseSensitive?: boolean;
+      strategy?: ElementSelectionStrategy;
+    }
+  ): ElementSelectionResult {
+    void viewHierarchy;
+    this.lastStrategy = options?.strategy;
+    this.lastText = text;
     return this.buildSelectionResult(options?.strategy);
   }
 }
