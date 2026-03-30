@@ -282,27 +282,79 @@ internal object DaemonSocketPaths {
   }
 
   private fun buildDaemonCommand(subCommand: String): List<String> {
-    // Use bunx to avoid requiring a global install of auto-mobile.
-    // Fall back to the global binary if bunx is not available.
-    val hasBunx = resolvePackageRunner()
-    return if (hasBunx) {
-      listOf("bunx", "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
+    val localPath = resolveLocalProjectPath()
+    if (localPath != null) {
+      val entryPoint = File(localPath, "dist/src/index.js")
+      if (entryPoint.exists()) {
+        val runtime = resolveRuntimePath()
+        return listOf(runtime, entryPoint.absolutePath, "--daemon", subCommand)
+      }
+    }
+
+    // Prefer bunx, fall back to npx, then the global binary.
+    val runner = resolvePackageRunner()
+    return if (runner != null) {
+      if (runner.endsWith("npx")) {
+        listOf(runner, "-y", "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
+      } else {
+        listOf(runner, "@kaeawc/auto-mobile@latest", "--daemon", subCommand)
+      }
     } else {
       listOf("auto-mobile", "--daemon", subCommand)
     }
   }
 
-  private fun resolvePackageRunner(): Boolean {
+  private fun resolveLocalProjectPath(): String? {
+    val sysProp = SystemPropertyCache.get("automobile.daemon.local.project.path", "")
+    val envVar = System.getenv("AUTOMOBILE_DAEMON_LOCAL_PROJECT_PATH")?.trim().orEmpty()
+    val path = sysProp.ifEmpty { envVar }
+    if (path.isEmpty()) return null
+    val dir = File(path)
+    return if (dir.isDirectory) dir.absolutePath else null
+  }
+
+  private fun resolveRuntimePath(): String {
+    // Gradle test workers often have a stripped PATH, so resolve full paths.
+    // Prefer bun since the project runs on bun.
+    val home = System.getProperty("user.home") ?: System.getenv("HOME") ?: ""
+    val candidates = listOfNotNull(
+        if (home.isNotEmpty()) "$home/.bun/bin/bun" else null,
+        "/usr/local/bin/bun",
+        "/opt/homebrew/bin/bun",
+        "/usr/local/bin/node",
+        "/opt/homebrew/bin/node",
+        if (home.isNotEmpty()) "$home/.nvm/current/bin/node" else null,
+    )
+
+    for (path in candidates) {
+      if (File(path).exists()) return path
+    }
+
+    return resolveCommandPath("bun") ?: resolveCommandPath("node") ?: "node"
+  }
+
+  private fun resolvePackageRunner(): String? {
+    for (cmd in listOf("bunx", "npx")) {
+      val resolved = resolveCommandPath(cmd)
+      if (resolved != null) return resolved
+    }
+    return null
+  }
+
+  private fun resolveCommandPath(cmd: String): String? {
     try {
-      val process = ProcessBuilder("which", "bunx")
-        .redirectErrorStream(true)
-        .start()
+      val process = ProcessBuilder("which", cmd)
+          .redirectErrorStream(true)
+          .start()
       val exited = process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-      return exited && process.exitValue() == 0
+      if (exited && process.exitValue() == 0) {
+        val path = process.inputStream.bufferedReader().readText().trim()
+        if (path.isNotEmpty()) return path
+      }
     } catch (_: Exception) {
       // ignore
     }
-    return false
+    return null
   }
 
   private fun getUserId(): String {

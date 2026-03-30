@@ -8,7 +8,8 @@ export type FeatureFlagKey =
   | "force-accessibility-mode"
   | "accessibility-auto-detect"
   | "raw-element-search"
-  | "ai-recovery";
+  | "ai-recovery"
+  | "mcp-recording";
 
 export type FeatureFlagConfig = Record<string, unknown>;
 
@@ -96,5 +97,11 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     defaultConfig: {
       maxToolCalls: 5,
     },
+  },
+  {
+    key: "mcp-recording",
+    label: "MCP call recording",
+    description: "Enable the recordSteps tool to capture MCP tool calls as replayable YAML test plans.",
+    defaultValue: false,
   },
 ];

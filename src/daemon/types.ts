@@ -112,6 +112,8 @@ export interface DaemonOptions {
   rawElementSearch?: boolean;
   /** Skip CtrlProxy download */
   skipCtrlProxyDownload?: boolean;
+  /** Enable MCP recording feature flag */
+  mcpRecording?: boolean;
 }
 
 /**

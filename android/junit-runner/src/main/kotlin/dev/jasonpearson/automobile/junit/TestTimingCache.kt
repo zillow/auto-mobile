@@ -116,8 +116,8 @@ internal object TestTimingCache {
   }
 
   private fun loadFromDaemon() {
-    val uri = buildRequestUri()
     try {
+      val uri = buildRequestUri()
       val response = DaemonSocketClientManager.readResource(uri, resolveTimeoutMs())
       val payload = extractResourcePayload(response)
       if (payload.isNullOrBlank()) {

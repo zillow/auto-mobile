@@ -20,6 +20,7 @@ import { ToolCallRepository } from "../db/toolCallRepository";
 import { getDeviceLabelMap, releaseDeviceLabelSessions } from "./deviceLabelMapping";
 import { isDebugModeEnabled } from "../utils/debug";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
+import { getMcpRecorder } from "./mcpRecordingManager";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -129,7 +130,9 @@ class ToolRegistryClass {
         ? options.shouldEnsureDevice(args)
         : true;
 
-      // Check for session UUID and create execution context
+      // Extract internal routing params from args.
+      // If you add new injected params here, also update INTERNAL_PARAMS in
+      // src/features/record/McpCallRecorder.ts so they are stripped from recordings.
       let providedDeviceId = args.deviceId;
       const baseSessionUuid = args.sessionUuid;
       const deviceLabel = typeof args.device === "string" ? args.device : undefined;
@@ -315,15 +318,34 @@ class ToolRegistryClass {
           }
         }
 
-        // Log tool response for debugging
-        const toolSuccess = response && typeof response === "object" && "success" in response
-          ? response.success !== false
+        // Unwrap MCP response envelope to get the inner result for success/error checks.
+        // Tools may return { content: [{ type: "text", text: '{"success":false,...}' }] }
+        // instead of a plain { success, error } object.
+        let unwrapped = response;
+        if (
+          response && typeof response === "object" &&
+          !("success" in response) &&
+          Array.isArray(response.content) && response.content.length > 0
+        ) {
+          const first = response.content[0];
+          if (first?.type === "text" && typeof first.text === "string") {
+            try {
+              const parsed = JSON.parse(first.text);
+              if (parsed && typeof parsed === "object" && "success" in parsed) {
+                unwrapped = parsed;
+              }
+            } catch { /* not JSON — use original response */ }
+          }
+        }
+
+        const toolSuccess = unwrapped && typeof unwrapped === "object" && "success" in unwrapped
+          ? unwrapped.success !== false
           : true;
-        const toolError = response && typeof response === "object" && "error" in response
-          ? String(response.error || "")
+        const toolError = unwrapped && typeof unwrapped === "object" && "error" in unwrapped
+          ? String(unwrapped.error || "")
           : null;
-        if (response && typeof response === "object" && "success" in response) {
-          logger.info(`[ToolRegistry] ${name} result: success=${response.success}${response.success === false ? `, error=${response.error || "unknown"}` : ""}`);
+        if (unwrapped && typeof unwrapped === "object" && "success" in unwrapped) {
+          logger.info(`[ToolRegistry] ${name} result: success=${unwrapped.success}${unwrapped.success === false ? `, error=${unwrapped.error || "unknown"}` : ""}`);
         }
 
         // Emit tool call telemetry
@@ -336,6 +358,11 @@ class ToolRegistryClass {
           error: toolError,
           args: typeof args === "object" ? args : null,
         });
+
+        // Record successful tool call for MCP recording (test plan generation)
+        if (toolSuccess) {
+          getMcpRecorder()?.record(name, args);
+        }
 
         // After swipeOn executes with lookFor, update the tool call with scroll position
         if (name === "swipeOn" && args.lookFor && response?.success && response?.found) {

@@ -46,6 +46,8 @@ function parseArgs(): {
   daemonCommand?: string;
   daemonArgs: string[];
   skipCtrlProxyDownload: boolean;
+  dismissKeyboardAfterInput: boolean;
+  mcpRecording: boolean;
   noProxy: boolean;
   noDaemon: boolean;
   } {
@@ -100,6 +102,8 @@ function parseArgs(): {
   const rawElementSearch = args.includes("--raw-element-search");
   const skipCtrlProxyDownload = args.includes("--skip-ctrl-proxy-download") || args.includes("--skip-accessibility-download");
   const networkMockable = args.includes("--network-mockable");
+  const dismissKeyboardAfterInput = args.includes("--dismiss-keyboard-after-input");
+  const mcpRecording = args.includes("--mcp-recording");
   let planExecutionLockScope: PlanExecutionLockScope = "session";
   const videoRecordingDefaults: VideoRecordingConfigInput = {};
 
@@ -291,6 +295,8 @@ function parseArgs(): {
     daemonArgs,
     skipCtrlProxyDownload,
     networkMockable,
+    dismissKeyboardAfterInput,
+    mcpRecording,
     noProxy,
     noDaemon,
   };
@@ -359,6 +365,8 @@ async function main() {
       daemonArgs,
       skipCtrlProxyDownload,
       networkMockable,
+      dismissKeyboardAfterInput,
+      mcpRecording,
       noProxy,
       noDaemon,
     } = parseArgs();
@@ -367,6 +375,7 @@ async function main() {
     serverConfig.setVideoRecordingDefaults(videoRecordingDefaults);
     serverConfig.setSkipCtrlProxyDownload(skipCtrlProxyDownload);
     serverConfig.setNetworkMockableEnabled(networkMockable);
+    serverConfig.setDismissKeyboardAfterInput(dismissKeyboardAfterInput);
     if (skipCtrlProxyDownload) {
       logger.info("CtrlProxy APK download disabled (--skip-ctrl-proxy-download)");
     } else {
@@ -402,6 +411,7 @@ async function main() {
       ["accessibility-audit", a11yAuditMode, "--accessibility-audit", accessibilityConfig],
       ["predictive-ui", predictiveUi, "--predictive/--predictive-ui"],
       ["raw-element-search", rawElementSearch, "--raw-element-search"],
+      ["mcp-recording", mcpRecording, "--mcp-recording"],
     ];
 
     for (const [key, enabled, flagLabel, config] of cliOverrides) {
@@ -451,6 +461,7 @@ async function main() {
         debug,
         debugPerf,
         planExecutionLockScope,
+        mcpRecording,
         videoQualityPreset: videoRecordingDefaults.qualityPreset,
         videoTargetBitrateKbps: videoRecordingDefaults.targetBitrateKbps,
         videoMaxThroughputMbps: videoRecordingDefaults.maxThroughputMbps,

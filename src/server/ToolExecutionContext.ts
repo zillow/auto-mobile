@@ -126,6 +126,9 @@ async function ensureAccessibilityServiceReady(deviceId: string, sessionId: stri
   perf.serial("ensureAccessibilityServiceReady");
 
   const serviceManager = AndroidCtrlProxyManager.getInstance(device);
+  // New session gets a clean setup attempt — the singleton's attemptedAutomatedSetup
+  // flag may be stale from a prior session on the same device.
+  serviceManager.resetSetupState();
   const setupResult = await serviceManager.setup(false, perf);
 
   if (!setupResult.success) {

@@ -49,6 +49,7 @@ describe("ToolExecutionContext", () => {
     let setupCalls = 0;
     AndroidCtrlProxyManager.getInstance = () =>
       ({
+        resetSetupState: () => {},
         setup: async () => {
           setupCalls += 1;
           return { success: true, message: "ok" };
@@ -71,6 +72,7 @@ describe("ToolExecutionContext", () => {
     let setupCalls = 0;
     AndroidCtrlProxyManager.getInstance = () =>
       ({
+        resetSetupState: () => {},
         setup: async () => {
           setupCalls += 1;
           return { success: true, message: "ok" };

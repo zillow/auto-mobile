@@ -140,8 +140,13 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDeepLinkTools();
   registerNavigationTools();
   registerNotificationTools();
+  // Plan tools (executePlan, recordSteps, startTestRecording, exportPlan)
+  // registered outside the daemonMode gate so MCP recording works in stdio mode
+  // (the standard MCP transport agents use). executePlan multi-device allocation
+  // still requires daemon and throws a clear error without it.
+  // Critical section tools remain daemon-only (DaemonState lock manager).
+  registerPlanTools();
   if (daemonMode) {
-    registerPlanTools();
     registerCriticalSectionTools();
   }
   registerDoctorTools();
