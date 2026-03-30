@@ -30,4 +30,4 @@ present these flags can only be set on MCP startup as CLI args. The plan is to h
 
 ### Recording Flags
 
-**`mcp-recording`** - Enable the `recordSteps` tool for capturing MCP tool calls as replayable YAML test plans. Off by default.
+**`--mcp-recording`** - Enable the `recordSteps` tool for capturing MCP tool calls as replayable YAML test plans. Off by default.
