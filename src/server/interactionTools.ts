@@ -421,14 +421,14 @@ export const clipboardSchema = addDeviceTargetingToSchema(z.object({
 const assertVisibleByTextSchema = addDeviceTargetingToSchema(z.object({
   text: z.string().min(1).describe("Element text to find"),
   containerElementId: z.string().optional().describe("Container element ID to scope search"),
-  timeout: z.number().min(500).max(30000).optional().describe("Timeout in ms (default: 3000, min: 500, max: 30000). Use higher values for screens with loading/network calls"),
+  timeout: z.number().min(500).max(60000).optional().describe("Timeout in ms (default: 5000, min: 500, max: 60000). Use higher values for screens with loading/network calls"),
   platform: platformSchema
 }).strict());
 
 const assertVisibleByIdSchema = addDeviceTargetingToSchema(z.object({
   id: z.string().min(1).describe("Element resource ID / accessibility identifier"),
   containerElementId: z.string().optional().describe("Container element ID to scope search"),
-  timeout: z.number().min(500).max(30000).optional().describe("Timeout in ms (default: 3000, min: 500, max: 30000). Use higher values for screens with loading/network calls"),
+  timeout: z.number().min(500).max(60000).optional().describe("Timeout in ms (default: 5000, min: 500, max: 60000). Use higher values for screens with loading/network calls"),
   platform: platformSchema
 }).strict());
 

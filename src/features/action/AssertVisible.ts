@@ -21,7 +21,7 @@ export interface AssertVisibleResult {
   error?: string;
 }
 
-const DEFAULT_TIMEOUT = 3000;
+const DEFAULT_TIMEOUT = 5000;
 const POLL_INTERVAL = 500;
 
 export class AssertVisible {
